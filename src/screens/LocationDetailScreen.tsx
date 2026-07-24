@@ -17,25 +17,17 @@ export const LocationDetailScreen: FC<LocationDetailScreenProps> = ({ location, 
         description: string;
         themeColor: string;
         lightColor: string;
-        weight: number;
         imageUrl: string;
-        centerX: number;
-        centerY: number;
         focalX: number;
         focalY: number;
-        discovered: boolean;
     }>({
         name: location.name,
         description: getLocationDescription(location.id, stage()),
         themeColor: location.themeColor,
         lightColor: location.lightColor,
-        weight: location.weight,
         imageUrl: location.imageUrl,
-        centerX: location.center?.x ?? 0.5,
-        centerY: location.center?.y ?? 0.5,
         focalX: location.focalPoint?.x ?? 0.5,
         focalY: location.focalPoint?.y ?? 0.5,
-        discovered: location.discovered,
     });
 
     const [isSaving, setIsSaving] = useState(false);
@@ -53,11 +45,8 @@ export const LocationDetailScreen: FC<LocationDetailScreenProps> = ({ location, 
         updateLocationDescription(location.id, editedLocation.description, stage());
         location.themeColor = editedLocation.themeColor;
         location.lightColor = editedLocation.lightColor;
-        location.weight = editedLocation.weight;
         location.imageUrl = editedLocation.imageUrl;
-        location.center = { x: editedLocation.centerX, y: editedLocation.centerY };
         location.focalPoint = { x: editedLocation.focalX, y: editedLocation.focalY };
-        location.discovered = editedLocation.discovered;
 
         stage().saveGame();
 
@@ -126,17 +115,6 @@ export const LocationDetailScreen: FC<LocationDetailScreenProps> = ({ location, 
         color: '#e0f0ff',
         fontFamily: 'inherit',
         resize: 'vertical',
-    };
-
-    const numberInputStyle: React.CSSProperties = {
-        width: '100%',
-        padding: '12px',
-        fontSize: '14px',
-        backgroundColor: 'rgba(0, 20, 40, 0.6)',
-        border: '2px solid rgba(0, 255, 136, 0.3)',
-        borderRadius: '5px',
-        color: '#e0f0ff',
-        fontFamily: 'inherit',
     };
 
     const sliderRowStyle: React.CSSProperties = {
@@ -282,21 +260,6 @@ export const LocationDetailScreen: FC<LocationDetailScreenProps> = ({ location, 
                                             style={textareaStyle}
                                         />
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <input
-                                            id={`discovered-${location.id}`}
-                                            type="checkbox"
-                                            checked={editedLocation.discovered}
-                                            onChange={(e) => handleInputChange('discovered', e.target.checked)}
-                                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#00ff88' }}
-                                        />
-                                        <label
-                                            htmlFor={`discovered-${location.id}`}
-                                            style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}
-                                        >
-                                            Discovered (visible on map)
-                                        </label>
-                                    </div>
                                 </div>
                             </section>
 
@@ -347,60 +310,10 @@ export const LocationDetailScreen: FC<LocationDetailScreenProps> = ({ location, 
                                 </div>
                             </section>
 
-                            {/* Map Settings */}
+                            {/* Positioning */}
                             <section>
-                                <h2 style={sectionHeadingStyle}>Map Settings</h2>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
-                                    <div style={{ gridColumn: '1 / -1' }}>
-                                        <label style={labelStyle}>
-                                            Weight
-                                            <span style={{ fontWeight: 'normal', opacity: 0.7, marginLeft: '8px' }}>
-                                                (base cell radius in map-vmin units)
-                                            </span>
-                                        </label>
-                                        <div style={sliderRowStyle}>
-                                            <input
-                                                type="range"
-                                                value={editedLocation.weight}
-                                                min={1}
-                                                max={100}
-                                                step={1}
-                                                onChange={(e) => handleInputChange('weight', parseFloat(e.target.value) || 1)}
-                                                style={sliderStyle}
-                                            />
-                                            <span style={sliderValueStyle}>{Math.round(editedLocation.weight)}</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>Center X <span style={{ fontWeight: 'normal', opacity: 0.7 }}>(0–1)</span></label>
-                                        <div style={sliderRowStyle}>
-                                            <input
-                                                type="range"
-                                                value={editedLocation.centerX}
-                                                min={0}
-                                                max={1}
-                                                step={0.01}
-                                                onChange={(e) => handleInputChange('centerX', clampedCoord(e.target.value))}
-                                                style={sliderStyle}
-                                            />
-                                            <span style={sliderValueStyle}>{editedLocation.centerX.toFixed(2)}</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>Center Y <span style={{ fontWeight: 'normal', opacity: 0.7 }}>(0–1)</span></label>
-                                        <div style={sliderRowStyle}>
-                                            <input
-                                                type="range"
-                                                value={editedLocation.centerY}
-                                                min={0}
-                                                max={1}
-                                                step={0.01}
-                                                onChange={(e) => handleInputChange('centerY', clampedCoord(e.target.value))}
-                                                style={sliderStyle}
-                                            />
-                                            <span style={sliderValueStyle}>{editedLocation.centerY.toFixed(2)}</span>
-                                        </div>
-                                    </div>
+                                <h2 style={sectionHeadingStyle}>Positioning</h2>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                     <div>
                                         <label style={labelStyle}>Focal Point X <span style={{ fontWeight: 'normal', opacity: 0.7 }}>(0–1)</span></label>
                                         <div style={sliderRowStyle}>

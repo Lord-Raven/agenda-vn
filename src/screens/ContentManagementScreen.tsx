@@ -388,7 +388,6 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                                                             flexDirection: 'column',
                                                                             alignItems: 'center',
                                                                             gap: '10px',
-                                                                            opacity: location.discovered ? 1 : 0.55,
                                                                         }}
                                                                     >
                                                                         {/* Location Thumbnail */}
@@ -424,16 +423,6 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                                                         >
                                                                             {location.name}
                                                                         </div>
-
-                                                                        {/* Undiscovered badge */}
-                                                                        {!location.discovered && (
-                                                                            <div style={{
-                                                                                fontSize: '11px',
-                                                                                color: 'rgba(224, 240, 255, 0.5)',
-                                                                            }}>
-                                                                                Undiscovered
-                                                                            </div>
-                                                                        )}
                                                                     </motion.div>
                                                                 ))}
                                                             </div>
