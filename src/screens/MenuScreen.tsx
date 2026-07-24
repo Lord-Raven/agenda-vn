@@ -190,8 +190,28 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.3, duration: 0.5 }}
+                        style={{ marginBottom: 'clamp(18px, 3vh, 28px)' }}
                     >
-                        
+                        <motion.h1
+                            initial={{ opacity: 0, y: -14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.4, duration: 0.45, ease: 'easeOut' }}
+                            style={{
+                                margin: 0,
+                                textAlign: 'center',
+                                color: 'var(--agenda-fog)',
+                                fontFamily: 'var(--agenda-font-flavor)',
+                                fontSize: 'clamp(2.4rem, 8vw, 4.6rem)',
+                                fontWeight: 700,
+                                letterSpacing: '0.08em',
+                                lineHeight: 0.95,
+                                textTransform: 'uppercase',
+                                textShadow: '0 10px 28px rgba(0, 0, 0, 0.32)',
+                                overflowWrap: 'anywhere',
+                            }}
+                        >
+                            {configuredTitle}
+                        </motion.h1>
                     </motion.div>
 
                     {/* Menu sections */}
