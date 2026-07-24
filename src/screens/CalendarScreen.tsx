@@ -62,7 +62,11 @@ const buildMonthGrid = (monthDate: Date) => {
     const leadingDays = monthStart.getUTCDay();
     const firstGridDay = addDays(monthStart, -leadingDays);
 
-    return Array.from({ length: 42 }, (_, index) => addDays(firstGridDay, index));
+    const monthEnd = addDays(addMonths(monthStart, 1), -1);
+    const daysInMonth = monthEnd.getUTCDate();
+    const weekCount = Math.max(5, Math.ceil((leadingDays + daysInMonth) / 7));
+
+    return Array.from({ length: weekCount * 7 }, (_, index) => addDays(firstGridDay, index));
 };
 
 const groupEventsByDate = (events: CalendarEvent[]) => events.reduce((grouped, event) => {
@@ -99,6 +103,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
+    const monthGridRowCount = monthGrid.length / 7;
 
     useEffect(() => {
         stageInstance.loadCalendarScreen();
@@ -304,7 +309,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             sx={{
                                 display: "grid",
                                 gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                                gridTemplateRows: "repeat(6, minmax(0, 1fr))",
+                                gridTemplateRows: `repeat(${monthGridRowCount}, minmax(0, 1fr))`,
                                 gap: 0,
                                 flex: 1,
                                 minHeight: 0,
