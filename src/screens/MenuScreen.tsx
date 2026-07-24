@@ -218,7 +218,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                             animate={{ x: expandedSection === 'attribution' ? -14 : 14 }}
                                             transition={{ type: 'spring', stiffness: 320, damping: 28, mass: 0.8 }}
                                         >
-                                            By Miyo
+                                            An Agenda VN
                                         </motion.span>
                                     </motion.span>
                                 </span>
@@ -249,35 +249,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                                 overflowWrap: 'break-word',
                                             }}
                                         >
-                                            {'This is a shared setting. Read the lore at '}
-                                            <a
-                                                href="https://mechabunny.com/jam/memoria/"
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                style={{ 
-                                                    color: 'inherit', 
-                                                    textDecoration: 'underline',
-                                                    wordBreak: 'break-all',
-                                                }}
-                                            >
-                                                mechabunny.com/jam/memoria
-                                            </a>
-                                            {` and visit Miyo's Chub profile at `}
-                                            <a
-                                                href="https://chub.ai/users/miyo_rin"
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                style={{ 
-                                                    color: 'inherit', 
-                                                    textDecoration: 'underline',
-                                                    wordBreak: 'break-all',
-                                                }}
-                                            >
-                                                chub.ai/users/miyo_rin
-                                            </a>
-                                            .
-                                            <br/>
-                                            {`Thanks to the many participants who contributed characters, lore, and images to the jam and this project; consider browsing their other works!`}
+                                            {'This project is powered by the Agenda VN system by JakeH.`}
 
                                         </div>
                                     </motion.div>
