@@ -1,16 +1,19 @@
 import { FC, useEffect, useRef, useState } from 'react';
-import { Box } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { ScreenType } from './BaseScreen';
 import { Stage } from '../Stage';
 import { GridOverlay, GlassPanel, Title } from './UiComponents';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GearSliderFidget } from './GearSliderFidget';
 import { DEFAULT_ATLAS_LOCATIONS } from '../content/Location';
 
 /*
  * Loading screen that displays while content is being loaded.
  * Monitors the loadPromises and automatically transitions to the Studio screen when complete.
  */
+
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const CALENDAR_ROWS = 5;
+const TOTAL_DAYS = DAY_LABELS.length * CALENDAR_ROWS; // 35
 
 interface LoadingScreenProps {
     stage: () => Stage;
@@ -152,23 +155,138 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                         flexDirection: 'column',
                         alignItems: 'stretch',
                         gap: '12px',
-                        padding: '20px 22px 10px',
+                        padding: '20px 22px 18px',
                     }}
                 >
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 2 }}>
                         <Title variant="glow" style={{ margin: 0, fontSize: 'clamp(1.2rem, 2.7vw, 1.65rem)' }}>
                             Generating Content...
                         </Title>
+                        <Typography
+                            sx={{
+                                fontFamily: 'var(--agenda-font-flavor)',
+                                fontSize: '0.85rem',
+                                color: 'var(--agenda-text-secondary)',
+                                opacity: 0.8,
+                                flexShrink: 0,
+                            }}
+                        >
+                            {Math.round(progress)}%
+                        </Typography>
                     </Box>
 
-                    <Box sx={{ display: 'flex', justifyContent: 'center', lineHeight: 0 }}>
-                        <GearSliderFidget
-                            loadingPercentage={progress}
-                            gearSize={226.46}
-                            rackWidth={640}
-                            rackHeight={41.85}
-                            rackViewportWidth={320}
-                        />
+                    {/* Calendar grid */}
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(7, 1fr)',
+                            gap: '5px',
+                        }}
+                    >
+                        {/* Day-of-week headers */}
+                        {DAY_LABELS.map((label) => (
+                            <Box
+                                key={label}
+                                sx={{
+                                    textAlign: 'center',
+                                    fontSize: '0.65rem',
+                                    fontFamily: 'var(--agenda-font-ui)',
+                                    letterSpacing: '0.08em',
+                                    color: 'var(--agenda-text-secondary)',
+                                    pb: '2px',
+                                    opacity: 0.7,
+                                }}
+                            >
+                                {label}
+                            </Box>
+                        ))}
+
+                        {/* Day cells */}
+                        {Array.from({ length: TOTAL_DAYS }).map((_, i) => {
+                            const markedCount = Math.floor((progress / 100) * TOTAL_DAYS);
+                            const isMarked = i < markedCount;
+                            return (
+                                <Box
+                                    key={i}
+                                    sx={{
+                                        position: 'relative',
+                                        aspectRatio: '1',
+                                        borderRadius: '4px',
+                                        border: '1px solid',
+                                        borderColor: isMarked
+                                            ? 'rgba(185, 143, 110, 0.35)'
+                                            : 'rgba(138, 176, 204, 0.2)',
+                                        background: isMarked
+                                            ? 'rgba(185, 143, 110, 0.08)'
+                                            : 'rgba(138, 176, 204, 0.04)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        overflow: 'hidden',
+                                        transition: 'border-color 0.3s, background 0.3s',
+                                    }}
+                                >
+                                    <Typography
+                                        sx={{
+                                            fontSize: 'clamp(0.5rem, 1.5vw, 0.7rem)',
+                                            fontFamily: 'var(--agenda-font-flavor)',
+                                            color: isMarked
+                                                ? 'rgba(185, 143, 110, 0.55)'
+                                                : 'var(--agenda-text-secondary)',
+                                            opacity: isMarked ? 0.6 : 0.5,
+                                            userSelect: 'none',
+                                            lineHeight: 1,
+                                            transition: 'color 0.3s, opacity 0.3s',
+                                        }}
+                                    >
+                                        {i + 1}
+                                    </Typography>
+
+                                    <AnimatePresence>
+                                        {isMarked && (
+                                            <>
+                                                <motion.div
+                                                    key={`x1-${i}`}
+                                                    initial={{ scaleX: 0, opacity: 0 }}
+                                                    animate={{ scaleX: 1, opacity: 1 }}
+                                                    exit={{ scaleX: 0, opacity: 0 }}
+                                                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        width: '72%',
+                                                        height: '1.5px',
+                                                        background: 'rgba(185, 143, 110, 0.72)',
+                                                        top: '50%',
+                                                        left: '14%',
+                                                        borderRadius: '1px',
+                                                        transform: 'translateY(-50%) rotate(38deg)',
+                                                        transformOrigin: 'left center',
+                                                    }}
+                                                />
+                                                <motion.div
+                                                    key={`x2-${i}`}
+                                                    initial={{ scaleX: 0, opacity: 0 }}
+                                                    animate={{ scaleX: 1, opacity: 1 }}
+                                                    exit={{ scaleX: 0, opacity: 0 }}
+                                                    transition={{ duration: 0.18, ease: 'easeOut', delay: 0.06 }}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        width: '72%',
+                                                        height: '1.5px',
+                                                        background: 'rgba(185, 143, 110, 0.72)',
+                                                        top: '50%',
+                                                        left: '14%',
+                                                        borderRadius: '1px',
+                                                        transform: 'translateY(-50%) rotate(-38deg)',
+                                                        transformOrigin: 'left center',
+                                                    }}
+                                                />
+                                            </>
+                                        )}
+                                    </AnimatePresence>
+                                </Box>
+                            );
+                        })}
                     </Box>
                 </GlassPanel>
             </motion.div>
