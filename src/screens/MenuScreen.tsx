@@ -249,7 +249,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                                 overflowWrap: 'break-word',
                                             }}
                                         >
-                                            {'This project is powered by the Agenda VN system by JakeH.`}
+                                            {'This project is powered by the Agenda VN system by JakeH.'}
 
                                         </div>
                                     </motion.div>
