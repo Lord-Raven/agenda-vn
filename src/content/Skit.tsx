@@ -6,6 +6,12 @@ import { Actor, ActorType, findBestNameMatch, getActorLore } from "./Actor";
 import { getLocationDescription } from "./Location";
 import { MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
+import {
+    buildStructuredExampleResponse,
+    buildStructuredResponseFormat,
+    parseStructuredResponse,
+    StructuredFieldDefinition,
+} from "../utils/StructuredResponse.js";
 
 export enum SkitType {
     INTRO = 'INTRO',
@@ -49,6 +55,19 @@ export class ScriptEntry {
         Object.assign(this, props);
     }
 }
+
+const SKIT_GUIDANCE_FIELDS: StructuredFieldDefinition[] = [
+    {
+        key: 'guidance',
+        label: 'GUIDANCE',
+        description: 'A concise guidance summary for the upcoming scene: plot goals, challenges, slice-of-life vignettes, or intimate moments.',
+    },
+    {
+        key: 'participants',
+        label: 'PARTICIPANTS',
+        description: 'Comma-separated character names selected from Available Characters who will participate in the scene.',
+    },
+];
 
     
 // Returns the last emotion for the given actor in the skit up to the current index, or neutral if none found.
@@ -300,10 +319,17 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             const actor = stage.getSave().actors?.[actorId];
                             return actor ? `  ${actor.name}\n    ${getActorLore(actor.id, stage)}` : '';
                         }))
+                    .addBlock('Response Format',
+                        buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
                     .addBlock('Example Response',
-                        `GUIDANCE: ${playerName} is relaxing at the Amber Drop when Cyanea walks in. Persephone hovers nearby, pretending not to listen to their exchange, but inevitably cutting in when things take an unexpected turn.\n` +
-                        `PARTICIPANTS: Cyanea, Persephone\n` +
-                        `#END#`)
+                        buildStructuredExampleResponse(
+                            SKIT_GUIDANCE_FIELDS,
+                            {
+                                guidance: `${playerName} is relaxing at the Amber Drop when Cyanea walks in. Persephone hovers nearby, pretending not to listen to their exchange, but inevitably cutting in when things take an unexpected turn.`,
+                                participants: 'Cyanea, Persephone',
+                            },
+                            { includeEndTag: true }
+                        ))
                     .addBlock('Additional Context',
                         generateContext(skit, stage, 5))
                     .format(),
@@ -314,12 +340,12 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             attempts--;
             if (response && response.trim().length > 0) {
                 console.log('Generated skit guidance: ', response.trim());
-                // Need to read GUIDANCE: and PARTICIPANTS:
-                const guidanceMatch = /GUIDANCE:\s*(.+)/i.exec(response);
-                const participantsMatch = /PARTICIPANTS:\s*(.+)/i.exec(response);
-                if (guidanceMatch && participantsMatch) {
-                    skit.guidance = guidanceMatch[1].trim();
-                    skit.initialActors = participantsMatch[1].split(',').map(name => findBestNameMatch(name.trim(), availableActors, ['name', 'nicknames'])?.id).filter(id => id !== undefined) as string[];
+                const parsedResponse = parseStructuredResponse(response, SKIT_GUIDANCE_FIELDS);
+                const guidanceText = parsedResponse.guidance?.trim();
+                const participantsText = parsedResponse.participants?.trim();
+                if (guidanceText && participantsText) {
+                    skit.guidance = guidanceText;
+                    skit.initialActors = participantsText.split(',').map(name => findBestNameMatch(name.trim(), availableActors, ['name', 'nicknames'])?.id).filter(id => id !== undefined) as string[];
                     break;
                 }
             }

@@ -4,6 +4,12 @@ import { Stage } from '../Stage';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry } from './Lore';
 import {buildPrompt} from "../utils/PromptBuilder.js";
+import {
+    buildStructuredExampleResponse,
+    buildStructuredResponseFormat,
+    parseStructuredResponse,
+    StructuredFieldDefinition,
+} from "../utils/StructuredResponse.js";
 
 export enum ActorType {
     PLAYER = 'PLAYER', // Primary player, controlled by the user; player is also a prisoner, but treated distinctly
@@ -77,28 +83,45 @@ export class Actor {
 
 export const clampActorAffinity = (value: number | undefined | null): number => Actor.clampAffinity(value);
 
-const DISTILLATION_KEY_MAP: { [key: string]: string } = {
-    name: 'name',
-    description: 'description',
-    profile: 'profile',
-    voice: 'voice',
-    color: 'color',
-    font: 'font',
-    outfit: 'outfit',
-    'outfit name': 'outfit_name',
-    'outfit description': 'outfit_description',
-};
-
-function normalizeDistillationKey(rawKey: string): string | null {
-    const normalizedKey = rawKey
-        .replace(/^\d+[.)-]?\s*/, '')
-        .replace(/^[-*]\s*/, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toLowerCase();
-
-    return DISTILLATION_KEY_MAP[normalizedKey] || null;
-}
+const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
+    { key: 'name', label: 'NAME', description: 'Their simple name' },
+    {
+        key: 'description',
+        label: 'DESCRIPTION',
+        description: 'A vivid description of the character\'s core physical appearance: elements like gender, build, skin tone, eye color, hair color, ears, tails, or other distinguishing features.',
+    },
+    {
+        key: 'outfit_description',
+        label: 'OUTFIT DESCRIPTION',
+        description: 'A detailed description of the character\'s current outfit, including style, colors, and any notable accessories or features.',
+    },
+    {
+        key: 'outfit_name',
+        label: 'OUTFIT NAME',
+        aliases: ['OUTFIT'],
+        description: 'A one- to two-word name for the character\'s current outfit that matches the description.',
+    },
+    {
+        key: 'profile',
+        label: 'PROFILE',
+        description: 'A summary of the character\'s personality traits, mannerisms, history, and motives.',
+    },
+    {
+        key: 'voice',
+        label: 'VOICE',
+        description: 'Output the specific voice ID from the Available Voices section that best matches the character\'s apparent gender (foremost) and personality.',
+    },
+    {
+        key: 'color',
+        label: 'COLOR',
+        description: 'A hex color that reflects the character\'s theme or mood—use darker or richer colors that will contrast with white text.',
+    },
+    {
+        key: 'font',
+        label: 'FONT',
+        description: 'A font stack, or font family that reflects the character\'s personality; this will be embedded in a CSS font-family property.',
+    },
+];
 
 // Mapping of voice IDs to a description of the voice, so the AI can choose an ID based on the character profile.
 export const VOICE_MAP: {[key: string]: string} = {
@@ -215,25 +238,22 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
             .addBlock('Character Details', definition.personality)
             .addBlock('Available Voices', Object.entries(VOICE_MAP).map(([voiceId, voiceDesc]) => ' - ' + voiceId + ': ' + voiceDesc).join('\n'))
             .addBlock('Response Format',
-                `NAME: Their simple name\n` +
-                `DESCRIPTION: A vivid description of the character's core physical appearance: elements like gender, build, skin tone, eye color, hair color, ears, tails, or other distinguishing features.\n` +
-                `OUTFIT DESCRIPTION: A detailed description of the character's current outfit, including style, colors, and any notable accessories or features.\n` +
-                `OUTFIT NAME: A one- to two-word name for the character's current outfit that matches the description.\n` +
-                `PROFILE: A summary of the character's personality traits, mannerisms, history, and motives.\n` +
-                `VOICE: Output the specific voice ID from the Available Voices section that best matches the character's apparent gender (foremost) and personality.\n` +
-                `COLOR: A hex color that reflects the character's theme or mood—use darker or richer colors that will contrast with white text.\n` +
-                `FONT: A font stack, or font family that reflects the character's personality; this will be embedded in a CSS font-family property.\n` +
-                `#END#`)
+                buildStructuredResponseFormat(DISTILLATION_FIELDS, { includeEndTag: true }))
             .addBlock('Example Response',
-                `NAME: Jane Doe\n` +
-                `DESCRIPTION: A tall, athletic woman with short, dark hair and piercing blue eyes. She rarely smiles, but when she does, it lights up her face.\n` +
-                `OUTFIT DESCRIPTION: She wears a simple, utilitarian outfit made from durable materials in dark colors. Lots of pockets and zippers.\n` +
-                `OUTFIT NAME: Adventurer's Gear\n` +
-                `PROFILE: Jane is confident and determined, quick-witted, and fiercely independent. Known for her sharp wit and strong presence, she has a commanding aura that draws attention. Deep down, Jane is driven by a need to prove she's worthy of love despite her past betrayals. She's here looking for someone who will challenge her and see beyond her tough exterior.\n` +
-                `VOICE: 03a438b7-ebfa-4f72-9061-f086d8f1fca6\n` +
-                `COLOR: #666666\n` +
-                `FONT: Calibri, sans-serif\n` +
-                `#END#`)
+                buildStructuredExampleResponse(
+                    DISTILLATION_FIELDS,
+                    {
+                        name: 'Jane Doe',
+                        description: 'A tall, athletic woman with short, dark hair and piercing blue eyes. She rarely smiles, but when she does, it lights up her face.',
+                        outfit_description: 'She wears a simple, utilitarian outfit made from durable materials in dark colors. Lots of pockets and zippers.',
+                        outfit_name: 'Adventurer\'s Gear',
+                        profile: 'Jane is confident and determined, quick-witted, and fiercely independent. Known for her sharp wit and strong presence, she has a commanding aura that draws attention. Deep down, Jane is driven by a need to prove she\'s worthy of love despite her past betrayals. She\'s here looking for someone who will challenge her and see beyond her tough exterior.',
+                        voice: '03a438b7-ebfa-4f72-9061-f086d8f1fca6',
+                        color: '#666666',
+                        font: 'Calibri, sans-serif',
+                    },
+                    { includeEndTag: true }
+                ))
         .format(),
         100,
         400);
@@ -244,22 +264,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     const generatedResponse = await generationRequest;
     console.log('Generated character distillation:');
     console.log(generatedResponse);
-    // Parse the generated response into components:
-    const lines = generatedResponse.split('\n').map((line: string) => line.trim()) || [];
-    const parsedData: any = {};
-    // data could be erroneously formatted (for instance, "1. Name:" or "-Description:"), so be resilient:
-    for (let line of lines) {
-        // strip ** from line:
-        line = line.replace(/\*\*/g, '');
-        const colonIndex = line.indexOf(':');
-        if (colonIndex > 0) {
-            const key = normalizeDistillationKey(line.substring(0, colonIndex));
-            if (!key) continue;
-            const value = line.substring(colonIndex + 1).trim();
-            // console.log(`Parsed line - Key: ${key}, Value: ${value}`);
-            parsedData[key] = value;
-        }
-    }
+    const parsedData = parseStructuredResponse(generatedResponse, DISTILLATION_FIELDS);
 
     // Validate that parsedData['color'] is a valid hex color, otherwise assign a random default:
     const themeColor = /^#([0-9A-F]{6}|[0-9A-F]{8})$/i.test(parsedData['color']) ?
@@ -276,7 +281,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
     if (actor.outfits.length === 0) {
 
-        const defaultOutfitName = parsedData['outfit_name'] || parsedData['outfit'] || 'Default Outfit';
+        const defaultOutfitName = parsedData['outfit_name'] || 'Default Outfit';
         const defaultOutfitDescription = parsedData['outfit_description'] || '';
 
         // Add shell of an initial outfit

@@ -12,6 +12,12 @@ import { BaseScreen } from "./screens/BaseScreen";
 import { fetchLorebook, Lore } from "./content/Lore";
 import { DEFAULT_PLAYER_THEME_COLOR } from "./screens/SettingsScreen";
 import {buildPrompt} from "./utils/PromptBuilder.js";
+import {
+    buildStructuredExampleResponse,
+    buildStructuredResponseFormat,
+    parseStructuredResponse,
+    StructuredFieldDefinition,
+} from "./utils/StructuredResponse.js";
 
 type MessageStateType = any;
 
@@ -87,6 +93,19 @@ const DEFAULT_UI_SETTINGS: UiSettings = {
     calendarCardBackground: 'rgba(28, 34, 52, 0.92)',
     calendarCardBorder: 'rgba(138, 176, 204, 0.34)',
 };
+
+const LORE_UPDATE_RESPONSE_FIELDS: StructuredFieldDefinition[] = [
+    {
+        key: 'planning',
+        label: 'PLANNING',
+        description: 'Brief explanation of what changes were made and what was retained from the original.',
+    },
+    {
+        key: 'content',
+        label: 'CONTENT',
+        description: 'Revised lore content that preserves still-true original information and integrates new updates.',
+    },
+];
 
 export type CalendarEvent = {
     id: string;
@@ -764,14 +783,19 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                             .addBlock('Instructions', `Based on the current context and recent events, output an updated or revised version of the content below, taking care to maintain all information from the original that remains true. If there are no significant changes, simply return the original content verbatim.`)
                             .addBlock('Target Lore Title', loreEntry.title)
                             .addBlock('Content for Revision', loreEntry.content)
-                            .addBlock('Example Response', `PLANNING: <explanation of changes to made and existing content to retain.>\nCONTENT: <revised content, including relevant updates and persisting other accurate details from the original.>`)
+                            .addBlock('Response Format', buildStructuredResponseFormat(LORE_UPDATE_RESPONSE_FIELDS))
+                            .addBlock('Example Response',
+                                buildStructuredExampleResponse(LORE_UPDATE_RESPONSE_FIELDS, {
+                                    planning: '<explanation of changes made and existing content to retain.>',
+                                    content: '<revised content, including relevant updates and persisting other accurate details from the original.>',
+                                }))
                             .addBlock('Additional Context', generateContext(undefined, this, 3))
                             .format(),
                             10, 1000
                         ).then(response => {
                             if (response) {
-                                // If "CONTENT:" occurs in the response, eliminate everything before it; use split.
-                                loreEntry.content = response.split('CONTENT:').pop()?.trim() || loreEntry.content;
+                                const parsedResponse = parseStructuredResponse(response, LORE_UPDATE_RESPONSE_FIELDS);
+                                loreEntry.content = parsedResponse.content || loreEntry.content;
                                 this.saveGame();
                             }
                         }).catch(error => {
