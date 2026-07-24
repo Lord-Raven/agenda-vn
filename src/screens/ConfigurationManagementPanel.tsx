@@ -44,14 +44,16 @@ const renderSegmentBody = (segment: ContextSegment): string => {
 };
 
 export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps> = ({ stage }) => {
-    const save = stage().getSave();
+    const stageInstance = stage();
+    const save = stageInstance.getSave();
+    const configuration = stageInstance.getConfiguration();
 
     const [uiSettings, setUiSettings] = useState<UiSettings>(() => ({ ...stage().getUiSettings() }));
     const [contextSegments, setContextSegments] = useState<ContextSegment[]>(() =>
-        (save.agendaConfig?.context || []).map(cloneSegment),
+        (configuration.context || []).map(cloneSegment),
     );
     const [customSettings, setCustomSettings] = useState<CustomSetting[]>(() =>
-        (save.agendaConfig?.settings || []).map(cloneSetting),
+        (configuration.settings || []).map(cloneSetting),
     );
     const [selectedSettings, setSelectedSettings] = useState<{ [key: string]: string }>(() => ({
         ...(save.agendaConfig?.selectedSettings || {}),
@@ -73,14 +75,19 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
     }, [customSettings, selectedSettings]);
 
     const saveConfiguration = () => {
-        const currentSave = stage().getSave();
-        currentSave.agendaConfig = {
+        stageInstance.updateConfiguration({
             context: contextSegments,
             settings: customSettings,
+        });
+
+        const currentSave = stageInstance.getSave();
+        currentSave.agendaConfig = {
+            context: contextSegments.map(cloneSegment),
+            settings: customSettings.map(cloneSetting),
             selectedSettings: validSelections,
         };
-        stage().updateUiSettings(uiSettings);
-        stage().saveGame();
+        stageInstance.updateUiSettings(uiSettings);
+        stageInstance.saveGame();
 
         const rootStyle = document.documentElement.style;
         rootStyle.setProperty('--agenda-mist', uiSettings.mistColor);

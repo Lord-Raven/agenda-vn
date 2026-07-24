@@ -27,6 +27,7 @@ type InitStateType = any;
 
 type ChatStateType = {
     saves: (SaveType | undefined)[]
+    configuration: NewGameConfiguration
     lastSaveSlot: number
 };
 
@@ -141,6 +142,19 @@ export type NewGameConfiguration = {
 
 }
 
+const cloneContextSegment = (segment: ContextSegment): ContextSegment => ({
+    title: segment.title,
+    body: typeof segment.body === 'string' ? segment.body : (segment.body || []).map(cloneContextSegment),
+});
+
+const cloneCustomSetting = (setting: CustomSetting): CustomSetting => ({
+    title: setting.title,
+    description: setting.description,
+    options: Object.fromEntries(
+        Object.entries(setting.options || {}).map(([key, value]) => [key, cloneContextSegment(value)]),
+    ),
+});
+
 type ExpeditionChoice = {
     id: string;
     locationId: string;
@@ -186,8 +200,77 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.primaryCharacter = Object.values(characters)[0];
 
         // Populate default saves with SAVE_SLOT_COUNT undefines:
-        this.saveData = chatState != null ? chatState : {saves: Array(this.SAVE_SLOT_COUNT).fill(undefined), lastSaveSlot: 0};
+        this.saveData = chatState != null
+            ? chatState
+            : {
+                saves: Array(this.SAVE_SLOT_COUNT).fill(undefined),
+                configuration: this.createDefaultNewGameConfiguration(),
+                lastSaveSlot: 0,
+            };
+        this.ensureChatState();
 
+    }
+
+    private createDefaultNewGameConfiguration(): NewGameConfiguration {
+        return {
+            actors: [],
+            locations: [],
+            context: [],
+            settings: [],
+            startingDate: new Date().toISOString().slice(0, 10),
+        };
+    }
+
+    private ensureChatState() {
+        if (!this.saveData.saves) {
+            this.saveData.saves = Array(this.SAVE_SLOT_COUNT).fill(undefined);
+        }
+
+        if (typeof this.saveData.lastSaveSlot !== 'number' || Number.isNaN(this.saveData.lastSaveSlot)) {
+            this.saveData.lastSaveSlot = 0;
+        }
+
+        const activeSave = this.saveData.saves[this.saveData.lastSaveSlot];
+        const defaultConfiguration = this.createDefaultNewGameConfiguration();
+        const legacyContext = activeSave?.agendaConfig?.context || [];
+        const legacySettings = activeSave?.agendaConfig?.settings || [];
+
+        if (!this.saveData.configuration) {
+            this.saveData.configuration = {
+                ...defaultConfiguration,
+                context: legacyContext.map(cloneContextSegment),
+                settings: legacySettings.map(cloneCustomSetting),
+            };
+            return;
+        }
+
+        this.saveData.configuration = {
+            actors: this.saveData.configuration.actors || defaultConfiguration.actors,
+            locations: this.saveData.configuration.locations || defaultConfiguration.locations,
+            context: (this.saveData.configuration.context || legacyContext).map(cloneContextSegment),
+            settings: (this.saveData.configuration.settings || legacySettings).map(cloneCustomSetting),
+            startingDate: this.saveData.configuration.startingDate || defaultConfiguration.startingDate,
+        };
+    }
+
+    getConfiguration(): NewGameConfiguration {
+        this.ensureChatState();
+        return this.saveData.configuration;
+    }
+
+    updateConfiguration(updates: Partial<NewGameConfiguration>) {
+        this.ensureChatState();
+        const current = this.saveData.configuration;
+        this.saveData.configuration = {
+            ...current,
+            ...updates,
+            actors: (updates.actors ?? current.actors ?? []).map(actor => ({...actor})),
+            locations: (updates.locations ?? current.locations ?? []).map(location => ({...location})),
+            context: (updates.context ?? current.context ?? []).map(cloneContextSegment),
+            settings: (updates.settings ?? current.settings ?? []).map(cloneCustomSetting),
+            startingDate: updates.startingDate ?? current.startingDate,
+        };
+        this.saveGame();
     }
 
     async load(): Promise<Partial<LoadResponse<InitStateType, ChatStateType, MessageStateType>>> {
@@ -264,6 +347,23 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         // Create new save data structure
         const newSave: SaveType = this.generateFreshSave(playerData);
         Object.assign(newSave, playerData.data);
+
+        const persistedConfiguration = this.getConfiguration();
+        if (!newSave.agendaConfig) {
+            newSave.agendaConfig = {
+                context: persistedConfiguration.context.map(cloneContextSegment),
+                settings: persistedConfiguration.settings.map(cloneCustomSetting),
+                selectedSettings: Object.fromEntries(
+                    persistedConfiguration.settings.map(setting => {
+                        const optionName = Object.keys(setting.options || {})[0];
+                        return [setting.title, optionName || ''];
+                    }),
+                ),
+            };
+        }
+        if (!newSave.currentDate && persistedConfiguration.startingDate) {
+            newSave.currentDate = persistedConfiguration.startingDate;
+        }
 
         this.anticipatedLoadingPromiseCount = Math.max(this.INITIAL_ACTORS - Object.keys(newSave.actors).length, 0) * 1 + 3;
 
