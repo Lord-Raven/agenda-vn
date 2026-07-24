@@ -1,0 +1,177 @@
+import { FC, useEffect, useRef, useState } from 'react';
+import { Box } from '@mui/material';
+import { ScreenType } from './BaseScreen';
+import { Stage } from '../Stage';
+import { GridOverlay, GlassPanel, Title } from './UiComponents';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GearSliderFidget } from './GearSliderFidget';
+import { DEFAULT_ATLAS_LOCATIONS } from '../content/Location';
+
+/*
+ * Loading screen that displays while content is being loaded.
+ * Monitors the loadPromises and automatically transitions to the Studio screen when complete.
+ */
+
+interface LoadingScreenProps {
+    stage: () => Stage;
+    setScreenType: (type: ScreenType) => void;
+}
+
+function shuffleArray<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) => {
+    const [progress, setProgress] = useState(0);
+    const seenPromiseKeysRef = useRef<Set<string>>(new Set());
+    const hasObservedPromiseActivityRef = useRef(false);
+
+    const bgQueueRef = useRef<string[]>([]);
+    const bgQueueIndexRef = useRef(0);
+    const [bgUrl, setBgUrl] = useState<string>(() => {
+        const urls = shuffleArray(
+            DEFAULT_ATLAS_LOCATIONS.map(l => l.imageUrl).filter(Boolean)
+        );
+        bgQueueRef.current = urls;
+        bgQueueIndexRef.current = 0;
+        return urls[0] ?? '';
+    });
+
+    useEffect(() => {
+        const bgInterval = setInterval(() => {
+            bgQueueIndexRef.current += 1;
+            if (bgQueueIndexRef.current >= bgQueueRef.current.length) {
+                bgQueueRef.current = shuffleArray(bgQueueRef.current);
+                bgQueueIndexRef.current = 0;
+            }
+            setBgUrl(bgQueueRef.current[bgQueueIndexRef.current]);
+        }, 10000);
+        return () => clearInterval(bgInterval);
+    }, []);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const currentStage = stage();
+            const normalizedAnticipatedPromiseCount = Math.max(currentStage.anticipatedLoadingPromiseCount, 1);
+            const loadPromises = currentStage.generationPromises;
+            const currentPromiseKeys = Object.keys(loadPromises || {});
+            const currentPromiseKeySet = new Set(currentPromiseKeys);
+
+            if (currentPromiseKeys.length > 0) {
+                hasObservedPromiseActivityRef.current = true;
+            }
+
+            currentPromiseKeys.forEach((key) => {
+                seenPromiseKeysRef.current.add(key);
+            });
+
+            let nextCompletedPromiseCount = 0;
+            seenPromiseKeysRef.current.forEach((key) => {
+                if (!currentPromiseKeySet.has(key)) {
+                    nextCompletedPromiseCount += 1;
+                }
+            });
+
+            setProgress(Math.min((nextCompletedPromiseCount / normalizedAnticipatedPromiseCount) * 100, 100));
+
+            if (currentPromiseKeys.length === 0 && hasObservedPromiseActivityRef.current) {
+                console.log('Done loading');
+                currentStage.saveGame();
+                currentStage.loadMapScreen();
+                setScreenType(ScreenType.MAP);
+            }
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, [setScreenType, stage]);
+
+    return (
+        <Box
+            className="memoria-screen-root"
+            sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100vh',
+                width: '100vw',
+                background: 'linear-gradient(160deg, #171b2d 0%, #1f2438 50%, #161a2a 100%)',
+                position: 'relative',
+                overflow: 'hidden',
+                isolation: 'isolate',
+            }}
+        >
+            <AnimatePresence>
+                {bgUrl && (
+                    <motion.div
+                        key={bgUrl}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 0.35 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 1.8, ease: 'easeInOut' }}
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            backgroundImage: `url(${bgUrl})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            zIndex: 0,
+                        }}
+                    />
+                )}
+            </AnimatePresence>
+            <Box
+                sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    background:
+                        'radial-gradient(120% 100% at 12% 16%, rgba(138, 176, 204, 0.2) 0%, rgba(26, 30, 48, 0) 52%), radial-gradient(95% 95% at 86% 82%, rgba(137, 205, 135, 0.18) 0%, rgba(26, 30, 48, 0) 58%), linear-gradient(160deg, rgba(23,27,45,0.55) 0%, rgba(31,36,56,0.55) 50%, rgba(22,26,42,0.55) 100%)',
+                    zIndex: 1,
+                    pointerEvents: 'none',
+                }}
+            />
+            <GridOverlay size={56} />
+
+            <motion.div
+                className="memoria-entrance"
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: 'easeOut' }}
+                style={{ width: '100%', display: 'flex', justifyContent: 'center', zIndex: 2 }}
+            >
+                <GlassPanel
+                    variant="bright"
+                    style={{
+                        width: 'min(560px, 92vw)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        gap: '12px',
+                        padding: '20px 22px 10px',
+                    }}
+                >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 2 }}>
+                        <Title variant="glow" style={{ margin: 0, fontSize: 'clamp(1.2rem, 2.7vw, 1.65rem)' }}>
+                            Generating Content...
+                        </Title>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', justifyContent: 'center', lineHeight: 0 }}>
+                        <GearSliderFidget
+                            loadingPercentage={progress}
+                            gearSize={226.46}
+                            rackWidth={640}
+                            rackHeight={41.85}
+                            rackViewportWidth={320}
+                        />
+                    </Box>
+                </GlassPanel>
+            </motion.div>
+        </Box>
+    );
+};

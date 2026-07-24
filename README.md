@@ -1,1 +1,1 @@
-# agenda-vn
+This is customizable VN stage for chub.ai.
