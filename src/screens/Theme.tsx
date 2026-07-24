@@ -1,6 +1,6 @@
 /**
  * Material UI Theme Configuration
- * Memoria visual language: ruin-tech, pale light, and weathered metal.
+ * Agenda visual language: ruin-tech, pale light, and weathered metal.
  */
 
 import { createTheme } from '@mui/material/styles';

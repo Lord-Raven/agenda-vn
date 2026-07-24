@@ -25,6 +25,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     const disableAllButtons = false; // When true, disable all options on this menu, including escape to continue; this is being used to effectively shut down the game at the moment.
     const [showSaveLoad, setShowSaveLoad] = React.useState(false);
     const [saveLoadMode, setSaveLoadMode] = React.useState<'save' | 'load'>('save');
+    const configuredTitle = stage().getUiSettings().gameTitle || 'Agenda VN';
 
     // Check if a save exists (if there are any actors or the layout has been modified)
     const saveExists = () => {
@@ -53,8 +54,8 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     }, [showSettings]);
 
     const handleContinue = () => {
-        stage().loadMapScreen();
-        setScreenType(ScreenType.MAP);
+        stage().loadCalendarScreen();
+        setScreenType(ScreenType.CALENDAR);
     };
 
     const handleNewGame = () => {
@@ -170,7 +171,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                     initial={{ opacity: 0, y: 50 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, ease: 'easeOut' }}
-                    className="glass-panel-bright memoria-entrance"
+                    className="glass-panel-bright agenda-entrance"
                     style={{
                         padding: 'clamp(20px, 5vh, 40px) clamp(20px, 5vw, 40px)',
                         minWidth: '300px',
@@ -218,7 +219,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                             animate={{ x: expandedSection === 'attribution' ? -14 : 14 }}
                                             transition={{ type: 'spring', stiffness: 320, damping: 28, mass: 0.8 }}
                                         >
-                                            An Agenda VN
+                                            {configuredTitle}
                                         </motion.span>
                                     </motion.span>
                                 </span>
@@ -249,7 +250,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                                 overflowWrap: 'break-word',
                                             }}
                                         >
-                                            {'This project is powered by the Agenda VN system by JakeH.'}
+                                            {`This project is powered by the ${configuredTitle} system by JakeH.`}
 
                                         </div>
                                     </motion.div>

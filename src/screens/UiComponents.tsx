@@ -139,7 +139,7 @@ export const TurnIndicator: FC<TurnIndicatorProps> = ({ currentTurn, totalTurns 
 					>
 						<HourglassIcon
 							sx={{
-								color: isSpent ? 'rgba(122, 123, 107, 0.55)' : 'var(--mem-mist)',
+								color: isSpent ? 'rgba(122, 123, 107, 0.55)' : 'var(--agenda-mist)',
 								filter: isSpent ? 'none' : 'drop-shadow(0 0 8px rgba(138, 176, 204, 0.45))',
 								fontSize: '28px',
 							}}

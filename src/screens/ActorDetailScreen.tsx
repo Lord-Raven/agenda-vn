@@ -7,7 +7,6 @@ import { Actor, ActorState, clampActorAffinity, generateBaseActorImage, generate
 import { Emotion } from '../content/Emotion';
 import { Close, Save, Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { Button, Chip, GlassPanel, TextInput, Title } from './UiComponents';
-import { usePreloadActorImages } from '../utils/useImagePreloading';
 
 interface ActorDetailScreenProps {
     actor: Actor;
@@ -94,9 +93,6 @@ export const ActorDetailScreen: FC<ActorDetailScreenProps> = ({ actor, stage, on
         onConfirm?: () => void;
     }>({ open: false, title: '', message: '' });
     const initialOutfitsRef = useRef<Outfit[]>(getClonedOutfits());
-
-    // Preload actor emotion images when the detail screen is opened
-    usePreloadActorImages(actor, stage());
 
     const cloneOutfits = (outfits: Outfit[]) => outfits.map((outfit) => ({
         ...outfit,

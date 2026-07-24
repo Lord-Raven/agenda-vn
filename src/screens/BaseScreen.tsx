@@ -5,7 +5,7 @@ import { TooltipProvider, useTooltip } from './TooltipContext';
 import { MenuScreen } from './MenuScreen';
 import { TooltipBar } from './TooltipBar';
 import { theme } from './Theme';
-import { MapScreen } from './MapScreen';
+import { CalendarScreen } from './CalendarScreen';
 import { LoadingScreen } from './LoadingScreen';
 import { usePreloadCriticalImages } from '../utils/useImagePreloading';
 import { AffinityPopIn, AffinityChangeInfo } from './AffinityPopIn';
@@ -17,7 +17,7 @@ import { AffinityPopIn, AffinityChangeInfo } from './AffinityPopIn';
 export enum ScreenType {
     MENU = 'menu',
     LOADING = 'loading',
-    MAP = 'map',
+    CALENDAR = 'calendar',
 }
 
 interface BaseScreenProps {
@@ -81,14 +81,37 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
         clearTooltip();
     }, [screenType]);
 
+    // Apply save-configured theme variables globally.
+    React.useEffect(() => {
+        const uiSettings = stage().getUiSettings();
+        const rootStyle = document.documentElement.style;
+
+        rootStyle.setProperty('--agenda-mist', uiSettings.mistColor);
+        rootStyle.setProperty('--agenda-verdant', uiSettings.verdantColor);
+        rootStyle.setProperty('--agenda-fog', uiSettings.fogColor);
+        rootStyle.setProperty('--agenda-text-secondary', uiSettings.textSecondaryColor);
+        rootStyle.setProperty('--agenda-bg-deep', uiSettings.bgDeepColor);
+        rootStyle.setProperty('--agenda-bg-mid', uiSettings.bgMidColor);
+        rootStyle.setProperty('--agenda-bg-soft', uiSettings.bgSoftColor);
+        rootStyle.setProperty('--agenda-border', uiSettings.borderColor);
+        rootStyle.setProperty('--agenda-border-strong', uiSettings.borderStrongColor);
+        rootStyle.setProperty('--agenda-font-ui', uiSettings.uiFontFamily);
+        rootStyle.setProperty('--agenda-font-flavor', uiSettings.flavorFontFamily);
+        rootStyle.setProperty('--agenda-calendar-overlay-start', uiSettings.calendarOverlayStart);
+        rootStyle.setProperty('--agenda-calendar-overlay-mid', uiSettings.calendarOverlayMid);
+        rootStyle.setProperty('--agenda-calendar-overlay-end', uiSettings.calendarOverlayEnd);
+        rootStyle.setProperty('--agenda-calendar-card-bg', uiSettings.calendarCardBackground);
+        rootStyle.setProperty('--agenda-calendar-card-border', uiSettings.calendarCardBorder);
+    }, [stage, screenType]);
+
     return (
-        <div className="memoria-screen-root">
+        <div className="agenda-screen-root">
             {screenType === ScreenType.MENU && (
                 // Render menu screen
                 <MenuScreen stage={stage} setScreenType={setScreenType} />
             )}
-            {screenType === ScreenType.MAP && (
-                <MapScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
+            {screenType === ScreenType.CALENDAR && (
+                <CalendarScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
             )}
             {screenType === ScreenType.LOADING && (
                 <LoadingScreen

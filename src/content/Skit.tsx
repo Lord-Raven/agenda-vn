@@ -124,6 +124,23 @@ function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage
         : '(None so far)';
 }
 
+function flattenContextSegments(segments: Array<{ title: string; body: string | any[] }> = [], depth = 0): string {
+    const prefix = '  '.repeat(Math.max(depth, 0));
+    return segments.map(segment => {
+        const titleLine = `${prefix}${segment.title}:`;
+        if (typeof segment.body === 'string') {
+            return `${titleLine}\n${prefix}${segment.body}`;
+        }
+
+        if (Array.isArray(segment.body)) {
+            const nested = flattenContextSegments(segment.body as Array<{ title: string; body: string | any[] }>, depth + 1);
+            return `${titleLine}\n${nested}`;
+        }
+
+        return titleLine;
+    }).join('\n');
+}
+
 export function buildPremise(playerName: string): string {
     return `This game is a post-apocalyptic science-fantasy game in which the world is an unknowable relic of its past self. ` +
             `Ever since the end of the world—two centuries ago—the lone, overgrown city of Ardeia has stood as the final bastion of humanity. ` +
@@ -143,6 +160,22 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e => e.skit !== skit);
     const currentActors = skit ? getCurrentActors(skit, skit.script.length - 1).map(actorId => save.actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[] : [];
     const lorebook = save.lorebook || [];
+    const agendaConfig = save.agendaConfig;
+    const agendaContext = flattenContextSegments(agendaConfig?.context || []);
+    const selectedSettingContext = (agendaConfig?.settings || []).map(setting => {
+        const selectedOptionName = agendaConfig?.selectedSettings?.[setting.title] || '';
+        if (!selectedOptionName) {
+            return '';
+        }
+
+        const selectedSegment = setting.options?.[selectedOptionName];
+        if (!selectedSegment) {
+            return '';
+        }
+
+        const renderedSegment = flattenContextSegments([selectedSegment]);
+        return `${setting.title}: ${selectedOptionName}\n${renderedSegment}`;
+    }).filter(Boolean).join('\n\n');
 
     // For lorebook context, we go through lorebook entries and add them 
     let triggeredLore = lorebook.filter(lore => {
@@ -192,6 +225,8 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     triggeredLore = triggeredLore.sort((a, b) => a.insertionOrder - b.insertionOrder);
 
     return (builder: PromptBuilder) => builder.addBlock(`Premise`, buildPremise(playerName))
+        .addBlock(`Agenda Context`, agendaContext || 'None.')
+        .addBlock(`Selected Custom Settings`, selectedSettingContext || 'None.')
         .addBlock(`Lore Entries`, (builder) => {
             // Add each lore entry as a separate block, with the title and content.
             triggeredLore.forEach(lore => {

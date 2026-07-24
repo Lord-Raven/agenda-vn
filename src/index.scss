@@ -1,22 +1,26 @@
 :root {
-  --mem-bg-deep: #1a1e30;
-  --mem-bg-mid: #24293f;
-  --mem-bg-soft: #2e354d;
-  --mem-fog: #edf2f2;
-  --mem-mist: #8ab0cc;
-  --mem-verdant: #89cd87;
-  --mem-lichen: #7a7b6b;
-  --mem-ember: #b98f6e;
-  --mem-border: rgba(138, 176, 204, 0.34);
-  --mem-border-strong: rgba(137, 205, 135, 0.44);
-  --mem-glass: rgba(26, 30, 48, 0.62);
-  --mem-glass-bright: rgba(36, 41, 63, 0.78);
-  --mem-text-primary: #edf2f2;
-  --mem-text-secondary: #b9d2e3;
-  --mem-shadow: 0 14px 34px rgba(2, 8, 18, 0.48);
-  --mem-glow: 0 0 20px rgba(138, 176, 204, 0.26);
-  --mem-font-flavor: "Lora", Georgia, serif;
-  --mem-font-ui: "Geologica", sans-serif;
+  --agenda-bg-deep: #1a1e30;
+  --agenda-bg-mid: #24293f;
+  --agenda-bg-soft: #2e354d;
+  --agenda-fog: #edf2f2;
+  --agenda-mist: #8ab0cc;
+  --agenda-verdant: #89cd87;
+  --agenda-lichen: #7a7b6b;
+  --agenda-ember: #b98f6e;
+  --agenda-border: rgba(138, 176, 204, 0.34);
+  --agenda-border-strong: rgba(137, 205, 135, 0.44);
+  --agenda-glass: rgba(26, 30, 48, 0.62);
+  --agenda-glass-bright: rgba(36, 41, 63, 0.78);
+  --agenda-text-primary: #edf2f2;
+  --agenda-text-secondary: #b9d2e3;
+  --agenda-shadow: 0 14px 34px rgba(2, 8, 18, 0.48);
+  --agenda-font-flavor: "Lora", Georgia, serif;
+  --agenda-font-ui: "Geologica", sans-serif;
+  --agenda-calendar-overlay-start: rgba(10, 28, 37, 0.79);
+  --agenda-calendar-overlay-mid: rgba(21, 41, 30, 0.73);
+  --agenda-calendar-overlay-end: rgba(35, 24, 56, 0.78);
+  --agenda-calendar-card-bg: rgba(28, 34, 52, 0.92);
+  --agenda-calendar-card-border: rgba(138, 176, 204, 0.34);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -32,15 +36,15 @@ html, body, #root {
 }
 
 body {
-  color: var(--mem-text-primary);
-  font-family: var(--mem-font-ui);
+  color: var(--agenda-text-primary);
+  font-family: var(--agenda-font-ui);
   background:
     radial-gradient(1200px 700px at 12% 10%, rgba(138, 176, 204, 0.2), transparent 56%),
     radial-gradient(950px 560px at 88% 90%, rgba(137, 205, 135, 0.16), transparent 62%),
     linear-gradient(160deg, #171b2d 0%, #1f2438 44%, #161a2a 100%);
 }
 
-.memoria-screen-root {
+.agenda-screen-root {
   position: relative;
   width: 100vw;
   height: 100vh;
@@ -48,7 +52,7 @@ body {
   isolation: isolate;
 }
 
-.memoria-screen-root::before {
+.agenda-screen-root::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -76,15 +80,15 @@ body {
 .glass-panel-bright,
 .glass-panel-tooltip {
   position: relative;
-  border: 1px solid var(--mem-border);
+  border: 1px solid var(--agenda-border);
   border-radius: 14px;
-  background: linear-gradient(155deg, var(--mem-glass-bright) 0%, var(--mem-glass) 100%);
-  box-shadow: var(--mem-shadow), inset 0 1px 0 rgba(237, 242, 242, 0.05);
+  background: linear-gradient(155deg, var(--agenda-glass-bright) 0%, var(--agenda-glass) 100%);
+  box-shadow: var(--agenda-shadow), inset 0 1px 0 rgba(237, 242, 242, 0.05);
   backdrop-filter: blur(12px);
 }
 
 .glass-panel-bright {
-  border: 1px solid var(--mem-border-strong);
+  border: 1px solid var(--agenda-border-strong);
   background:
     linear-gradient(160deg, rgba(36, 41, 63, 0.86) 0%, rgba(26, 30, 48, 0.8) 100%),
     radial-gradient(circle at 8% 14%, rgba(138, 176, 204, 0.2), transparent 60%);
@@ -96,16 +100,16 @@ body {
 }
 
 .text-glow-primary {
-  color: var(--mem-fog);
-  font-family: var(--mem-font-flavor);
+  color: var(--agenda-fog);
+  font-family: var(--agenda-font-flavor);
   letter-spacing: 0.1em;
   text-shadow: 0 0 18px rgba(138, 176, 204, 0.34), 0 4px 10px rgba(3, 7, 15, 0.66);
 }
 
 .text-gradient {
   color: transparent;
-  font-family: var(--mem-font-flavor);
-  background: linear-gradient(95deg, var(--mem-mist) 0%, var(--mem-verdant) 52%, var(--mem-fog) 100%);
+  font-family: var(--agenda-font-flavor);
+  background: linear-gradient(95deg, var(--agenda-mist) 0%, var(--agenda-verdant) 52%, var(--agenda-fog) 100%);
   background-clip: text;
   -webkit-background-clip: text;
   text-shadow: 0 0 14px rgba(138, 176, 204, 0.26);
@@ -117,8 +121,8 @@ body {
 .btn-danger {
   border: 1px solid transparent;
   border-radius: 10px;
-  color: var(--mem-fog);
-  font-family: var(--mem-font-ui);
+  color: var(--agenda-fog);
+  font-family: var(--agenda-font-ui);
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -134,7 +138,7 @@ body {
 }
 
 .btn-secondary {
-  color: var(--mem-text-secondary);
+  color: var(--agenda-text-secondary);
   background: linear-gradient(135deg, rgba(34, 42, 63, 0.95), rgba(42, 53, 80, 0.9));
   border-color: rgba(138, 176, 204, 0.36);
 }
@@ -142,7 +146,7 @@ body {
 .btn-menu {
   width: 100%;
   text-align: left;
-  color: var(--mem-fog);
+  color: var(--agenda-fog);
   background: linear-gradient(140deg, rgba(31, 37, 58, 0.95), rgba(24, 29, 45, 0.96));
   border-color: rgba(138, 176, 204, 0.28);
   box-shadow: 0 10px 24px rgba(5, 10, 20, 0.34);
@@ -161,17 +165,17 @@ body {
   text-transform: none;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--mem-text-secondary);
+  color: var(--agenda-text-secondary);
   background: transparent;
   border: 0;
-  border-bottom: 2px solid var(--mem-border);
+  border-bottom: 2px solid var(--agenda-border);
   box-shadow: none;
   transition: color 180ms ease, border-bottom-color 220ms ease;
 }
 
 .menu-section-header.is-active {
-  color: var(--mem-fog);
-  border-bottom-color: var(--mem-border-strong);
+  color: var(--agenda-fog);
+  border-bottom-color: var(--agenda-border-strong);
   box-shadow: inset 0 -1px 0 rgba(137, 205, 135, 0.35);
 }
 
@@ -203,7 +207,7 @@ body {
   transform: none;
   background: transparent;
   border-color: transparent;
-  border-bottom-color: var(--mem-border-strong);
+  border-bottom-color: var(--agenda-border-strong);
   box-shadow: none;
 }
 
@@ -236,10 +240,10 @@ body {
   box-sizing: border-box;
   border-radius: 9px;
   border: 1px solid rgba(138, 176, 204, 0.36);
-  color: var(--mem-text-primary);
+  color: var(--agenda-text-primary);
   background: linear-gradient(145deg, rgba(27, 33, 51, 0.92), rgba(21, 26, 40, 0.92));
   padding: 12px 14px;
-  font-family: var(--mem-font-ui);
+  font-family: var(--agenda-font-ui);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
@@ -281,17 +285,17 @@ body {
   width: 34px;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--mem-border);
+  border-left: 1px solid var(--agenda-border);
   border-radius: 0 8px 8px 0;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--mem-bg-soft), var(--mem-bg-mid));
+  background: linear-gradient(180deg, var(--agenda-bg-soft), var(--agenda-bg-mid));
 }
 
 .number-stepper-button {
   flex: 1;
   border: none;
   background: transparent;
-  color: var(--mem-mist);
+  color: var(--agenda-mist);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -300,20 +304,20 @@ body {
 }
 
 .number-stepper-button + .number-stepper-button {
-  border-top: 1px solid var(--mem-border);
+  border-top: 1px solid var(--agenda-border);
 }
 
 .number-stepper-button:hover {
-  color: var(--mem-fog);
-  background: var(--mem-glass-bright);
+  color: var(--agenda-fog);
+  background: var(--agenda-glass-bright);
 }
 
 .number-stepper-button:active {
-  background: var(--mem-glass);
+  background: var(--agenda-glass);
 }
 
 .number-stepper-button:focus-visible {
-  outline: 1px solid var(--mem-border-strong);
+  outline: 1px solid var(--agenda-border-strong);
   outline-offset: -1px;
 }
 
@@ -323,7 +327,7 @@ select.input-base {
 
 select.input-base option,
 select.input-base optgroup {
-  color: var(--mem-text-primary);
+  color: var(--agenda-text-primary);
   background-color: #1f2438;
 }
 
@@ -347,7 +351,7 @@ select.input-base optgroup {
   background: linear-gradient(180deg, rgba(138, 176, 204, 0.75), rgba(95, 127, 155, 0.9));
 }
 
-@keyframes memoriaFadeRise {
+@keyframes agendaFadeRise {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -358,20 +362,20 @@ select.input-base optgroup {
   }
 }
 
-.memoria-entrance {
-  animation: memoriaFadeRise 380ms ease-out;
+.agenda-entrance {
+  animation: agendaFadeRise 380ms ease-out;
 }
 
 .gear-slider-fidget {
   position: relative;
   width: var(--gsf-rack-window-width);
   height: calc(var(--gsf-gear-size) + var(--gsf-rack-height));
-  --gsf-gear-highlight: var(--mem-fog);
-  --gsf-gear-mid: var(--mem-mist);
-  --gsf-gear-shadow: var(--mem-lichen);
-  --gsf-liquid-start: var(--mem-ember);
-  --gsf-liquid-mid: var(--mem-verdant);
-  --gsf-liquid-end: var(--mem-fog);
+  --gsf-gear-highlight: var(--agenda-fog);
+  --gsf-gear-mid: var(--agenda-mist);
+  --gsf-gear-shadow: var(--agenda-lichen);
+  --gsf-liquid-start: var(--agenda-ember);
+  --gsf-liquid-mid: var(--agenda-verdant);
+  --gsf-liquid-end: var(--agenda-fog);
   user-select: none;
 }
 
@@ -535,7 +539,7 @@ select.input-base optgroup {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  color: var(--mem-bg-deep);
+  color: var(--agenda-bg-deep);
   background:
     radial-gradient(circle at 34% 30%, rgba(237, 242, 242, 0.95) 0%, rgba(237, 242, 242, 0.3) 18%, rgba(237, 242, 242, 0) 28%),
     radial-gradient(circle at 52% 54%, rgba(137, 205, 135, 0.24) 0%, rgba(137, 205, 135, 0) 44%),

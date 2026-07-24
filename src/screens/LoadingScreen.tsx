@@ -82,8 +82,8 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
             if (currentPromiseKeys.length === 0 && hasObservedPromiseActivityRef.current) {
                 console.log('Done loading');
                 currentStage.saveGame();
-                currentStage.loadMapScreen();
-                setScreenType(ScreenType.MAP);
+                currentStage.loadCalendarScreen();
+                setScreenType(ScreenType.CALENDAR);
             }
         }, 100);
 
@@ -92,7 +92,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
 
     return (
         <Box
-            className="memoria-screen-root"
+            className="agenda-screen-root"
             sx={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -138,7 +138,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
             <GridOverlay size={56} />
 
             <motion.div
-                className="memoria-entrance"
+                className="agenda-entrance"
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, ease: 'easeOut' }}

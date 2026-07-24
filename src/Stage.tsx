@@ -37,7 +37,89 @@ export type SaveType = {
     language?: string;
     lorebook?: Lore[];
     expeditionChoices?: ExpeditionChoice[];
+    currentDate?: string;
+    upcomingEvents?: CalendarEvent[];
+    agendaConfig?: {
+        context: ContextSegment[];
+        settings: CustomSetting[];
+        selectedSettings: {[key: string]: string};
+    };
+    uiSettings?: UiSettings;
     betaMode?: boolean;
+}
+
+export type UiSettings = {
+    gameTitle: string;
+    uiFontFamily: string;
+    flavorFontFamily: string;
+    mistColor: string;
+    verdantColor: string;
+    fogColor: string;
+    textSecondaryColor: string;
+    bgDeepColor: string;
+    bgMidColor: string;
+    bgSoftColor: string;
+    borderColor: string;
+    borderStrongColor: string;
+    calendarOverlayStart: string;
+    calendarOverlayMid: string;
+    calendarOverlayEnd: string;
+    calendarCardBackground: string;
+    calendarCardBorder: string;
+}
+
+const DEFAULT_UI_SETTINGS: UiSettings = {
+    gameTitle: 'Agenda VN',
+    uiFontFamily: '"Geologica", sans-serif',
+    flavorFontFamily: '"Lora", Georgia, serif',
+    mistColor: '#8ab0cc',
+    verdantColor: '#89cd87',
+    fogColor: '#edf2f2',
+    textSecondaryColor: '#b9d2e3',
+    bgDeepColor: '#1a1e30',
+    bgMidColor: '#24293f',
+    bgSoftColor: '#2e354d',
+    borderColor: 'rgba(138, 176, 204, 0.34)',
+    borderStrongColor: 'rgba(137, 205, 135, 0.44)',
+    calendarOverlayStart: 'rgba(10, 28, 37, 0.79)',
+    calendarOverlayMid: 'rgba(21, 41, 30, 0.73)',
+    calendarOverlayEnd: 'rgba(35, 24, 56, 0.78)',
+    calendarCardBackground: 'rgba(28, 34, 52, 0.92)',
+    calendarCardBorder: 'rgba(138, 176, 204, 0.34)',
+};
+
+export type CalendarEvent = {
+    id: string;
+    name: string;
+    date: string; // YYYY-MM-DD
+    locationId: string;
+    participantActorIds: string[];
+    guidance: string;
+    status: 'upcoming' | 'played' | 'skipped';
+}
+
+// Represents a piece of context to be included in generative requests. Has a title and text body/array of sub-segments
+export type ContextSegment = {
+    title: string;
+    body: string|ContextSegment[];
+}
+
+// Represents a setting drop-down that can build added to the game.
+export type CustomSetting = {
+    title: string; // Name of the setting
+    description: string; // Description of what it does
+    options: {[key: string]: ContextSegment} // Map of option name to a ContextSegment that it will cause to be used.
+}
+
+// Represents a configuration that is used to initialize new games.
+export type NewGameConfiguration = {
+    
+    actors: Actor[], // All defined actors
+    locations: Location[], // All defined locations
+    context: ContextSegment[], // All defined context segments
+    settings: CustomSetting[] // All defined custom settings
+    startingDate: string; // The starting date of the game, in YYYY-MM-DD format
+
 }
 
 type ExpeditionChoice = {
@@ -141,6 +223,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             timeline: [],
             turn: 0,
             timestamp: Date.now(),
+            currentDate: new Date().toISOString().slice(0, 10),
+            upcomingEvents: [],
+            agendaConfig: {
+                context: [],
+                settings: [],
+                selectedSettings: {},
+            },
+            uiSettings: {...DEFAULT_UI_SETTINGS},
         };
     }
 
@@ -271,7 +361,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             delete this.generationPromises['newGame']; // Clear the dummy promise to allow the loading screen to finish.
 
             // Generate an intro skit:
-            const randomStartingLocation = this.pickRandom(Object.values(newSave.atlas).filter(loc => this.isArdeiaLocationId(loc.id)));
+            /* const randomStartingLocation = this.pickRandom(Object.values(newSave.atlas).filter(loc => this.isArdeiaLocationId(loc.id)));
             newSave.timeline.push({
                 turn: 0,
                 description: 'Waking up in Ardeia',
@@ -283,21 +373,33 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     initialActors: [this.getWardenActor().id],
                     summary: ''
                 })
+            }); */
+
+            this.rebuildUpcomingEvents(newSave).catch(error => {
+                console.error('Error seeding upcoming events for new game', error);
             });
 
             this.saveGame();
         });
     }
 
-    // Called when map screen displays.
-    loadMapScreen() {
-        if (!this.generationPromises['expeditionChoices'] && (!this.getSave().expeditionChoices || this.getSave().expeditionChoices?.length === 0)) {
-            this.generationPromises['expeditionChoices'] = this.rebuildExpeditionChoices(this.getSave()).then(() => {
-                this.showPriorityMessage('Expeditions are now available.');
+    // Called when the calendar screen displays.
+    loadCalendarScreen() {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+
+        if (!this.generationPromises['calendarEvents'] && (!save.upcomingEvents || save.upcomingEvents.length === 0)) {
+            this.generationPromises['calendarEvents'] = this.rebuildUpcomingEvents(save).then(() => {
+                this.showPriorityMessage('Upcoming events are now available.');
             }).finally(() => {
-                delete this.generationPromises['expeditionChoices'];
+                delete this.generationPromises['calendarEvents'];
             });
         }
+    }
+
+    // Backward compatibility shim while older UI references remain.
+    loadMapScreen() {
+        this.loadCalendarScreen();
     }
     
     loadSave(slotIndex: number) {
@@ -316,8 +418,84 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.messenger.updateChatState(this.saveData);
     }
 
-    isMapScreenLoading(): boolean {
+    isCalendarScreenLoading(): boolean {
         return Object.keys(this.generationPromises).length > 0;
+    }
+
+    isMapScreenLoading(): boolean {
+        return this.isCalendarScreenLoading();
+    }
+
+    getUpcomingEvents(): CalendarEvent[] {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+
+        return (save.upcomingEvents || [])
+            .filter(event => event.status === 'upcoming' && event.date >= (save.currentDate || '0000-01-01'))
+            .sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    skipNextEvent(): CalendarEvent | null {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+
+        const nextEvent = this.getUpcomingEvents()[0];
+        if (!nextEvent) {
+            return null;
+        }
+
+        nextEvent.status = 'skipped';
+        save.currentDate = nextEvent.date;
+        save.turn += 1;
+        save.timeline.push({
+            turn: save.turn,
+            description: `Skipped event: ${nextEvent.name} at ${save.atlas[nextEvent.locationId]?.name || 'Unknown Location'}.`,
+        });
+
+        this.rebuildUpcomingEvents(save);
+        this.saveGame();
+        return nextEvent;
+    }
+
+    startCalendarEventSkit(eventId: string): Skit | null {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+
+        const selectedEvent = (save.upcomingEvents || []).find(event => event.id === eventId && event.status === 'upcoming');
+        if (!selectedEvent) {
+            return null;
+        }
+
+        const selectedLocation = save.atlas[selectedEvent.locationId];
+        if (!selectedLocation) {
+            return null;
+        }
+
+        const skit = new Skit({
+            skitType: SkitType.SOCIAL,
+            initialLocationId: selectedLocation.id,
+            guidance: selectedEvent.guidance,
+            script: [],
+            initialActors: selectedEvent.participantActorIds,
+            summary: '',
+        });
+
+        selectedEvent.status = 'played';
+        save.currentDate = selectedEvent.date;
+        save.turn += 1;
+        if (!save.timeline) {
+            save.timeline = [];
+        }
+
+        save.timeline.push({
+            turn: save.turn,
+            description: `Event: ${selectedEvent.name}`,
+            skit,
+        });
+
+        this.rebuildUpcomingEvents(save);
+        this.saveGame();
+        return skit;
     }
 
     deleteSave(slotIndex: number) {
@@ -329,7 +507,26 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     getSave(): SaveType {
-        return this.saveData.saves[this.saveData.lastSaveSlot] || this.generateFreshSave({name: this.primaryUser.name, personality: this.primaryUser.chatProfile});
+        const save = this.saveData.saves[this.saveData.lastSaveSlot] || this.generateFreshSave({name: this.primaryUser.name, personality: this.primaryUser.chatProfile});
+        this.ensureCalendarState(save);
+        return save;
+    }
+
+    getUiSettings(): UiSettings {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+        return {...DEFAULT_UI_SETTINGS, ...(save.uiSettings || {})};
+    }
+
+    updateUiSettings(updates: Partial<UiSettings>) {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+        save.uiSettings = {
+            ...DEFAULT_UI_SETTINGS,
+            ...(save.uiSettings || {}),
+            ...updates,
+        };
+        this.saveGame();
     }
 
     getPlayerActor(): Actor {
@@ -360,10 +557,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return null;
     }
 
-    private isArdeiaLocationId(locationId: string): boolean {
-        return locationId.startsWith('ardeia-');
-    }
-
     private pickRandom<T>(items: T[]): T | null {
         if (!items.length) {
             return null;
@@ -387,17 +580,117 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return selections;
     }
 
-    private getDiscoveredOutsideLocations(save: SaveType): Location[] {
-        return Object.values(save.atlas || {}).filter(
-            location => location.discovered && !this.isArdeiaLocationId(location.id),
-        );
+    private formatDate(date: Date): string {
+        return date.toISOString().slice(0, 10);
     }
 
-    private getEligibleExpeditionActorsFromSave(save: SaveType): Actor[] {
-        return Object.values(save.actors || {}).filter(actor =>
-            actor.state === ActorState.AVAILABLE &&
-            actor.type == ActorType.PRISONER
+    private addDays(baseDate: string, days: number): string {
+        const parsedBaseDate = new Date(`${baseDate}T00:00:00Z`);
+        if (Number.isNaN(parsedBaseDate.getTime())) {
+            return this.formatDate(new Date());
+        }
+
+        parsedBaseDate.setUTCDate(parsedBaseDate.getUTCDate() + Math.max(days, 0));
+        return this.formatDate(parsedBaseDate);
+    }
+
+    private buildEventName(locationName: string, participantNames: string[]): string {
+        if (participantNames.length === 0) {
+            return `Visit ${locationName}`;
+        }
+
+        if (participantNames.length === 1) {
+            return `${participantNames[0]} at ${locationName}`;
+        }
+
+        return `${participantNames[0]} & ${participantNames[1]} at ${locationName}`;
+    }
+
+    private ensureCalendarState(save: SaveType) {
+        if (!save.currentDate) {
+            save.currentDate = new Date().toISOString().slice(0, 10);
+        }
+
+        if (!save.upcomingEvents) {
+            save.upcomingEvents = [];
+        }
+
+        if (!save.agendaConfig) {
+            save.agendaConfig = {
+                context: [],
+                settings: [],
+                selectedSettings: {},
+            };
+        }
+
+        if (!save.uiSettings) {
+            save.uiSettings = {...DEFAULT_UI_SETTINGS};
+        } else {
+            save.uiSettings = {...DEFAULT_UI_SETTINGS, ...save.uiSettings};
+        }
+    }
+
+    private createCalendarEvents(save: SaveType, count: number): CalendarEvent[] {
+        this.ensureCalendarState(save);
+
+        const availableActors = Object.values(save.actors || {}).filter(actor =>
+            actor.type === ActorType.PRISONER && actor.state === ActorState.AVAILABLE,
         );
+
+        const generatedEvents: CalendarEvent[] = [];
+        const upcomingEvents = (save.upcomingEvents || []).filter(event => event.status === 'upcoming');
+        const sortedExistingEvents = [...upcomingEvents].sort((a, b) => a.date.localeCompare(b.date));
+        let dateCursor = sortedExistingEvents.length > 0
+            ? sortedExistingEvents[sortedExistingEvents.length - 1].date
+            : (save.currentDate || new Date().toISOString().slice(0, 10));
+
+        for (let i = 0; i < count; i += 1) {
+            const location = this.pickRandom(Object.values(save.atlas || {}));
+            if (!location) {
+                break;
+            }
+
+            const participantCount = Math.min(availableActors.length, location.id.startsWith('ardeia-') ? 3 : 2);
+            const participants = participantCount > 0
+                ? this.takeRandomDistinct(availableActors, Math.max(1, participantCount))
+                : [];
+
+            dateCursor = this.addDays(dateCursor, 1 + Math.floor(Math.random() * 4));
+            const participantNames = participants.map(actor => actor.name);
+            const eventName = this.buildEventName(location.name, participantNames);
+            const locationContext = location.description?.trim()
+                ? location.description.trim()
+                : `A scene centered on ${location.name}.`;
+
+            generatedEvents.push({
+                id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${i}`,
+                name: eventName,
+                date: dateCursor,
+                locationId: location.id,
+                participantActorIds: participants.map(actor => actor.id),
+                guidance: `${eventName}. ${locationContext}`,
+                status: 'upcoming',
+            });
+        }
+
+        return generatedEvents;
+    }
+
+    async rebuildUpcomingEvents(save: SaveType = this.getSave(), targetEventCount: number = 6): Promise<CalendarEvent[]> {
+        this.ensureCalendarState(save);
+
+        const existingUpcomingEvents = (save.upcomingEvents || [])
+            .filter(event => event.status === 'upcoming' && event.date >= (save.currentDate || '0000-01-01'))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        const neededEventCount = Math.max(targetEventCount - existingUpcomingEvents.length, 0);
+        const newEvents = neededEventCount > 0 ? this.createCalendarEvents(save, neededEventCount) : [];
+
+        save.upcomingEvents = [...existingUpcomingEvents, ...newEvents]
+            .sort((a, b) => a.date.localeCompare(b.date));
+        this.saveGame();
+
+        return save.upcomingEvents;
     }
 
     public async generateText(prompt: string, minTokens: number = 50, maxTokens: number = 200): Promise<string> {
@@ -411,95 +704,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return response?.result || '';
     }
 
-    private async rebuildExpeditionChoices(save: SaveType = this.getSave()): Promise<ExpeditionChoice[]> {
-        save.expeditionChoices = [];
-        this.saveGame();
-        
-        const discoveredOutsideLocations = this.getDiscoveredOutsideLocations(save);
-        const eligibleActors = this.getEligibleExpeditionActorsFromSave(save);
-
-        const parseChoices = (text: string): ExpeditionChoice[] => {
-            const parsed: ExpeditionChoice[] = [];
-            // Split on blank lines or on a new DESTINATION: block
-            const blocks = text.split(/(?=DESTINATION:)/i).map(b => b.trim()).filter(Boolean);
-            for (const block of blocks) {
-                const destMatch = block.match(/^DESTINATION:\s*(.+)/im);
-                const partnerMatch = block.match(/^PARTNER:\s*(.+)/im);
-                const summaryMatch = block.match(/^SUMMARY:\s*(.+)/im);
-                const nameMatch = block.match(/^NAME:\s*(.+)/im);
-
-                if (!destMatch || !partnerMatch || !summaryMatch || !nameMatch) continue;
-
-                const destName = destMatch[1].trim();
-                const partnerName = partnerMatch[1].trim();
-                const summary = summaryMatch[1].trim();
-                const name = nameMatch[1].trim();
-
-                const location = findBestNameMatch(destName, discoveredOutsideLocations);
-                const actor = findBestNameMatch(partnerName, eligibleActors, ['name', 'nicknames']);
-
-                if (!location || !actor) continue;
-
-                parsed.push({
-                    id: `expedition-${location.id}-${actor.id}`,
-                    locationId: location.id,
-                    description: summary,
-                    name,
-                    partnerActorIds: [actor.id],
-                });
-            }
-            return parsed;
-        };
-
-        let choices: ExpeditionChoice[] = [];
-        let attempts = 0;
-        while (choices.length === 0 && attempts < 3) {
-            attempts++;
-            const response = await this.generateText(
-                    buildPrompt()
-                        .addBlock('Instructions',
-                            `This is a request for structured content for a game. Given the context, eligible partners, and possible destinations above, generate and output three potential expeditions, ` +
-                            `each with a destination, partner, short summary/goal, and abbreviated name. ` +
-                            `Ensure that at least one option is a natural continuation of ongoing events and at least one is a new and unexpected development with an underutilized character. ` +
-                            `If a character has just returned from an expedition, avoid sending them out again so soon. ` +
-                            `The summary/goal will be used as guidance for the skit that ensues and can include motives, challenges, or objectives to consider; it is not user-facing content.`)
-                        .addBlock('Example Response',
-                            `DESTINATION: The Cradle\n` +
-                            `PARTNER: Mel\n` +
-                            `SUMMARY: The last expedition the Cradle found something strange. A key, perhaps. Cassiel is sending the Prisoners back with it; whether to use it or destroy it remains unclear.\n` +
-                            `NAME: Return the Key with Mel\n\n` +
-                            `DESTINATION: Pilgrimage\n` +
-                            `PARTNER: Lyra\n` +
-                            `SUMMARY: Lyra has been quiet lately. Maybe a change of scenery will help her open up? Maybe it will drive her further into herself?\n` +
-                            `NAME: Take Lyra on a Pilgrimage\n\n` +
-                            `DESTINATION: The Core\n` +
-                            `PARTNER: Milliette\n` +
-                            `SUMMARY: Everyone's looking for Reitia. Milliette believes she's the only one who can do it. She doesn't realize that success might cost her.\n` +
-                            `NAME: Join Milliette at the Core\n\n` +
-                            `#END#`)
-                        .addBlock('Eligible Partners', eligibleActors.map(actor => `  ${actor.name}\n    Profile: ${actor.profile}\n    Lore: ${getActorLore(actor.id, this)}`).join('\n'))
-                        .addBlock('Possible Destinations', discoveredOutsideLocations.map(location => `  ${location.name}\n    ${getLinkedLocationLore(location.name, this)}`).join('\n'))
-                        .addBlock('Additional Context', generateContext(undefined, this, 5))
-                    .format(),
-                    100, 500);
-            if (response) {
-                choices = parseChoices(response);
-            }
-        }
-
-        if (choices.length > 0) {
-            save.expeditionChoices = choices;
-            this.saveGame();
-        }
-
-        return save.expeditionChoices ?? [];
-    }
-
     private buildTravelTimelineDescription(location: Location): string {
-        if (this.isArdeiaLocationId(location.id)) {
-            return `Visited ${location.name}.`;
-        }
-        return `Journeyed to ${location.name}.`;
+        return `Visited ${location.name}.`;
     }
 
     startTravelSkit(selectedLocationId: string): Skit | null {
@@ -512,30 +718,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         let skit: Skit;
 
-        if (this.isArdeiaLocationId(selectedLocation.id)) {
-            skit = new Skit({
-                skitType: SkitType.SOCIAL,
-                initialLocationId: selectedLocation.id,
-                guidance: '',
-                script: [],
-                initialActors: [],
-                summary: '',
-            });
-        } else {
-            // if there's an expedition, the initial actors should be the partner IDs from the expedition:
-            const potentialInitialActors = this.getEligibleExpeditionActorsFromSave(save);
-            const expedition = save.expeditionChoices?.find(choice => choice.locationId === selectedLocation.id);
-            const initialActors = expedition ? expedition.partnerActorIds : [this.pickRandom(potentialInitialActors)?.id].filter(Boolean);
-
-            skit = new Skit({
-                skitType: SkitType.EXPEDITION,
-                initialLocationId: selectedLocation.id,
-                guidance: expedition?.description || '',
-                script: [],
-                initialActors: initialActors,
-                summary: '',
-            });
-        }
+        skit = new Skit({
+            skitType: SkitType.SOCIAL,
+            initialLocationId: selectedLocation.id,
+            guidance: '',
+            script: [],
+            initialActors: [],
+            summary: '',
+        });
 
         save.turn += 1;
         if (!save.timeline) {
@@ -621,13 +811,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
         }
 
-        if (!this.generationPromises['rebuildExpeditions']) {
-            const rebuildExpeditionsPromise = this.rebuildExpeditionChoices(save).then(() => {
-                this.showPriorityMessage('Expeditions are now available.');
+        if (!this.generationPromises['rebuildCalendarEvents']) {
+            const rebuildEventsPromise = this.rebuildUpcomingEvents(save).then(() => {
+                this.showPriorityMessage('Calendar updated with new upcoming events.');
             }).catch(error => {
-                console.error('Error rebuilding expedition choices after skit', error);
-            }).finally(() => {delete  this.generationPromises['rebuildExpeditions']});
-            this.generationPromises['rebuildExpeditions'] = rebuildExpeditionsPromise;
+                console.error('Error rebuilding upcoming events after skit', error);
+            }).finally(() => {delete this.generationPromises['rebuildCalendarEvents']});
+            this.generationPromises['rebuildCalendarEvents'] = rebuildEventsPromise;
         }
 
         this.saveGame();
