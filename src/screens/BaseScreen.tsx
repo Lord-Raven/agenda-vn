@@ -1,13 +1,14 @@
 import React, { FC } from 'react';
 import { Stage } from '../Stage';
 import { ThemeProvider } from '@mui/material';
+import { AnimatePresence, motion } from 'framer-motion';
 import { TooltipProvider, useTooltip } from './TooltipContext';
 import { MenuScreen } from './MenuScreen';
 import { TooltipBar } from './TooltipBar';
 import { theme } from './Theme';
 import { CalendarScreen } from './CalendarScreen';
+import { CalendarSkitScreen } from './CalendarSkitScreen';
 import { LoadingScreen } from './LoadingScreen';
-import { usePreloadCriticalImages } from '../utils/useImagePreloading';
 import { AffinityPopIn, AffinityChangeInfo } from './AffinityPopIn';
 
 /*
@@ -18,6 +19,7 @@ export enum ScreenType {
     MENU = 'menu',
     LOADING = 'loading',
     CALENDAR = 'calendar',
+    SKIT = 'skit',
 }
 
 interface BaseScreenProps {
@@ -48,12 +50,6 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
             setCurrentAffinityPopIn(affinityQueue[0]);
         }
     }, [currentAffinityPopIn, affinityQueue]);
-
-    // Preload critical images (actor neutrals and location maps) on mount
-    const stageInstance = stage();
-    const actors = React.useMemo(() => Object.values(stageInstance.getSave()?.actors || {}), [stageInstance.getSave()?.actors]);
-    const locations = React.useMemo(() => Object.values(stageInstance.getSave()?.atlas || {}), [stageInstance.getSave()?.atlas]);
-    usePreloadCriticalImages(actors, locations);
 
     // Set up the priority message callback in the stage
     React.useEffect(() => {
@@ -106,19 +102,32 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
 
     return (
         <div className="agenda-screen-root">
-            {screenType === ScreenType.MENU && (
-                // Render menu screen
-                <MenuScreen stage={stage} setScreenType={setScreenType} />
-            )}
-            {screenType === ScreenType.CALENDAR && (
-                <CalendarScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
-            )}
-            {screenType === ScreenType.LOADING && (
-                <LoadingScreen
-                    stage={stage}
-                    setScreenType={setScreenType}
-                />
-            )}
+            <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                    key={screenType}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.24, ease: 'easeOut' }}
+                    style={{ position: 'absolute', inset: 0 }}
+                >
+                    {screenType === ScreenType.MENU && (
+                        <MenuScreen stage={stage} setScreenType={setScreenType} />
+                    )}
+                    {screenType === ScreenType.CALENDAR && (
+                        <CalendarScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
+                    )}
+                    {screenType === ScreenType.SKIT && (
+                        <CalendarSkitScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
+                    )}
+                    {screenType === ScreenType.LOADING && (
+                        <LoadingScreen
+                            stage={stage}
+                            setScreenType={setScreenType}
+                        />
+                    )}
+                </motion.div>
+            </AnimatePresence>
             {/* Unified tooltip bar that renders over all screens */}
             <TooltipBar 
                 message={message} 
