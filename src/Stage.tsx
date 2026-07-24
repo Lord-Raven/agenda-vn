@@ -27,7 +27,7 @@ type InitStateType = any;
 
 type ChatStateType = {
     saves: (SaveType | undefined)[]
-    configuration: NewGameConfiguration
+    configuration: GameConfiguration
     lastSaveSlot: number
 };
 
@@ -135,14 +135,14 @@ export type CustomSetting = {
     options: {[key: string]: ContextSegment} // Map of option name to a ContextSegment that it will cause to be used.
 }
 
-// Represents a configuration that is used to initialize new games.
-export type NewGameConfiguration = {
+// Represents a configuration that is used to initialize new games, but can also influence existing games.
+export type GameConfiguration = {
     
-    actors: Actor[], // All defined actors
-    locations: Location[], // All defined locations
-    context: ContextSegment[], // All defined context segments
-    settings: CustomSetting[] // All defined custom settings
-    startingDate: string; // The starting date of the game, in YYYY-MM-DD format
+    actors: Actor[], // All defined actors for a new game
+    locations: Location[], // All defined locations for a new game
+    context: ContextSegment[], // All defined context segments (applies to current and new games)
+    settings: CustomSetting[] // All defined custom settings (applies to current and new games)
+    startingDate: string; // The starting date of the game, in YYYY-MM-DD format (applies to new game)
 
 }
 
@@ -215,7 +215,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     }
 
-    private createDefaultNewGameConfiguration(): NewGameConfiguration {
+    private createDefaultNewGameConfiguration(): GameConfiguration {
         return {
             actors: [],
             locations: [],
@@ -257,12 +257,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
     }
 
-    getConfiguration(): NewGameConfiguration {
+    getConfiguration(): GameConfiguration {
         this.ensureChatState();
         return this.saveData.configuration;
     }
 
-    updateConfiguration(updates: Partial<NewGameConfiguration>) {
+    updateConfiguration(updates: Partial<GameConfiguration>) {
         this.ensureChatState();
         const current = this.saveData.configuration;
         this.saveData.configuration = {
