@@ -38,6 +38,7 @@ export type SaveType = {
     inventory: Item[];
     timeline: TimelineEntry[];
     turn: number;
+    startingDate?: string;
     timestamp: number; // Time of last save
     textToSpeech?: boolean;
     disableImpersonation?: boolean;
@@ -113,9 +114,12 @@ export type CalendarEvent = {
     name: string;
     date: string; // YYYY-MM-DD
     locationId: string;
-    participantActorIds: string[];
-    guidance: string;
+    actorIds: string[];
+    description: string;
+    hiddenAgenda: string;
     status: 'upcoming' | 'played' | 'skipped';
+    participantActorIds?: string[];
+    guidance?: string;
 }
 
 // Represents a piece of context to be included in generative requests. Has a title and text body/array of sub-segments
@@ -300,6 +304,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     generateFreshSave(playerData: {name: string, personality: string, themeColor?: string}): SaveType {
+        const startingDate = this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10);
+
         return {playerId: this.primaryUser.anonymizedId,
             actors: {
                 [this.primaryUser.anonymizedId]: {
@@ -324,8 +330,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             inventory: [],
             timeline: [],
             turn: 0,
+            startingDate,
             timestamp: Date.now(),
-            currentDate: new Date().toISOString().slice(0, 10),
+            currentDate: startingDate,
             upcomingEvents: [],
             agendaConfig: {
                 context: [],
@@ -507,7 +514,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const save = this.getSave();
         this.ensureCalendarState(save);
 
-        if (!this.generationPromises['calendarEvents'] && (!save.upcomingEvents || save.upcomingEvents.length === 0)) {
+        if (!this.generationPromises['calendarEvents'] && this.getUpcomingEvents().length === 0) {
             this.generationPromises['calendarEvents'] = this.rebuildUpcomingEvents(save).then(() => {
                 this.showPriorityMessage('Upcoming events are now available.');
             }).finally(() => {
@@ -564,8 +571,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         nextEvent.status = 'skipped';
+        save.turn = this.getDayDifference(this.getStartingDate(save), nextEvent.date);
         save.currentDate = nextEvent.date;
-        save.turn += 1;
         save.timeline.push({
             turn: save.turn,
             description: `Skipped event: ${nextEvent.name} at ${save.atlas[nextEvent.locationId]?.name || 'Unknown Location'}.`,
@@ -593,15 +600,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const skit = new Skit({
             skitType: SkitType.SOCIAL,
             initialLocationId: selectedLocation.id,
-            guidance: selectedEvent.guidance,
+            guidance: selectedEvent.hiddenAgenda || selectedEvent.guidance || selectedEvent.description,
             script: [],
-            initialActors: selectedEvent.participantActorIds,
+            initialActors: selectedEvent.actorIds || selectedEvent.participantActorIds || [],
             summary: '',
         });
 
         selectedEvent.status = 'played';
+        save.turn = this.getDayDifference(this.getStartingDate(save), selectedEvent.date);
         save.currentDate = selectedEvent.date;
-        save.turn += 1;
         if (!save.timeline) {
             save.timeline = [];
         }
@@ -709,8 +716,40 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return this.formatDate(new Date());
         }
 
-        parsedBaseDate.setUTCDate(parsedBaseDate.getUTCDate() + Math.max(days, 0));
+        parsedBaseDate.setUTCDate(parsedBaseDate.getUTCDate() + days);
         return this.formatDate(parsedBaseDate);
+    }
+
+    private getDayDifference(startDate: string, endDate: string): number {
+        const start = new Date(`${startDate}T00:00:00Z`);
+        const end = new Date(`${endDate}T00:00:00Z`);
+
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+            return 0;
+        }
+
+        return Math.round((end.getTime() - start.getTime()) / 86400000);
+    }
+
+    private getStartingDate(save: SaveType): string {
+        if (save.startingDate) {
+            return save.startingDate;
+        }
+
+        if (save.currentDate) {
+            const derivedStartingDate = this.addDays(save.currentDate, -(save.turn || 0));
+            save.startingDate = derivedStartingDate;
+            return derivedStartingDate;
+        }
+
+        const fallbackDate = this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10);
+        save.startingDate = fallbackDate;
+        return fallbackDate;
+    }
+
+    private syncCurrentDateToTurn(save: SaveType) {
+        const startingDate = this.getStartingDate(save);
+        save.currentDate = this.addDays(startingDate, save.turn || 0);
     }
 
     private buildEventName(locationName: string, participantNames: string[]): string {
@@ -726,13 +765,25 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private ensureCalendarState(save: SaveType) {
-        if (!save.currentDate) {
-            save.currentDate = new Date().toISOString().slice(0, 10);
+        const startingDate = this.getStartingDate(save);
+        if (typeof save.turn !== 'number' || Number.isNaN(save.turn)) {
+            save.turn = 0;
         }
+
+        save.currentDate = this.addDays(startingDate, save.turn);
 
         if (!save.upcomingEvents) {
             save.upcomingEvents = [];
         }
+
+        save.upcomingEvents = save.upcomingEvents.map((event) => ({
+            ...event,
+            actorIds: event.actorIds || event.participantActorIds || [],
+            participantActorIds: event.participantActorIds || event.actorIds || [],
+            description: event.description || event.guidance || `${event.name} at ${save.atlas[event.locationId]?.name || 'an unknown location'}.`,
+            hiddenAgenda: event.hiddenAgenda || event.guidance || event.description || event.name,
+            guidance: event.guidance || event.hiddenAgenda || event.description || event.name,
+        }));
 
         if (!save.agendaConfig) {
             save.agendaConfig = {
@@ -780,14 +831,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             const locationContext = location.description?.trim()
                 ? location.description.trim()
                 : `A scene centered on ${location.name}.`;
+            const description = participantNames.length > 0
+                ? `${eventName} at ${location.name} featuring ${participantNames.join(', ')}.`
+                : `${eventName} at ${location.name}.`;
+            const hiddenAgenda = `${eventName}. ${locationContext} Guide the skit toward the event's private purpose without exposing it to the player.`;
 
             generatedEvents.push({
                 id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${i}`,
                 name: eventName,
                 date: dateCursor,
                 locationId: location.id,
+                actorIds: participants.map(actor => actor.id),
                 participantActorIds: participants.map(actor => actor.id),
-                guidance: `${eventName}. ${locationContext}`,
+                description,
+                hiddenAgenda,
+                guidance: hiddenAgenda,
                 status: 'upcoming',
             });
         }
@@ -798,14 +856,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     async rebuildUpcomingEvents(save: SaveType = this.getSave(), targetEventCount: number = 6): Promise<CalendarEvent[]> {
         this.ensureCalendarState(save);
 
-        const existingUpcomingEvents = (save.upcomingEvents || [])
+        const existingEvents = save.upcomingEvents || [];
+        const existingUpcomingEvents = existingEvents
             .filter(event => event.status === 'upcoming' && event.date >= (save.currentDate || '0000-01-01'))
             .sort((a, b) => a.date.localeCompare(b.date));
 
         const neededEventCount = Math.max(targetEventCount - existingUpcomingEvents.length, 0);
         const newEvents = neededEventCount > 0 ? this.createCalendarEvents(save, neededEventCount) : [];
 
-        save.upcomingEvents = [...existingUpcomingEvents, ...newEvents]
+        save.upcomingEvents = [...existingEvents, ...newEvents]
             .sort((a, b) => a.date.localeCompare(b.date));
         this.saveGame();
 
@@ -847,6 +906,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         });
 
         save.turn += 1;
+        this.syncCurrentDateToTurn(save);
         if (!save.timeline) {
             save.timeline = [];
         }
@@ -865,6 +925,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (currentSkit) {
             currentSkit.over = true;
             save.turn += 1;
+            this.syncCurrentDateToTurn(save);
         }
 
         // This is where various outcomes of the skit are processed and applied to the save state
