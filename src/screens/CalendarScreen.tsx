@@ -19,6 +19,7 @@ interface CalendarScreenProps {
 
 const CALENDAR_BACKGROUND_IMAGE = "https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png";
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const CALENDAR_ROW_COUNT = 6;
 
 const parseDateKey = (dateText: string) => new Date(`${dateText}T00:00:00Z`);
 
@@ -62,11 +63,7 @@ const buildMonthGrid = (monthDate: Date) => {
     const leadingDays = monthStart.getUTCDay();
     const firstGridDay = addDays(monthStart, -leadingDays);
 
-    const monthEnd = addDays(addMonths(monthStart, 1), -1);
-    const daysInMonth = monthEnd.getUTCDate();
-    const weekCount = Math.max(5, Math.ceil((leadingDays + daysInMonth) / 7));
-
-    return Array.from({ length: weekCount * 7 }, (_, index) => addDays(firstGridDay, index));
+    return Array.from({ length: CALENDAR_ROW_COUNT * 7 }, (_, index) => addDays(firstGridDay, index));
 };
 
 const groupEventsByDate = (events: CalendarEvent[]) => events.reduce((grouped, event) => {
@@ -103,7 +100,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
-    const monthGridRowCount = monthGrid.length / 7;
 
     useEffect(() => {
         stageInstance.loadCalendarScreen();
@@ -309,7 +305,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             sx={{
                                 display: "grid",
                                 gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                                gridTemplateRows: `repeat(${monthGridRowCount}, minmax(0, 1fr))`,
+                                gridTemplateRows: `repeat(${CALENDAR_ROW_COUNT}, minmax(0, 1fr))`,
                                 gap: 0,
                                 flex: 1,
                                 minHeight: 0,

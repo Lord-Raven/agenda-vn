@@ -175,7 +175,7 @@ export function buildPremise(playerName: string, stage?: any): string {
     let worldContext = '';
     if (stage) {
         const contextSegments = (stage.getConfiguration?.()?.context || []);
-        worldContext = contextSegments.map(segment => renderContextSegment(segment)).join('\n\n');
+        worldContext = contextSegments.map((segment: any) => renderContextSegment(segment)).join('\n\n');
     }
     
     // Fallback generic premise if no configuration context available
