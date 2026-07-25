@@ -2,7 +2,7 @@ import { Emotion, EMOTION_MAPPING } from "./Emotion";
 import { v4 as generateUuid } from 'uuid';
 import { Outcome, OutcomeType } from "./Outcome";
 import { Stage } from "../Stage";
-import { Actor, ActorType, findBestNameMatch, getActorLore } from "./Actor";
+import { Actor, findBestNameMatch, getActorLore } from "./Actor";
 import { getLocationDescription } from "./Location";
 import { MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -271,27 +271,11 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
                     builder.addBlock(`${actor.name}`, `  Current Outfit (${currentOutfit.name}): ${currentOutfit.description}\n` +
                         (otherOutfits.length > 0 ? `  Other Outfits: ${otherOutfits.map(o => o.name).join(', ')}\n` : '') +
                         `  Profile: ${actor.profile}\n` +
-                        `  Lore: ${getActorLore(actor.id, stage)}` +
-                        `  Affinity: ${getAffinityPrompt(actor.affinity, playerName)}`
+                        `  Lore: ${getActorLore(actor.id, stage)}`
                     );
                 })
             }
         });
-}
-
-// Affinity is a score between 0 and 10.
-function getAffinityPrompt(affinity: number, playerName: string): string {
-    if (affinity >= 9) {
-        return `They are extremely close to ${playerName}, expressing deep care, affection, and absolute faith in them.`;
-    } else if (affinity >=7) {
-        return `They are very fond of ${playerName}, showing strong care, affection, and trust for them.`;
-    } else if (affinity >= 5) {
-        return `They are fond of ${playerName}, demonstrating care, affection, and trust, with occasional reservations.`;
-    } else if (affinity >= 2) {
-        return `They have a neutral relationship with ${playerName}, demonstrating some tentative care and trust, despite concerns.`;
-    } else {
-        return `They barely know ${playerName}, uncertain of their intentions.`;
-    }
 }
 
 export async function generateSkitScript(skit: Skit, stage: Stage): Promise<ScriptEntry[]> {
@@ -303,7 +287,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
         console.log('Generating skit guidance...');
         let attempts = 3;
         const availableActors = Object.values(stage.getSave().actors)
-            .filter(actor => actor.type !== ActorType.PLAYER && !(stage.getSave().expeditionChoices || []).some(choice => choice.partnerActorIds.includes(actor.id)));
+            .filter(actor => actor.id !== stage.getSave().playerId && !(stage.getSave().expeditionChoices || []).some(choice => choice.partnerActorIds.includes(actor.id)));
         while (attempts > 0) {
             const response = await stage.generateText(
                 buildPrompt()
@@ -345,7 +329,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 const participantsText = parsedResponse.participants?.trim();
                 if (guidanceText && participantsText) {
                     skit.guidance = guidanceText;
-                    skit.initialActors = participantsText.split(',').map(name => findBestNameMatch(name.trim(), availableActors, ['name', 'nicknames'])?.id).filter(id => id !== undefined) as string[];
+                    skit.initialActors = participantsText.split(',').map(name => findBestNameMatch(name.trim(), availableActors, ['name'])?.id).filter(id => id !== undefined) as string[];
                     break;
                 }
             }

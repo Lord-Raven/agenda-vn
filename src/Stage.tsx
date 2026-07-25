@@ -1,7 +1,7 @@
 import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character} from "@chub-ai/stages-ts";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
-import { Actor, ActorType, findBestNameMatch, loadSupportedActor, ActorState, getActorLore, getEmotionImage } from "./content/Actor";
+import { Actor, findBestNameMatch, loadSupportedActor, getActorLore, getEmotionImage } from "./content/Actor";
 import { Emotion } from "./content/Emotion";
 import { AffinityChangeInfo } from "./screens/AffinityPopIn";
 import { BETA_CHARACTERS, COMPLETE_CHARACTERS } from "./content/Characters";
@@ -51,6 +51,7 @@ export type SaveType = {
         context: ContextSegment[];
         settings: CustomSetting[];
         selectedSettings: {[key: string]: string};
+        actorStats?: ActorStat[];
     };
     uiSettings?: UiSettings;
     betaMode?: boolean;
@@ -128,6 +129,17 @@ export type ContextSegment = {
     body: string|ContextSegment[];
 }
 
+// Represents a custom stat that applies to all actors in the game.
+export type ActorStat = {
+    name: string; // Display name of the stat
+    description: string; // User-facing description of what the stat represents
+    guidance: string; // Guidance for how the stat should be used in generative requests
+    default: number; // Default value of the stat
+    displayType: 'number' | 'percentage' | 'stars' | 'letter grade'; // How the stat should be displayed in the UI
+    min?: number; // Minimum value of the stat (optional)
+    max?: number; // Maximum value of the stat (optional)
+}
+
 // Represents a setting drop-down that can build added to the game.
 export type CustomSetting = {
     title: string; // Name of the setting
@@ -141,7 +153,8 @@ export type GameConfiguration = {
     actors: Actor[], // All defined actors for a new game
     locations: Location[], // All defined locations for a new game
     context: ContextSegment[], // All defined context segments (applies to current and new games)
-    settings: CustomSetting[] // All defined custom settings (applies to current and new games)
+    settings: CustomSetting[], // All defined custom settings (applies to current and new games)
+    actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
     startingDate: string; // The starting date of the game, in YYYY-MM-DD format (applies to new game)
 
 }
@@ -157,6 +170,16 @@ const cloneCustomSetting = (setting: CustomSetting): CustomSetting => ({
     options: Object.fromEntries(
         Object.entries(setting.options || {}).map(([key, value]) => [key, cloneContextSegment(value)]),
     ),
+});
+
+const cloneActorStat = (stat: ActorStat): ActorStat => ({
+    name: stat.name,
+    description: stat.description,
+    guidance: stat.guidance,
+    default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
+    displayType: stat.displayType,
+    min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
+    max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
 });
 
 type ExpeditionChoice = {
@@ -221,6 +244,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locations: [],
             context: [],
             settings: [],
+            actorStats: [],
             startingDate: new Date().toISOString().slice(0, 10),
         };
     }
@@ -238,6 +262,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const defaultConfiguration = this.createDefaultNewGameConfiguration();
         const legacyContext = activeSave?.agendaConfig?.context || [];
         const legacySettings = activeSave?.agendaConfig?.settings || [];
+        const legacyActorStats = activeSave?.agendaConfig?.actorStats || [];
 
         if (!this.saveData.configuration) {
             this.saveData.configuration = {
@@ -253,6 +278,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locations: this.saveData.configuration.locations || defaultConfiguration.locations,
             context: (this.saveData.configuration.context || legacyContext).map(cloneContextSegment),
             settings: (this.saveData.configuration.settings || legacySettings).map(cloneCustomSetting),
+            actorStats: (this.saveData.configuration.actorStats || legacyActorStats).map(cloneActorStat),
             startingDate: this.saveData.configuration.startingDate || defaultConfiguration.startingDate,
         };
     }
@@ -272,8 +298,24 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locations: (updates.locations ?? current.locations ?? []).map(location => ({...location})),
             context: (updates.context ?? current.context ?? []).map(cloneContextSegment),
             settings: (updates.settings ?? current.settings ?? []).map(cloneCustomSetting),
+            actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneActorStat),
             startingDate: updates.startingDate ?? current.startingDate,
         };
+
+        const currentSave = this.saveData.saves[this.saveData.lastSaveSlot];
+        if (currentSave) {
+            if (!currentSave.agendaConfig) {
+                currentSave.agendaConfig = {
+                    context: [],
+                    settings: [],
+                    selectedSettings: {},
+                    actorStats: [],
+                };
+            }
+            currentSave.agendaConfig.actorStats = this.saveData.configuration.actorStats.map(cloneActorStat);
+            this.syncActorStats(currentSave);
+        }
+
         this.saveGame();
     }
 
@@ -311,16 +353,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 [this.primaryUser.anonymizedId]: {
                     id: this.primaryUser.anonymizedId,
                     name: playerData.name,
-                    nicknames: ['player'],
-                    type: ActorType.PLAYER,
-                    state: ActorState.AVAILABLE,
                     description: '',
                     profile: playerData.personality,
-                    sampleImageUrl: '', // Unneeded; the player is never seen.
                     outfits: [], // Ditto.
                     outfitId: '', // Ditto.
-                    fullPath: '',
-                    affinity: 0,
+                    statMap: {},
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
                     themeFontFamily: '',
                     voiceId: ''
@@ -338,6 +375,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 context: [],
                 settings: [],
                 selectedSettings: {},
+                actorStats: this.getConfiguration().actorStats.map(cloneActorStat),
             },
             uiSettings: {...DEFAULT_UI_SETTINGS},
         };
@@ -366,8 +404,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         return [setting.title, optionName || ''];
                     }),
                 ),
+                actorStats: persistedConfiguration.actorStats.map(cloneActorStat),
             };
+        } else if (!newSave.agendaConfig.actorStats) {
+            newSave.agendaConfig.actorStats = persistedConfiguration.actorStats.map(cloneActorStat);
         }
+
+        this.syncActorStats(newSave);
+
         if (!newSave.currentDate && persistedConfiguration.startingDate) {
             newSave.currentDate = persistedConfiguration.startingDate;
         }
@@ -656,15 +700,19 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     getPlayerActor(): Actor {
-        return Object.values(this.getSave().actors).find(actor => actor.type === 'PLAYER')!;
+        return this.getSave().actors[this.getSave().playerId];
     }
 
     getWardenActor(): Actor {
-        return Object.values(this.getSave().actors).find(actor => actor.type === 'WARDEN')!;
+        return this.getSave().actors['cassiel']
+            || Object.values(this.getSave().actors).find(actor => actor.name.toLowerCase() === 'cassiel')
+            || this.getPlayerActor();
     }
 
     getPrisonerActors(): Actor[] {
-        return Object.values(this.getSave().actors).filter(actor => actor.type === 'PRISONER');
+        const playerId = this.getSave().playerId;
+        const wardenId = this.getWardenActor()?.id;
+        return Object.values(this.getSave().actors).filter(actor => actor.id !== playerId && actor.id !== wardenId);
     }
 
     getCurrentSkit(): Skit | null {
@@ -790,8 +838,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 context: [],
                 settings: [],
                 selectedSettings: {},
+                actorStats: [],
             };
         }
+
+        if (!save.agendaConfig.actorStats) {
+            save.agendaConfig.actorStats = this.getConfiguration().actorStats.map(cloneActorStat);
+        }
+
+        this.syncActorStats(save);
 
         if (!save.uiSettings) {
             save.uiSettings = {...DEFAULT_UI_SETTINGS};
@@ -800,11 +855,47 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
     }
 
+    private normalizeActorStatValue(value: number, stat: ActorStat): number {
+        let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
+        if (typeof stat.min === 'number') {
+            resolved = Math.max(stat.min, resolved);
+        }
+        if (typeof stat.max === 'number') {
+            resolved = Math.min(stat.max, resolved);
+        }
+        return resolved;
+    }
+
+    private syncActorStats(save: SaveType) {
+        const configuredStats = (save.agendaConfig?.actorStats || []).filter(stat => stat?.name?.trim());
+        const statNames = new Set(configuredStats.map(stat => stat.name));
+
+        Object.values(save.actors || {}).forEach(actor => {
+            if (!actor.statMap || typeof actor.statMap !== 'object') {
+                actor.statMap = {};
+            }
+
+            configuredStats.forEach(stat => {
+                const existingValue = actor.statMap[stat.name];
+                const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
+                const value = Number.isFinite(existingValue) ? Number(existingValue) : fallback;
+                actor.statMap[stat.name] = this.normalizeActorStatValue(value, stat);
+            });
+
+            Object.keys(actor.statMap).forEach(statName => {
+                if (!statNames.has(statName)) {
+                    delete actor.statMap[statName];
+                }
+            });
+        });
+    }
+
     private createCalendarEvents(save: SaveType, count: number): CalendarEvent[] {
         this.ensureCalendarState(save);
 
+        const playerId = save.playerId;
         const availableActors = Object.values(save.actors || {}).filter(actor =>
-            actor.type === ActorType.PRISONER && actor.state === ActorState.AVAILABLE,
+            actor.id !== playerId && actor.name.toLowerCase() !== 'cassiel',
         );
 
         const generatedEvents: CalendarEvent[] = [];
@@ -967,12 +1058,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     break;
                 case 'RELATIONSHIP_CHANGE': {
                     // For relationship changes, we expect details to include actorId and change (e.g. +10 or -5).
-                    const actor = findBestNameMatch(outcome.details?.actorName, Object.values(save.actors), ['name', 'nicknames']);
+                    const actor = findBestNameMatch(outcome.details?.actorName, Object.values(save.actors), ['name']);
                     if (actor) {
-                        const previousAffinity = actor.affinity;
-                        actor.affinity = Math.min(10, Math.max(0, actor.affinity + (outcome.details?.changeValue || 0)));
-                        const effectiveChange = actor.affinity - previousAffinity;
-                        // If affinity effectively changed, show a heart portrait pop-in at the top of the screen.
+                        const affinityStatName = Object.keys(actor.statMap || {}).find((key) => key.toLowerCase() === 'affinity');
+                        if (!affinityStatName) {
+                            break;
+                        }
+
+                        const previousAffinity = Number(actor.statMap?.[affinityStatName] || 0);
+                        const nextAffinity = Math.min(10, Math.max(0, previousAffinity + (outcome.details?.changeValue || 0)));
+                        actor.statMap[affinityStatName] = nextAffinity;
+                        const effectiveChange = nextAffinity - previousAffinity;
                         if (effectiveChange !== 0) {
                             const isPositive = effectiveChange > 0;
                             const emotionKey = isPositive
@@ -1110,7 +1206,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     if (!character) {
                         console.warn('No more supported characters to load as reserve actors.');
                         break;
-                    } else if (!character.name || !character.fullPath) {
+                    } else if (!character.name) {
                         continue;
                     }
                     // Enforce a minimum loop duration; loadSupportedActor time counts toward this.
@@ -1126,11 +1222,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         await new Promise(resolve => setTimeout(resolve, minLoopDurationMs - loopElapsedMs));
                     }
                     if (newActor) {
-                        console.log(`Loaded reserve actor ${newActor.name} from fullPath ${newActor.fullPath}`);
+                        console.log(`Loaded reserve actor ${newActor.name}`);
                         this.getSave().actors = {...actors, [newActor.id]: newActor};
                         actors = this.getSave().actors || {};
                     } else {
-                        console.warn(`Failed to load actor from fullPath ${character.fullPath}`);
+                        console.warn(`Failed to load actor ${character.name}`);
                     }
                 }
                 console.log('Finished loading reserve actors');

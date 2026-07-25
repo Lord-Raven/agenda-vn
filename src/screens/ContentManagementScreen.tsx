@@ -25,18 +25,8 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
     const sortByName = <T extends { name?: string }>(a: T, b: T) =>
         (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), undefined, { sensitivity: 'base' });
 
-    const getActorAuthor = (actor: Actor): string => {
-        const fullPath = (actor.fullPath || '').trim();
-        if (!fullPath) {
-            return '';
-        }
-
-        const firstSlashIndex = fullPath.indexOf('/');
-        return firstSlashIndex >= 0 ? fullPath.slice(0, firstSlashIndex) : fullPath;
-    };
-
     // Get all actors from the save
-    const actors = Object.values(stage().getSave().actors).filter(actor => actor.type != 'PLAYER').sort(sortByName);
+    const actors = Object.values(stage().getSave().actors).filter(actor => actor.id !== stage().getSave().playerId).sort(sortByName);
 
     // Get all locations from the save atlas
     const locations = Object.values(stage().getSave().atlas || {}).sort(sortByName);
@@ -277,8 +267,8 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                                             borderRadius: '50%',
                                                             backgroundColor: 'rgba(0, 20, 40, 0.8)',
                                                             border: `3px solid ${actor.themeColor}`,
-                                                            backgroundImage: getEmotionImage(actor, 'neutral') || getEmotionImage(actor, 'base') || actor.sampleImageUrl 
-                                                                ? `url(${getEmotionImage(actor, 'neutral') || getEmotionImage(actor, 'base') || actor.sampleImageUrl})` 
+                                                            backgroundImage: getEmotionImage(actor, 'neutral') || getEmotionImage(actor, 'base')
+                                                                ? `url(${getEmotionImage(actor, 'neutral') || getEmotionImage(actor, 'base')})`
                                                                 : 'none',
                                                             backgroundSize: 'cover',
                                                             backgroundPosition: 'top center',
@@ -287,12 +277,12 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                                             justifyContent: 'center',
                                                         }}
                                                     >
-                                                        {!getEmotionImage(actor, 'neutral') && !getEmotionImage(actor, 'base') && !actor.sampleImageUrl && (
+                                                        {!getEmotionImage(actor, 'neutral') && !getEmotionImage(actor, 'base') && (
                                                             <Person style={{ fontSize: '50px', color: 'rgba(0, 255, 136, 0.3)' }} />
                                                         )}
                                                     </div>
                                                     
-                                                    {/* Actor Name + Author */}
+                                                    {/* Actor Name */}
                                                     <div style={{ textAlign: 'center' }}>
                                                         <div
                                                             style={{
@@ -304,19 +294,6 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                                         >
                                                             {actor.name}
                                                         </div>
-                                                        {getActorAuthor(actor) && (
-                                                            <div
-                                                                style={{
-                                                                    marginTop: '4px',
-                                                                    color: 'rgba(224, 240, 255, 0.5)',
-                                                                    fontSize: '12px',
-                                                                    fontWeight: 400,
-                                                                    fontFamily: 'system-ui, sans-serif',
-                                                                }}
-                                                            >
-                                                                {getActorAuthor(actor)}
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </motion.div>
                                             ))

@@ -3,10 +3,10 @@ import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer";
 import { Box, Typography } from "@mui/material";
-import { Favorite, FavoriteBorder, LastPage, PlayArrow, Send } from "@mui/icons-material";
+import { LastPage, PlayArrow, Send } from "@mui/icons-material";
 import { NamePlate } from "./UiComponents";
 import { useTooltip } from "./TooltipContext";
-import { Actor, clampActorAffinity, getEmotionImage } from "../content/Actor";
+import { Actor, getEmotionImage } from "../content/Actor";
 import { determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
 
 interface CalendarSkitScreenProps {
@@ -16,8 +16,6 @@ interface CalendarSkitScreenProps {
 }
 
 const CALENDAR_BACKGROUND_IMAGE = "https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png";
-const HEART_COUNT = 10;
-
 export const CalendarSkitScreen: FC<CalendarSkitScreenProps> = ({ stage, setScreenType, isVerticalLayout }) => {
     const { setTooltip } = useTooltip();
     const [isGeneratingNextSkit, setIsGeneratingNextSkit] = useState(false);
@@ -155,8 +153,6 @@ export const CalendarSkitScreen: FC<CalendarSkitScreenProps> = ({ stage, setScre
                     responsiveOverlay={(_skit, actor) => {
                         if (!actor || actor.id === stage().getPlayerActor().id) return null;
                         const typedActor = actor as Actor;
-                        const authorName = typedActor.fullPath?.split("/").filter(Boolean)[0] || "";
-                        const affinity = clampActorAffinity(typedActor.affinity);
                         return (
                             <Box
                                 sx={{
@@ -170,35 +166,6 @@ export const CalendarSkitScreen: FC<CalendarSkitScreenProps> = ({ stage, setScre
                             >
                                 <Box sx={{ marginBottom: 1 }}>
                                     <NamePlate actor={typedActor} />
-                                </Box>
-                                {authorName && (
-                                    <Typography
-                                        variant="caption"
-                                        sx={{
-                                            display: "block",
-                                            marginBottom: 1,
-                                            color: "rgba(185, 210, 227, 0.84)",
-                                            fontStyle: "italic",
-                                            fontFamily: '"Lora", Georgia, serif',
-                                        }}
-                                    >
-                                        by {authorName}
-                                    </Typography>
-                                )}
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 0.5,
-                                        marginBottom: 1,
-                                        color: "#f2adb8",
-                                    }}
-                                >
-                                    {Array.from({ length: HEART_COUNT }, (_, index) => (
-                                        index < affinity
-                                            ? <Favorite key={`heart-filled-${index}`} sx={{ fontSize: 16 }} />
-                                            : <FavoriteBorder key={`heart-empty-${index}`} sx={{ fontSize: 16, opacity: 0.65 }} />
-                                    ))}
                                 </Box>
                                 <Box sx={{ color: "#edf2f2", fontSize: "0.9rem", lineHeight: 1.4 }}>
                                     {typedActor.profile}

@@ -11,20 +11,6 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 
-export enum ActorType {
-    PLAYER = 'PLAYER', // Primary player, controlled by the user; player is also a prisoner, but treated distinctly
-    WARDEN = 'WARDEN', // Cassiel, special role that needs to be treated distinctly
-    PRISONER = 'PRISONER', // Most characters
-    ITEM = 'ITEM', // Some "characters" are souls trapped in items
-}
-
-export enum ActorState {
-    AVAILABLE = 'AVAILABLE', // Actor is available for interaction and can be included in skits
-    FORMA = 'FORMA', // Actor is currently in a forma and unavailable for SOCIAL interactions or as an expedition partner, but they can be encountered in skits in their forma state.
-    SHADE = 'SHADE', // Ill-defined at this time; unavailable for anything for now.
-    RECOVERING = 'RECOVERING', // Actor is recovering from an injury or trauma; unavailable for SOCIAL or EXPEDITION interactions, but could be added mid-skit, if the narrative calls for it.
-    TIMEOUT = 'TIMEOUT', // Actor has been placed in timeout by Cassiel; they are available for SOCIAL interactions, but they will not receive a bracer and are barred from EXPEDITION interactions.
-}
 
 // An outfit represents a set of clothing or physical transformation that can be applied to a specific actor; each outfit comes with a full set of emotions
 export type Outfit = {
@@ -37,13 +23,7 @@ export type Outfit = {
 
 export class Actor {
     id: string = ''; // UUID
-    type: ActorType = ActorType.PRISONER; // Default to PRISONER
-    state: ActorState = ActorState.AVAILABLE; // Default to AVAILABLE
     name: string = ''; // Display name
-    nicknames: string[] = []; // List of nicknames
-    lorebookName?: string; // Name to link to lorebook entries; if empty, use display name
-    fullPath: string = ''; // Path to original character definition
-    sampleImageUrl: string = ''; // Original reference image
     description: string = ''; // Core physical description—not outfit-oriented
     profile: string = ''; // Personality profile description of character
     outfitId: string = ''; // The ID of the current outfit for this actor; if empty, use the first outfit index
@@ -51,15 +31,7 @@ export class Actor {
     themeColor: string = ''; // Theme color (hex code)
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
-    affinity: number = 0; // Trust/reputation with the player, clamped between 0 and 10.
-    heightMultiplier?: number;
-
-    static clampAffinity(value: number | undefined | null): number {
-        if (!Number.isFinite(value)) {
-            return 0;
-        }
-        return Math.max(0, Math.min(10, Math.round(value as number)));
-    }
+    statMap: { [key: string]: number } = {}; // Map of custom stat name to numeric value for this actor
 
     /**
      * Rehydrate an Actor from saved data
@@ -67,8 +39,7 @@ export class Actor {
     static fromSave(savedActor: any): Actor {
         const actor = Object.create(Actor.prototype);
         Object.assign(actor, savedActor);
-        actor.affinity = Actor.clampAffinity(actor.affinity);
-        actor.state = savedActor.state || ActorState.AVAILABLE;
+        actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
         return actor;
     }
 
@@ -77,11 +48,9 @@ export class Actor {
         if (!this.id) {
             this.id = generateUuid();
         }
-        this.affinity = Actor.clampAffinity(this.affinity);
+        this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
     }
 }
-
-export const clampActorAffinity = (value: number | undefined | null): number => Actor.clampAffinity(value);
 
 const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
     { key: 'name', label: 'NAME', description: 'Their simple name' },
@@ -146,17 +115,18 @@ export const VOICE_MAP: {[key: string]: string} = {
 export async function loadSupportedActor(data: Partial<Actor>, stage: Stage): Promise<Actor|null> {
     // Canon data within the stage:
     const newActor = new Actor(data);
+    const sourcePath = ((data as any)?.fullPath || '').trim();
 
     // Retrieve data from Chub to fill in possible gaps:
     let definition: any = null;
     try {
-        // If fullPath is present and contains a "/", load the character details from Chub.
-        if (newActor.fullPath && newActor.fullPath.includes('/')) {
-            const response = await fetch(stage.characterDetailQuery.replace('{fullPath}', newActor.fullPath));
+        // If the source path is present and contains a "/", load character details from Chub.
+        if (sourcePath.includes('/')) {
+            const response = await fetch(stage.characterDetailQuery.replace('{fullPath}', sourcePath));
             definition = (await response.json()).node.definition;
         }
     } catch (error) {
-        console.warn(`Failed to fetch character details for ${data.name} at path ${newActor.fullPath}:`, error);
+        console.warn(`Failed to fetch character details for ${data.name} at path ${sourcePath}:`, error);
     }
 
     if (definition) {
@@ -186,7 +156,7 @@ export async function loadSupportedActor(data: Partial<Actor>, stage: Stage): Pr
         }
 
         // if newActor is missing critical fields like personality or outfits, distill these details to fill the gaps
-        if ((!newActor.profile || !newActor.outfits) && newActor.fullPath) {
+        if ((!newActor.profile || !newActor.outfits) && sourcePath) {
             return await distillActor(newActor, definition, stage);
         }
     }
@@ -257,9 +227,9 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         .format(),
         100,
         400);
-    stage.generationPromises[`distilling_actor/${actor.fullPath}`] = generationRequest.finally(() => {
+        stage.generationPromises[`distilling_actor/${actor.id}`] = generationRequest.finally(() => {
             console.log('Finished generating distillation for actor:', actor.name);
-            delete stage.generationPromises[`distilling_actor/${actor.fullPath}`];
+            delete stage.generationPromises[`distilling_actor/${actor.id}`];
     });
     const generatedResponse = await generationRequest;
     console.log('Generated character distillation:');
@@ -301,7 +271,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     const currentOutfit = getActiveOutfit(actor);
     if (!currentOutfit.emotionPack['base']) {
         // Kick off base image generation:
-        await generateBaseActorImage(actor, stage, false, true, actor.outfitId, actor.sampleImageUrl);
+        await generateBaseActorImage(actor, stage, false, true, actor.outfitId);
     } else if (!currentOutfit.emotionPack['neutral']) {
         // Kick off neutral image generation:
         await generateEmotionImage(actor, Emotion.neutral, stage, false, actor.outfitId);
@@ -393,7 +363,7 @@ export function getEmotionImage(actor: Actor, emotion: Emotion | string, stage?:
     const emotionPack = getOutfitById(actor, targetOutfitId).emotionPack;
     const emotionUrl = emotionPack[emotionKey];
     const neutralUrl = emotionPack['neutral'] || emotionPack['base'];
-    const fallbackUrl = neutralUrl || actor.sampleImageUrl || '';
+    const fallbackUrl = neutralUrl || '';
 
     // Check if we need to generate the image
     //if (stage && (!emotionUrl || emotionUrl === actor.sampleImageUrl || emotionUrl === emotionPack['base'] || (emotionKey !== 'neutral' && emotionUrl === neutralUrl))) {
@@ -432,7 +402,7 @@ export async function generateBaseActorImage(
             delete stage.generationPromises[`actor/${actor.id}`];
         }
         let imageUrl = '';
-        let baseSourceImage = sourceImageUrl || actor.sampleImageUrl || '';
+        let baseSourceImage = sourceImageUrl || '';
         
         if (!baseSourceImage || !fromAvatar) {
             console.log(`Generating new image for actor ${actor.name} from description`);
@@ -533,7 +503,7 @@ export function getActorLore(actorId: string, stage: Stage) {
 		return '';
 	}
 
-	const lore = getLinkedActorLore(actor.lorebookName || actor.name, stage);
+    const lore = getLinkedActorLore(actor.name, stage);
 	return lore?.content ?? '';
 }
 
@@ -552,7 +522,7 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage) {
 		return;
 	}
 
-	const linkedLore = getLinkedActorLore(actor.lorebookName || actor.name, stage);
+    const linkedLore = getLinkedActorLore(actor.name, stage);
 	if (linkedLore) {
 		linkedLore.content = lore;
 		return;

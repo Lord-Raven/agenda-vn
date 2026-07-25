@@ -4,7 +4,7 @@ import { Stage, SaveType } from '../Stage';
 import { Save, FolderOpen, Close, Delete } from '@mui/icons-material';
 import { ScreenType } from './BaseScreen';
 import { useTooltip } from './TooltipContext';
-import { ActorType, getEmotionImage } from '../content/Actor';
+import { getEmotionImage } from '../content/Actor';
 import { Button, Title } from './UiComponents';
 
 interface SaveLoadScreenProps {
@@ -63,7 +63,9 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
         const isCurrentSlot = stage().saveData.lastSaveSlot === slotIndex;
 
         // Get non-warden, non-player actors:
-        let actors = !isEmpty ? Object.values(save.actors).filter(actor => actor.type !== ActorType.WARDEN && actor.type !== ActorType.PLAYER) : [];
+        let actors = !isEmpty
+            ? Object.values(save.actors).filter(actor => actor.id !== save.playerId && actor.name.toLowerCase() !== 'cassiel')
+            : [];
         // Sort actors by most recent appearance in a skit (initial only).
         actors.map(actor => {
             const lastAppearance = save?.timeline.filter(entry => entry.skit).sort((a, b) => b.turn - a.turn).reduce((last, entry, index) => {

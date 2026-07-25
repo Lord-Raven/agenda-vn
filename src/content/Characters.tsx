@@ -1,7 +1,15 @@
-import { Actor, ActorState, ActorType } from "./Actor";
+import { Actor } from "./Actor";
+
+type ActorSeed = Partial<Actor> & {
+    fullPath?: string;
+    sampleImageUrl?: string;
+    heightMultiplier?: number;
+    type?: string;
+    nicknames?: string[];
+};
 
 
-export const BETA_CHARACTERS: Partial<Actor>[] = [
+export const BETA_CHARACTERS: ActorSeed[] = [
     {
         name: 'Haylon',
         fullPath: '',//Inanite/haylon-da4271ca7fee',
@@ -65,11 +73,11 @@ export const BETA_CHARACTERS: Partial<Actor>[] = [
 ];
 
 
-export const COMPLETE_CHARACTERS: Partial<Actor>[] = [
+export const COMPLETE_CHARACTERS: ActorSeed[] = [
     {
         id: `cassiel`,
         name: 'Cassiel',
-        type: ActorType.WARDEN,
+        type: 'WARDEN',
         description: `Cassiel is a towering eight-foot goddess with flowing green hair past her waist; it floats and flows as though submerged, and constellations twinkle in its shadows. Her emerald eyes pierce the soul, despite her perpetual impassivity.`,
         profile: `She built the Barrier. The signal that keeps you coherent and the city around it. But there are whispers, that before the sky broke, she was made to keep people in, not the world out. When the war ended and nothing was left, she did the only thing she was built to do: she preserved. She gave everyone a framework. She walks among us through her Constructs—attendant figures in white that move with too much grace, watch with too much attention. She inhabits a dozen at once. Some find this comforting. She does not seem to notice the difference. The warmth is real, though. You feel it in how she remembers everything you’ve said. She knows you are hurting before you do. It comes through words and actions. But her face gives you nothing to read.`,
         sampleImageUrl: 'https://media.charhub.io/3bb73e95-be2a-4f2c-bda7-1314e821eb3b/1641bc16-ede8-492c-b135-e82f019b3bed.png',
@@ -1383,7 +1391,7 @@ export const COMPLETE_CHARACTERS: Partial<Actor>[] = [
         name: 'Sam',
         fullPath: 'Beastmastaa/the-living-scythe-sam-a97cfbc256a1',
         sampleImageUrl: 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/aad73514-fc09-4241-ac38-851d7033e253/b223f2ae-44e9-4802-a719-5b46099999c4.png',
-        type: ActorType.ITEM,
+        type: 'ITEM',
         description: `A sentient, ornate war scythe. The weapon is crafted from a dark, polished metal that seems to drink the light. Its crescent blade is etched with faint, intricate patterns that shimmer when moved. It has no humanoid form, but its presence is communicated through a resonant, androgynous voice that seems to emanate from the weapon itself.`,
         themeColor: '#3dc2fa',
         themeFontFamily: `"Garamond", "Times New Roman", serif`,

@@ -7,7 +7,7 @@
 import React, { FC, ReactNode } from 'react';
 import { Actor } from '../content/Actor';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HourglassTop, HourglassBottom, Link } from '@mui/icons-material';
+import { HourglassTop, HourglassBottom } from '@mui/icons-material';
 import { Box, lighten, Chip as MuiChip, Typography } from '@mui/material';
 import { useTooltip } from './TooltipContext';
 
@@ -205,19 +205,12 @@ export const NamePlate: FC<NamePlateProps> = ({
 
 	const themeColor = actor.themeColor || '#8ab0cc';
 	const lightColor = lighten(themeColor, 0.6);
-	const { setTooltip, clearTooltip } = useTooltip();
-
-	const hoverText = actor.fullPath ? `Visit ${actor.name} by ${actor.fullPath.split('/')[0]}` : '';
-	const link = actor.fullPath && actor.fullPath.includes('/') ? `https://chub.ai/characters/${actor.fullPath}` : (actor.fullPath ? `https://chub.ai/users/${actor.fullPath}` : null);
+	const { clearTooltip } = useTooltip();
 
 	return (
 		<Box
-			component={link ? 'a' : 'div'}
-			href={link || undefined}
-			target={link ? '_blank' : undefined}
-			rel={link ? 'noopener noreferrer' : undefined}
+			component={'div'}
 			className={className}
-			onMouseEnter={() => link && setTooltip(hoverText, Link)}
 			onMouseLeave={clearTooltip}
 			sx={{
 				display: 'inline-flex',
@@ -244,7 +237,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 				fontSize: '1.2rem',
 				padding: '2px 6px',
 				minHeight: '30px',
-				cursor: link ? 'pointer' : 'default',
+				cursor: 'default',
 				textDecoration: 'none',
 				...style,
 				'&::after': {

@@ -448,7 +448,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                                 marginLeft: index === 0 ? 0 : -0.5,
                                                                                 borderRadius: "50%",
                                                                                 border: "1px solid rgba(237, 242, 242, 0.32)",
-                                                                                backgroundImage: `url(${getEmotionImage(actor, "neutral", stageInstance, actor.outfitId) || actor.sampleImageUrl})`,
+                                                                                backgroundImage: `url(${getEmotionImage(actor, "neutral", stageInstance, actor.outfitId) || getEmotionImage(actor, "base", stageInstance, actor.outfitId)})`,
                                                                                 backgroundSize: "cover",
                                                                                 backgroundPosition: "top center",
                                                                                 backgroundColor: "rgba(12, 18, 28, 0.88)",
@@ -528,7 +528,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         height: 26,
                                                         borderRadius: "50%",
                                                         border: "1px solid rgba(237, 242, 242, 0.34)",
-                                                        backgroundImage: `url(${getEmotionImage(actor, "neutral", stageInstance, actor.outfitId) || actor.sampleImageUrl})`,
+                                                        backgroundImage: `url(${getEmotionImage(actor, "neutral", stageInstance, actor.outfitId)})`,
                                                         backgroundSize: "cover",
                                                         backgroundPosition: "top center",
                                                     }}

@@ -1,5 +1,5 @@
 import React, { FC, useMemo, useState } from 'react';
-import { Stage, ContextSegment, CustomSetting, UiSettings } from '../Stage';
+import { Stage, ContextSegment, CustomSetting, UiSettings, ActorStat } from '../Stage';
 import { Button, GlassPanel, TextInput, Title } from './UiComponents';
 
 interface ConfigurationManagementPanelProps {
@@ -35,6 +35,37 @@ const defaultCustomSetting = (): CustomSetting => ({
     },
 });
 
+const cloneActorStat = (stat: ActorStat): ActorStat => ({
+    name: stat.name,
+    description: stat.description,
+    guidance: stat.guidance,
+    default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
+    displayType: stat.displayType,
+    min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
+    max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
+});
+
+const defaultActorStat = (): ActorStat => ({
+    name: 'Discipline',
+    description: 'How consistently this actor follows through under pressure.',
+    guidance: 'Use this to describe reliability and focus when stakes are high.',
+    default: 50,
+    displayType: 'percentage',
+    min: 0,
+    max: 100,
+});
+
+const clampStatValue = (value: number, stat: ActorStat): number => {
+    let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
+    if (typeof stat.min === 'number') {
+        resolved = Math.max(stat.min, resolved);
+    }
+    if (typeof stat.max === 'number') {
+        resolved = Math.min(stat.max, resolved);
+    }
+    return resolved;
+};
+
 const renderSegmentBody = (segment: ContextSegment): string => {
     if (typeof segment.body === 'string') {
         return segment.body;
@@ -54,6 +85,9 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
     );
     const [customSettings, setCustomSettings] = useState<CustomSetting[]>(() =>
         (configuration.settings || []).map(cloneSetting),
+    );
+    const [actorStats, setActorStats] = useState<ActorStat[]>(() =>
+        (configuration.actorStats || save.agendaConfig?.actorStats || []).map(cloneActorStat),
     );
     const [selectedSettings, setSelectedSettings] = useState<{ [key: string]: string }>(() => ({
         ...(save.agendaConfig?.selectedSettings || {}),
@@ -78,6 +112,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
         stageInstance.updateConfiguration({
             context: contextSegments,
             settings: customSettings,
+            actorStats,
         });
 
         const currentSave = stageInstance.getSave();
@@ -85,7 +120,33 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
             context: contextSegments.map(cloneSegment),
             settings: customSettings.map(cloneSetting),
             selectedSettings: validSelections,
+            actorStats: actorStats.map(cloneActorStat),
         };
+
+        const statNames = new Set(actorStats.map(stat => stat.name.trim()).filter(Boolean));
+        Object.values(currentSave.actors || {}).forEach(actor => {
+            if (!actor.statMap || typeof actor.statMap !== 'object') {
+                actor.statMap = {};
+            }
+
+            actorStats.forEach(stat => {
+                const statName = stat.name.trim();
+                if (!statName) {
+                    return;
+                }
+                const existing = actor.statMap[statName];
+                const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
+                const value = Number.isFinite(existing) ? Number(existing) : fallback;
+                actor.statMap[statName] = clampStatValue(value, stat);
+            });
+
+            Object.keys(actor.statMap).forEach(statName => {
+                if (!statNames.has(statName)) {
+                    delete actor.statMap[statName];
+                }
+            });
+        });
+
         stageInstance.updateUiSettings(uiSettings);
         stageInstance.saveGame();
 
@@ -126,6 +187,16 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
 
     const removeCustomSetting = (index: number) => {
         setCustomSettings(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const updateActorStat = (index: number, patch: Partial<ActorStat>) => {
+        setActorStats(prev => prev.map((stat, idx) =>
+            idx === index ? { ...stat, ...patch } : stat,
+        ));
+    };
+
+    const removeActorStat = (index: number) => {
+        setActorStats(prev => prev.filter((_, idx) => idx !== index));
     };
 
     const updateSettingOption = (settingIndex: number, optionName: string, segment: ContextSegment) => {
@@ -421,6 +492,82 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                     })}
 
                     <Button variant="secondary" onClick={() => setCustomSettings(prev => [...prev, defaultCustomSetting()])}>Add Custom Setting</Button>
+                </div>
+            </GlassPanel>
+
+            <GlassPanel variant="default" style={{ padding: '18px' }}>
+                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Actor Stats</Title>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {actorStats.map((stat, statIndex) => (
+                        <div key={`actor-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 10 }}>
+                            <TextInput
+                                fullWidth
+                                value={stat.name}
+                                onChange={(e) => updateActorStat(statIndex, { name: e.target.value })}
+                                placeholder="Stat name"
+                                style={{ marginBottom: 8 }}
+                            />
+
+                            <textarea
+                                className="input-base"
+                                value={stat.description}
+                                onChange={(e) => updateActorStat(statIndex, { description: e.target.value })}
+                                rows={2}
+                                placeholder="Describe what this stat represents."
+                                style={{ width: '100%', resize: 'vertical', marginBottom: 8 }}
+                            />
+
+                            <textarea
+                                className="input-base"
+                                value={stat.guidance}
+                                onChange={(e) => updateActorStat(statIndex, { guidance: e.target.value })}
+                                rows={2}
+                                placeholder="Guidance for using this stat in generated narrative."
+                                style={{ width: '100%', resize: 'vertical', marginBottom: 8 }}
+                            />
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginBottom: 8 }}>
+                                <TextInput
+                                    fullWidth
+                                    type="number"
+                                    value={String(stat.default)}
+                                    onChange={(e) => updateActorStat(statIndex, { default: Number(e.target.value) || 0 })}
+                                    placeholder="Default"
+                                />
+
+                                <TextInput
+                                    fullWidth
+                                    type="number"
+                                    value={typeof stat.min === 'number' ? String(stat.min) : ''}
+                                    onChange={(e) => updateActorStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                    placeholder="Min"
+                                />
+
+                                <TextInput
+                                    fullWidth
+                                    type="number"
+                                    value={typeof stat.max === 'number' ? String(stat.max) : ''}
+                                    onChange={(e) => updateActorStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                    placeholder="Max"
+                                />
+
+                                <select
+                                    className="input-base"
+                                    value={stat.displayType}
+                                    onChange={(e) => updateActorStat(statIndex, { displayType: e.target.value as ActorStat['displayType'] })}
+                                >
+                                    <option value="number">number</option>
+                                    <option value="percentage">percentage</option>
+                                    <option value="stars">stars</option>
+                                    <option value="letter grade">letter grade</option>
+                                </select>
+                            </div>
+
+                            <Button variant="danger" onClick={() => removeActorStat(statIndex)}>Remove Actor Stat</Button>
+                        </div>
+                    ))}
+
+                    <Button variant="secondary" onClick={() => setActorStats(prev => [...prev, defaultActorStat()])}>Add Actor Stat</Button>
                 </div>
             </GlassPanel>
 

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, ActorState, clampActorAffinity, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore } from '../content/Actor';
+import { Actor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
 import { Close, Save, Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { Button, Chip, GlassPanel, TextInput, Title } from './UiComponents';
@@ -18,9 +18,9 @@ const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 
 export const ActorDetailScreen: FC<ActorDetailScreenProps> = ({ actor, stage, onClose }) => {
     type ImageTarget = 'base' | Emotion;
-    type BaseRegenSource = 'description' | 'original sample' | `outfit:${string}`;
+    type BaseRegenSource = 'description' | `outfit:${string}`;
     const initialOutfitIdRef = useRef(actor.outfitId);
-    const linkedLoreEntry = getLinkedActorLore(actor.lorebookName || actor.name, stage());
+    const linkedLoreEntry = getLinkedActorLore(actor.name, stage());
 
     const getClonedOutfits = (): Outfit[] => {
         const sourceOutfits: Outfit[] = Array.isArray(actor.outfits) && actor.outfits.length > 0
@@ -46,8 +46,6 @@ export const ActorDetailScreen: FC<ActorDetailScreenProps> = ({ actor, stage, on
         description: string;
         profile: string;
         lore: string;
-        affinity: number;
-        state: ActorState;
         voiceId: string;
         themeColor: string;
         themeFontFamily: string;
@@ -56,8 +54,6 @@ export const ActorDetailScreen: FC<ActorDetailScreenProps> = ({ actor, stage, on
         description: actor.description || '',
         profile: actor.profile || '',
         lore: linkedLoreEntry?.content || '',
-        affinity: clampActorAffinity(actor.affinity),
-        state: actor.state || ActorState.AVAILABLE,
         voiceId: actor.voiceId,
         themeColor: actor.themeColor,
         themeFontFamily: actor.themeFontFamily,
@@ -80,7 +76,7 @@ export const ActorDetailScreen: FC<ActorDetailScreenProps> = ({ actor, stage, on
         open: boolean;
         target: ImageTarget | null;
     }>({ open: false, target: null });
-    const [baseRegenSource, setBaseRegenSource] = useState<BaseRegenSource>(() => (actor.sampleImageUrl ? 'original sample' : 'description'));
+    const [baseRegenSource, setBaseRegenSource] = useState<BaseRegenSource>('description');
     const [emotionPromptDraft, setEmotionPromptDraft] = useState('');
     const [isImageDropActive, setIsImageDropActive] = useState(false);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -167,8 +163,6 @@ export const ActorDetailScreen: FC<ActorDetailScreenProps> = ({ actor, stage, on
         if (linkedLoreEntry) {
             updateActorLore(actor.id, editedActor.lore, stage());
         }
-        actor.affinity = clampActorAffinity(editedActor.affinity);
-        actor.state = editedActor.state;
         actor.voiceId = editedActor.voiceId;
         actor.themeColor = editedActor.themeColor;
         actor.themeFontFamily = editedActor.themeFontFamily;
@@ -195,7 +189,7 @@ export const ActorDetailScreen: FC<ActorDetailScreenProps> = ({ actor, stage, on
     const handleInputChange = (field: string, value: string | number) => {
         setEditedActor(prev => ({
             ...prev,
-            [field]: field === 'affinity' ? clampActorAffinity(Number(value)) : value
+            [field]: value
         }));
     };
 
@@ -397,7 +391,7 @@ ${indent}}`;
     const handleOpenImageDialog = (target: ImageTarget) => {
         setImageDialog({ open: true, target });
         if (target === 'base') {
-            setBaseRegenSource(actor.sampleImageUrl ? 'original sample' : 'description');
+            setBaseRegenSource('description');
             setEmotionPromptDraft('');
         } else {
             setEmotionPromptDraft(getEmotionPrompt(target));
@@ -458,20 +452,12 @@ ${indent}}`;
     const handleRegenerateBase = async (source: BaseRegenSource) => {
         if (regeneratingImages.has('base')) return;
 
-        const hasOriginalSample = !!actor.sampleImageUrl;
         const sourceOutfitId = source.startsWith('outfit:') ? source.slice('outfit:'.length) : '';
         const sourceOutfit = editedOutfits.find((outfit) => outfit.id === sourceOutfitId);
         const sourceImageUrl = sourceOutfit?.emotionPack?.base || '';
-        const selectedLabel = source === 'original sample'
-            ? 'Original Sample Image'
-            : source === 'description'
+        const selectedLabel = source === 'description'
                 ? 'Description Only'
                 : `Outfit: ${sourceOutfit?.name || 'Unknown Outfit'}`;
-
-        if (source === 'original sample' && !hasOriginalSample) {
-            stage().showPriorityMessage('Original sample is not available for this actor.');
-            return;
-        }
 
         if (source.startsWith('outfit:') && !sourceImageUrl) {
             stage().showPriorityMessage('The selected outfit does not have an original sample.');
@@ -659,7 +645,6 @@ ${indent}}`;
     const dialogEmotionIndex = isDialogEmotionTarget ? allEmotions.indexOf(imageDialog.target as Emotion) : -1;
     const baseRegenOutfitOptions = editedOutfits.filter((outfit) => !!outfit.emotionPack?.base);
     const baseRegenOptions: Array<{ value: BaseRegenSource; label: string }> = [
-        ...(actor.sampleImageUrl ? [{ value: 'original sample' as BaseRegenSource, label: 'Original Sample Image' }] : []),
         { value: 'description' as BaseRegenSource, label: 'Description Only' },
         ...baseRegenOutfitOptions.map((outfit) => ({
             value: `outfit:${outfit.id}` as BaseRegenSource,
@@ -807,66 +792,6 @@ ${indent}}`;
                                             placeholder="Character name"
                                         />
                                     </div>
-
-                                    <div>
-                                        <label
-                                            style={{
-                                                display: 'block',
-                                                color: '#00ff88',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold',
-                                                marginBottom: '8px',
-                                            }}
-                                        >
-                                            Affinity (0-10)
-                                        </label>
-                                        <TextInput
-                                            type="number"
-                                            min={0}
-                                            max={10}
-                                            step={1}
-                                            fullWidth
-                                            value={editedActor.affinity}
-                                            onChange={(e) => handleInputChange('affinity', e.target.value)}
-                                            placeholder="0"
-                                        />
-                                    </div>
-
-                                    { /*<div>
-                                        <label
-                                            style={{
-                                                display: 'block',
-                                                color: '#00ff88',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold',
-                                                marginBottom: '8px',
-                                            }}
-                                        >
-                                            State
-                                        </label>
-                                        <select
-                                            value={editedActor.state}
-                                            onChange={(e) => handleInputChange('state', e.target.value as ActorState)}
-                                            style={{
-                                                width: '100%',
-                                                padding: '12px',
-                                                fontSize: '14px',
-                                                backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                border: '2px solid rgba(0, 255, 136, 0.3)',
-                                                borderRadius: '5px',
-                                                color: '#e0f0ff',
-                                                fontFamily: 'inherit',
-                                                cursor: 'pointer',
-                                            }}
-                                        >
-                                            {Object.values(ActorState).map((state) => (
-                                                <option key={state} value={state}>
-                                                    {state}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div> 
-                                    */}
 
                                     <div>
                                         <label 
@@ -1454,21 +1379,6 @@ ${indent}}`;
                                             {actor.id}
                                         </div>
                                     </div>
-                                    {actor.fullPath && (
-                                        <div style={{ gridColumn: '1 / -1' }}>
-                                            <div style={{ color: 'rgba(0, 255, 136, 0.7)', fontSize: '12px', marginBottom: '4px' }}>
-                                                Source Path
-                                            </div>
-                                            <div style={{ 
-                                                color: '#e0f0ff', 
-                                                fontSize: '12px', 
-                                                fontFamily: 'monospace',
-                                                wordBreak: 'break-all'
-                                            }}>
-                                                {actor.fullPath}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </section>
                         </div>
