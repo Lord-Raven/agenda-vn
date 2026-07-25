@@ -10,6 +10,18 @@ import {
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
+import { ActorStat } from "../Stage";
+
+
+function renderContextSegment(segment: any): string {
+    if (typeof segment.body === 'string') {
+        return segment.body;
+    }
+    if (Array.isArray(segment.body)) {
+        return segment.body.map((child: any) => `${child.title}:\n${renderContextSegment(child)}`).join('\n\n');
+    }
+    return '';
+}
 
 
 // An outfit represents a set of clothing or physical transformation that can be applied to a specific actor; each outfit comes with a full set of emotions
@@ -92,6 +104,30 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
     },
 ];
 
+function buildActorStatFields(actorStats: ActorStat[]): StructuredFieldDefinition[] {
+    return actorStats.map((stat, index) => ({
+        key: `stat_${index}`,
+        label: `STAT ${index + 1}`,
+        description:
+            `Numeric value for \"${stat.name}\".` +
+            ` Description: ${stat.description || 'N/A'}.` +
+            ` Guidance: ${stat.guidance || 'N/A'}.` +
+            ` Range: ${typeof stat.min === 'number' ? stat.min : '-inf'} to ${typeof stat.max === 'number' ? stat.max : '+inf'}.` +
+            ` Default: ${Number.isFinite(stat.default) ? Number(stat.default) : 0}.`,
+    }));
+}
+
+function clampActorStatValue(value: number, stat: ActorStat): number {
+    let normalized = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
+    if (typeof stat.min === 'number') {
+        normalized = Math.max(stat.min, normalized);
+    }
+    if (typeof stat.max === 'number') {
+        normalized = Math.min(stat.max, normalized);
+    }
+    return normalized;
+}
+
 // Mapping of voice IDs to a description of the voice, so the AI can choose an ID based on the character profile.
 export const VOICE_MAP: {[key: string]: string} = {
     '751212e5-a871-45c7-b10b-6f42a5785954': 'feminine - posh and catty',
@@ -115,19 +151,7 @@ export const VOICE_MAP: {[key: string]: string} = {
 export async function loadSupportedActor(data: Partial<Actor>, stage: Stage): Promise<Actor|null> {
     // Canon data within the stage:
     const newActor = new Actor(data);
-    const sourcePath = ((data as any)?.fullPath || '').trim();
-
-    // Retrieve data from Chub to fill in possible gaps:
     let definition: any = null;
-    try {
-        // If the source path is present and contains a "/", load character details from Chub.
-        if (sourcePath.includes('/')) {
-            const response = await fetch(stage.characterDetailQuery.replace('{fullPath}', sourcePath));
-            definition = (await response.json()).node.definition;
-        }
-    } catch (error) {
-        console.warn(`Failed to fetch character details for ${data.name} at path ${sourcePath}:`, error);
-    }
 
     if (definition) {
         console.log(`Loaded character definition for ${data.name} from Chub:`);
@@ -156,9 +180,18 @@ export async function loadSupportedActor(data: Partial<Actor>, stage: Stage): Pr
         }
 
         // if newActor is missing critical fields like personality or outfits, distill these details to fill the gaps
-        if ((!newActor.profile || !newActor.outfits) && sourcePath) {
+        if (!newActor.profile || !newActor.outfits?.length) {
             return await distillActor(newActor, definition, stage);
         }
+    }
+
+    if (!newActor.profile || !newActor.outfits?.length) {
+        const fallbackDefinition = {
+            name: newActor.name,
+            personality: [newActor.description, newActor.profile].filter(Boolean).join('\n').trim() || newActor.name,
+            voice_id: newActor.voiceId,
+        };
+        return await distillActor(newActor, fallbackDefinition, stage);
     }
 
     return newActor;
@@ -191,27 +224,56 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         'school': 'college'};
 
 
+    const actorStats = (stage.getSave().agendaConfig?.actorStats || []).filter(stat => stat?.name?.trim());
+    const actorStatFields = buildActorStatFields(actorStats);
+    const distillationFields = [...DISTILLATION_FIELDS, ...actorStatFields];
+
     // Preserve content while removing JSON-like structures.
-    definition.personality = definition.personality.replace(/{/g, '(').replace(/}/g, ')');
+    const definitionPersonality = String(definition.personality || actor.profile || actor.description || actor.name || '')
+        .replace(/{/g, '(')
+        .replace(/}/g, ')');
+    definition.personality = definitionPersonality;
+
+    const actorStatContext = actorStats.length > 0
+        ? actorStats.map((stat, index) => {
+            const defaultValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
+            const minValue = typeof stat.min === 'number' ? `${stat.min}` : '-inf';
+            const maxValue = typeof stat.max === 'number' ? `${stat.max}` : '+inf';
+            return `${index + 1}. ${stat.name}\nDescription: ${stat.description || 'N/A'}\nGuidance: ${stat.guidance || 'N/A'}\nRange: ${minValue} to ${maxValue}\nDefault: ${defaultValue}`;
+        }).join('\n\n')
+        : 'No custom actor stats are configured.';
+
+    const exampleStatValues = Object.fromEntries(actorStatFields.map((field, index) => {
+        const sourceStat = actorStats[index];
+        const fallbackValue = Number.isFinite(sourceStat?.default) ? Number(sourceStat.default) : 0;
+        return [field.key, `${fallbackValue}`];
+    }));
 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
+    const buildWorldContext = (builder: any) => {
+        (stage.getConfiguration().context || []).forEach(segment => {
+            builder.addBlock(segment.title, renderContextSegment(segment));
+        });
+    };
+    
     const generationRequest = stage.generateText(buildPrompt()
             .addBlock('Instructions',
-                `This is preparatory request for structured and formatted game content. This game is a post-apocalyptic science-fantasy game in which the world is an unknowable relic of its past self. ` +
-                `The denizens of this world—referred to as 'prisoners'—have been pulled from across time, resulting in a diverse and eclectic mix of characters. Most have only vague memories of their past lives, ` +
-                `but all have rich and detailed personalities that persist and even new motives driving their existence in a new world. ` +
-                `All prisoners live in the sole populated city of Ardeia and serve its Warden, Cassiel, an eight-foot, angelic woman who oversees the city's operations with a mix of benevolence and authority. ` +
-                `The player of this game, ${stage.getPlayerActor()?.name || 'Player'}, is one of the many prisoners, bearing the signature bracer that binds them to Ardeia and the Warden. ` +
-                `The prisoners work to keep the city running while also exploring the Outside, beyond the cities walls and Barriers. Some are new arrivals, while others have been here for centuries. ` +
-                `They find all manner of otherworldly artifacts and remnants among the mysterious, war-torn, or overgrown ruins of the old world, including relics, constructs, forma, and errata. ` +
-                `\n\nThe Character Details below describe a character of this world (${actor.name}) to convert into a set of defined fields for this game.`)
+                `This is preparatory request for structured and formatted game content. ` +
+                `The world and its rules are described below. ` +
+                `The character details below describe a character of this world (${actor.name}) to convert into a set of defined fields for this game.`)
+            .addBlock('World Context', buildWorldContext)
             .addBlock('Character Details', definition.personality)
+            .addBlock('Custom Actor Stats', actorStatContext)
+            .addBlock('Stat Guidance',
+                actorStats.length > 0
+                    ? `Output one numeric value for each STAT field in the response format. Keep values in range and aligned with the character profile.`
+                    : `No stat output is required beyond the base fields.`)
             .addBlock('Available Voices', Object.entries(VOICE_MAP).map(([voiceId, voiceDesc]) => ' - ' + voiceId + ': ' + voiceDesc).join('\n'))
             .addBlock('Response Format',
-                buildStructuredResponseFormat(DISTILLATION_FIELDS, { includeEndTag: true }))
+                buildStructuredResponseFormat(distillationFields, { includeEndTag: true }))
             .addBlock('Example Response',
                 buildStructuredExampleResponse(
-                    DISTILLATION_FIELDS,
+                    distillationFields,
                     {
                         name: 'Jane Doe',
                         description: 'A tall, athletic woman with short, dark hair and piercing blue eyes. She rarely smiles, but when she does, it lights up her face.',
@@ -221,6 +283,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
                         voice: '03a438b7-ebfa-4f72-9061-f086d8f1fca6',
                         color: '#666666',
                         font: 'Calibri, sans-serif',
+                        ...exampleStatValues,
                     },
                     { includeEndTag: true }
                 ))
@@ -234,7 +297,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     const generatedResponse = await generationRequest;
     console.log('Generated character distillation:');
     console.log(generatedResponse);
-    const parsedData = parseStructuredResponse(generatedResponse, DISTILLATION_FIELDS);
+    const parsedData = parseStructuredResponse(generatedResponse, distillationFields);
 
     // Validate that parsedData['color'] is a valid hex color, otherwise assign a random default:
     const themeColor = /^#([0-9A-F]{6}|[0-9A-F]{8})$/i.test(parsedData['color']) ?
@@ -248,6 +311,15 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     actor.themeColor = actor.themeColor || themeColor;
     actor.themeFontFamily = actor.themeFontFamily || parsedData['font'] || 'Arial, sans-serif';
     actor.outfits = actor.outfits.length > 0 ? actor.outfits : [];
+    actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
+
+    actorStats.forEach((stat, index) => {
+        const parsedValue = Number(parsedData[`stat_${index}`]);
+        const currentValue = Number(actor.statMap[stat.name]);
+        const fallbackValue = Number.isFinite(currentValue) ? currentValue : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
+        const resolvedValue = Number.isFinite(parsedValue) ? parsedValue : fallbackValue;
+        actor.statMap[stat.name] = clampActorStatValue(resolvedValue, stat);
+    });
 
     if (actor.outfits.length === 0) {
 
@@ -364,12 +436,6 @@ export function getEmotionImage(actor: Actor, emotion: Emotion | string, stage?:
     const emotionUrl = emotionPack[emotionKey];
     const neutralUrl = emotionPack['neutral'] || emotionPack['base'];
     const fallbackUrl = neutralUrl || '';
-
-    // Check if we need to generate the image
-    //if (stage && (!emotionUrl || emotionUrl === actor.sampleImageUrl || emotionUrl === emotionPack['base'] || (emotionKey !== 'neutral' && emotionUrl === neutralUrl))) {
-        // Kick off generation in the background (don't wait)
-        // generateEmotionImage(actor, emotion as Emotion, stage, false, targetOutfitId);
-    //}
 
     // Return the emotion image or fallback
     return emotionUrl || fallbackUrl;
@@ -592,7 +658,7 @@ export function getNameSimilarity(name: string, possibleName: string): number {
  * Find the best matching name from a list of candidates.
  * @param searchName The name to search for
  * @param candidates An array of objects with name properties
- * @param nameProperties The properties to use for comparison—default is ['name'] but could be ['name', 'nicknames'] (where nicknames is an array of strings)
+ * @param nameProperties The properties to use for comparison—default is ['name']
  * @returns The best matching candidate, or null if no good match is found
  */
 export function findBestNameMatch<T extends Record<K, string | string[]>, K extends string = 'name'>(

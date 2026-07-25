@@ -4,12 +4,11 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, findBestNameMatch, loadSupportedActor, getActorLore, getEmotionImage } from "./content/Actor";
 import { Emotion } from "./content/Emotion";
 import { AffinityChangeInfo } from "./screens/AffinityPopIn";
-import { BETA_CHARACTERS, COMPLETE_CHARACTERS } from "./content/Characters";
 import { Item } from "./content/Item";
 import { generateContext, Skit, SkitType } from "./content/Skit";
 import { createDefaultAtlas, getLinkedLocationLore, Location } from "./content/Location";
 import { BaseScreen } from "./screens/BaseScreen";
-import { fetchLorebook, Lore } from "./content/Lore";
+import { fetchLorebook, Lore, updateTypeMapping } from "./content/Lore";
 import { DEFAULT_PLAYER_THEME_COLOR } from "./screens/SettingsScreen";
 import {buildPrompt} from "./utils/PromptBuilder.js";
 import {
@@ -110,6 +109,24 @@ const LORE_UPDATE_RESPONSE_FIELDS: StructuredFieldDefinition[] = [
     },
 ];
 
+const ACTOR_SEED_FIELDS: StructuredFieldDefinition[] = [
+    {
+        key: 'name',
+        label: 'NAME',
+        description: 'A distinct first name or codename for the prisoner.',
+    },
+    {
+        key: 'profile',
+        label: 'PROFILE',
+        description: '2-4 sentences describing personality, motives, and social role in this world.',
+    },
+    {
+        key: 'description',
+        label: 'DESCRIPTION',
+        description: '1-3 sentences describing key visual traits to guide character art distillation.',
+    },
+];
+
 export type CalendarEvent = {
     id: string;
     name: string;
@@ -200,9 +217,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
 
     readonly SAVE_SLOT_COUNT = 10;
-    readonly characterDetailQuery = 'https://inference.chub.ai/api/characters/{fullPath}?full=true';
-    
-
     readonly INITIAL_ACTORS = 33; // Gotta load 'em all.
 
     saveData: ChatStateType;
@@ -417,14 +431,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         this.anticipatedLoadingPromiseCount = Math.max(this.INITIAL_ACTORS - Object.keys(newSave.actors).length, 0) * 1 + 3;
-
-        // Load Cassiel as the Warden and add to actors
-        loadSupportedActor(COMPLETE_CHARACTERS.find(char => char.name === 'Cassiel') || {}, this).then(cassielActor => {
-            if (cassielActor) {
-                newSave.actors[`cassiel`] = cassielActor;
-                this.saveGame(); // Save after adding Cassiel so that we have her in the save data when we generate her emotion images and lorebook entry.
-            }
-        });
 
         this.generationPromises['lorebook'] = fetchLorebook().then(loreEntries => {
             newSave.lorebook = loreEntries;
@@ -1188,56 +1194,169 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return updateResponse.data[0].value;
     }
 
+    private buildActiveSettingContextSummary(save: SaveType): string {
+        const agendaConfig = save.agendaConfig;
+        if (!agendaConfig?.settings?.length) {
+            return 'No custom setting context is active.';
+        }
+
+        const lines: string[] = [];
+        for (const setting of agendaConfig.settings) {
+            const optionName = agendaConfig.selectedSettings?.[setting.title] || Object.keys(setting.options || {})[0] || '';
+            if (!optionName) {
+                continue;
+            }
+
+            const context = setting.options?.[optionName];
+            if (!context) {
+                continue;
+            }
+
+            const contextBody = typeof context.body === 'string'
+                ? context.body
+                : (context.body || []).map(segment => `${segment.title}: ${typeof segment.body === 'string' ? segment.body : ''}`).join('\n');
+            lines.push(`${setting.title}: ${optionName}\n${context.title}: ${contextBody}`.trim());
+        }
+
+        return lines.length > 0 ? lines.join('\n\n') : 'No custom setting context is active.';
+    }
+
+    private buildActorSeedPrompt(save: SaveType, existingActorNames: string[]): string {
+        return buildPrompt()
+            .addBlock('Instructions',
+                `This is a preparatory request for generating one new supporting prisoner for a narrative game. ` +
+                `Create an original character who fits the world and does not duplicate any existing character names. ` +
+                `Avoid using the player name or Cassiel. Keep it grounded for social scenes in Ardeia.`)
+            .addBlock('World Context',
+                `Ardeia is the only populated city in a post-apocalyptic science-fantasy world. ` +
+                `Prisoners are drawn across time with fragmented memories but vivid personalities and motives.`)
+            .addBlock('Active Configuration Context', this.buildActiveSettingContextSummary(save))
+            .addBlock('Existing Character Names', existingActorNames.join(', '))
+            .addBlock('Response Format', buildStructuredResponseFormat(ACTOR_SEED_FIELDS, { includeEndTag: true }))
+            .addBlock('Example Response',
+                buildStructuredExampleResponse(
+                    ACTOR_SEED_FIELDS,
+                    {
+                        name: 'Mirel',
+                        profile: 'Mirel is observant, practical, and quietly theatrical when she tells stories. She scavenges old transit hubs for useful artifacts and treats every social exchange like a puzzle. She wants status in Ardeia but fears becoming dependent on anyone.',
+                        description: 'A lean woman with short copper hair, soot-smudged skin, and alert amber eyes. She wears layered expedition gear with salvaged metallic charms and a patched hooded cloak.',
+                    },
+                    { includeEndTag: true },
+                ))
+            .format();
+    }
+
+    private async generateActorSeed(save: SaveType): Promise<Partial<Actor> | null> {
+        const existingActorNames = Object.values(save.actors || {})
+            .map(actor => actor.name?.trim())
+            .filter((name): name is string => Boolean(name));
+
+        const response = await this.generateText(this.buildActorSeedPrompt(save, existingActorNames), 40, 220);
+        const parsed = parseStructuredResponse(response, ACTOR_SEED_FIELDS);
+        const name = (parsed['name'] || '').trim();
+        if (!name) {
+            return null;
+        }
+
+        return {
+            name,
+            profile: (parsed['profile'] || '').trim(),
+            description: (parsed['description'] || '').trim(),
+            outfits: [],
+            outfitId: '',
+            statMap: {},
+        };
+    }
+
     async loadActors() {
         if (Object.keys(this.generationPromises).includes('loadActors')) {
             return this.generationPromises['loadActors'];
         }
 
-        const promise = new Promise<string>(async (resolve, reject) => {
-            try {
-                console.log(`Loading reserve actors...${Object.keys(this.getSave().actors || {}).length}`);
-                console.log(this.getSave().actors);
-                let actors = this.getSave().actors || {};
-                const minLoopDurationMs = 1000;
-                while (Object.keys(actors).length < this.INITIAL_ACTORS) {
-                    // Load one random actor from a hardcoded whitelist of fullPaths (COMPLETE_CHARACTERS); filter out characters that are already in actors
-                    console.log('Loading reserve actor from supported characters...');
-                    const character = this.pickRandom((this.getSave().betaMode ? [...COMPLETE_CHARACTERS, ...BETA_CHARACTERS] : COMPLETE_CHARACTERS).filter(charDef => !Object.values(actors).some(actor => actor.name === charDef.name)));
-                    if (!character) {
-                        console.warn('No more supported characters to load as reserve actors.');
-                        break;
-                    } else if (!character.name) {
+        const promise = (async () => {
+            const save = this.getSave();
+            const configuredActors = this.getConfiguration().actors || [];
+
+            // Seed actors from the game configuration first.
+            for (const configuredActor of configuredActors) {
+                const seededActor = new Actor({
+                    ...configuredActor,
+                    statMap: configuredActor?.statMap && typeof configuredActor.statMap === 'object'
+                        ? { ...configuredActor.statMap }
+                        : {},
+                });
+
+                if (!save.actors[seededActor.id]) {
+                    save.actors[seededActor.id] = seededActor;
+                }
+            }
+
+            this.syncActorStats(save);
+
+            // Distill seeded actors with incomplete details.
+            const seededCandidates = Object.values(save.actors).filter(actor =>
+                actor.id !== save.playerId && (!actor.profile?.trim() || !actor.description?.trim() || !actor.outfits?.length),
+            );
+
+            for (const seededActor of seededCandidates) {
+                try {
+                    const enrichedActor = await loadSupportedActor(seededActor, this);
+                    if (enrichedActor) {
+                        save.actors[enrichedActor.id] = enrichedActor;
+                        this.syncActorStats(save);
+                    }
+                } catch (error) {
+                    console.warn(`Failed to distill configured actor ${seededActor.name || seededActor.id}`, error);
+                }
+            }
+
+            // Generate additional actors until we reach the initial roster size.
+            let attemptsRemaining = Math.max((this.INITIAL_ACTORS - Object.keys(save.actors).length) * 2, 0);
+            while (Object.keys(save.actors).length < this.INITIAL_ACTORS && attemptsRemaining > 0) {
+                attemptsRemaining -= 1;
+
+                let actorSeed: Partial<Actor> | null = null;
+                try {
+                    actorSeed = await this.generateActorSeed(save);
+                } catch (error) {
+                    console.warn('Failed to generate actor seed', error);
+                    continue;
+                }
+
+                if (!actorSeed?.name) {
+                    continue;
+                }
+
+                const nameKey = actorSeed.name.trim().toLowerCase();
+                const duplicateByName = Object.values(save.actors).some(existing => existing.name?.trim().toLowerCase() === nameKey);
+                if (duplicateByName) {
+                    continue;
+                }
+
+                const draftActor = new Actor(actorSeed);
+                try {
+                    const newActor = await loadSupportedActor(draftActor, this);
+                    if (!newActor) {
                         continue;
                     }
-                    // Enforce a minimum loop duration; loadSupportedActor time counts toward this.
-                    const loopStartTime = Date.now();
 
-                    const loadPromise = loadSupportedActor(character, this);
-                    this.generationPromises[`loading ${character.name}`] = loadPromise;
-                    loadPromise.then(() => delete this.generationPromises[`loading ${character.name}`]);
+                    const alreadyExists = Object.values(save.actors).some(existing =>
+                        existing.id === newActor.id || existing.name?.trim().toLowerCase() === newActor.name?.trim().toLowerCase(),
+                    );
+                    if (alreadyExists) {
+                        continue;
+                    }
 
-                    const newActor = await loadPromise;
-                    const loopElapsedMs = Date.now() - loopStartTime;
-                    if (loopElapsedMs < minLoopDurationMs) {
-                        await new Promise(resolve => setTimeout(resolve, minLoopDurationMs - loopElapsedMs));
-                    }
-                    if (newActor) {
-                        console.log(`Loaded reserve actor ${newActor.name}`);
-                        this.getSave().actors = {...actors, [newActor.id]: newActor};
-                        actors = this.getSave().actors || {};
-                    } else {
-                        console.warn(`Failed to load actor ${character.name}`);
-                    }
+                    save.actors[newActor.id] = newActor;
+                    this.syncActorStats(save);
+                } catch (error) {
+                    console.warn(`Failed to generate actor from seed ${actorSeed.name}`, error);
                 }
-                console.log('Finished loading reserve actors');
-                delete this.generationPromises['loadActors'];
-                this.saveGame();
-                resolve('');
-            } catch (err) {
-                console.error('Error loading reserve actors', err);
-                delete this.generationPromises['loadActors'];
-                reject(err);
             }
+
+            this.saveGame();
+        })().finally(() => {
+            delete this.generationPromises['loadActors'];
         });
 
         console.log('Set promise');

@@ -13,6 +13,16 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 
+function renderContextSegment(segment: any): string {
+    if (typeof segment.body === 'string') {
+        return segment.body;
+    }
+    if (Array.isArray(segment.body)) {
+        return segment.body.map((child: any) => `${child.title}:\n${renderContextSegment(child)}`).join('\n\n');
+    }
+    return '';
+}
+
 export enum SkitType {
     INTRO = 'INTRO',
     SOCIAL = 'SOCIAL',
@@ -160,16 +170,21 @@ function flattenContextSegments(segments: Array<{ title: string; body: string | 
     }).join('\n');
 }
 
-export function buildPremise(playerName: string): string {
-    return `This game is a post-apocalyptic science-fantasy game in which the world is an unknowable relic of its past self. ` +
-            `Ever since the end of the world—two centuries ago—the lone, overgrown city of Ardeia has stood as the final bastion of humanity. ` +
-            `The population of Ardeia—referred to as 'prisoners'—have been pulled from across time, resulting in a diverse and eclectic mix of characters. ` +
-            `Most have only vague memories of their past lives, ` +
-            `but all have rich and detailed personalities and motives driving their existence in a new world. ` +
-            `Prisoners of Ardeia serve its Warden, Cassiel, an eight-foot, angelic woman who oversees the city's operations with a mix of benevolence and authority. ` +
-            `\nThe player of this game, ${playerName}, is one of these many prisoner citizens. ` +
-            `This game revolves around ${playerName}'s journey through this world, as they interact with other prisoners or embark on dangerous or intriguing expeditions. ` +
-            `These expeditions discover all manner of otherworldly artifacts and remnants among the mysterious, war-torn, or overgrown ruins of the old world, including relics, constructs, forma, and errata. `;
+export function buildPremise(playerName: string, stage?: any): string {
+    // Build world context from configuration if stage is provided
+    let worldContext = '';
+    if (stage) {
+        const contextSegments = (stage.getConfiguration?.()?.context || []);
+        worldContext = contextSegments.map(segment => renderContextSegment(segment)).join('\n\n');
+    }
+    
+    // Fallback generic premise if no configuration context available
+    if (!worldContext) {
+        worldContext = `This is a science-fantasy game set in a unique world. The player is one of many characters navigating this world, interacting with others and embarking on expeditions to discover artifacts and remnants of the old world.`;
+    }
+    
+    return `${worldContext}\n\nThe player of this game, ${playerName}, is one of the citizens of this world. ` +
+            `This game revolves around ${playerName}'s journey through this world, as they interact with other characters or embark on dangerous or intriguing expeditions.`;
 }
 
 export function generateContext(skit: Skit|undefined, stage: Stage, historyLength: number): ((b: PromptBuilder) => any) {
@@ -243,7 +258,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Finally, order the triggeredLore list by insertion order, so that earlier lore entries appear first in the context.
     triggeredLore = triggeredLore.sort((a, b) => a.insertionOrder - b.insertionOrder);
 
-    return (builder: PromptBuilder) => builder.addBlock(`Premise`, buildPremise(playerName))
+    return (builder: PromptBuilder) => builder.addBlock(`Premise`, buildPremise(playerName, stage))
         .addBlock(`Agenda Context`, agendaContext || 'None.')
         .addBlock(`Selected Custom Settings`, selectedSettingContext || 'None.')
         .addBlock(`Lore Entries`, (builder) => {
@@ -476,7 +491,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             continue;
                         }
 
-                        const matchedActor = findBestNameMatch(moverName, allActors, ['name', 'nicknames']);
+                        const matchedActor = findBestNameMatch(moverName, allActors, ['name']);
                         if (!matchedActor) continue;
 
                         const isMoveToCurrentScene = destinationUpper === 'HERE' ||
@@ -502,7 +517,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         const characterName = outfitMatch[1].trim();
                         const outfitName = outfitMatch[2].trim();
                         // Find matching actor using findBestNameMatch
-                        const matched = findBestNameMatch(characterName, allActors, ['name', 'nicknames']);
+                        const matched = findBestNameMatch(characterName, allActors, ['name']);
                         if (!matched) continue;
 
                         // Find matching outfit for this actor
@@ -523,7 +538,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         const characterName = emotionMatch[1].trim();
                         const emotionName = emotionMatch[2].trim().toLowerCase();
                         // Find matching actor using findBestNameMatch
-                        const matched = findBestNameMatch(characterName, allActors, ['name', 'nicknames']);
+                        const matched = findBestNameMatch(characterName, allActors, ['name']);
                         if (!matched) continue;
 
                         // Try to map emotion using EMOTION_SYNONYMS if not a standard emotion
@@ -600,7 +615,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     console.log(speakerLineMatch);
                     const speakerName = speakerLineMatch[1].trim();
                     // Find matching actor using findBestNameMatch
-                    const matched = findBestNameMatch(speakerName, save.actors ? Object.values(save.actors) : [], ['name', 'nicknames']);
+                    const matched = findBestNameMatch(speakerName, save.actors ? Object.values(save.actors) : [], ['name']);
                     speakerId = matched ? matched.id : ''; // Use actor ID if found, otherwise empty for narrator.
                     message = speakerLineMatch[2].trim();
                 }
@@ -661,8 +676,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             const ttsPromises = scriptEntries.map(async (entry) => {
                 const actor = entry.speakerId ? save.actors[entry.speakerId] : null;
                 // Only TTS if entry.speaker matches an actor from stage().getSave().actors and entry.message includes dialogue in quotes.
-                if (!actor || actor.type === ActorType.PLAYER || !entry.message.includes('"') || !save.textToSpeech) {
-                    console.log(`Skipping TTS: ${(!actor || actor.type === ActorType.PLAYER) ? "No matching non-player actor" : (!entry.message.includes('"') ? "No dialogue in quotes" : "Text-to-speech disabled")}.`);
+                if (!actor || actor.id === save.playerId || !entry.message.includes('"') || !save.textToSpeech) {
+                    console.log(`Skipping TTS: ${(!actor || actor.id === save.playerId) ? "No matching non-player actor" : (!entry.message.includes('"') ? "No dialogue in quotes" : "Text-to-speech disabled")}.`);
                     entry.speechUrl = '';
                     return;
                 }
@@ -741,7 +756,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         while ((match = affectionChangeRegex.exec(endResponse)) !== null) {
                             const characterName = match[1].trim();
                             const changeValue = parseInt(match[2]);
-                            const matchedActor = findBestNameMatch(characterName, Object.values(save.actors), ['name', 'nicknames']);
+                            const matchedActor = findBestNameMatch(characterName, Object.values(save.actors), ['name']);
                             if (matchedActor && !isNaN(changeValue) && changeValue !== 0) {
                                 console.log(`Affection change flagged for ${matchedActor.name}: ${changeValue > 0 ? '+' : ''}${changeValue}`);
                                 outcomes.push(new Outcome({

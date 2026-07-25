@@ -1,20 +1,18 @@
 type LoreType = "character" | "location" | "other" | string;
 import { v4 as generateUuid } from 'uuid';
 
-// Hard-coding entry names to type for character and location:
+// Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
-    character: ["Cassiel", "Cass", "Halvola",
-        "Thessaly Argyra", "Dorothy Nalaresno", "Dolus Perniciosus", "Axo", "Amat-Ea", "Caedmon Brightwork", "Mira",
-        "Arca-7", "AL1-C3", "X01E", "Lyra", "Persephone", "Reitia", "Soren Rokhe", "Astraea", "Sam", "Lumen Halas",
-        "Nadiya", "Amara", "Melina Argyra", "Rattle", "Millia & Milliette", /*"Milliana",*/ "Haylon", "Keri",
-        "Jeanette Beausoleil", "Cyanea", "Aeriya", "Tawamure Rei" 
-    ],
-    location: ["Ardeia", "The Temple", "The Plaza", "The Library", "The Gardens", "The Clock Tower", "The Names", 
-        "The Amber Drop", "Mel's Pit", "Yarrow Rest", "7Loaves", "Mira's Miracle Metalworks", "Brightwork Forge",
-        "The Pilgrimage", "The Loom", "Slumbering Orchard", "Blind Spire", "Bleached Earth", "The Threshold",
-        "Sunken Core", "The Cradle", "The Shells", ""],
-    
+    character: [],
+    location: [],
     other: [], // Everything else ends up being assigned to this by default.
+};
+
+// Populate TYPE_MAPPING from loaded lore entries
+export function updateTypeMapping(lore: Lore[]): void {
+    TYPE_MAPPING.character = lore.filter(l => l.type === 'character').flatMap(l => l.triggers);
+    TYPE_MAPPING.location = lore.filter(l => l.type === 'location').flatMap(l => l.triggers);
+    TYPE_MAPPING.other = lore.filter(l => l.type === 'other').flatMap(l => l.triggers);
 }
 
 export const MAX_ENTRIES = 30; // Maximum number of lore entries to add to context; if there are more, we'll prioritize based on priority and probability.

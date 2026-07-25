@@ -111,7 +111,11 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
     const categoryOrder = useMemo(() => {
         // Add a category for each Actor name not present in the groups, to allow users to assign lore entries to them
-        const extraCategories = Object.values(stage().getSave().actors || {}).filter(actor => actor.type !== 'PLAYER').map((actor) => actor.name.trim()).sort((a, b) => a.localeCompare(b));
+        const playerId = stage().getSave().playerId;
+        const extraCategories = Object.values(stage().getSave().actors || {})
+            .filter(actor => actor.id !== playerId)
+            .map((actor) => actor.name.trim())
+            .sort((a, b) => a.localeCompare(b));
 
         return [...CORE_CATEGORY_ORDER, ...extraCategories];
     }, [loreEntries]);
@@ -150,7 +154,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             return false;
         }
 
-        return !!findBestNameMatch(normalizedTitle, Object.values(stage().getSave().actors) || [], ['name', 'nicknames']);
+        return !!findBestNameMatch(normalizedTitle, Object.values(stage().getSave().actors) || [], ['name']);
     }, [selectedLore]);
 
     const selectedLoreMatchesExistingLocation = useMemo(() => {
