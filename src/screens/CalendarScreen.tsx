@@ -2,7 +2,6 @@ import { FC, useEffect, useMemo, useState } from "react";
 import type { CalendarEvent } from "../Stage";
 import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
-import { BlurredBackground } from "@lord-raven/novel-visualizer";
 import { Box, Typography } from "@mui/material";
 import { ArrowBackRounded, ArrowForwardRounded, CalendarMonth, EventAvailable, EventBusy, MenuRounded, Settings, TodayRounded } from "@mui/icons-material";
 import { motion } from "framer-motion";
@@ -161,22 +160,23 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
     return (
         <>
-            <BlurredBackground
-                imageUrl={CALENDAR_BACKGROUND_IMAGE}
-                overlay="linear-gradient(130deg, var(--agenda-calendar-overlay-start) 0%, var(--agenda-calendar-overlay-mid) 48%, var(--agenda-calendar-overlay-end) 100%)"
+            <Box
+                sx={{
+                    width: "100vw",
+                    minHeight: "100vh",
+                    height: "100dvh",
+                    boxSizing: "border-box",
+                    padding: { xs: "12px", md: "18px" },
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1.5,
+                    overflow: "hidden",
+                    backgroundImage: `linear-gradient(130deg, var(--agenda-calendar-overlay-start) 0%, var(--agenda-calendar-overlay-mid) 48%, var(--agenda-calendar-overlay-end) 100%), url(${CALENDAR_BACKGROUND_IMAGE})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    backgroundRepeat: "no-repeat",
+                }}
             >
-                <Box
-                    sx={{
-                        width: "100vw",
-                        height: "100vh",
-                        boxSizing: "border-box",
-                        padding: { xs: "12px", md: "18px" },
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1.5,
-                        overflow: "hidden",
-                    }}
-                >
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                             <Button
@@ -567,8 +567,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             </Box>
                         )}
                     </GlassPanel>
-                </Box>
-            </BlurredBackground>
+            </Box>
 
             {showContentManagement && (
                 <ContentManagementScreen
