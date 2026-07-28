@@ -95,6 +95,61 @@ export function buildStructuredExampleResponse(
     return lines.join('\n');
 }
 
+function parseXmlTagContent(content: string): any {
+    const trimmedContent = (content || '').trim();
+    if (!trimmedContent) {
+        return '';
+    }
+
+    const tagPattern = /<([A-Za-z0-9:_-]+)\b[^>]*>/g;
+    const childNodes: Array<{ tagName: string; innerContent: string }> = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = tagPattern.exec(trimmedContent)) !== null) {
+        const tagName = match[1];
+        const openingTagLength = match[0].length;
+        const closingTag = `</${tagName}>`;
+        const closeIndex = trimmedContent.indexOf(closingTag, match.index + openingTagLength);
+
+        if (closeIndex === -1) {
+            break;
+        }
+
+        childNodes.push({
+            tagName,
+            innerContent: trimmedContent.slice(match.index + openingTagLength, closeIndex),
+        });
+
+        tagPattern.lastIndex = closeIndex + closingTag.length;
+    }
+
+    if (childNodes.length === 0) {
+        return trimmedContent;
+    }
+
+    const parsedObject: Record<string, any> = {};
+    for (const childNode of childNodes) {
+        const childValue = parseXmlTagContent(childNode.innerContent);
+        if (parsedObject[childNode.tagName] === undefined) {
+            parsedObject[childNode.tagName] = childValue;
+        } else if (Array.isArray(parsedObject[childNode.tagName])) {
+            parsedObject[childNode.tagName].push(childValue);
+        } else {
+            parsedObject[childNode.tagName] = [parsedObject[childNode.tagName], childValue];
+        }
+    }
+
+    return parsedObject;
+}
+
+export function parseXmlTagsToObjects(text: string): any {
+    const sanitizedText = (text || '').replace(/\*\*/g, '').replace(new RegExp(DEFAULT_END_TAG, 'g'), '').trim();
+    const parsedValue = parseXmlTagContent(sanitizedText);
+    return parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)
+        ? parsedValue
+        : {};
+}
+
 export function parseStructuredResponse(
     text: string,
     fields: StructuredFieldDefinition[]

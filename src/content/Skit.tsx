@@ -10,6 +10,7 @@ import {
     buildStructuredExampleResponse,
     buildStructuredResponseFormat,
     parseStructuredResponse,
+    parseXmlTagsToObjects,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 
@@ -650,12 +651,16 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `\n\nIf the scene is complete, include optional relationship and lore update tags to flag follow-up game mechanics.`
                         )
                         .addBlock('Stat Changes',
-                            `Indicate affection changes between the player and any characters involved in the scene; affection is represented as a number between 1 and 10, so adjustments should be generally incremental.\n` +
-                            `<AffectionChange><Actor>Character Name</Actor><Amount>+/-x</Amount></AffectionChange>`
+                            `Indicate stat changes for any characters affected by the scene.\n` +
+                            `<StatChange><Actor>[Character Name]</Actor><Stat>[Stat Name]</Stat><Amount>+/-x</Amount></StatChange>`
                         )
                         .addBlock('Lore Updates',
                             `Indicate lore entries that may need to be updated as a result of the skit. Actual updates happen elsewhere; this only flags entries for review.\n` +
                             `<LoreUpdate><Entry>Lore Entry Name</Entry></LoreUpdate>`
+                        )
+                        .addBlock('New Event',
+                            `Create a new calendar event if the scene specified or implied a future event. Include the event name, date, a location (ID or name), required characters (IDs or names), a brief user-facing description, and secret additional guidance.\n` +
+                            `<NewEvent><Name>Event Name</Name><Date>YYYY-MM-DD</Date><Location>Location ID or Name</Location><RequiredCharacters><Character>[Character ID or Name]</Character><Character>[Another Character ID or Name]</Character></RequiredCharacters><Description>Brief user-facing description</Description><Secret>Additional secret guidance</Secret></NewEvent>`
                         )
                         .addBlock('Example Response',
                             `<SceneAnalysis><SceneStatus>END</SceneStatus><Summary>This expedition took ${playerName} and Cyanea to the Shells, where they encountered Red Hood and uncovered a new forma: the Coral Razor. Red Hood vehemently disagreed with ${playerName} and Cyanea on how to handle this new threat.</Summary><AffectionChange><Actor>Cyanea</Actor><Amount>+1</Amount></AffectionChange><AffectionChange><Actor>Red Hood</Actor><Amount>-2</Amount></AffectionChange><LoreUpdate><Entry>The Shells</Entry></LoreUpdate><LoreUpdate><Entry>Cyanea</Entry></LoreUpdate><LoreUpdate><Entry>Red Hood</Entry></LoreUpdate></SceneAnalysis>\n#END#` +
@@ -679,23 +684,34 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
 
                     if (hasEndSceneTag) {
                         endScene = true;
-                        const summaryMatch = /<Summary>([\s\S]*?)<\/Summary>/i.exec(normalizedEndResponse) || /<SUMMARY:\s*([^>]+)>/i.exec(normalizedEndResponse);
-                        summary = summaryMatch ? summaryMatch[1].trim() : '';
+                        const parsedAnalysis = parseXmlTagsToObjects(normalizedEndResponse);
+                        const sceneAnalysis = parsedAnalysis?.SceneAnalysis || parsedAnalysis;
+                        const summaryText = typeof sceneAnalysis?.Summary === 'string'
+                            ? sceneAnalysis.Summary
+                            : typeof sceneAnalysis?.summary === 'string'
+                                ? sceneAnalysis.summary
+                                : '';
+                        summary = summaryText.trim();
                         console.log('Model determined scene should end. Summary:', summary);
-                        let match;
 
-                        const parsedAffectionActors = new Set<string>();
+                        const statChanges = Array.isArray(sceneAnalysis?.StatChange)
+                            ? sceneAnalysis.StatChange
+                            : sceneAnalysis?.StatChange
+                                ? [sceneAnalysis.StatChange]
+                                : [];
 
-                        const affectionXmlRegex = /<AffectionChange>\s*<Actor>([^<]+)<\/Actor>\s*<Amount>([+-]?\d+)<\/Amount>\s*<\/AffectionChange>/gi;
-                        while ((match = affectionXmlRegex.exec(normalizedEndResponse)) !== null) {
-                            const characterName = match[1].trim();
-                            const changeValue = parseInt(match[2], 10);
-                            const matchedActor = findBestNameMatch(characterName, Object.values(save.actors), ['name']);
+                        for (const statChange of statChanges) {
+                            const actorName = typeof statChange?.Actor === 'string'
+                                ? statChange.Actor
+                                : typeof statChange?.actor === 'string'
+                                    ? statChange.actor
+                                    : '';
+                            const changeValue = parseInt(`${statChange?.Amount ?? statChange?.amount ?? ''}`, 10);
+                            const matchedActor = findBestNameMatch(actorName, Object.values(save.actors), ['name']);
                             if (matchedActor && !isNaN(changeValue) && changeValue !== 0) {
-                                parsedAffectionActors.add(matchedActor.id);
                                 outcomes.push(new Outcome({
-                                    type: OutcomeType.RELATIONSHIP_CHANGE,
-                                    description: `Affection with ${matchedActor.name} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
+                                    type: OutcomeType.STAT_CHANGE,
+                                    description: `Stat for ${matchedActor.name} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
                                     details: {
                                         actorId: matchedActor.id,
                                         actorName: matchedActor.name,
@@ -705,27 +721,18 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             }
                         }
 
-                        const affectionLegacyRegex = /<AFFECTION CHANGE:\s*([^>]+?)\s*([+-]\d+)>/gi;
-                        while ((match = affectionLegacyRegex.exec(normalizedEndResponse)) !== null) {
-                            const characterName = match[1].trim();
-                            const changeValue = parseInt(match[2], 10);
-                            const matchedActor = findBestNameMatch(characterName, Object.values(save.actors), ['name']);
-                            if (matchedActor && !parsedAffectionActors.has(matchedActor.id) && !isNaN(changeValue) && changeValue !== 0) {
-                                outcomes.push(new Outcome({
-                                    type: OutcomeType.RELATIONSHIP_CHANGE,
-                                    description: `Affection with ${matchedActor.name} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
-                                    details: {
-                                        actorId: matchedActor.id,
-                                        actorName: matchedActor.name,
-                                        changeValue,
-                                    },
-                                }));
-                            }
-                        }
+                        const loreUpdates = Array.isArray(sceneAnalysis?.LoreUpdate)
+                            ? sceneAnalysis.LoreUpdate
+                            : sceneAnalysis?.LoreUpdate
+                                ? [sceneAnalysis.LoreUpdate]
+                                : [];
 
-                        const loreUpdateXmlRegex = /<LoreUpdate>\s*<Entry>([^<]+)<\/Entry>\s*<\/LoreUpdate>/gi;
-                        while ((match = loreUpdateXmlRegex.exec(normalizedEndResponse)) !== null) {
-                            const loreName = match[1].trim();
+                        for (const loreUpdate of loreUpdates) {
+                            const loreName = typeof loreUpdate?.Entry === 'string'
+                                ? loreUpdate.Entry
+                                : typeof loreUpdate?.entry === 'string'
+                                    ? loreUpdate.entry
+                                    : '';
                             const matchedLore = findBestNameMatch(loreName, save.lorebook || [], ['title']);
                             if (matchedLore) {
                                 console.log(`Lore update flagged for "${matchedLore.title}".`);
@@ -740,23 +747,47 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             }
                         }
 
-                        const loreUpdateLegacyRegex = /<LORE UPDATE:\s*([^>]+)>/gi;
-                        while ((match = loreUpdateLegacyRegex.exec(normalizedEndResponse)) !== null) {
-                            const loreName = match[1].trim();
-                            const matchedLore = findBestNameMatch(loreName, save.lorebook || [], ['title']);
-                            if (matchedLore) {
-                                console.log(`Lore update flagged for "${matchedLore.title}".`);
+                        const newEvents = Array.isArray(sceneAnalysis?.NewEvent)
+                            ? sceneAnalysis.NewEvent
+                            : sceneAnalysis?.NewEvent
+                                ? [sceneAnalysis.NewEvent]
+                                : [];
+
+                        for (const newEvent of newEvents) {
+                            const eventName = typeof newEvent?.Name === 'string'
+                                ? newEvent.Name
+                                : typeof newEvent?.name === 'string'
+                                    ? newEvent.name
+                                    : '';
+                            const eventLocation = typeof newEvent?.Location === 'string'
+                                ? newEvent.Location
+                                : typeof newEvent?.location === 'string'
+                                    ? newEvent.location
+                                    : '';
+                            const eventDescription = typeof newEvent?.Description === 'string'
+                                ? newEvent.Description
+                                : typeof newEvent?.description === 'string'
+                                    ? newEvent.description
+                                    : '';
+                            const eventSecret = typeof newEvent?.Secret === 'string'
+                                ? newEvent.Secret
+                                : typeof newEvent?.secret === 'string'
+                                    ? newEvent.secret
+                                    : '';
+
+                            if (eventName) {
                                 outcomes.push(new Outcome({
-                                    type: OutcomeType.LORE_UPDATE,
-                                    description: `Lore entry \"${matchedLore.title}\" should be reviewed for updates.`,
+                                    type: OutcomeType.NEW_EVENT,
+                                    description: `New calendar event \"${eventName}\" was flagged.`,
                                     details: {
-                                        loreId: matchedLore.id,
-                                        loreTitle: matchedLore.title,
+                                        name: eventName,
+                                        location: eventLocation,
+                                        description: eventDescription,
+                                        secret: eventSecret,
                                     },
                                 }));
                             }
                         }
-
                     }
                 }
             })());

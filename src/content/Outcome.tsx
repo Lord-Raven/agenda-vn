@@ -1,6 +1,7 @@
 export enum OutcomeType {
     LORE_UPDATE = 'LORE_UPDATE',
-    RELATIONSHIP_CHANGE = 'RELATIONSHIP_CHANGE',
+    STAT_CHANGE = 'STAT_CHANGE',
+    NEW_EVENT = 'NEW_EVENT',
     OTHER = 'OTHER',
 }
 
