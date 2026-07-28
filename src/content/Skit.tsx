@@ -648,7 +648,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `Analyze the provided script and determine whether the depicted scene has run its course. ` +
                             `Respond using XML tags. If complete, use <SceneStatus>END</SceneStatus>; otherwise use <SceneStatus>CONTINUE</SceneStatus>. ` +
                             `Always include <Summary>...</Summary> with a concise explanation of the scene state and key developments. ` +
-                            `\n\nIf the scene is complete, include optional relationship and lore update tags to flag follow-up game mechanics.`
+                            `\n\nIf the scene is complete, include optional lore update tags to flag follow-up game mechanics.`
                         )
                         .addBlock('Stat Changes',
                             `Indicate stat changes for any characters affected by the scene.\n` +
@@ -663,7 +663,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `<NewEvent><Name>Event Name</Name><Date>YYYY-MM-DD</Date><Location>Location ID or Name</Location><RequiredCharacters><Character>[Character ID or Name]</Character><Character>[Another Character ID or Name]</Character></RequiredCharacters><Description>Brief user-facing description</Description><Secret>Additional secret guidance</Secret></NewEvent>`
                         )
                         .addBlock('Example Response',
-                            `<SceneAnalysis><SceneStatus>END</SceneStatus><Summary>This expedition took ${playerName} and Cyanea to the Shells, where they encountered Red Hood and uncovered a new forma: the Coral Razor. Red Hood vehemently disagreed with ${playerName} and Cyanea on how to handle this new threat.</Summary><AffectionChange><Actor>Cyanea</Actor><Amount>+1</Amount></AffectionChange><AffectionChange><Actor>Red Hood</Actor><Amount>-2</Amount></AffectionChange><LoreUpdate><Entry>The Shells</Entry></LoreUpdate><LoreUpdate><Entry>Cyanea</Entry></LoreUpdate><LoreUpdate><Entry>Red Hood</Entry></LoreUpdate></SceneAnalysis>\n#END#` +
+                            `<SceneAnalysis><SceneStatus>END</SceneStatus><Summary>This expedition took ${playerName} and Cyanea to the Shells, where they encountered Red Hood and uncovered a new forma: the Coral Razor. Red Hood vehemently disagreed with ${playerName} and Cyanea on how to handle this new threat.</Summary><LoreUpdate><Entry>The Shells</Entry></LoreUpdate><LoreUpdate><Entry>Cyanea</Entry></LoreUpdate><LoreUpdate><Entry>Red Hood</Entry></LoreUpdate></SceneAnalysis>\n#END#` +
                             `\nExample Response:\n` +
                             `<SceneAnalysis><SceneStatus>CONTINUE</SceneStatus><Summary>The scene is developing well, but it would be more satisfying with a clearer moment of resolution at the end. Consider whether ${playerName} could discover a clue or have a significant interaction with another character to create a more compelling ending.</Summary></SceneAnalysis>\n#END#`
                         )

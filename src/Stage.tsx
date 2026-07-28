@@ -3,7 +3,6 @@ import {StageBase, StageResponse, InitialData, Message, User, Character} from "@
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, findBestNameMatch, loadSupportedActor, getActorLore, getEmotionImage } from "./content/Actor";
 import { Emotion } from "./content/Emotion";
-import { AffinityChangeInfo } from "./screens/AffinityPopIn";
 import { Item } from "./content/Item";
 import { generateContext, Skit, SkitType } from "./content/Skit";
 import { createDefaultAtlas, getLinkedLocationLore, Location } from "./content/Location";
@@ -985,39 +984,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         this.generationPromises[`loreUpdate-${loreEntry.id}`] = loreUpdatePromise;
                     }
                     break;
-                case 'RELATIONSHIP_CHANGE': {
-                    // For relationship changes, we expect details to include actorId and change (e.g. +10 or -5).
-                    const actor = findBestNameMatch(outcome.details?.actorName, Object.values(save.actors), ['name']);
-                    if (actor) {
-                        const affinityStatName = Object.keys(actor.statMap || {}).find((key) => key.toLowerCase() === 'affinity');
-                        if (!affinityStatName) {
-                            break;
-                        }
-
-                        const previousAffinity = Number(actor.statMap?.[affinityStatName] || 0);
-                        const nextAffinity = Math.min(10, Math.max(0, previousAffinity + (outcome.details?.changeValue || 0)));
-                        actor.statMap[affinityStatName] = nextAffinity;
-                        const effectiveChange = nextAffinity - previousAffinity;
-                        if (effectiveChange !== 0) {
-                            const isPositive = effectiveChange > 0;
-                            const emotionKey = isPositive
-                                ? (getEmotionImage(actor, Emotion.joy) ? Emotion.joy :
-                                   getEmotionImage(actor, Emotion.love) ? Emotion.love :
-                                   getEmotionImage(actor, Emotion.kindness) ? Emotion.kindness : Emotion.neutral)
-                                : (getEmotionImage(actor, Emotion.sadness) ? Emotion.sadness :
-                                   getEmotionImage(actor, Emotion.disappointment) ? Emotion.disappointment : Emotion.neutral);
-                            const portraitUrl = getEmotionImage(actor, emotionKey);
-                            this.showAffinityChange({
-                                id: `${actor.id}-${Date.now()}`,
-                                actorName: actor.name,
-                                portraitUrl,
-                                change: effectiveChange,
-                                themeColor: actor.themeColor || '#ffffff',
-                            });
-                        }
-                    }
-                    break;
-                }
             }
         }
 
@@ -1035,25 +1001,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Callback to show priority messages in the tooltip bar
     private priorityMessageCallback?: (message: string, icon?: any, durationMs?: number) => void;
-
-    // Callback to show affinity change pop-ins
-    private affinityChangeCallback?: (info: AffinityChangeInfo) => void;
-
-    /**
-     * Register a callback to display affinity change pop-ins.
-     */
-    setAffinityChangeCallback(callback: (info: AffinityChangeInfo) => void) {
-        this.affinityChangeCallback = callback;
-    }
-
-    /**
-     * Trigger an affinity change pop-in.
-     */
-    showAffinityChange(info: AffinityChangeInfo) {
-        if (this.affinityChangeCallback) {
-            this.affinityChangeCallback(info);
-        }
-    }
 
     /**
      * Register a callback to show priority messages in the tooltip bar.

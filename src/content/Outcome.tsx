@@ -7,7 +7,7 @@ export enum OutcomeType {
 
 export class Outcome {
     type: OutcomeType = OutcomeType.OTHER;
-    description: string = ''; // Description of the outcome, e.g. "Found a mysterious key", "Increased strength by 2", "Relationship with Alice improved"
+    description: string = ''; // Description of the outcome, e.g. "Found a mysterious key", "Increased strength by 2"
     details: any = {}; // Additional details relevant to the outcome, structure can vary based on type
 
     constructor(props: any) {
