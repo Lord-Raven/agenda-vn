@@ -383,12 +383,13 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `When establishing a character at the beginning of a scene or when moving to this location with a movement tag, give special consideration to the inclusion of a 'wears' tag to explicitly call out an appropriate look. ` +
                             `OUTFIT NAME must be found under the specified character—either their current outfit or one of their listed alternatives.`)
                         .addBlock('Movement Tags',
-                    `\n\nA Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be used when an Absent Character engages in the scene (even if they are already narratively present). ` +
+                            `\n\nA Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be used when an Absent Character engages in the scene (even if they are already narratively present). ` +
                             `\n\nCharacter movement tags must also be included when a character leaves the scene or moves to another location. ` +
                             `\n\nA Scene movement tag ("<Movement><Scene/><Location>[HERE|location name|location ID]</Location></Movement>") may be used when the scene itself transitions to another location. ` +
                             `When this tag is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
                             `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "HERE" to move to the scene's location, or "AWAY" to leave this area. ` +
                             `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when Absent Characters enter the scene, Present Characters leave, or the scene itself relocates.`)
+                        
                 ).addBlock('Example Script',
                     `<Entry><Speaker>NARRATOR</Speaker><Message>The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.</Message></Entry>\n` +
                     `<Entry><Speaker>CYANEA</Speaker><Message>"I can't believe we're finally here. It's been a long journey."</Message></Entry>\n` +
