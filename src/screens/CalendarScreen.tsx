@@ -3,8 +3,8 @@ import type { CalendarEvent } from "../Stage";
 import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { Box, Typography } from "@mui/material";
-import { ArrowBackRounded, ArrowForwardRounded, CalendarMonth, EventAvailable, EventBusy, MenuRounded, Settings, TodayRounded } from "@mui/icons-material";
-import { motion } from "framer-motion";
+import { ArrowBackRounded, ArrowForwardRounded, EventAvailable, EventBusy, MenuRounded, Settings, TodayRounded } from "@mui/icons-material";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button, GlassPanel } from "./UiComponents";
 import { useTooltip } from "./TooltipContext";
 import { ContentManagementScreen } from "./ContentManagementScreen";
@@ -19,6 +19,7 @@ interface CalendarScreenProps {
 const CALENDAR_BACKGROUND_IMAGE = "https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png";
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const CALENDAR_ROW_COUNT = 6;
+const MAX_EVENT_LINES_PER_DAY = 3;
 
 const parseDateKey = (dateText: string) => new Date(`${dateText}T00:00:00Z`);
 
@@ -78,7 +79,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
     const stageInstance = stage();
     const save = stageInstance.getSave();
-    const uiSettings = stageInstance.getUiSettings();
     const currentDateKey = save.currentDate || formatDateKey(new Date());
 
     const allEvents = useMemo(
@@ -94,8 +94,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const todayDate = parseDateKey(todayDateKey);
 
     const [viewMonth, setViewMonth] = useState(() => startOfMonth(todayDate));
-    const [selectedDate, setSelectedDate] = useState(todayDateKey);
-    const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+    const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
@@ -116,27 +115,13 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [setScreenType]);
 
-    const selectedDateEvents = eventsByDate.get(selectedDate) || [];
-    const selectedEvent = selectedEventId
-        ? selectedDateEvents.find((event) => event.id === selectedEventId) || selectedDateEvents[0] || null
-        : selectedDateEvents[0] || null;
-
     const jumpToCurrentMonth = () => {
         setViewMonth(startOfMonth(todayDate));
-        setSelectedDate(todayDateKey);
-        setSelectedEventId(null);
     };
 
     const changeMonth = (offset: number) => {
         const nextMonth = addMonths(viewMonth, offset);
         setViewMonth(nextMonth);
-        setSelectedDate(formatDateKey(nextMonth));
-        setSelectedEventId(null);
-    };
-
-    const selectDate = (dateKey: string, eventId: string | null = null) => {
-        setSelectedDate(dateKey);
-        setSelectedEventId(eventId);
     };
 
     const openEvent = (eventId: string) => {
@@ -211,31 +196,20 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                     </Box>
 
                     <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 16, overflow: "hidden" }}>
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2, flexWrap: "wrap" }}>
-                            <Box>
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 1, marginBottom: "4px" }}>
-                                    <CalendarMonth sx={{ color: "var(--agenda-mist)", fontSize: "1.1rem" }} />
-                                    <Typography sx={{ color: "var(--agenda-verdant)", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", fontSize: "0.8rem" }}>
-                                        {uiSettings.gameTitle || "Agenda VN"}
-                                    </Typography>
-                                </Box>
-                                <Typography
-                                    sx={{
-                                        color: "var(--agenda-fog)",
-                                        fontFamily: "var(--agenda-font-flavor)",
-                                        fontWeight: 700,
-                                        fontSize: { xs: "1.9rem", md: "2.9rem" },
-                                        letterSpacing: "0.03em",
-                                        lineHeight: 1,
-                                        textShadow: "0 3px 14px rgba(0, 0, 0, 0.24)",
-                                    }}
-                                >
-                                    {formatMonthLabel(viewMonth)}
-                                </Typography>
-                                <Typography sx={{ color: "var(--agenda-text-secondary)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem", opacity: 0.9 }}>
-                                    Today: {formatDate(todayDateKey)}
-                                </Typography>
-                            </Box>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                            <Typography
+                                sx={{
+                                    color: "var(--agenda-fog)",
+                                    fontFamily: "var(--agenda-font-flavor)",
+                                    fontWeight: 700,
+                                    fontSize: { xs: "2rem", md: "3rem" },
+                                    letterSpacing: "0.04em",
+                                    lineHeight: 1,
+                                    textShadow: "0 3px 14px rgba(0, 0, 0, 0.24)",
+                                }}
+                            >
+                                {formatMonthLabel(viewMonth)}
+                            </Typography>
 
                             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, opacity: 0.82 }}>
                                 <Button
@@ -320,14 +294,11 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 const dateKey = formatDateKey(cellDate);
                                 const isCurrentMonth = cellDate.getUTCMonth() === viewMonth.getUTCMonth();
                                 const isToday = isSameDate(cellDate, todayDate);
-                                const isPast = dateKey < todayDateKey;
                                 const cellEvents = eventsByDate.get(dateKey) || [];
-                                const isSelected = dateKey === selectedDate;
 
                                 return (
                                     <motion.div
                                         key={dateKey}
-                                        onClick={() => selectDate(dateKey, cellEvents[0]?.id || null)}
                                         whileHover={{ scale: 1.01 }}
                                         whileTap={{ scale: 0.995 }}
                                         style={{
@@ -354,10 +325,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                     ? "linear-gradient(178deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.005))"
                                                     : "rgba(0, 0, 0, 0.2)",
                                                 opacity: isCurrentMonth ? 1 : 0.5,
-                                                boxShadow: isSelected
-                                                    ? "inset 0 0 0 2px var(--agenda-verdant), inset 0 0 0 3px rgba(255, 255, 255, 0.08)"
-                                                    : isToday
-                                                        ? "inset 0 0 0 2px rgba(137, 205, 135, 0.42)"
+                                                boxShadow: isToday
+                                                    ? "inset 0 0 0 2px rgba(137, 205, 135, 0.42)"
                                                     : "none",
                                                 display: "flex",
                                                 flexDirection: "column",
@@ -365,16 +334,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                 padding: "10px",
                                                 overflow: "hidden",
                                                 position: "relative",
-                                                "&::after": isPast && isCurrentMonth ? {
-                                                    content: '""',
-                                                    position: "absolute",
-                                                    left: "6px",
-                                                    right: "6px",
-                                                    top: "50%",
-                                                    borderTop: "2px solid rgba(185, 210, 227, 0.34)",
-                                                    transform: "rotate(-8deg)",
-                                                    pointerEvents: "none",
-                                                } : undefined,
                                             }}
                                         >
                                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 1 }}>
@@ -383,7 +342,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         color: isToday ? "var(--agenda-verdant)" : "var(--agenda-fog)",
                                                         fontWeight: 700,
                                                         fontSize: { xs: "0.82rem", md: "0.92rem" },
-                                                        textDecoration: isPast && isCurrentMonth ? "line-through" : "none",
                                                     }}
                                                 >
                                                     {cellDate.getUTCDate()}
@@ -396,10 +354,11 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             </Box>
 
                                             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, overflow: "hidden" }}>
-                                                {cellEvents.slice(0, 3).map((eventItem) => {
+                                                {cellEvents.slice(0, MAX_EVENT_LINES_PER_DAY).map((eventItem) => {
                                                     const participants = (eventItem.actorIds || eventItem.participantActorIds || [])
                                                         .map((actorId) => save.actors[actorId])
                                                         .filter(Boolean) as Actor[];
+                                                    const leadActor = participants[0];
 
                                                     return (
                                                         <motion.button
@@ -407,9 +366,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                             type="button"
                                                             onClick={(event) => {
                                                                 event.stopPropagation();
-                                                                selectDate(dateKey, eventItem.id);
+                                                                setDetailEvent(eventItem);
                                                             }}
-                                                            onMouseEnter={() => setTooltip(`Select event: ${eventItem.name}`, EventAvailable)}
+                                                            onMouseEnter={() => setTooltip(`View event: ${eventItem.name}`, EventAvailable)}
                                                             onMouseLeave={clearTooltip}
                                                             whileHover={{ scale: 1.01 }}
                                                             whileTap={{ scale: 0.99 }}
@@ -424,47 +383,72 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         >
                                                             <Box
                                                                 sx={{
+                                                                    position: "relative",
                                                                     display: "flex",
                                                                     alignItems: "center",
-                                                                    gap: 0.75,
-                                                                        backgroundColor: eventItem.status === "upcoming" ? "rgba(17, 24, 39, 0.66)" : "rgba(17, 24, 39, 0.5)",
-                                                                        border: `1px solid ${eventItem.status === "upcoming" ? "var(--agenda-border-strong)" : "var(--agenda-border)"}`,
-                                                                        borderRadius: "6px",
-                                                                    padding: "4px 8px 4px 4px",
+                                                                    backgroundColor: `${leadActor?.themeColor || "#8ab0cc"}22`,
+                                                                    border: `1px solid ${leadActor?.themeColor || "rgba(138, 176, 204, 0.48)"}`,
+                                                                    borderRadius: "7px",
+                                                                    padding: "4px 8px",
+                                                                    minHeight: "30px",
                                                                     overflow: "hidden",
                                                                 }}
                                                             >
-                                                                <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-                                                                    {participants.slice(0, 3).map((actor, index) => (
+                                                                <Box
+                                                                    sx={{
+                                                                        position: "absolute",
+                                                                        right: 6,
+                                                                        top: "50%",
+                                                                        transform: "translateY(-50%)",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        pointerEvents: "none",
+                                                                        zIndex: 1,
+                                                                    }}
+                                                                >
+                                                                    {participants.slice(0, 4).map((actor, index) => (
                                                                         <Box
                                                                             key={`${eventItem.id}-${actor.id}`}
                                                                             sx={{
-                                                                                width: 22,
-                                                                                height: 22,
-                                                                                marginLeft: index === 0 ? 0 : -0.5,
+                                                                                width: 20,
+                                                                                height: 20,
+                                                                                marginLeft: index === 0 ? 0 : -0.9,
                                                                                 borderRadius: "50%",
-                                                                                border: "1px solid rgba(237, 242, 242, 0.32)",
+                                                                                border: "1px solid rgba(237, 242, 242, 0.44)",
                                                                                 backgroundImage: `url(${getEmotionImage(actor, "neutral", stageInstance, actor.outfitId) || getEmotionImage(actor, "base", stageInstance, actor.outfitId)})`,
                                                                                 backgroundSize: "cover",
                                                                                 backgroundPosition: "top center",
                                                                                 backgroundColor: "rgba(12, 18, 28, 0.88)",
+                                                                                boxShadow: "0 1px 4px rgba(0, 0, 0, 0.35)",
                                                                             }}
                                                                         />
                                                                     ))}
                                                                 </Box>
-                                                                <Typography sx={{ color: "var(--agenda-fog)", fontSize: "0.72rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+
+                                                                <Typography
+                                                                    sx={{
+                                                                        position: "relative",
+                                                                        zIndex: 2,
+                                                                        color: "rgba(240, 246, 246, 0.98)",
+                                                                        fontSize: "0.72rem",
+                                                                        fontWeight: 700,
+                                                                        letterSpacing: "0.01em",
+                                                                        whiteSpace: "nowrap",
+                                                                        overflow: "hidden",
+                                                                        textOverflow: "ellipsis",
+                                                                        paddingRight: "48px",
+                                                                        width: "100%",
+                                                                        fontFamily: leadActor?.themeFontFamily || "inherit",
+                                                                        textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
+                                                                        WebkitTextStroke: `0.6px ${leadActor?.themeColor || "rgba(12, 18, 28, 0.95)"}`,
+                                                                    }}
+                                                                >
                                                                     {eventItem.name}
                                                                 </Typography>
                                                             </Box>
                                                         </motion.button>
                                                     );
                                                 })}
-
-                                                {cellEvents.length > 3 && (
-                                                    <Typography sx={{ color: "var(--agenda-text-secondary)", fontSize: "0.72rem", fontStyle: "italic", opacity: 0.85 }}>
-                                                        +{cellEvents.length - 3} more
-                                                    </Typography>
-                                                )}
                                             </Box>
                                         </Box>
                                     </motion.div>
@@ -472,34 +456,57 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             })}
                         </Box>
                     </GlassPanel>
+            </Box>
 
-                    <GlassPanel variant="default" style={{ flexShrink: 0, minHeight: 160, overflow: "hidden" }}>
-                        {selectedEvent ? (
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                                <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap", alignItems: "flex-start" }}>
+            <AnimatePresence>
+                {detailEvent && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        onClick={() => setDetailEvent(null)}
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            background: "rgba(9, 14, 24, 0.62)",
+                            backdropFilter: "blur(5px)",
+                            zIndex: 1200,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: "16px",
+                        }}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+                            transition={{ duration: 0.24, ease: "easeOut" }}
+                            onClick={(event) => event.stopPropagation()}
+                            style={{ width: "min(720px, 92vw)" }}
+                        >
+                            <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2, flexWrap: "wrap" }}>
                                     <Box>
-                                        <Typography sx={{ color: "rgba(185, 210, 227, 0.78)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
-                                            Selected Event
-                                        </Typography>
                                         <Typography sx={{ color: "#edf2f2", fontWeight: 700, fontSize: { xs: "1rem", md: "1.2rem" } }}>
-                                            {selectedEvent.name}
+                                            {detailEvent.name}
                                         </Typography>
-                                        <Typography sx={{ color: "rgba(185, 210, 227, 0.88)", fontSize: "0.88rem" }}>
-                                            {formatDate(selectedEvent.date)} · {save.atlas[selectedEvent.locationId]?.name || "Unknown Location"}
+                                        <Typography sx={{ color: "rgba(185, 210, 227, 0.9)", fontSize: "0.88rem" }}>
+                                            {formatDate(detailEvent.date)} · {save.atlas[detailEvent.locationId]?.name || "Unknown Location"}
                                         </Typography>
                                     </Box>
-
-                                    <Typography sx={{ color: selectedEvent.status === "upcoming" ? "var(--agenda-verdant)" : "rgba(185, 210, 227, 0.78)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem", alignSelf: "center" }}>
-                                        {selectedEvent.status}
+                                    <Typography sx={{ color: detailEvent.status === "upcoming" ? "var(--agenda-verdant)" : "rgba(185, 210, 227, 0.8)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
+                                        {detailEvent.status}
                                     </Typography>
                                 </Box>
 
-                                <Typography sx={{ color: "#edf2f2", lineHeight: 1.55, maxWidth: 980 }}>
-                                    {selectedEvent.description}
+                                <Typography sx={{ color: "#edf2f2", lineHeight: 1.55 }}>
+                                    {detailEvent.description}
                                 </Typography>
 
                                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8 }}>
-                                    {(selectedEvent.actorIds || selectedEvent.participantActorIds || []).map((actorId) => {
+                                    {(detailEvent.actorIds || detailEvent.participantActorIds || []).map((actorId) => {
                                         const actor = save.actors[actorId];
                                         if (!actor) {
                                             return null;
@@ -507,7 +514,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
                                         return (
                                             <Box
-                                                key={`${selectedEvent.id}-${actor.id}`}
+                                                key={`${detailEvent.id}-${actor.id}`}
                                                 sx={{
                                                     display: "flex",
                                                     alignItems: "center",
@@ -535,39 +542,31 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                     })}
                                 </Box>
 
-                                {selectedEvent.status === "upcoming" ? (
-                                    <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+                                <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap" }}>
+                                    {detailEvent.date === todayDateKey && detailEvent.status === "upcoming" && (
                                         <Button
                                             variant="primary"
-                                            onClick={() => openEvent(selectedEvent.id)}
-                                            onMouseEnter={() => setTooltip(`Open event: ${selectedEvent.name}`, EventAvailable)}
+                                            onClick={() => openEvent(detailEvent.id)}
+                                            onMouseEnter={() => setTooltip(`Open event: ${detailEvent.name}`, EventAvailable)}
                                             onMouseLeave={clearTooltip}
                                             style={{ padding: "10px 14px" }}
                                         >
-                                            Open Event
+                                            Confirm
                                         </Button>
-                                    </Box>
-                                ) : (
-                                    <Typography sx={{ color: "rgba(185, 210, 227, 0.74)", fontSize: "0.85rem" }}>
-                                        This event has already been resolved and remains on the calendar for reference.
-                                    </Typography>
-                                )}
-                            </Box>
-                        ) : (
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
-                                <Typography sx={{ color: "rgba(185, 210, 227, 0.78)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
-                                    Selected Date
-                                </Typography>
-                                <Typography sx={{ color: "#edf2f2", fontWeight: 700, fontSize: "1rem" }}>
-                                    {formatDate(selectedDate)}
-                                </Typography>
-                                <Typography sx={{ color: "rgba(185, 210, 227, 0.8)" }}>
-                                    No events on this date.
-                                </Typography>
-                            </Box>
-                        )}
-                    </GlassPanel>
-            </Box>
+                                    )}
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setDetailEvent(null)}
+                                        style={{ padding: "10px 14px" }}
+                                    >
+                                        Back
+                                    </Button>
+                                </Box>
+                            </GlassPanel>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {showContentManagement && (
                 <ContentManagementScreen
