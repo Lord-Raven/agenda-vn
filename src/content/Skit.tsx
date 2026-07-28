@@ -138,17 +138,16 @@ export function getCurrentLocation(skit: Skit, upToEntryIndex: number): string {
 function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage?: Stage): string {
     return ((skit.script && skit.script.length > 0) || additionalEntries.length > 0) ?
         [...skit.script, ...additionalEntries].map(e => {
-            // Find the best matching emotion key for this speaker
             const emotionText = Object.entries(e.actorEmotions || {}).map(([actorId, emotion]) => {
                 const actor = stage?.getSave().actors?.[actorId];
-                return actor ? ` [${actor.name} expresses ${emotion}]` : '';
+                return actor ? `<Expression><Actor>${actor.name}</Actor><Mood>${emotion}</Mood></Expression>` : '';
             }).join('');
             const wearsText = Object.entries(e.actorOutfits || {}).map(([actorId, outfitId]) => {
                 const actor = stage?.getSave().actors?.[actorId];
                 const outfit = actor?.outfits.find(o => o.id === outfitId);
-                return actor && outfit ? ` [${actor.name} wears ${outfit.name}]` : '';
+                return actor && outfit ? `<OutfitChange><Actor>${actor.name}</Actor><Outfit>${outfit.name}</Outfit></OutfitChange>` : '';
             }).join('');
-            return `${stage?.getSave().actors?.[e.speakerId]?.name.toUpperCase() || e.speakerId}:${e.message}${emotionText}${wearsText}`;
+            return `<Entry><Speaker>${stage?.getSave().actors?.[e.speakerId]?.name.toUpperCase() || e.speakerId || 'NARRATOR'}</Speaker>${emotionText}${wearsText}<Message>${e.message}</Message></Entry>`;
         }).join('\n')
         : '(None so far)';
 }
@@ -373,30 +372,30 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     ((save.language || 'English').toLowerCase() !== 'english' ? `\n\nNote: The game is now being played in ${save.language}. Regardless of historic language use, generate this skit content in ${save.language} accordingly. Special emotion, outfit, and movement tags continue to use English (these are invisible to the user).` : '')
                 )
                 .addBlock('Script Format',
-                    `SPEAKER NAME: [Appropriate Tags] Prose with "embedded dialogue" and actions.`)
+                    `<Entry><Speaker>SPEAKER NAME</Speaker>[Appropriate Tags]<Message>Prose with "embedded dialogue" and actions.</Message></Entry>`)
                 .addBlock('Tags', (builder) =>
                     builder.addBlock('Tag Instruction',
                         `Embedded within this script, you may employ special tags to trigger various game mechanics. These tags are not presented to users, so the narrative content of the script should also organically mention characters entering, exiting, or relocating. Character names in tags or in the script are ALL CAPS.`)
                         .addBlock('Emotion Tags',
-                        `Emotion tags ("[CHARACTER NAME expresses JOY]") should be used to indicate visible emotional shifts in a character's appearance using a single-word emotion name.`)
+                        `Emotion tags ("<Expression><Actor>[Character Name]</Actor><Mood>[EMOTION]</Mood></Expression>") should be used to indicate visible emotional shifts in a character's appearance using a single-word emotion name.`)
                         .addBlock('Outfit Tags',
-                        `Outfit tags ("[CHARACTER NAME wears OUTFIT NAME]") should be used when a character changes outfit. ` +
+                        `Outfit tags ("<OutfitChange><Actor>[Character Name]</Actor><Outfit>[OUTFIT NAME]</Outfit></OutfitChange>") should be used when a character changes outfit. ` +
                             `When establishing a character at the beginning of a scene or when moving to this location with a movement tag, give special consideration to the inclusion of a 'wears' tag to explicitly call out an appropriate look. ` +
                             `OUTFIT NAME must be found under the specified character—either their current outfit or one of their listed alternatives.`)
                         .addBlock('Movement Tags',
-                    `\n\nA Character movement tag ("[CHARACTER NAME moves HERE]") must be used when an Absent Character engages in the scene (even if they are already narratively present). ` +
-                            `\n\nCharacter movement tags ("[CHARACTER NAME moves AWAY]") must also be included when a character leaves the scene or moves to another location. ` +
-                            `\n\nA Scene movement tag ("[SCENE moves LOCATION]") may be used when the scene itself transitions to another location. ` +
+                    `\n\nA Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be used when an Absent Character engages in the scene (even if they are already narratively present). ` +
+                            `\n\nCharacter movement tags must also be included when a character leaves the scene or moves to another location. ` +
+                            `\n\nA Scene movement tag ("<Movement><Scene/><Location>[HERE|location name|location ID]</Location></Movement>") may be used when the scene itself transitions to another location. ` +
                             `When this tag is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
                             `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "HERE" to move to the scene's location, or "AWAY" to leave this area. ` +
                             `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when Absent Characters enter the scene, Present Characters leave, or the scene itself relocates.`)
                 ).addBlock('Example Script',
-                    `NARRATOR: The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.\n` +
-                    `CYANEA: "I can't believe we're finally here. It's been a long journey."\n` +
-                    `PERSEPHONE: "Yes, but the real challenge is just beginning. We must stay vigilant." Persephone gently chides Cyanea.\n` +
-                    `CYANEA: [CYANEA expresses DETERMINATION] Cyanea frowns uncharacteristically with determination, "Of course." She nods with almost comical sobriety.\n` +
-                    (!save.disableImpersonation ? `${playerName.toUpperCase()}: I smile warmly at the two women, "I agree. We need to be careful and work together."\n` : '') +
-                    `RED HOOD: [RED HOOD moves to HERE] A crimson-clad figure approaches with supplies."\n`
+                    `<Entry><Speaker>NARRATOR</Speaker><Message>The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.</Message></Entry>\n` +
+                    `<Entry><Speaker>CYANEA</Speaker><Message>"I can't believe we're finally here. It's been a long journey."</Message></Entry>\n` +
+                    `<Entry><Speaker>PERSEPHONE</Speaker><Message>"Yes, but the real challenge is just beginning. We must stay vigilant." Persephone gently chides Cyanea.</Message></Entry>\n` +
+                    `<Entry><Speaker>CYANEA</Speaker><Expression><Actor>Cyanea</Actor><Mood>Determination</Mood></Expression><Message>Cyanea frowns uncharacteristically with determination, "Of course." She nods with almost comical sobriety.</Message></Entry>\n` +
+                    (!save.disableImpersonation ? `<Entry><Speaker>${playerName.toUpperCase()}</Speaker><Message>I smile warmly at the two women, "I agree. We need to be careful and work together."</Message></Entry>\n` : '') +
+                    `<Entry><Speaker>RED HOOD</Speaker><Movement><Actor>Red Hood</Actor><Location>Here</Location></Movement><Message>A crimson-clad figure approaches with supplies."</Message></Entry>\n`
                 )
                 .addBlock('Scene Prompt',
                     `Scene Prompt: ${skit.guidance}`)
@@ -421,75 +420,113 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 text = text.slice(7).trim();
             }
 
-            // Parse response based on format "ALL CAPS NAME: content"; content could be multi-line.
-            // This avoids treating narrative colons as speaker delimiters.
-            const speakerLineRegex = /^([A-Z][A-Z0-9 '&.-]*):\s*(.*)$/s;
-            const lines = text.split('\n');
-            const combinedLines: string[] = [];
-            const combinedTagData: {emotions: {[key: string]: Emotion}, outfitChanges: {[actorId: string]: string}, updatedActors?: string[], updatedLocationId?: string}[] = [];
-            let currentLine = '';
-            let currentEmotionTags: {[key: string]: Emotion} = {};
-            let currentOutfitChanges: {[actorId: string]: string} = {};
-            let currentUpdatedActors: string[] | undefined;
-            let currentUpdatedLocationId: string | undefined;
-
             // Prepare list of all actors (not just present)
             const allActors: Actor[] = Object.values(stage.getSave().actors);
             const allLocations = Object.values(stage.getSave().atlas || {});
+            const resolveLocationId = (locationNameOrId: string): string | undefined => {
+                const locationText = locationNameOrId.trim();
+                if (!locationText) return undefined;
 
-            for (const line of lines) {
-                // Skip empty lines
-                let trimmed = line.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, '\'');
+                if (stage.getSave().atlas?.[locationText]) {
+                    return locationText;
+                }
 
-                console.log(`Process line: ${trimmed}`);
+                const matchedLocation = findBestNameMatch(locationText, allLocations);
+                return matchedLocation?.id;
+            };
 
-                // If a line doesn't end with ], ., !, ?, or ", then it's likely incomplete and we should drop it.
-                if (!trimmed || ![']', '*', '_', ')', '.', '!', '?', '"', '\''].some(end => trimmed.endsWith(end))) continue;
+            const resolveEmotion = (emotionName: string, actorName: string): Emotion | undefined => {
+                const normalizedEmotion = emotionName.trim().toLowerCase();
+                if (!normalizedEmotion) return undefined;
 
-                const newEmotionTags: {[key: string]: Emotion} = {};
-                const newOutfitChanges: {[actorId: string]: string} = {};
-                let newUpdatedActors: string[] | undefined;
-                let newUpdatedLocationId: string | undefined;
+                if (normalizedEmotion in Emotion) {
+                    return normalizedEmotion as Emotion;
+                }
 
-                const resolveLocationId = (locationNameOrId: string): string | undefined => {
-                    const locationText = locationNameOrId.trim();
-                    if (!locationText) return undefined;
+                const closestEmotion = findBestNameMatch(normalizedEmotion, Object.keys(EMOTION_MAPPING).map(e => ({ name: e })));
+                if (closestEmotion) {
+                    console.log(`Emotion "${normalizedEmotion}" for ${actorName} mapped to emotion "${EMOTION_MAPPING[closestEmotion.name]}".`);
+                    return EMOTION_MAPPING[closestEmotion.name];
+                }
 
-                    if (stage.getSave().atlas?.[locationText]) {
-                        return locationText;
+                console.warn(`Unrecognized emotion "${normalizedEmotion}" for ${actorName}; skipping tag.`);
+                return undefined;
+            };
+
+            const parseXmlScriptEntries = (input: string): ScriptEntry[] => {
+                const entries: ScriptEntry[] = [];
+                const entryMatches = [...input.matchAll(/<Entry>([\s\S]*?)<\/Entry>/gi)];
+                if (entryMatches.length === 0) {
+                    return entries;
+                }
+
+                for (const entryMatch of entryMatches) {
+                    const entryBody = entryMatch[1];
+                    const speakerName = (/<Speaker>([\s\S]*?)<\/Speaker>/i.exec(entryBody)?.[1] || '').trim();
+                    const messageBlock = (/<Message>([\s\S]*?)<\/Message>/i.exec(entryBody)?.[1] || '').trim();
+                    const message = messageBlock
+                        .replace(/[“”]/g, '"')
+                        .replace(/[‘’]/g, '\'')
+                        .replace(/<[^>]+>/g, '')
+                        .trim();
+
+                    const speakerMatch = findBestNameMatch(speakerName, save.actors ? Object.values(save.actors) : [], ['name']);
+                    const speakerId = speakerMatch ? speakerMatch.id : '';
+
+                    const actorEmotions: {[key: string]: Emotion} = {};
+                    const actorOutfits: {[actorId: string]: string} = {};
+                    let updatedActors: string[] | undefined;
+                    let updatedLocationId: string | undefined;
+
+                    for (const expressionMatch of entryBody.matchAll(/<Expression>\s*<Actor>([\s\S]*?)<\/Actor>\s*<Mood>([\s\S]*?)<\/Mood>\s*<\/Expression>/gi)) {
+                        const actorName = expressionMatch[1].trim();
+                        const moodName = expressionMatch[2].trim();
+                        const matchedActor = findBestNameMatch(actorName, allActors, ['name']);
+                        if (!matchedActor) continue;
+
+                        const finalEmotion = resolveEmotion(moodName, matchedActor.name);
+                        if (!finalEmotion) continue;
+                        actorEmotions[matchedActor.id] = finalEmotion;
                     }
 
-                    const matchedLocation = findBestNameMatch(locationText, allLocations);
-                    return matchedLocation?.id;
-                };
-                
-                // Process tags in the line
-                for (const tag of trimmed.match(/\[[^\]]+\]/g) || []) {
-                    const raw = tag.slice(1, -1).trim();
-                    if (!raw) continue;
+                    for (const outfitMatch of entryBody.matchAll(/<OutfitChange>\s*<Actor>([\s\S]*?)<\/Actor>\s*<Outfit>([\s\S]*?)<\/Outfit>\s*<\/OutfitChange>/gi)) {
+                        const actorName = outfitMatch[1].trim();
+                        const outfitName = outfitMatch[2].trim();
+                        const matchedActor = findBestNameMatch(actorName, allActors, ['name']);
+                        if (!matchedActor) continue;
 
-                    console.log(`Processing tag: ${raw}`);
+                        const matchedOutfit = findBestNameMatch(outfitName, matchedActor.outfits || []);
+                        if (!matchedOutfit) {
+                            console.warn(`Outfit "${outfitName}" not found for ${matchedActor.name}; skipping tag.`);
+                            continue;
+                        }
+                        actorOutfits[matchedActor.id] = matchedOutfit.id;
+                    }
 
-                    // Handle movement tags (character and scene):
-                    const movementTagRegex = /([^[\]]+)\s+moves\s+([^[\]]+)/i;
-                    const movementMatch = movementTagRegex.exec(raw);
-                    if (movementMatch) {
-                        const moverName = movementMatch[1].trim();
-                        const destinationText = movementMatch[2].trim();
-                        const destinationUpper = destinationText.toUpperCase();
-
-                        if (moverName.toUpperCase() === 'SCENE') {
+                    for (const movementMatch of entryBody.matchAll(/<Movement>([\s\S]*?)<\/Movement>/gi)) {
+                        const movementBody = movementMatch[1];
+                        const sceneMovementMatch = /<Scene\s*\/>\s*<Location>([\s\S]*?)<\/Location>/i.exec(movementBody);
+                        if (sceneMovementMatch) {
+                            const destinationText = sceneMovementMatch[1].trim();
+                            const destinationUpper = destinationText.toUpperCase();
                             if (destinationUpper !== 'AWAY') {
                                 const resolvedSceneLocationId = destinationUpper === 'HERE'
                                     ? parsedSceneLocationId
                                     : resolveLocationId(destinationText);
                                 if (resolvedSceneLocationId) {
                                     parsedSceneLocationId = resolvedSceneLocationId;
-                                    newUpdatedLocationId = resolvedSceneLocationId;
+                                    updatedLocationId = resolvedSceneLocationId;
                                 }
                             }
                             continue;
                         }
+
+                        const actorMovementMatch = /<Actor>([\s\S]*?)<\/Actor>\s*<Location>([\s\S]*?)<\/Location>/i.exec(movementBody);
+                        if (!actorMovementMatch) continue;
+
+                        const moverName = actorMovementMatch[1].trim();
+                        const destinationText = actorMovementMatch[2].trim();
+                        const destinationUpper = destinationText.toUpperCase();
 
                         const matchedActor = findBestNameMatch(moverName, allActors, ['name']);
                         if (!matchedActor) continue;
@@ -505,142 +542,42 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             parsedCurrentActors = parsedCurrentActors.filter(actorId => actorId !== matchedActor.id);
                         }
 
-                        newUpdatedActors = [...parsedCurrentActors];
-                        continue;
+                        updatedActors = [...parsedCurrentActors];
                     }
 
-
-                    // Handle outfit tags:
-                    const outfitTagRegex = /([^[\]]+)\s+wears\s+([^[\]]+)/gi;
-                    let outfitMatch = outfitTagRegex.exec(raw);
-                    if (outfitMatch) {
-                        const characterName = outfitMatch[1].trim();
-                        const outfitName = outfitMatch[2].trim();
-                        // Find matching actor using findBestNameMatch
-                        const matched = findBestNameMatch(characterName, allActors, ['name']);
-                        if (!matched) continue;
-
-                        // Find matching outfit for this actor
-                        const matchedOutfit = findBestNameMatch(outfitName, matched.outfits || []);
-                        if (!matchedOutfit) {
-                            console.warn(`Outfit "${outfitName}" not found for ${matched.name}; skipping tag.`);
-                            continue;
-                        }
-
-                        newOutfitChanges[matched.id] = matchedOutfit.id;
-                        console.log(`Outfit tag: ${matched.name} wears ${matchedOutfit.name}`);
-                    }
-                    
-                    // Look for expresses tags:
-                    const emotionTagRegex = /([^[\]]+)\s+expresses\s+([^[\]]+)/gi;
-                    let emotionMatch = emotionTagRegex.exec(raw);
-                    if (emotionMatch) {
-                        const characterName = emotionMatch[1].trim();
-                        const emotionName = emotionMatch[2].trim().toLowerCase();
-                        // Find matching actor using findBestNameMatch
-                        const matched = findBestNameMatch(characterName, allActors, ['name']);
-                        if (!matched) continue;
-
-                        // Try to map emotion using EMOTION_SYNONYMS if not a standard emotion
-                        let finalEmotion: Emotion | undefined;
-                        if (emotionName in Emotion) {
-                            finalEmotion = emotionName as Emotion;
-                            console.log(`Recognized standard emotion "${finalEmotion}" for ${matched.name}`);
-                        } else {
-                            const closestEmotion = findBestNameMatch(emotionName, Object.keys(EMOTION_MAPPING).map(e => ({ name: e })));
-                            if (closestEmotion) {
-                                console.log(`Emotion "${emotionName}" for ${matched.name} mapped to emotion "${EMOTION_MAPPING[closestEmotion.name]}".`);
-                                finalEmotion = EMOTION_MAPPING[closestEmotion.name];
-                            } else {
-                                console.warn(`Unrecognized emotion "${emotionName}" for ${matched.name} and no close match found; skipping tag.`);
-                            }
-                        }
-                        
-                        if (!finalEmotion) continue;
-                        newEmotionTags[matched.id] = finalEmotion;
-                    }
+                    entries.push(new ScriptEntry({
+                        speakerId,
+                        message,
+                        speechUrl: '',
+                        actorEmotions,
+                        actorOutfits,
+                        updatedActors,
+                        updatedLocationId,
+                        outcomes: [],
+                    }));
                 }
 
-                // Remove all tags before processing for display:
-                trimmed = trimmed.replace(/\[([^\]]+)\]/g, '').trim();
+                return entries;
+            };
 
-                const speakerLineMatch = speakerLineRegex.exec(trimmed);
-                console.log(`Testing ${trimmed}\nSpeaker line match: ${speakerLineMatch ? speakerLineMatch[1].trim() : 'No match'}`);
+            let scriptEntries = parseXmlScriptEntries(text);
 
-                // Only treat lines with an ALL CAPS speaker prefix as new script entries.
-                if (speakerLineMatch) {
-                    // New line
-                    if (currentLine) {
-                        combinedLines.push(currentLine.trim());
-                        combinedTagData.push({
-                            emotions: currentEmotionTags,
-                            outfitChanges: currentOutfitChanges,
-                            updatedActors: currentUpdatedActors,
-                            updatedLocationId: currentUpdatedLocationId
-                        });
-                    }
-                    currentLine = trimmed;
-                    currentEmotionTags = newEmotionTags;
-                    currentOutfitChanges = newOutfitChanges;
-                    currentUpdatedActors = newUpdatedActors;
-                    currentUpdatedLocationId = newUpdatedLocationId;
-                } else {
-                    // Continuation of previous line
-                    currentLine += '\n' + trimmed;
-                    currentEmotionTags = {...currentEmotionTags, ...newEmotionTags};
-                    currentOutfitChanges = {...currentOutfitChanges, ...newOutfitChanges};
-                    currentUpdatedActors = newUpdatedActors || currentUpdatedActors;
-                    currentUpdatedLocationId = newUpdatedLocationId || currentUpdatedLocationId;
-                }
+            // Fallback for non-conforming model output.
+            if (scriptEntries.length === 0) {
+                const speakerLineRegex = /^([A-Z][A-Z0-9 '&.-]*):\s*(.*)$/s;
+                scriptEntries = text
+                    .split('\n')
+                    .map(line => line.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, '\''))
+                    .filter(Boolean)
+                    .map(line => {
+                        const speakerLineMatch = speakerLineRegex.exec(line);
+                        const speakerName = speakerLineMatch?.[1]?.trim() || 'NARRATOR';
+                        const speakerMatch = findBestNameMatch(speakerName, save.actors ? Object.values(save.actors) : [], ['name']);
+                        const speakerId = speakerMatch ? speakerMatch.id : '';
+                        const message = (speakerLineMatch?.[2] || line).trim();
+                        return new ScriptEntry({ speakerId, message, speechUrl: '', actorEmotions: {}, actorOutfits: {}, outcomes: [] });
+                    });
             }
-            if (currentLine) {
-                combinedLines.push(currentLine.trim());
-                combinedTagData.push({
-                    emotions: currentEmotionTags,
-                    outfitChanges: currentOutfitChanges,
-                    updatedActors: currentUpdatedActors,
-                    updatedLocationId: currentUpdatedLocationId
-                });
-            }
-
-            // Convert combined lines into ScriptEntry objects when an ALL CAPS speaker prefix is present.
-            const scriptEntries: ScriptEntry[] = combinedLines.map((l, index) => {
-                let speakerId = '';
-                let message = l;
-                
-                const speakerLineMatch = speakerLineRegex.exec(message);
-                console.log(`Processing combined line: ${message}`);
-                if (speakerLineMatch) {
-                    console.log(`Found speaker line match: ${speakerLineMatch[1].trim()}`);
-                    console.log(speakerLineMatch);
-                    const speakerName = speakerLineMatch[1].trim();
-                    // Find matching actor using findBestNameMatch
-                    const matched = findBestNameMatch(speakerName, save.actors ? Object.values(save.actors) : [], ['name']);
-                    speakerId = matched ? matched.id : ''; // Use actor ID if found, otherwise empty for narrator.
-                    message = speakerLineMatch[2].trim();
-                }
-                
-                // Remove any remaining tags
-                message = message.replace(/\[([^\]]+)\]/g, '').trim();
-                
-                const entry: ScriptEntry = { speakerId: speakerId, message, speechUrl: '', actorEmotions: {}, actorOutfits: {}, outcomes: [] };
-                const tagData = combinedTagData[index];
-                
-                if (tagData.emotions && Object.keys(tagData.emotions).length > 0) {
-                    entry.actorEmotions = tagData.emotions;
-                }
-                if (tagData.updatedActors) {
-                    entry.updatedActors = [...tagData.updatedActors];
-                }
-                if (tagData.outfitChanges && Object.keys(tagData.outfitChanges).length > 0) {
-                    entry.actorOutfits = tagData.outfitChanges;
-                }
-                if (tagData.updatedLocationId) {
-                    entry.updatedLocationId = tagData.updatedLocationId;
-                }
-                
-                return entry;
-            });
 
             // Drop empty entries from scriptEntries and adjust speaker to any matching actor's name:
             for (const entry of scriptEntries) {
@@ -703,35 +640,26 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             // If this response contains an endScene, we will analyze the script for stat changes or other game mechanics to be applied. Add this to the ttsPromises to run in parallel.
             console.log('Perform additional analysis.');
             ttsPromises.push((async () => {
-                const endResponse = await stage.generateText(
+                let endResponse = await stage.generateText(
                     buildPrompt()
                         .addBlock(`Instructions`,
                             `Analyze the provided script and determine whether the depicted scene has run its course. ` +
-                            `If the scene feels complete or has reached a suitable moment to end on, output "[END SCENE]" followed by a "[SUMMARY: ...]" tag with a brief summary of the entire scene's key events and outcomes. ` +
-                            `If the scene feels incomplete or unresolved, output "[CONTINUE SCENE]" and "[SUMMARY: ...]" tag with a brief explanation of what is missing or what could be developed further to reach a satisfying conclusion. ` +
-                            `\n\nIf the scene is complete, utilize additional tags to highlight any significant developments, such as character relationship changes or lore entries above that require updates as a result of this scene. `
+                            `Respond using XML tags. If complete, use <SceneStatus>END</SceneStatus>; otherwise use <SceneStatus>CONTINUE</SceneStatus>. ` +
+                            `Always include <Summary>...</Summary> with a concise explanation of the scene state and key developments. ` +
+                            `\n\nIf the scene is complete, include optional relationship and lore update tags to flag follow-up game mechanics.`
                         )
-                        .addBlock('Relationship Changes',
+                        .addBlock('Stat Changes',
                             `Indicate affection changes between the player and any characters involved in the scene; affection is represented as a number between 1 and 10, so adjustments should be generally incremental.\n` +
-                            `[AFFECTION CHANGE: Character Name +/-x]` +
-                            `\nExamples:\n[AFFECTION CHANGE: Cyanea +1]\n[AFFECTION CHANGE: Lyra -1]`
+                            `<AffectionChange><Actor>Character Name</Actor><Amount>+/-x</Amount></AffectionChange>`
                         )
                         .addBlock('Lore Updates',
-                            `Indicate the names of lore entries that may need to be updated as a result of the skit. Actual updates will be made in separate requests; this tag merely flags an entry for update.\n` +
-                            `[LORE UPDATE: Lore Entry Name]` +
-                            `\nExample:\n[LORE UPDATE: Cassiel]\n[LORE UPDATE: The Gardens]`
+                            `Indicate lore entries that may need to be updated as a result of the skit. Actual updates happen elsewhere; this only flags entries for review.\n` +
+                            `<LoreUpdate><Entry>Lore Entry Name</Entry></LoreUpdate>`
                         )
                         .addBlock('Example Response',
-                            `[END SCENE]\n[SUMMARY: This expedition took ${playerName} and Cyanea to the Shells, where they encountered Red Hood and uncovered a new forma: the Coral Razor. Red Hood vehemently disagreed with ${playerName} and Cyanea on how to handle this new threat.]` +
-                            `\n[AFFECTION CHANGE: Cyanea +1]\n[AFFECTION CHANGE: Red Hood -2]\n[LORE UPDATE: The Shells]\n[LORE UPDATE: Cyanea]\n[LORE UPDATE: Red Hood]\n` +
-                            `#END#` +
+                            `<SceneAnalysis><SceneStatus>END</SceneStatus><Summary>This expedition took ${playerName} and Cyanea to the Shells, where they encountered Red Hood and uncovered a new forma: the Coral Razor. Red Hood vehemently disagreed with ${playerName} and Cyanea on how to handle this new threat.</Summary><AffectionChange><Actor>Cyanea</Actor><Amount>+1</Amount></AffectionChange><AffectionChange><Actor>Red Hood</Actor><Amount>-2</Amount></AffectionChange><LoreUpdate><Entry>The Shells</Entry></LoreUpdate><LoreUpdate><Entry>Cyanea</Entry></LoreUpdate><LoreUpdate><Entry>Red Hood</Entry></LoreUpdate></SceneAnalysis>\n#END#` +
                             `\nExample Response:\n` +
-                            `[CONTINUE SCENE]\n[SUMMARY: The scene is developing well, but it would be more satisfying with a clearer moment of resolution at the end. Consider whether ${playerName} could discover a clue or have a significant interaction with another character to create a more compelling ending.]\n` +
-                            `#END#`
-                        )
-                        .addBlock('Example Response',
-                            `[CONTINUE SCENE]\n[SUMMARY: The scene is developing well, but it would be more satisfying with a clearer moment of resolution at the end. Consider whether ${playerName} could discover a clue or have a significant interaction with another character to create a more compelling ending.]\n` +
-                            `#END#`
+                            `<SceneAnalysis><SceneStatus>CONTINUE</SceneStatus><Summary>The scene is developing well, but it would be more satisfying with a clearer moment of resolution at the end. Consider whether ${playerName} could discover a clue or have a significant interaction with another character to create a more compelling ending.</Summary></SceneAnalysis>\n#END#`
                         )
                         .addBlock('Scene Script for Analysis',
                             buildScriptLog(skit, scriptEntries, stage))
@@ -743,22 +671,27 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
 
                 if (endResponse) {
                     // Strip double-asterisks. TODO: Remove this once other model issue is resolved.
-                    text = text.replace(/\*\*/g, '');
+                    endResponse = endResponse.replace(/\*\*/g, '');
 
-                    if (endResponse.includes('[END SCENE]')) {
+                    const normalizedEndResponse = endResponse.replace(/[“”]/g, '"').replace(/[‘’]/g, '\'');
+                    const hasEndSceneTag = normalizedEndResponse.includes('<END SCENE>') || /<SceneStatus>\s*END\s*<\/SceneStatus>/i.test(normalizedEndResponse);
+
+                    if (hasEndSceneTag) {
                         endScene = true;
-                        const summaryMatch = /\[SUMMARY:\s*([^\]]+)\]/i.exec(endResponse);
+                        const summaryMatch = /<Summary>([\s\S]*?)<\/Summary>/i.exec(normalizedEndResponse) || /<SUMMARY:\s*([^>]+)>/i.exec(normalizedEndResponse);
                         summary = summaryMatch ? summaryMatch[1].trim() : '';
                         console.log('Model determined scene should end. Summary:', summary);
-
-                        const affectionChangeRegex = /\[AFFECTION CHANGE:\s*([^\]]+?)\s*([+-]\d+)\]/gi;
                         let match;
-                        while ((match = affectionChangeRegex.exec(endResponse)) !== null) {
+
+                        const parsedAffectionActors = new Set<string>();
+
+                        const affectionXmlRegex = /<AffectionChange>\s*<Actor>([^<]+)<\/Actor>\s*<Amount>([+-]?\d+)<\/Amount>\s*<\/AffectionChange>/gi;
+                        while ((match = affectionXmlRegex.exec(normalizedEndResponse)) !== null) {
                             const characterName = match[1].trim();
-                            const changeValue = parseInt(match[2]);
+                            const changeValue = parseInt(match[2], 10);
                             const matchedActor = findBestNameMatch(characterName, Object.values(save.actors), ['name']);
                             if (matchedActor && !isNaN(changeValue) && changeValue !== 0) {
-                                console.log(`Affection change flagged for ${matchedActor.name}: ${changeValue > 0 ? '+' : ''}${changeValue}`);
+                                parsedAffectionActors.add(matchedActor.id);
                                 outcomes.push(new Outcome({
                                     type: OutcomeType.RELATIONSHIP_CHANGE,
                                     description: `Affection with ${matchedActor.name} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
@@ -771,8 +704,43 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             }
                         }
 
-                        const loreUpdateRegex = /\[LORE UPDATE:\s*([^\]]+)\]/gi;
-                        while ((match = loreUpdateRegex.exec(endResponse)) !== null) {
+                        const affectionLegacyRegex = /<AFFECTION CHANGE:\s*([^>]+?)\s*([+-]\d+)>/gi;
+                        while ((match = affectionLegacyRegex.exec(normalizedEndResponse)) !== null) {
+                            const characterName = match[1].trim();
+                            const changeValue = parseInt(match[2], 10);
+                            const matchedActor = findBestNameMatch(characterName, Object.values(save.actors), ['name']);
+                            if (matchedActor && !parsedAffectionActors.has(matchedActor.id) && !isNaN(changeValue) && changeValue !== 0) {
+                                outcomes.push(new Outcome({
+                                    type: OutcomeType.RELATIONSHIP_CHANGE,
+                                    description: `Affection with ${matchedActor.name} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
+                                    details: {
+                                        actorId: matchedActor.id,
+                                        actorName: matchedActor.name,
+                                        changeValue,
+                                    },
+                                }));
+                            }
+                        }
+
+                        const loreUpdateXmlRegex = /<LoreUpdate>\s*<Entry>([^<]+)<\/Entry>\s*<\/LoreUpdate>/gi;
+                        while ((match = loreUpdateXmlRegex.exec(normalizedEndResponse)) !== null) {
+                            const loreName = match[1].trim();
+                            const matchedLore = findBestNameMatch(loreName, save.lorebook || [], ['title']);
+                            if (matchedLore) {
+                                console.log(`Lore update flagged for "${matchedLore.title}".`);
+                                outcomes.push(new Outcome({
+                                    type: OutcomeType.LORE_UPDATE,
+                                    description: `Lore entry \"${matchedLore.title}\" should be reviewed for updates.`,
+                                    details: {
+                                        loreId: matchedLore.id,
+                                        loreTitle: matchedLore.title,
+                                    },
+                                }));
+                            }
+                        }
+
+                        const loreUpdateLegacyRegex = /<LORE UPDATE:\s*([^>]+)>/gi;
+                        while ((match = loreUpdateLegacyRegex.exec(normalizedEndResponse)) !== null) {
                             const loreName = match[1].trim();
                             const matchedLore = findBestNameMatch(loreName, save.lorebook || [], ['title']);
                             if (matchedLore) {
