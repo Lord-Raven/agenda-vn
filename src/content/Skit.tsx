@@ -188,7 +188,7 @@ export function buildPremise(playerName: string, stage?: any): string {
 }
 
 export function generateContext(skit: Skit|undefined, stage: Stage, historyLength: number): ((b: PromptBuilder) => any) {
-    const playerName = stage.getPlayerActor()?.name || 'The Prisoner';
+    const playerName = stage.getPlayerActor()?.name || 'J. Doe';
     const save = stage.getSave();
     const location = skit ? save.atlas[skit.initialLocationId] : undefined;
     const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e => e.skit !== skit);
@@ -294,7 +294,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 }
 
 export async function generateSkitScript(skit: Skit, stage: Stage): Promise<ScriptEntry[]> {
-    const playerName = stage.getPlayerActor()?.name || 'The Prisoner';
+    const playerName = stage.getPlayerActor()?.name || 'J. Doe';
     const save = stage.getSave();
 
     if (!skit.guidance) {

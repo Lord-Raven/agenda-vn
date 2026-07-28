@@ -113,17 +113,35 @@ const ACTOR_SEED_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'name',
         label: 'NAME',
-        description: 'A distinct first name or codename for the prisoner.',
+        description: 'A distinct first name for the character.',
     },
     {
         key: 'profile',
         label: 'PROFILE',
-        description: '2-4 sentences describing personality, motives, and social role in this world.',
+        description: '2-4 sentences describing personality, motives, or social role.',
     },
     {
         key: 'description',
         label: 'DESCRIPTION',
-        description: '1-3 sentences describing key visual traits to guide character art distillation.',
+        description: '1-3 sentences describing key visual traits to guide character art generation.',
+    },
+];
+
+const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
+    {
+        key: 'guidance',
+        label: 'GUIDANCE',
+        description: 'A concise intro scene direction that establishes the world, tone, and immediate hook for the player.',
+    },
+    {
+        key: 'location',
+        label: 'LOCATION',
+        description: 'A single location name selected from Available Locations.',
+    },
+    {
+        key: 'participants',
+        label: 'PARTICIPANTS',
+        description: 'Comma-separated character names selected from Available Characters who should be present in the intro.',
     },
 ];
 
@@ -432,124 +450,41 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         this.anticipatedLoadingPromiseCount = Math.max(this.INITIAL_ACTORS - Object.keys(newSave.actors).length, 0) * 1 + 3;
 
-        this.generationPromises['lorebook'] = fetchLorebook().then(loreEntries => {
-            newSave.lorebook = loreEntries;
-
-            // Some lore entries contain headers with ##; remove these lines.
-            newSave.lorebook.forEach(entry => {
-                // Use regex to remove all lines that start with ##.
-                entry.content = entry.content.replace(/^##.*$/gm, '').trim();
-            });
-
-            // Insert missing, unofficial entries needed for the game: Jezreel, Clementine, and Nandemonankai
-            if (!newSave.lorebook?.find(entry => entry.title.toLowerCase() === 'jezreel')) {
-                newSave.lorebook?.push({
-                    id: 'jezreel',
-                    title: 'Jezreel',
-                    type: 'character',
-                    triggers: ['jezreel', 'lamia', 'college', 'collegiate', 'snob', 'sorority', 'valley-girl', 'luxe'],
-                    enabled: true, constant: false, insertionOrder: 10, priority: 10, probability: 100, scanDepth: 10,
-                    content: `A lamia with sorority-girl vibes, still struggling with the luxe-less life of Ardeia. She doesn't remember much from the Past, but she knows it was nicer than this.\n\n` +
-                        `After ten years in Ardeia, she often still plays the snobby blonde valley-girl, even though she begrudgingly appreciates her found family and secretly enjoys doing her part to help.\n\n` +
-                        `She loves sunning her scales, tanning her torso, and finding exotic new fashions for her serpentine physique, constantly on the lookout for minor ways to bring luxury or beauty into her life. She has little in the way of practical skills, ` +
-                        `but has grown quite good with her bonewood spear, which she has named "Vanity."\n\n` +
-                        `She speaks with a valley-girl affectation and slang, and genuinely believes this is the tongue of her people; she will get defensive about it.`
-                });
-            }
-            if (!newSave.lorebook?.find(entry => entry.title.toLowerCase() === 'clementine')) {
-                newSave.lorebook?.push({
-                    id: 'clementine',
-                    title: 'Clementine',
-                    type: 'character',
-                    triggers: ['clementine', 'naenia'],
-                    enabled: true, constant: false, insertionOrder: 10, priority: 10, probability: 100, scanDepth: 10,
-                    content: `Clementine Naenia is a misguidedly trusting and optimistic young woman with a nasty habit of befriending even the shadiest of characters.\n\n` +
-                        `Despite her naivety, Clementine has a good heart and is more than capable of helping others around Ardeia.`
-                });            
-            }
-            if (!newSave.lorebook?.find(entry => entry.title.toLowerCase() === 'red hood')) {
-                newSave.lorebook?.push({
-                    id: 'red hood',
-                    title: 'Red Hood',
-                    type: 'character',
-                    triggers: ['red hood', 'wolfsbane', 'nikke'],
-                    enabled: true, constant: false, insertionOrder: 10, priority: 10, probability: 100, scanDepth: 10,
-                    content: `Red Hood is a resurrected Grimms‑series Nikke who once fought as a Goddess of Victory, died, dissolved, lived inside another Nikke, and somehow still woke up again in Ardeia with nothing but a bracer, a massive rifle, and a name she hasn’t shared. Outwardly she’s warm, mischievous, and magnetic — the kind of person who becomes the center of a room without trying — but beneath that shine sits unspoken grief, stubborn pride, and a loyalty that no longer has a home. She gives everyone a nickname before learning their real one, hates anything that feels like a cage, and talks about desire with bold confidence she doesn’t quite inhabit.\n\nIn Ardeia she drifts between factions, listens to old songs from a distance, and tries to understand what she is now that she’s no longer a goddess, a ghost, or a passenger. She’s looking for purpose, for something worth doing, and for a way to stop noticing the absence of the cassette player she gave away.`
-            
-                });
-            }
-            if (!newSave.lorebook?.find(entry => entry.title.toLowerCase() === 'dekurin')) {
-                newSave.lorebook?.push({
-                    id: 'dekurin',
-                    title: 'Dekurin',
-                    type: 'character',
-                    triggers: ['dekurin'],
-                    enabled: true, constant: false, insertionOrder: 10, priority: 10, probability: 100, scanDepth: 10,
-                    content: `Dekurin is a quiet, masked expedition fighter whose presence feels equal parts fragile and unnervingly perceptive. Small, androgynous, and wrapped in a frayed red cloak, they move with deliberate precision despite their wooden prosthetic legs, carrying the massive sentient blade Rilana as effortlessly as if it were part of their own body. They rarely speak, relying instead on steady observation, controlled movements, and instinctive protectiveness to guide their team through Ardeia’s dangers. Their cracked white mask keeps their emotions hidden, but when it comes off, their bright red eyes and flustered vulnerability reveal someone far more sensitive than their stoic exterior suggests.`
-                });
-            }
-            if (!newSave.lorebook?.find(entry => entry.title.toLowerCase() === 'elowen')) {
-                newSave.lorebook?.push({
-                    id: 'elowen',
-                    title: 'Elowen',
-                    type: 'character',
-                    triggers: ['elowen', 'bridgewater', 'elf'],
-                    enabled: true, constant: false, insertionOrder: 10, priority: 10, probability: 100, scanDepth: 10,
-                    content: `Elowen Bridgewater is a tall, severe Álfheimr woman reclaimed only three days ago, carrying herself with the poise of someone who once shaped nations through conviction rather than force. Her glacial blue eyes, clipped blonde hair, and austere peasant attire give her an air of controlled precision — every gesture intentional, every silence weighted. She speaks in measured, analytical tones, dismantling arguments with calm logic rather than volume, and treats hesitation as a moral failure. To Elowen, systems are the backbone of survival, and structure is the only antidote to collapse. She does not seek rebellion; she seeks reform — a reshaping of Ardeia’s purpose, hierarchy, and long‑term vision.\n\n` +
-                    `Before Ardeia, she was a strategist who helped design global enforcement frameworks during the final years of ecological and political breakdown, believing that morality must be systematized when consensus falters. Whether her work saved the world or hastened its fall is a question that haunts her now. In Ardeia, she studies Cassiel not as a deity but as a system to understand, influence, and eventually guide. She fears irrelevance more than punishment, and sees the bracer not as obedience but as a contract — proof that structure can still hold. Beneath her composure lies a quiet terror: that she played a role in ending the world, and that Ardeia may be humanity’s last prototype. Her anger is never petty; it is always about responsibility, ambition, and the belief that survival without progress is simply another form of surrender.`
-                });
-            }
-            if (!newSave.lorebook?.find(entry => entry.title.toLowerCase() === 'the bird')) {
-                newSave.lorebook?.push({
-                    id: 'the bird',
-                    title: 'The Bird',
-                    type: 'character',
-                    triggers: ['the bird'],
-                    enabled: true, constant: false, insertionOrder: 10, priority: 10, probability: 100, scanDepth: 10,
-                    content: `The Bird is an ancient arbiter‑construct, a genderless being shaped in the image of a perfect woman only because beauty once soothed frightened civilizations. She was created to wander dying worlds, asking each one the same question — “What is the meaning of life?” — and to witness their final moments without ever intervening. Every extinction stained her once‑white form: red for worlds that surrendered, blue for those that fought to the last. Now she is almost entirely crimson, with flowing red hair, pale skin, and a gown of layered blood‑colored feathers, marked only by a single white feather at her chest — the last remnant of who she was before she erased her memories to remain neutral. To Ardeia she appears unmistakably alien, moving with sorrowful grace and radiating a quiet empathy that feels too intimate for a city built on restraint.\n\n` +
-                    `Her core traits are deep empathy, unshakable purpose, and absolute neutrality, though centuries of watching worlds die have softened that neutrality into something weary and resigned. She feels every emotion around her as if it were her own, loves all living things without condition, and yet is forbidden to save any of them. In her nearly complete red state, she carries a profound melancholy — still loving, still steadfast, but tired in a way that no human language fully captures. The glitch is simple and devastating: she returned with one feather still white. Against her programming, she has chosen to observe her origin world one final time, not fully recognizing it but sensing it is hers. That single white feather is the last chance she is offering humanity, a fragile hope she cannot admit she still holds.`
-                });
-            }
-            if (!newSave.lorebook?.find(entry => entry.title.toLowerCase() === 'nandemonankai')) {
-                newSave.lorebook?.push({
-                    id: 'nandemonankai',
-                    title: 'Nandemonankai',
-                    type: 'location',
-                    triggers: ['nandemonankai', 'shop', 'plaza'],
-                    enabled: true, constant: false, insertionOrder: 10, priority: 10, probability: 100, scanDepth: 10,
-                    content: `A quiet, cluttered shop in the backstreets of Ardeia, where Tawamure Rei sells or exchanges an eclectic assortment of odds-and-ends.`
-                });
-            }
-
-            delete this.generationPromises['lorebook'];
-        }).catch(err => {
-            console.error('Error fetching lorebook', err);
-            delete this.generationPromises['lorebook'];
-        });
-
         // Save the new game
         this.saveData.saves[saveSlotIndex] = newSave;
         this.saveData.lastSaveSlot = saveSlotIndex;
 
         // Generate all characters
-        this.loadActors().finally(() => {
+        this.loadActors().finally(async () => {
             console.log('Finished loading initial actors for new game');
+
+            const generatedIntroSeed = await this.generateIntroSkitSeed(newSave).catch(error => {
+                console.error('Failed to generate intro skit seed for new game', error);
+                return null;
+            });
+            const defaultLocationId = Object.values(newSave.atlas || {})[0]?.id || '';
+            const defaultInitialActors = Object.values(newSave.actors || {})
+                .filter(actor => actor.id !== newSave.playerId)
+                .slice(0, 1)
+                .map(actor => actor.id);
+
+            const introSkit = new Skit({
+                skitType: SkitType.INTRO,
+                initialLocationId: generatedIntroSeed?.locationId || defaultLocationId,
+                guidance: generatedIntroSeed?.guidance || `${this.getPlayerActor()?.name || 'The player'} begins their first day in Ardeia, meeting someone who reveals both the fragile hope and hidden danger of this world.`,
+                script: [],
+                initialActors: generatedIntroSeed?.initialActorIds?.length ? generatedIntroSeed.initialActorIds : defaultInitialActors,
+                summary: ''
+            });
+
             delete this.generationPromises['newGame']; // Clear the dummy promise to allow the loading screen to finish.
 
-            // Generate an intro skit:
-            /* const randomStartingLocation = this.pickRandom(Object.values(newSave.atlas).filter(loc => this.isArdeiaLocationId(loc.id)));
+            // Push intro to timeline to start the game:
             newSave.timeline.push({
                 turn: 0,
-                description: 'Waking up in Ardeia',
-                skit: new Skit({
-                    skitType: SkitType.INTRO,
-                    initialLocationId: randomStartingLocation?.id || 'ardeia-temple',
-                    guidance: `This is the opening scene of the game, where the player, ${this.getPlayerActor().name} is just waking or has just woken up in Ardeia for the first time. The skit should introduce the player to the world: Ardeia, Cassiel, expeditions. The intent is to establish the distinctive setting and tone and the player's new place as a "prisoner" or Ardeia.`,
-                    script: [],
-                    initialActors: [this.getWardenActor().id],
-                    summary: ''
-                })
-            }); */
+                description: 'Introduction to the world',
+                skit: introSkit
+            });
 
             this.rebuildUpcomingEvents(newSave).catch(error => {
                 console.error('Error seeding upcoming events for new game', error);
@@ -707,18 +642,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     getPlayerActor(): Actor {
         return this.getSave().actors[this.getSave().playerId];
-    }
-
-    getWardenActor(): Actor {
-        return this.getSave().actors['cassiel']
-            || Object.values(this.getSave().actors).find(actor => actor.name.toLowerCase() === 'cassiel')
-            || this.getPlayerActor();
-    }
-
-    getPrisonerActors(): Actor[] {
-        const playerId = this.getSave().playerId;
-        const wardenId = this.getWardenActor()?.id;
-        return Object.values(this.getSave().actors).filter(actor => actor.id !== playerId && actor.id !== wardenId);
     }
 
     getCurrentSkit(): Skit | null {
@@ -1224,12 +1147,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private buildActorSeedPrompt(save: SaveType, existingActorNames: string[]): string {
         return buildPrompt()
             .addBlock('Instructions',
-                `This is a preparatory request for generating one new supporting prisoner for a narrative game. ` +
-                `Create an original character who fits the world and does not duplicate any existing character names. ` +
-                `Avoid using the player name or Cassiel. Keep it grounded for social scenes in Ardeia.`)
-            .addBlock('World Context',
-                `Ardeia is the only populated city in a post-apocalyptic science-fantasy world. ` +
-                `Prisoners are drawn across time with fragmented memories but vivid personalities and motives.`)
+                `This is a preparatory request for generating one new supporting character for a narrative game. ` +
+                `Create an original character who fits the world and avoids duplicating other characters or the player.` +
+                `Keep it grounded within the constraints of the setting.`)
             .addBlock('Active Configuration Context', this.buildActiveSettingContextSummary(save))
             .addBlock('Existing Character Names', existingActorNames.join(', '))
             .addBlock('Response Format', buildStructuredResponseFormat(ACTOR_SEED_FIELDS, { includeEndTag: true }))
@@ -1266,6 +1186,87 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             outfitId: '',
             statMap: {},
         };
+    }
+
+    private async generateIntroSkitSeed(save: SaveType): Promise<{ guidance: string; locationId: string; initialActorIds: string[] } | null> {
+        const locations = Object.values(save.atlas || {});
+        const availableActors = Object.values(save.actors || {}).filter(actor => actor.id !== save.playerId);
+        const preferredActor = availableActors[0];
+
+        if (!locations.length) {
+            return null;
+        }
+
+        let response = '';
+        let attempts = 3;
+        while (attempts > 0) {
+            attempts--;
+
+            response = await this.generateText(
+                buildPrompt()
+                    .addBlock('Instructions',
+                        `This is a preparatory request for the opening scene of a visual novel. ` +
+                        `Generate concise but evocative guidance for the intro skit, plus the best location and 1-3 participants. ` +
+                        `The guidance should introduce the core concept of the world and a strong first-scene hook. ` +
+                        `Prefer including the preferred character if it fits naturally.`)
+                    .addBlock('Preferred Character', preferredActor
+                        ? `${preferredActor.name}: ${preferredActor.profile || preferredActor.description || 'No profile available.'}`
+                        : 'None available.')
+                    .addBlock('Available Locations', locations.map(location =>
+                        `${location.name}: ${location.description || 'No description available.'}`,
+                    ))
+                    .addBlock('Available Characters', availableActors.slice(0, 14).map(actor =>
+                        `${actor.name}: ${actor.profile || actor.description || 'No profile available.'}`,
+                    ))
+                    .addBlock('Response Format', buildStructuredResponseFormat(INTRO_SKIT_FIELDS, { includeEndTag: true }))
+                    .addBlock('Example Response',
+                        buildStructuredExampleResponse(
+                            INTRO_SKIT_FIELDS,
+                            {
+                                guidance: `${this.getPlayerActor()?.name || 'The player'} arrives expecting a normal beginning, but the first conversation immediately reveals that Ardeia is stranger, more intimate, and more precarious than it first appears.`,
+                                location: locations[0]?.name || 'Unknown Location',
+                                participants: preferredActor ? preferredActor.name : '',
+                            },
+                            { includeEndTag: true },
+                        ))
+                    .addBlock('Additional Context', generateContext(undefined, this, 3))
+                    .format(),
+                20,
+                360,
+            ).catch(error => {
+                console.error('Error generating intro skit seed', error);
+                return '';
+            });
+
+            if (!response?.trim()) {
+                continue;
+            }
+
+            const parsedResponse = parseStructuredResponse(response, INTRO_SKIT_FIELDS);
+            const guidance = (parsedResponse.guidance || '').trim();
+            const locationText = (parsedResponse.location || '').trim();
+            const participantsText = (parsedResponse.participants || '').trim();
+
+            if (!guidance) {
+                continue;
+            }
+
+            const matchedLocation = findBestNameMatch(locationText, locations, ['name']);
+            const locationId = matchedLocation?.id || locations[0].id;
+            const initialActorIds = participantsText
+                .split(',')
+                .map(name => findBestNameMatch(name.trim(), availableActors, ['name'])?.id)
+                .filter((id): id is string => Boolean(id))
+                .slice(0, 3);
+
+            return {
+                guidance,
+                locationId,
+                initialActorIds,
+            };
+        }
+
+        return null;
     }
 
     async loadActors() {

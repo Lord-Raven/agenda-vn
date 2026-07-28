@@ -48,7 +48,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     // Load existing settings or use defaults
     const [settings, setSettings] = useState<SettingsData>({
         playerName: stage().getPlayerActor()?.name || stage().primaryUser?.name || 'Player',
-        playerDescription: stage().getPlayerActor()?.profile || stage().primaryUser?.chatProfile || 'An enigmatic prisoner.',
+        playerDescription: stage().getPlayerActor()?.profile || stage().primaryUser?.chatProfile || 'An enigmatic individual.',
         playerColor: resolvePlayerThemeColor(stage().getPlayerActor()?.themeColor || ''),
         textToSpeech: (stage().getSave()?.textToSpeech ?? true),
         disableImpersonation: (stage().getSave()?.disableImpersonation ?? false),
@@ -225,7 +225,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         marginBottom: '8px',
                                     }}
                                 >
-                                    Prisoner Name
+                                    Player Name
                                 </label>
                                 <TextInput
                                     id="player-name"
@@ -249,7 +249,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         marginBottom: '8px',
                                     }}
                                 >
-                                    Prisoner Details
+                                    Player Description
                                 </label>
                                 <textarea
                                     id="player-description"
@@ -278,7 +278,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         marginBottom: '8px',
                                     }}
                                 >
-                                    Prisoner Color
+                                    Player Color
                                 </label>
                                 <div
                                     style={{
@@ -293,7 +293,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         type="color"
                                         value={resolvedPlayerThemeColor}
                                         onChange={(e) => handlePlayerColorChange(e.target.value)}
-                                        aria-label="Pick prisoner color"
+                                        aria-label="Player color"
                                         style={{
                                             width: '88px',
                                             height: '56px',
