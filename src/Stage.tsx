@@ -984,6 +984,46 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         this.generationPromises[`loreUpdate-${loreEntry.id}`] = loreUpdatePromise;
                     }
                     break;
+                case 'STAT_CHANGE':
+                    // For stat changes, we expect details to include an actorId and a statMap with the changes.
+                    const actorId = outcome.details?.actorId;
+                    const statMap = outcome.details?.statMap || {};
+                    if (actorId && save.actors?.[actorId]) {
+                        const actor = save.actors[actorId];
+                        const configuredStats = (save.agendaConfig?.actorStats || []).filter(stat => stat?.name?.trim());
+                        const configuredStatByName = new Map(configuredStats.map(stat => [stat.name, stat]));
+                        for (const [stat, value] of Object.entries(statMap)) {
+                            const incomingStatName = `${stat}`.trim();
+                            const changeValue = Number(value);
+                            if (!incomingStatName || !Number.isFinite(changeValue)) {
+                                continue;
+                            }
+
+                            const resolvedStat = configuredStatByName.get(incomingStatName)
+                                || configuredStats.find(configured => configured.name.toLowerCase() === incomingStatName.toLowerCase());
+                            const targetStatName = resolvedStat?.name || incomingStatName;
+                            actor.statMap = actor.statMap || {};
+                            const existingValue = Number(actor.statMap[targetStatName]);
+                            const currentValue = Number.isFinite(existingValue)
+                                ? existingValue
+                                : (resolvedStat ? this.normalizeActorStatValue(Number(resolvedStat.default) || 0, resolvedStat) : 0);
+                            const nextValue = currentValue + changeValue;
+                            actor.statMap[targetStatName] = resolvedStat
+                                ? this.normalizeActorStatValue(nextValue, resolvedStat)
+                                : nextValue;
+                        }
+                        this.saveGame();
+                    }
+                    break;
+                case 'NEW_EVENT':
+                    // For new events, we expect details to include the event data.
+                    const newEvent = outcome.details?.event;
+                    if (newEvent) {
+                        save.upcomingEvents = save.upcomingEvents || [];
+                        save.upcomingEvents.push(newEvent);
+                        this.saveGame();
+                    }
+                    break;
             }
         }
 
