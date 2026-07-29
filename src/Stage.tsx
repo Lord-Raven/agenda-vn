@@ -556,6 +556,82 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .sort((a, b) => a.date.localeCompare(b.date));
     }
 
+    getManagedCalendarEvents(): CalendarEvent[] {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+
+        return (save.upcomingEvents || [])
+            .filter(event => (event.recurrenceInstanceIndex || 0) <= 0)
+            .sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    createCalendarEventDraft(): CalendarEvent {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+
+        const locations = Object.values(save.atlas || {});
+        const fallbackLocation = locations[0];
+        const actorIds = Object.values(save.actors || {})
+            .filter(actor => actor.id !== save.playerId)
+            .slice(0, 1)
+            .map(actor => actor.id);
+        const date = this.addDays(save.currentDate || this.getStartingDate(save), 1);
+
+        return {
+            id: this.createCalendarEventId(),
+            name: 'New Event',
+            date,
+            locationId: fallbackLocation?.id || '',
+            actorIds,
+            participantActorIds: [...actorIds],
+            description: '',
+            hiddenAgenda: '',
+            guidance: '',
+            status: 'upcoming',
+        };
+    }
+
+    upsertCalendarEventSeries(event: CalendarEvent): CalendarEvent {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+
+        const seriesId = `${event.recurrenceParentId || event.id || this.createCalendarEventId()}`.trim() || this.createCalendarEventId();
+        const normalizedBaseEvent = this.normalizeCalendarEventForSave({
+            ...event,
+            id: seriesId,
+            recurrenceParentId: undefined,
+            recurrenceInstanceIndex: undefined,
+        }, save);
+
+        this.removeCalendarEventSeries(save, seriesId);
+        save.upcomingEvents = [...(save.upcomingEvents || []), ...this.expandRecurringEvent(normalizedBaseEvent)]
+            .sort((a, b) => a.date.localeCompare(b.date));
+        this.saveGame();
+
+        return normalizedBaseEvent;
+    }
+
+    deleteCalendarEventSeries(eventId: string): boolean {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+
+        const matchedEvent = (save.upcomingEvents || []).find(event => event.id === eventId);
+        if (!matchedEvent) {
+            return false;
+        }
+
+        const seriesId = matchedEvent.recurrenceParentId || matchedEvent.id;
+        const originalCount = (save.upcomingEvents || []).length;
+        this.removeCalendarEventSeries(save, seriesId);
+
+        if ((save.upcomingEvents || []).length === originalCount) {
+            return false;
+        }
+
+        this.saveGame();
+        return true;
+    }
+
     skipNextEvent(): CalendarEvent | null {
         const save = this.getSave();
         this.ensureCalendarState(save);
@@ -715,6 +791,56 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         parsedBaseDate.setUTCMonth(parsedBaseDate.getUTCMonth() + months);
         return this.formatDate(parsedBaseDate);
+    }
+
+    private createCalendarEventId(): string {
+        return `event-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    private removeCalendarEventSeries(save: SaveType, seriesId: string) {
+        save.upcomingEvents = (save.upcomingEvents || []).filter((event) => {
+            const eventSeriesId = event.recurrenceParentId || event.id;
+            return eventSeriesId !== seriesId;
+        });
+    }
+
+    private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType): CalendarEvent {
+        const allLocations = Object.values(save.atlas || {});
+        const fallbackLocationId = allLocations[0]?.id || '';
+        const locationId = allLocations.some(location => location.id === event.locationId)
+            ? event.locationId
+            : fallbackLocationId;
+        const name = `${event.name || ''}`.trim() || 'Untitled Event';
+        const date = `${event.date || ''}`.trim() || (save.currentDate || this.getStartingDate(save));
+        const actorIds = Array.from(new Set(
+            (event.actorIds || event.participantActorIds || [])
+                .filter(actorId => Boolean(save.actors?.[actorId]))
+                .map(actorId => `${actorId}`),
+        ));
+        const locationName = save.atlas[locationId]?.name || 'an unknown location';
+        const description = `${event.description || ''}`.trim() || `${name} at ${locationName}.`;
+        const hiddenAgenda = `${event.hiddenAgenda || event.guidance || description || name}`.trim();
+        const guidance = `${event.guidance || hiddenAgenda || description || name}`.trim();
+        const normalizedStatus: CalendarEvent['status'] = event.status === 'played' || event.status === 'skipped'
+            ? event.status
+            : 'upcoming';
+
+        return {
+            ...event,
+            id: `${event.id || this.createCalendarEventId()}`,
+            name,
+            date,
+            locationId,
+            actorIds,
+            participantActorIds: [...actorIds],
+            description,
+            hiddenAgenda,
+            guidance,
+            status: normalizedStatus,
+            recurrence: this.normalizeCalendarEventRecurrence(event.recurrence, date),
+            recurrenceParentId: undefined,
+            recurrenceInstanceIndex: undefined,
+        };
     }
 
     private normalizeRecurrenceFrequency(value: unknown): CalendarEventRecurrenceFrequency | undefined {

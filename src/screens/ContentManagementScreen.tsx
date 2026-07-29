@@ -3,19 +3,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Location } from '../content/Location';
-import { Close, Person, Book, Place, Tune } from '@mui/icons-material';
+import { Close, Person, Book, Place, Tune, CalendarMonth } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from './UiComponents';
 import { ActorDetailScreen } from './ActorDetailScreen';
 import { LocationDetailScreen } from './LocationDetailScreen';
 import { LorebookManagementPanel } from './LorebookManagementScreen';
 import { ConfigurationManagementPanel } from './ConfigurationManagementPanel';
+import { CalendarEventManagementPanel } from './CalendarEventManagementPanel';
 
 interface ContentManagementScreenProps {
     stage: () => Stage;
     onClose: () => void;
 }
 
-type TabType = 'configuration' | 'lorebook' | 'actors' | 'locations';
+type TabType = 'configuration' | 'lorebook' | 'actors' | 'locations' | 'calendarEvents';
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [activeTab, setActiveTab] = useState<TabType>('configuration');
@@ -194,6 +195,19 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     <Place />
                                     Locations ({locations.length})
                                 </Button>
+                                <Button
+                                    onClick={() => setActiveTab('calendarEvents')}
+                                    variant={activeTab === 'calendarEvents' ? 'primary' : 'secondary'}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        opacity: activeTab === 'calendarEvents' ? 1 : 0.6,
+                                    }}
+                                >
+                                    <CalendarMonth />
+                                    Calendar Events ({stage().getManagedCalendarEvents().length})
+                                </Button>
                             </div>
 
                             {/* Content Area */}
@@ -213,6 +227,11 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 {/* Lorebook Tab */}
                                 {activeTab === 'lorebook' && (
                                     <LorebookManagementPanel stage={stage} />
+                                )}
+
+                                {/* Calendar Events Tab */}
+                                {activeTab === 'calendarEvents' && (
+                                    <CalendarEventManagementPanel stage={stage} />
                                 )}
 
                                 {/* Actors Tab */}
