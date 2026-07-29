@@ -672,7 +672,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         .addBlock('Additional Context',
                             generateContext(skit, stage, 0))
                         .format(),
-                    1, 500
+                    1, 1000
                 );
 
                 if (endResponse) {
