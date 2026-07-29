@@ -1,5 +1,5 @@
 import { FC, useEffect, useMemo, useState } from "react";
-import type { CalendarEvent } from "../Stage";
+import type { CalendarEvent, CalendarEventRecurrence } from "../Stage";
 import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { Box, Typography } from "@mui/material";
@@ -57,6 +57,20 @@ const formatMonthLabel = (date: Date) => date.toLocaleDateString("en-US", {
     year: "numeric",
     timeZone: "UTC",
 });
+
+const formatRecurrenceSummary = (recurrence?: CalendarEventRecurrence | null) => {
+    if (!recurrence) {
+        return "";
+    }
+
+    const interval = Math.max(1, Number(recurrence.interval) || 1);
+    const unit = recurrence.frequency === "daily"
+        ? (interval === 1 ? "day" : "days")
+        : recurrence.frequency === "weekly"
+            ? (interval === 1 ? "week" : "weeks")
+            : (interval === 1 ? "month" : "months");
+    return `Repeats every ${interval} ${unit} until ${formatDate(recurrence.untilDate)}`;
+};
 
 const buildMonthGrid = (monthDate: Date) => {
     const monthStart = startOfMonth(monthDate);
@@ -443,7 +457,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                         WebkitTextStroke: `0.6px ${leadActor?.themeColor || "rgba(12, 18, 28, 0.95)"}`,
                                                                     }}
                                                                 >
-                                                                    {eventItem.name}
+                                                                    {eventItem.recurrence ? "↻ " : ""}{eventItem.name}
                                                                 </Typography>
                                                             </Box>
                                                         </motion.button>
@@ -504,6 +518,12 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 <Typography sx={{ color: "#edf2f2", lineHeight: 1.55 }}>
                                     {detailEvent.description}
                                 </Typography>
+
+                                {detailEvent.recurrence && (
+                                    <Typography sx={{ color: "rgba(185, 210, 227, 0.9)", fontSize: "0.84rem", letterSpacing: "0.02em" }}>
+                                        {formatRecurrenceSummary(detailEvent.recurrence)}
+                                    </Typography>
+                                )}
 
                                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8 }}>
                                     {(detailEvent.actorIds || detailEvent.participantActorIds || []).map((actorId) => {

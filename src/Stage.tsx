@@ -155,6 +155,17 @@ export type CalendarEvent = {
     status: 'upcoming' | 'played' | 'skipped';
     participantActorIds?: string[];
     guidance?: string;
+    recurrence?: CalendarEventRecurrence;
+    recurrenceParentId?: string;
+    recurrenceInstanceIndex?: number;
+}
+
+export type CalendarEventRecurrenceFrequency = 'daily' | 'weekly' | 'monthly';
+
+export type CalendarEventRecurrence = {
+    frequency: CalendarEventRecurrenceFrequency;
+    interval: number;
+    untilDate: string;
 }
 
 // Represents a piece of context to be included in generative requests. Has a title and text body/array of sub-segments
@@ -696,6 +707,172 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return this.formatDate(parsedBaseDate);
     }
 
+    private addMonths(baseDate: string, months: number): string {
+        const parsedBaseDate = new Date(`${baseDate}T00:00:00Z`);
+        if (Number.isNaN(parsedBaseDate.getTime())) {
+            return this.formatDate(new Date());
+        }
+
+        parsedBaseDate.setUTCMonth(parsedBaseDate.getUTCMonth() + months);
+        return this.formatDate(parsedBaseDate);
+    }
+
+    private normalizeRecurrenceFrequency(value: unknown): CalendarEventRecurrenceFrequency | undefined {
+        const normalized = `${value || ''}`.trim().toLowerCase();
+        if (normalized === 'daily' || normalized === 'weekly' || normalized === 'monthly') {
+            return normalized;
+        }
+        return undefined;
+    }
+
+    private normalizeCalendarEventRecurrence(rawRecurrence: any, eventDate: string): CalendarEventRecurrence | undefined {
+        if (!rawRecurrence || typeof rawRecurrence !== 'object') {
+            return undefined;
+        }
+
+        const frequency = this.normalizeRecurrenceFrequency(
+            rawRecurrence.frequency
+            ?? rawRecurrence.Frequency
+            ?? rawRecurrence.type
+            ?? rawRecurrence.Type,
+        );
+        if (!frequency) {
+            return undefined;
+        }
+
+        const intervalCandidate = Number(rawRecurrence.interval ?? rawRecurrence.Interval ?? 1);
+        const interval = Number.isFinite(intervalCandidate) && intervalCandidate > 0
+            ? Math.floor(intervalCandidate)
+            : 1;
+        const untilDate = `${rawRecurrence.untilDate ?? rawRecurrence.UntilDate ?? rawRecurrence.endDate ?? rawRecurrence.EndDate ?? ''}`.trim();
+
+        if (!untilDate || this.getDayDifference(eventDate, untilDate) < 0) {
+            return undefined;
+        }
+
+        return {
+            frequency,
+            interval,
+            untilDate,
+        };
+    }
+
+    private expandRecurringEvent(event: CalendarEvent): CalendarEvent[] {
+        const recurrence = event.recurrence;
+        if (!recurrence) {
+            return [event];
+        }
+
+        const expanded: CalendarEvent[] = [
+            {
+                ...event,
+                recurrenceParentId: event.recurrenceParentId || event.id,
+                recurrenceInstanceIndex: event.recurrenceInstanceIndex ?? 0,
+            },
+        ];
+
+        let nextDate = event.date;
+        let iteration = 0;
+        const maxGeneratedInstances = 180;
+        while (iteration < maxGeneratedInstances) {
+            iteration += 1;
+            if (recurrence.frequency === 'daily') {
+                nextDate = this.addDays(nextDate, recurrence.interval);
+            } else if (recurrence.frequency === 'weekly') {
+                nextDate = this.addDays(nextDate, recurrence.interval * 7);
+            } else {
+                nextDate = this.addMonths(nextDate, recurrence.interval);
+            }
+
+            if (this.getDayDifference(nextDate, recurrence.untilDate) < 0) {
+                break;
+            }
+
+            expanded.push({
+                ...event,
+                id: `${event.id}-r${iteration}`,
+                date: nextDate,
+                status: 'upcoming',
+                recurrenceParentId: event.id,
+                recurrenceInstanceIndex: iteration,
+            });
+        }
+
+        return expanded;
+    }
+
+    private parseOutcomeCharacters(rawCharacters: any): string[] {
+        if (Array.isArray(rawCharacters)) {
+            return rawCharacters.map(item => `${item || ''}`.trim()).filter(Boolean);
+        }
+        if (typeof rawCharacters === 'string') {
+            return rawCharacters
+                .split(',')
+                .map(item => item.trim())
+                .filter(Boolean);
+        }
+        if (rawCharacters && typeof rawCharacters === 'object') {
+            const characterField = rawCharacters.Character ?? rawCharacters.character;
+            if (Array.isArray(characterField)) {
+                return characterField.map(item => `${item || ''}`.trim()).filter(Boolean);
+            }
+            if (typeof characterField === 'string') {
+                return [characterField.trim()].filter(Boolean);
+            }
+        }
+        return [];
+    }
+
+    private buildCalendarEventFromOutcome(details: any, save: SaveType): CalendarEvent | null {
+        const source = details?.event || details || {};
+        const eventName = `${source.name ?? source.Name ?? ''}`.trim();
+        if (!eventName) {
+            return null;
+        }
+
+        const eventDate = `${source.date ?? source.Date ?? save.currentDate ?? this.getStartingDate(save)}`.trim();
+        const resolvedDate = eventDate || this.addDays(save.currentDate || this.getStartingDate(save), 1);
+        const locationText = `${source.location ?? source.Location ?? ''}`.trim();
+        const locations = Object.values(save.atlas || {});
+        const matchedLocation = findBestNameMatch(locationText, locations, ['id', 'name']) || locations[0];
+        if (!matchedLocation) {
+            return null;
+        }
+
+        const actorCandidates = this.parseOutcomeCharacters(
+            source.requiredCharacters
+            ?? source.RequiredCharacters
+            ?? source.characters
+            ?? source.Character
+            ?? source.character,
+        );
+        const availableActors = Object.values(save.actors || {});
+        const actorIds = actorCandidates
+            .map(name => findBestNameMatch(name, availableActors, ['id', 'name'])?.id)
+            .filter((id): id is string => Boolean(id));
+
+        const description = `${source.description ?? source.Description ?? `${eventName} at ${matchedLocation.name}.`}`.trim();
+        const hiddenAgenda = `${source.secret ?? source.Secret ?? source.hiddenAgenda ?? source.guidance ?? source.Guidance ?? description}`.trim();
+        const recurrence = this.normalizeCalendarEventRecurrence(
+            source.recurrence ?? source.Recurrence,
+            resolvedDate,
+        );
+
+        return {
+            id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            name: eventName,
+            date: resolvedDate,
+            locationId: matchedLocation.id,
+            actorIds,
+            participantActorIds: [...actorIds],
+            description,
+            hiddenAgenda,
+            guidance: hiddenAgenda,
+            status: 'upcoming',
+            recurrence,
+        };
+    }
+
     private getDayDifference(startDate: string, endDate: string): number {
         const start = new Date(`${startDate}T00:00:00Z`);
         const end = new Date(`${endDate}T00:00:00Z`);
@@ -759,6 +936,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             description: event.description || event.guidance || `${event.name} at ${save.atlas[event.locationId]?.name || 'an unknown location'}.`,
             hiddenAgenda: event.hiddenAgenda || event.guidance || event.description || event.name,
             guidance: event.guidance || event.hiddenAgenda || event.description || event.name,
+            recurrence: this.normalizeCalendarEventRecurrence(event.recurrence, event.date),
+            recurrenceParentId: event.recurrenceParentId || undefined,
+            recurrenceInstanceIndex: Number.isFinite(event.recurrenceInstanceIndex)
+                ? Number(event.recurrenceInstanceIndex)
+                : undefined,
         }));
 
         if (!save.agendaConfig) {
@@ -1017,10 +1199,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     break;
                 case 'NEW_EVENT':
                     // For new events, we expect details to include the event data.
-                    const newEvent = outcome.details?.event;
+                    const newEvent = this.buildCalendarEventFromOutcome(outcome.details, save);
                     if (newEvent) {
                         save.upcomingEvents = save.upcomingEvents || [];
-                        save.upcomingEvents.push(newEvent);
+                        save.upcomingEvents.push(...this.expandRecurringEvent(newEvent));
                         this.saveGame();
                     }
                     break;

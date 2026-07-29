@@ -660,7 +660,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         )
                         .addBlock('New Event',
                             `Create a new calendar event if the scene specified or implied a future event. Include the event name, date, a location (ID or name), required characters (IDs or names), a brief user-facing description, and secret additional guidance.\n` +
-                            `<NewEvent><Name>Event Name</Name><Date>YYYY-MM-DD</Date><Location>Location ID or Name</Location><RequiredCharacters><Character>[Character ID or Name]</Character><Character>[Another Character ID or Name]</Character></RequiredCharacters><Description>Brief user-facing description</Description><Secret>Additional secret guidance</Secret></NewEvent>`
+                            `Optional recurrence can be included if this should repeat for a finite period.\n` +
+                            `<NewEvent><Name>Event Name</Name><Date>YYYY-MM-DD</Date><Location>Location ID or Name</Location><RequiredCharacters><Character>[Character ID or Name]</Character><Character>[Another Character ID or Name]</Character></RequiredCharacters><Description>Brief user-facing description</Description><Secret>Additional secret guidance</Secret><Recurrence><Frequency>DAILY|WEEKLY|MONTHLY</Frequency><Interval>1</Interval><UntilDate>YYYY-MM-DD</UntilDate></Recurrence></NewEvent>`
                         )
                         .addBlock('Example Response',
                             `<SceneAnalysis><SceneStatus>END</SceneStatus><Summary>This expedition took ${playerName} and Cyanea to the Shells, where they encountered Red Hood and uncovered a new forma: the Coral Razor. Red Hood vehemently disagreed with ${playerName} and Cyanea on how to handle this new threat.</Summary><LoreUpdate><Entry>The Shells</Entry></LoreUpdate><LoreUpdate><Entry>Cyanea</Entry></LoreUpdate><LoreUpdate><Entry>Red Hood</Entry></LoreUpdate></SceneAnalysis>\n#END#` +
@@ -759,6 +760,11 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                                 : typeof newEvent?.name === 'string'
                                     ? newEvent.name
                                     : '';
+                            const eventDate = typeof newEvent?.Date === 'string'
+                                ? newEvent.Date
+                                : typeof newEvent?.date === 'string'
+                                    ? newEvent.date
+                                    : '';
                             const eventLocation = typeof newEvent?.Location === 'string'
                                 ? newEvent.Location
                                 : typeof newEvent?.location === 'string'
@@ -774,16 +780,59 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                                 : typeof newEvent?.secret === 'string'
                                     ? newEvent.secret
                                     : '';
+                            const recurrence = newEvent?.Recurrence || newEvent?.recurrence;
+                            const recurrenceFrequency = typeof recurrence?.Frequency === 'string'
+                                ? recurrence.Frequency
+                                : typeof recurrence?.frequency === 'string'
+                                    ? recurrence.frequency
+                                    : '';
+                            const recurrenceInterval = typeof recurrence?.Interval === 'string' || typeof recurrence?.Interval === 'number'
+                                ? recurrence.Interval
+                                : typeof recurrence?.interval === 'string' || typeof recurrence?.interval === 'number'
+                                    ? recurrence.interval
+                                    : '';
+                            const recurrenceUntilDate = typeof recurrence?.UntilDate === 'string'
+                                ? recurrence.UntilDate
+                                : typeof recurrence?.untilDate === 'string'
+                                    ? recurrence.untilDate
+                                    : '';
+
+                            const requiredCharactersRaw = newEvent?.RequiredCharacters || newEvent?.requiredCharacters;
+                            let requiredCharacters: string[] = [];
+                            if (Array.isArray(requiredCharactersRaw?.Character)) {
+                                requiredCharacters = requiredCharactersRaw.Character
+                                    .map((character: any) => `${character || ''}`.trim())
+                                    .filter(Boolean);
+                            } else if (typeof requiredCharactersRaw?.Character === 'string') {
+                                requiredCharacters = [requiredCharactersRaw.Character.trim()].filter(Boolean);
+                            } else if (Array.isArray(requiredCharactersRaw?.character)) {
+                                requiredCharacters = requiredCharactersRaw.character
+                                    .map((character: any) => `${character || ''}`.trim())
+                                    .filter(Boolean);
+                            } else if (typeof requiredCharactersRaw?.character === 'string') {
+                                requiredCharacters = [requiredCharactersRaw.character.trim()].filter(Boolean);
+                            }
 
                             if (eventName) {
                                 outcomes.push(new Outcome({
                                     type: OutcomeType.NEW_EVENT,
                                     description: `New calendar event \"${eventName}\" was flagged.`,
                                     details: {
-                                        name: eventName,
-                                        location: eventLocation,
-                                        description: eventDescription,
-                                        secret: eventSecret,
+                                        event: {
+                                            name: eventName,
+                                            date: eventDate,
+                                            location: eventLocation,
+                                            requiredCharacters,
+                                            description: eventDescription,
+                                            secret: eventSecret,
+                                            recurrence: recurrenceFrequency
+                                                ? {
+                                                    frequency: recurrenceFrequency,
+                                                    interval: recurrenceInterval,
+                                                    untilDate: recurrenceUntilDate,
+                                                }
+                                                : undefined,
+                                        },
                                     },
                                 }));
                             }
