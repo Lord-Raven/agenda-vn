@@ -5,13 +5,13 @@ import { getLocationDescription, Location, updateLocationDescription } from '../
 import { Close, Save, Image as ImageIcon, Place } from '@mui/icons-material';
 import { Button, GlassPanel, TextInput, Title } from './UiComponents';
 
-interface LocationDetailScreenProps {
+interface LocationDetailPanelProps {
     location: Location;
     stage: () => Stage;
     onClose: () => void;
 }
 
-export const LocationDetailScreen: FC<LocationDetailScreenProps> = ({ location, stage, onClose }) => {
+export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onClose }) => {
     const [editedLocation, setEditedLocation] = useState<{
         name: string;
         description: string;

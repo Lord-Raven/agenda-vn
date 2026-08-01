@@ -8,10 +8,6 @@ import { Button, ConfirmDialog, GlassPanel, TextInput, Title } from './UiCompone
 import { findBestNameMatch, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { getLinkedLocationLore, updateLocationDescription } from '../content/Location';
 
-interface LorebookManagementScreenProps {
-    stage: () => Stage;
-    onClose: () => void;
-}
 
 interface LorebookManagementPanelProps {
     stage: () => Stage;

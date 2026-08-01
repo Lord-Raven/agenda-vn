@@ -8,7 +8,7 @@ import { Emotion } from '../content/Emotion';
 import { Close, Save, Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { Button, Chip, GlassPanel, TextInput, Title } from './UiComponents';
 
-interface ActorDetailScreenProps {
+interface ActorDetailPanelProps {
     actor: Actor;
     stage: () => Stage;
     onClose: () => void;
@@ -16,7 +16,7 @@ interface ActorDetailScreenProps {
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 
-export const ActorDetailScreen: FC<ActorDetailScreenProps> = ({ actor, stage, onClose }) => {
+export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onClose }) => {
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
     const initialOutfitIdRef = useRef(actor.outfitId);

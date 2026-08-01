@@ -5,9 +5,9 @@ import { Actor, getEmotionImage } from '../content/Actor';
 import { Location } from '../content/Location';
 import { Close, Person, Book, Place, Tune, CalendarMonth, Palette } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from './UiComponents';
-import { ActorDetailScreen } from './ActorDetailScreen';
-import { LocationDetailScreen } from './LocationDetailScreen';
-import { LorebookManagementPanel } from './LorebookManagementScreen';
+import { ActorDetailPanel } from './ActorDetailjPanel';
+import { LocationDetailPanel } from './LocationDetailPanel';
+import { LorebookManagementPanel } from './LorebookManagementPanel';
 import { StyleManagementPanel } from './StyleManagementPanel';
 import { GameManagementPanel } from './GameManagementPanel';
 import { CalendarEventManagementPanel } from './CalendarEventManagementPanel';
@@ -48,6 +48,66 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
 
     const handleLocationClick = (location: Location) => {
         setSelectedLocation(location);
+    };
+
+    const handleCreateActor = () => {
+        const save = stage().getSave();
+        const baseName = 'New Actor';
+        const usedNames = new Set(Object.values(save.actors || {}).map(actor => actor.name?.trim().toLowerCase()));
+
+        let candidateName = baseName;
+        let counter = 1;
+        while (usedNames.has(candidateName.toLowerCase())) {
+            candidateName = `New Actor ${counter}`;
+            counter += 1;
+        }
+
+        const actor = new Actor({
+            name: candidateName,
+            description: '',
+            profile: '',
+            outfitId: '',
+            outfits: [],
+            themeColor: '',
+            themeFontFamily: '',
+            voiceId: '',
+            statMap: {},
+        });
+
+        save.actors[actor.id] = actor;
+        stage().saveGame();
+        setSelectedActor(actor);
+        setSelectedLocation(null);
+        setActiveTab('actors');
+    };
+
+    const handleCreateLocation = () => {
+        const save = stage().getSave();
+        const baseName = 'New Location';
+        const usedNames = new Set(Object.values(save.atlas || {}).map(location => location.name?.trim().toLowerCase()));
+
+        let candidateName = baseName;
+        let counter = 1;
+        while (usedNames.has(candidateName.toLowerCase())) {
+            candidateName = `New Location ${counter}`;
+            counter += 1;
+        }
+
+        const location = new Location({
+            name: candidateName,
+            description: '',
+            imageUrl: '',
+            focalPoint: { x: 0.5, y: 0.5 },
+            lightColor: '',
+            themeColor: '',
+        });
+
+        save.atlas = save.atlas || {};
+        save.atlas[location.id] = location;
+        stage().saveGame();
+        setSelectedLocation(location);
+        setSelectedActor(null);
+        setActiveTab('locations');
     };
 
     const handleCloseLocationDetail = () => {
@@ -255,12 +315,22 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
 
                                 {/* Actors Tab */}
                                 {activeTab === 'actors' && (
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                                        gap: '15px',
-                                        padding: '10px',
-                                    }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', padding: '10px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                            <Button
+                                                onClick={handleCreateActor}
+                                                variant="primary"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                            >
+                                                <Person />
+                                                Add New Actor
+                                            </Button>
+                                        </div>
+                                        <div style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                                            gap: '15px',
+                                        }}>
                                         {actors.length === 0 ? (
                                             <div style={{
                                                 gridColumn: '1 / -1',
@@ -336,6 +406,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                                 </motion.div>
                                             ))
                                         )}
+                                        </div>
                                     </div>
                                 )}
 
@@ -347,6 +418,16 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                         gap: '25px',
                                         padding: '10px',
                                     }}>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                            <Button
+                                                onClick={handleCreateLocation}
+                                                variant="primary"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                            >
+                                                <Place />
+                                                Add New Location
+                                            </Button>
+                                        </div>
                                         {locations.length === 0 ? (
                                             <div style={{
                                                 textAlign: 'center',
@@ -456,7 +537,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
 
             {/* Actor Detail Modal */}
             {selectedActor && (
-                <ActorDetailScreen
+                <ActorDetailPanel
                     actor={selectedActor}
                     stage={stage}
                     onClose={handleCloseDetail}
@@ -465,7 +546,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
 
             {/* Location Detail Modal */}
             {selectedLocation && (
-                <LocationDetailScreen
+                <LocationDetailPanel
                     location={selectedLocation}
                     stage={stage}
                     onClose={handleCloseLocationDetail}
