@@ -151,10 +151,10 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
         stageInstance.saveGame();
 
         const rootStyle = document.documentElement.style;
-        rootStyle.setProperty('--agenda-mist', uiSettings.mistColor);
-        rootStyle.setProperty('--agenda-verdant', uiSettings.verdantColor);
-        rootStyle.setProperty('--agenda-fog', uiSettings.fogColor);
-        rootStyle.setProperty('--agenda-text-secondary', uiSettings.textSecondaryColor);
+        rootStyle.setProperty('--agenda-accent', uiSettings.accentColor);
+        rootStyle.setProperty('--agenda-active', uiSettings.activeColor);
+        rootStyle.setProperty('--agenda-primary', uiSettings.primaryColor);
+        rootStyle.setProperty('--agenda-inactive', uiSettings.inactiveColor);
         rootStyle.setProperty('--agenda-bg-deep', uiSettings.bgDeepColor);
         rootStyle.setProperty('--agenda-bg-mid', uiSettings.bgMidColor);
         rootStyle.setProperty('--agenda-bg-soft', uiSettings.bgSoftColor);
@@ -258,7 +258,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Game Title</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Game Title</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.gameTitle}
@@ -268,7 +268,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>UI Font Family</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>UI Font Family</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.uiFontFamily}
@@ -278,7 +278,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Flavor Font Family</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Flavor Font Family</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.flavorFontFamily}
@@ -288,34 +288,34 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                     </div>
 
                     {[
-                        ['Mist', 'mistColor'],
-                        ['Verdant', 'verdantColor'],
-                        ['Fog', 'fogColor'],
-                        ['Text Secondary', 'textSecondaryColor'],
+                        ['Primary Text', 'primaryColor'],
+                        ['Active / Selected', 'activeColor'],
+                        ['Accent / Icon', 'accentColor'],
+                        ['Inactive / Secondary Text', 'inactiveColor'],
                         ['Background Deep', 'bgDeepColor'],
                         ['Background Mid', 'bgMidColor'],
                         ['Background Soft', 'bgSoftColor'],
                     ].map(([label, key]) => (
-                        <div key={key as string}>
-                            <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>{label}</label>
+                        <div key={key as keyof UiSettings}>
+                            <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>{label}</label>
                             <div style={{ display: 'grid', gridTemplateColumns: '58px 1fr', gap: '8px', alignItems: 'center' }}>
                                 <input
                                     type="color"
-                                    value={(uiSettings as any)[key as string]}
-                                    onChange={(e) => setUiSettings(prev => ({ ...prev, [key as string]: e.target.value }))}
+                                    value={uiSettings[key as keyof UiSettings] as string}
+                                    onChange={(e) => setUiSettings(prev => ({ ...prev, [key as keyof UiSettings]: e.target.value }))}
                                     style={{ width: '58px', height: '36px', border: '1px solid var(--agenda-border)', borderRadius: 8, background: 'transparent' }}
                                 />
                                 <TextInput
                                     fullWidth
-                                    value={(uiSettings as any)[key as string]}
-                                    onChange={(e) => setUiSettings(prev => ({ ...prev, [key as string]: e.target.value }))}
+                                    value={uiSettings[key as keyof UiSettings] as string}
+                                    onChange={(e) => setUiSettings(prev => ({ ...prev, [key as keyof UiSettings]: e.target.value }))}
                                 />
                             </div>
                         </div>
                     ))}
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Border Color</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Border Color</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.borderColor}
@@ -324,7 +324,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Border Strong Color</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Border Strong Color</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.borderStrongColor}
@@ -338,7 +338,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Calendar Styling</Title>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Overlay Start</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay Start</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.calendarOverlayStart}
@@ -346,7 +346,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Overlay Mid</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay Mid</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.calendarOverlayMid}
@@ -354,7 +354,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Overlay End</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay End</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.calendarOverlayEnd}
@@ -362,7 +362,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Card Background</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Card Background</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.calendarCardBackground}
@@ -370,7 +370,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Card Border</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Card Border</label>
                         <TextInput
                             fullWidth
                             value={uiSettings.calendarCardBorder}
@@ -432,7 +432,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
                                     style={{ width: '100%', resize: 'vertical', marginBottom: 8 }}
                                 />
 
-                                <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Selected Option</label>
+                                <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Selected Option</label>
                                 <select
                                     className="input-base"
                                     value={selectedOption}

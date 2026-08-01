@@ -19,11 +19,6 @@ export const colors = {
     dark: '#5f9360',
     contrastText: '#1a1e30',
   },
-  accent: {
-    lichen: '#7a7b6b',
-    ember: '#b98f6e',
-    signal: '#d9e9f7',
-  },
   background: {
     default: '#1a1e30',
     paper: '#25293f',

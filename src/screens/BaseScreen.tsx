@@ -7,7 +7,7 @@ import { MenuScreen } from './MenuScreen';
 import { TooltipBar } from './TooltipBar';
 import { theme } from './Theme';
 import { CalendarScreen } from './CalendarScreen';
-import { CalendarSkitScreen } from './CalendarSkitScreen';
+import { SkitScreen } from './CalendarSkitScreen';
 import { LoadingScreen } from './LoadingScreen';
 
 /*
@@ -54,10 +54,10 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
         const uiSettings = stage().getUiSettings();
         const rootStyle = document.documentElement.style;
 
-        rootStyle.setProperty('--agenda-mist', uiSettings.mistColor);
-        rootStyle.setProperty('--agenda-verdant', uiSettings.verdantColor);
-        rootStyle.setProperty('--agenda-fog', uiSettings.fogColor);
-        rootStyle.setProperty('--agenda-text-secondary', uiSettings.textSecondaryColor);
+        rootStyle.setProperty('--agenda-accent', uiSettings.accentColor);
+        rootStyle.setProperty('--agenda-active', uiSettings.activeColor);
+        rootStyle.setProperty('--agenda-primary', uiSettings.primaryColor);
+        rootStyle.setProperty('--agenda-inactive', uiSettings.inactiveColor);
         rootStyle.setProperty('--agenda-bg-deep', uiSettings.bgDeepColor);
         rootStyle.setProperty('--agenda-bg-mid', uiSettings.bgMidColor);
         rootStyle.setProperty('--agenda-bg-soft', uiSettings.bgSoftColor);
@@ -90,7 +90,7 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
                         <CalendarScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
                     )}
                     {screenType === ScreenType.SKIT && (
-                        <CalendarSkitScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
+                        <SkitScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
                     )}
                     {screenType === ScreenType.LOADING && (
                         <LoadingScreen

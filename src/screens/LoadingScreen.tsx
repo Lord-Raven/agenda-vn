@@ -166,7 +166,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                             sx={{
                                 fontFamily: 'var(--agenda-font-flavor)',
                                 fontSize: '0.85rem',
-                                color: 'var(--agenda-text-secondary)',
+                                color: 'var(--agenda-inactive)',
                                 opacity: 0.8,
                                 flexShrink: 0,
                             }}
@@ -192,7 +192,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                                     fontSize: '0.65rem',
                                     fontFamily: 'var(--agenda-font-ui)',
                                     letterSpacing: '0.08em',
-                                    color: 'var(--agenda-text-secondary)',
+                                    color: 'var(--agenda-inactive)',
                                     pb: '2px',
                                     opacity: 0.7,
                                 }}
@@ -232,7 +232,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                                             fontFamily: 'var(--agenda-font-flavor)',
                                             color: isMarked
                                                 ? 'rgba(185, 143, 110, 0.55)'
-                                                : 'var(--agenda-text-secondary)',
+                                                : 'var(--agenda-inactive)',
                                             opacity: isMarked ? 0.6 : 0.5,
                                             userSelect: 'none',
                                             lineHeight: 1,

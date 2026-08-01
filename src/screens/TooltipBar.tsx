@@ -26,7 +26,7 @@ export const TooltipBar: FC<TooltipBarProps> = ({
     isVerticalLayout = false
 }) => {
     const [isHovered, setIsHovered] = useState(false);
-    const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const messageRef = useRef<string | null>(null);
 
     // Clear timer helper
@@ -118,7 +118,7 @@ export const TooltipBar: FC<TooltipBarProps> = ({
                         {Icon && (
                             <Icon
                                 sx={{
-                                    color: 'var(--agenda-mist)',
+                                    color: 'var(--agenda-accent)',
                                     fontSize: '28px',
                                     filter: 'drop-shadow(0 0 8px rgba(138, 176, 204, 0.45))',
                                     flexShrink: 0,
@@ -128,7 +128,7 @@ export const TooltipBar: FC<TooltipBarProps> = ({
                         <Typography
                             variant="body1"
                             sx={{
-                                color: 'var(--agenda-fog)',
+                                color: 'var(--agenda-primary)',
                                 fontSize: '16px',
                                 fontWeight: 600,
                                 textShadow: '0 0 10px rgba(138, 176, 204, 0.35)',

@@ -199,7 +199,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                             style={{
                                 margin: 0,
                                 textAlign: 'center',
-                                color: 'var(--agenda-fog)',
+                                color: 'var(--agenda-primary)',
                                 fontFamily: 'var(--agenda-font-flavor)',
                                 fontSize: 'clamp(2.4rem, 8vw, 4.6rem)',
                                 fontWeight: 700,

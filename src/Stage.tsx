@@ -57,10 +57,10 @@ export type UiSettings = {
     gameTitle: string;
     uiFontFamily: string;
     flavorFontFamily: string;
-    mistColor: string;
-    verdantColor: string;
-    fogColor: string;
-    textSecondaryColor: string;
+    primaryColor: string; // Used for default UI text color. was "fog"
+    activeColor: string; // Used to indicate active/selected elements in the UI, such as buttons, tabs, and highlights. was "verdant"
+    inactiveColor: string; // Used for unselected elements in the UI, such as inactive buttons, tabs, and text. was "textSecondary"
+    accentColor: string; // Used for MUI icons and some secondary headers or other elements that require differentiation. was "mist"
     bgDeepColor: string;
     bgMidColor: string;
     bgSoftColor: string;
@@ -77,10 +77,10 @@ const DEFAULT_UI_SETTINGS: UiSettings = {
     gameTitle: 'Agenda VN',
     uiFontFamily: '"Geologica", sans-serif',
     flavorFontFamily: '"Lora", Georgia, serif',
-    mistColor: '#8ab0cc',
-    verdantColor: '#89cd87',
-    fogColor: '#edf2f2',
-    textSecondaryColor: '#b9d2e3',
+    accentColor: '#8ab0cc',
+    activeColor: '#89cd87',
+    primaryColor: '#edf2f2',
+    inactiveColor: '#b9d2e3',
     bgDeepColor: '#1a1e30',
     bgMidColor: '#24293f',
     bgSoftColor: '#2e354d',
@@ -241,7 +241,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
 
     readonly SAVE_SLOT_COUNT = 10;
-    readonly INITIAL_ACTORS = 33; // Gotta load 'em all.
+    readonly INITIAL_ACTORS = 5;
 
     saveData: ChatStateType;
     primaryUser: User;
@@ -373,14 +373,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     async afterResponse(botMessage: Message): Promise<Partial<StageResponse<ChatStateType, MessageStateType>>> {return {}}
 
     pushMessage(message: string) {
-        //if (this.isAuthenticated) {
-            this.messenger.impersonate({
-                speaker_id: this.primaryCharacter.anonymizedId,
-                is_main: false,
-                parent_id: null,
-                message: message
-            });
-        //}
+        this.messenger.impersonate({
+            speaker_id: this.primaryCharacter.anonymizedId,
+            is_main: false,
+            parent_id: null,
+            message: message
+        });
     }
 
     generateFreshSave(playerData: {name: string, personality: string, themeColor?: string}): SaveType {
@@ -393,8 +391,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     name: playerData.name,
                     description: '',
                     profile: playerData.personality,
-                    outfits: [], // Ditto.
-                    outfitId: '', // Ditto.
+                    outfits: [],
+                    outfitId: '',
                     statMap: {},
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
                     themeFontFamily: '',
@@ -512,11 +510,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             });
         }
     }
-
-    // Backward compatibility shim while older UI references remain.
-    loadMapScreen() {
-        this.loadCalendarScreen();
-    }
     
     loadSave(slotIndex: number) {
         if (this.saveData.saves[this.saveData.lastSaveSlot]) {
@@ -536,10 +529,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     isCalendarScreenLoading(): boolean {
         return Object.keys(this.generationPromises).length > 0;
-    }
-
-    isMapScreenLoading(): boolean {
-        return this.isCalendarScreenLoading();
     }
 
     getUpcomingEvents(): CalendarEvent[] {
@@ -1142,7 +1131,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             const description = participantNames.length > 0
                 ? `${eventName} at ${location.name} featuring ${participantNames.join(', ')}.`
                 : `${eventName} at ${location.name}.`;
-            const hiddenAgenda = `${eventName}. ${locationContext} Guide the skit toward the event's private purpose without exposing it to the player.`;
+            const guidance = `${eventName}. ${locationContext} Guide the skit toward the event's private purpose without exposing it to the player.`;
 
             generatedEvents.push({
                 id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${i}`,
@@ -1152,7 +1141,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 actorIds: participants.map(actor => actor.id),
                 participantActorIds: participants.map(actor => actor.id),
                 description,
-                guidance: hiddenAgenda,
+                guidance: guidance,
             });
         }
 

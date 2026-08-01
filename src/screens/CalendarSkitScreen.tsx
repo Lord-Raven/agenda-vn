@@ -9,14 +9,14 @@ import { useTooltip } from "./TooltipContext";
 import { Actor, getEmotionImage } from "../content/Actor";
 import { determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
 
-interface CalendarSkitScreenProps {
+interface SkitScreenProps {
     stage: () => Stage;
     setScreenType: (type: ScreenType) => void;
     isVerticalLayout: boolean;
 }
 
 const CALENDAR_BACKGROUND_IMAGE = "https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png";
-export const CalendarSkitScreen: FC<CalendarSkitScreenProps> = ({ stage, setScreenType, isVerticalLayout }) => {
+export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVerticalLayout }) => {
     const { setTooltip } = useTooltip();
     const [isGeneratingNextSkit, setIsGeneratingNextSkit] = useState(false);
     const initializedSkitIdRef = useRef<string | null>(null);

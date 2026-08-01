@@ -211,11 +211,11 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                         </Button>
                     </Box>
 
-                    <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 16, overflow: "hidden" }}>
+                    <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
                             <Typography
                                 sx={{
-                                    color: "var(--agenda-fog)",
+                                    color: "var(--agenda-primary)",
                                     fontFamily: "var(--agenda-font-flavor)",
                                     fontWeight: 700,
                                     fontSize: { xs: "2rem", md: "3rem" },
@@ -273,7 +273,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 <Typography
                                     key={label}
                                     sx={{
-                                        color: "var(--agenda-text-secondary)",
+                                        color: "var(--agenda-inactive)",
                                         letterSpacing: "0.12em",
                                         textTransform: "uppercase",
                                         fontSize: "0.68rem",
@@ -355,7 +355,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 1 }}>
                                                 <Typography
                                                     sx={{
-                                                        color: isToday ? "var(--agenda-verdant)" : "var(--agenda-fog)",
+                                                        color: isToday ? "var(--agenda-active)" : "var(--agenda-primary)",
                                                         fontWeight: 700,
                                                         fontSize: { xs: "0.82rem", md: "0.92rem" },
                                                     }}
@@ -363,7 +363,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                     {cellDate.getUTCDate()}
                                                 </Typography>
                                                 {isToday && (
-                                                    <Typography sx={{ color: "var(--agenda-verdant)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                                                    <Typography sx={{ color: "var(--agenda-active)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>
                                                         Today
                                                     </Typography>
                                                 )}
@@ -512,7 +512,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             {formatDate(detailEvent.date)} · {save.atlas[detailEvent.locationId]?.name || "Unknown Location"}
                                         </Typography>
                                     </Box>
-                                    <Typography sx={{ color: "var(--agenda-verdant)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
+                                    <Typography sx={{ color: "var(--agenda-active)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
                                         Potential Event
                                     </Typography>
                                 </Box>

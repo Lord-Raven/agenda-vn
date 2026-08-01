@@ -176,7 +176,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'auto', minHeight: 0 }}>
                     {events.length === 0 && (
-                        <div style={{ color: 'var(--agenda-text-secondary)', fontStyle: 'italic' }}>
+                        <div style={{ color: 'var(--agenda-inactive)', fontStyle: 'italic' }}>
                             No saved events.
                         </div>
                     )}
@@ -195,8 +195,8 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                             }}
                         >
                             <div style={{ fontWeight: 700, marginBottom: 4 }}>{event.name}</div>
-                            <div style={{ fontSize: '13px', color: 'var(--agenda-text-secondary)' }}>{event.date}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--agenda-text-secondary)' }}>{recurrenceSummary(event.recurrence)}</div>
+                            <div style={{ fontSize: '13px', color: 'var(--agenda-inactive)' }}>{event.date}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--agenda-inactive)' }}>{recurrenceSummary(event.recurrence)}</div>
                         </button>
                     ))}
                 </div>
@@ -207,7 +207,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Name</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Name</label>
                         <TextInput
                             fullWidth
                             value={draft.name}
@@ -217,7 +217,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Date</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Date</label>
                         <TextInput
                             fullWidth
                             type="date"
@@ -227,7 +227,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Location</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Location</label>
                         <select
                             className="input-base"
                             value={draft.locationId}
@@ -240,7 +240,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Description</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Description</label>
                         <textarea
                             className="input-base"
                             value={draft.description}
@@ -251,7 +251,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Guidance</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Guidance</label>
                         <textarea
                             className="input-base"
                             value={draft.guidance}
@@ -262,7 +262,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Participants</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Participants</label>
                         <div style={{
                             border: '1px solid var(--agenda-border)',
                             borderRadius: 8,
@@ -285,7 +285,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--agenda-text-secondary)', marginBottom: 8 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--agenda-inactive)', marginBottom: 8 }}>
                             <input
                                 type="checkbox"
                                 checked={recurrenceEnabled}
