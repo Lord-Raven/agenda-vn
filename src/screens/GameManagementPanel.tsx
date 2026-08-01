@@ -1,8 +1,8 @@
 import React, { FC, useMemo, useState } from 'react';
-import { Stage, ContextSegment, CustomSetting, UiSettings, ActorStat } from '../Stage';
+import { ActorStat, ContextSegment, CustomSetting, Stage } from '../Stage';
 import { Button, GlassPanel, TextInput, Title } from './UiComponents';
 
-interface ConfigurationManagementPanelProps {
+interface GameManagementPanelProps {
     stage: () => Stage;
 }
 
@@ -19,6 +19,16 @@ const cloneSetting = (setting: CustomSetting): CustomSetting => ({
     ),
 });
 
+const cloneActorStat = (stat: ActorStat): ActorStat => ({
+    name: stat.name,
+    description: stat.description,
+    guidance: stat.guidance,
+    default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
+    displayType: stat.displayType,
+    min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
+    max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
+});
+
 const defaultContextSegment = (): ContextSegment => ({
     title: 'New Context Block',
     body: 'Describe this context block.',
@@ -33,16 +43,6 @@ const defaultCustomSetting = (): CustomSetting => ({
             body: 'Describe the default selected option context.',
         },
     },
-});
-
-const cloneActorStat = (stat: ActorStat): ActorStat => ({
-    name: stat.name,
-    description: stat.description,
-    guidance: stat.guidance,
-    default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
-    displayType: stat.displayType,
-    min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
-    max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
 });
 
 const defaultActorStat = (): ActorStat => ({
@@ -74,12 +74,12 @@ const renderSegmentBody = (segment: ContextSegment): string => {
     return (segment.body || []).map(child => `${child.title}: ${renderSegmentBody(child)}`).join('\n');
 };
 
-export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps> = ({ stage }) => {
+export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => {
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const configuration = stageInstance.getConfiguration();
 
-    const [uiSettings, setUiSettings] = useState<UiSettings>(() => ({ ...stage().getUiSettings() }));
+    const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
     const [contextSegments, setContextSegments] = useState<ContextSegment[]>(() =>
         (configuration.context || []).map(cloneSegment),
     );
@@ -108,11 +108,12 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
         return nextSelections;
     }, [customSettings, selectedSettings]);
 
-    const saveConfiguration = () => {
+    const saveGameConfiguration = () => {
         stageInstance.updateConfiguration({
             context: contextSegments,
             settings: customSettings,
             actorStats,
+            startingDate,
         });
 
         const currentSave = stageInstance.getSave();
@@ -147,32 +148,13 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
             });
         });
 
-        stageInstance.updateUiSettings(uiSettings);
         stageInstance.saveGame();
-
-        const rootStyle = document.documentElement.style;
-        rootStyle.setProperty('--agenda-accent', uiSettings.accentColor);
-        rootStyle.setProperty('--agenda-active', uiSettings.activeColor);
-        rootStyle.setProperty('--agenda-primary', uiSettings.primaryColor);
-        rootStyle.setProperty('--agenda-inactive', uiSettings.inactiveColor);
-        rootStyle.setProperty('--agenda-bg-deep', uiSettings.bgDeepColor);
-        rootStyle.setProperty('--agenda-bg-mid', uiSettings.bgMidColor);
-        rootStyle.setProperty('--agenda-bg-soft', uiSettings.bgSoftColor);
-        rootStyle.setProperty('--agenda-border', uiSettings.borderColor);
-        rootStyle.setProperty('--agenda-border-strong', uiSettings.borderStrongColor);
-        rootStyle.setProperty('--agenda-font-ui', uiSettings.uiFontFamily);
-        rootStyle.setProperty('--agenda-font-flavor', uiSettings.flavorFontFamily);
-        rootStyle.setProperty('--agenda-calendar-overlay-start', uiSettings.calendarOverlayStart);
-        rootStyle.setProperty('--agenda-calendar-overlay-mid', uiSettings.calendarOverlayMid);
-        rootStyle.setProperty('--agenda-calendar-overlay-end', uiSettings.calendarOverlayEnd);
-        rootStyle.setProperty('--agenda-calendar-card-bg', uiSettings.calendarCardBackground);
-        rootStyle.setProperty('--agenda-calendar-card-border', uiSettings.calendarCardBorder);
     };
 
     const updateContextSegment = (index: number, patch: Partial<ContextSegment>) => {
-        setContextSegments(prev => prev.map((segment, idx) =>
-            idx === index ? { ...segment, ...patch } : segment,
-        ));
+        setContextSegments(prev => prev.map((segment, idx) => (
+            idx === index ? { ...segment, ...patch } : segment
+        )));
     };
 
     const removeContextSegment = (index: number) => {
@@ -180,9 +162,9 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
     };
 
     const updateCustomSetting = (index: number, patch: Partial<CustomSetting>) => {
-        setCustomSettings(prev => prev.map((setting, idx) =>
-            idx === index ? { ...setting, ...patch } : setting,
-        ));
+        setCustomSettings(prev => prev.map((setting, idx) => (
+            idx === index ? { ...setting, ...patch } : setting
+        )));
     };
 
     const removeCustomSetting = (index: number) => {
@@ -190,9 +172,9 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
     };
 
     const updateActorStat = (index: number, patch: Partial<ActorStat>) => {
-        setActorStats(prev => prev.map((stat, idx) =>
-            idx === index ? { ...stat, ...patch } : stat,
-        ));
+        setActorStats(prev => prev.map((stat, idx) => (
+            idx === index ? { ...stat, ...patch } : stat
+        )));
     };
 
     const removeActorStat = (index: number) => {
@@ -244,6 +226,7 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
             if (current !== oldName) {
                 return prev;
             }
+
             return {
                 ...prev,
                 [customSettings[settingIndex]?.title || '']: nextName,
@@ -254,127 +237,15 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>UI Theme</Title>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Game Title</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.gameTitle}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, gameTitle: e.target.value }))}
-                            placeholder="Agenda VN"
-                        />
-                    </div>
-
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>UI Font Family</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.uiFontFamily}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, uiFontFamily: e.target.value }))}
-                            placeholder='"Geologica", sans-serif'
-                        />
-                    </div>
-
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Flavor Font Family</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.flavorFontFamily}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, flavorFontFamily: e.target.value }))}
-                            placeholder='"Lora", Georgia, serif'
-                        />
-                    </div>
-
-                    {[
-                        ['Primary Text', 'primaryColor'],
-                        ['Active / Selected', 'activeColor'],
-                        ['Accent / Icon', 'accentColor'],
-                        ['Inactive / Secondary Text', 'inactiveColor'],
-                        ['Background Deep', 'bgDeepColor'],
-                        ['Background Mid', 'bgMidColor'],
-                        ['Background Soft', 'bgSoftColor'],
-                    ].map(([label, key]) => (
-                        <div key={key as keyof UiSettings}>
-                            <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>{label}</label>
-                            <div style={{ display: 'grid', gridTemplateColumns: '58px 1fr', gap: '8px', alignItems: 'center' }}>
-                                <input
-                                    type="color"
-                                    value={uiSettings[key as keyof UiSettings] as string}
-                                    onChange={(e) => setUiSettings(prev => ({ ...prev, [key as keyof UiSettings]: e.target.value }))}
-                                    style={{ width: '58px', height: '36px', border: '1px solid var(--agenda-border)', borderRadius: 8, background: 'transparent' }}
-                                />
-                                <TextInput
-                                    fullWidth
-                                    value={uiSettings[key as keyof UiSettings] as string}
-                                    onChange={(e) => setUiSettings(prev => ({ ...prev, [key as keyof UiSettings]: e.target.value }))}
-                                />
-                            </div>
-                        </div>
-                    ))}
-
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Border Color</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.borderColor}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, borderColor: e.target.value }))}
-                        />
-                    </div>
-
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Border Strong Color</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.borderStrongColor}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, borderStrongColor: e.target.value }))}
-                        />
-                    </div>
-                </div>
-            </GlassPanel>
-
-            <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Calendar Styling</Title>
+                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Game Settings</Title>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay Start</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Start Date</label>
                         <TextInput
                             fullWidth
-                            value={uiSettings.calendarOverlayStart}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarOverlayStart: e.target.value }))}
-                        />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay Mid</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.calendarOverlayMid}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarOverlayMid: e.target.value }))}
-                        />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay End</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.calendarOverlayEnd}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarOverlayEnd: e.target.value }))}
-                        />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Card Background</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.calendarCardBackground}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarCardBackground: e.target.value }))}
-                        />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Card Border</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.calendarCardBorder}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarCardBorder: e.target.value }))}
+                            type="date"
+                            value={startingDate}
+                            onChange={(e) => setStartingDate(e.target.value)}
                         />
                     </div>
                 </div>
@@ -572,10 +443,10 @@ export const ConfigurationManagementPanel: FC<ConfigurationManagementPanelProps>
             </GlassPanel>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                <Button variant="primary" onClick={saveConfiguration}>Save Configuration</Button>
+                <Button variant="primary" onClick={saveGameConfiguration}>Save Game Settings</Button>
             </div>
         </div>
     );
 };
 
-export default ConfigurationManagementPanel;
+export default GameManagementPanel;

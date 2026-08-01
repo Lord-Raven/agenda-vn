@@ -3,12 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Location } from '../content/Location';
-import { Close, Person, Book, Place, Tune, CalendarMonth } from '@mui/icons-material';
+import { Close, Person, Book, Place, Tune, CalendarMonth, Palette } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from './UiComponents';
 import { ActorDetailScreen } from './ActorDetailScreen';
 import { LocationDetailScreen } from './LocationDetailScreen';
 import { LorebookManagementPanel } from './LorebookManagementScreen';
-import { ConfigurationManagementPanel } from './ConfigurationManagementPanel';
+import { StyleManagementPanel } from './StyleManagementPanel';
+import { GameManagementPanel } from './GameManagementPanel';
 import { CalendarEventManagementPanel } from './CalendarEventManagementPanel';
 
 interface ContentManagementScreenProps {
@@ -16,10 +17,10 @@ interface ContentManagementScreenProps {
     onClose: () => void;
 }
 
-type TabType = 'configuration' | 'lorebook' | 'actors' | 'locations' | 'calendarEvents';
+type TabType = 'style' | 'game' | 'lorebook' | 'actors' | 'locations' | 'calendarEvents';
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
-    const [activeTab, setActiveTab] = useState<TabType>('configuration');
+    const [activeTab, setActiveTab] = useState<TabType>('style');
     const [selectedActor, setSelectedActor] = useState<Actor | null>(null);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
@@ -144,17 +145,30 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 paddingBottom: '10px',
                             }}>
                                 <Button
-                                    onClick={() => setActiveTab('configuration')}
-                                    variant={activeTab === 'configuration' ? 'primary' : 'secondary'}
+                                    onClick={() => setActiveTab('style')}
+                                    variant={activeTab === 'style' ? 'primary' : 'secondary'}
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '8px',
-                                        opacity: activeTab === 'configuration' ? 1 : 0.6,
+                                        opacity: activeTab === 'style' ? 1 : 0.6,
+                                    }}
+                                >
+                                    <Palette />
+                                    Style
+                                </Button>
+                                <Button
+                                    onClick={() => setActiveTab('game')}
+                                    variant={activeTab === 'game' ? 'primary' : 'secondary'}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        opacity: activeTab === 'game' ? 1 : 0.6,
                                     }}
                                 >
                                     <Tune />
-                                    Configuration
+                                    Game
                                 </Button>
                                 <Button
                                     onClick={() => setActiveTab('lorebook')}
@@ -219,9 +233,14 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 flexDirection: 'column',
                                 minHeight: 0,
                             }}>
-                                {/* Configuration Tab */}
-                                {activeTab === 'configuration' && (
-                                    <ConfigurationManagementPanel stage={stage} />
+                                {/* Style Tab */}
+                                {activeTab === 'style' && (
+                                    <StyleManagementPanel stage={stage} />
+                                )}
+
+                                {/* Game Tab */}
+                                {activeTab === 'game' && (
+                                    <GameManagementPanel stage={stage} />
                                 )}
 
                                 {/* Lorebook Tab */}
