@@ -24,6 +24,15 @@ function renderContextSegment(segment: any): string {
     return '';
 }
 
+const getDayDifference = (startDate: string, endDate: string): number => {
+    const start = new Date(`${startDate}T00:00:00Z`);
+    const end = new Date(`${endDate}T00:00:00Z`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return 0;
+    }
+    return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
+};
+
 export enum SkitType {
     INTRO = 'INTRO',
     SOCIAL = 'SOCIAL',
@@ -270,7 +279,10 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             pastEvents.forEach((event, index) => {
                 if (event.skit) {
                     const locationName = (event.skit.initialLocationId ? save.atlas[event.skit.initialLocationId]?.name : '') ?? 'Unknown Location';
-                    builder.addBlock(`Event_${index + 1}`, `Scene in ${locationName} (${stage.getSave().turn - event.turn}) days ago:\n` +
+                    const daysAgo = event.date && save.currentDate
+                        ? getDayDifference(event.date, save.currentDate)
+                        : Math.max(1, index + 1);
+                    builder.addBlock(`Event_${index + 1}`, `Scene in ${locationName} (${daysAgo} days ago):\n` +
                         (event.skit.summary ? `Summary: ${event.skit.summary}` : `Script:\n${buildScriptLog(event.skit, [], stage)}`));
                 }
             });

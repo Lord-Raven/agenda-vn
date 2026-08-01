@@ -227,19 +227,6 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Status</label>
-                        <select
-                            className="input-base"
-                            value={draft.status}
-                            onChange={(e) => updateDraft({ status: e.target.value as CalendarEvent['status'] })}
-                        >
-                            <option value="upcoming">upcoming</option>
-                            <option value="played">played</option>
-                            <option value="skipped">skipped</option>
-                        </select>
-                    </div>
-
-                    <div>
                         <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Location</label>
                         <select
                             className="input-base"
@@ -264,23 +251,12 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Hidden Agenda</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Guidance</label>
                         <textarea
                             className="input-base"
-                            value={draft.hiddenAgenda}
-                            onChange={(e) => updateDraft({ hiddenAgenda: e.target.value })}
-                            rows={3}
-                            style={{ width: '100%', resize: 'vertical' }}
-                        />
-                    </div>
-
-                    <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-secondary)', marginBottom: 6 }}>Guidance (optional)</label>
-                        <textarea
-                            className="input-base"
-                            value={draft.guidance || ''}
+                            value={draft.guidance}
                             onChange={(e) => updateDraft({ guidance: e.target.value })}
-                            rows={2}
+                            rows={3}
                             style={{ width: '100%', resize: 'vertical' }}
                         />
                     </div>

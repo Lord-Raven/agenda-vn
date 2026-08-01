@@ -67,13 +67,19 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
             ? Object.values(save.actors).filter(actor => actor.id !== save.playerId && actor.name.toLowerCase() !== 'cassiel')
             : [];
         // Sort actors by most recent appearance in a skit (initial only).
-        actors.map(actor => {
-            const lastAppearance = save?.timeline.filter(entry => entry.skit).sort((a, b) => b.turn - a.turn).reduce((last, entry, index) => {
-                const found = entry?.skit?.initialActors.includes(actor.id);
-                return found ? Math.max(last, index) : last;
-            }, 0) || 0;
-            return {...actor, lastAppearance: lastAppearance};
-        }).filter(a => a.lastAppearance > 0).sort((a, b) => b.lastAppearance - a.lastAppearance);
+        const timelineWithSkit = (save?.timeline || []).filter(entry => entry.skit);
+        actors = actors
+            .map(actor => {
+                const reverseIndex = [...timelineWithSkit]
+                    .reverse()
+                    .findIndex(entry => entry?.skit?.initialActors.includes(actor.id));
+                const lastAppearance = reverseIndex >= 0
+                    ? timelineWithSkit.length - reverseIndex
+                    : 0;
+                return { ...actor, lastAppearance };
+            })
+            .filter(a => a.lastAppearance > 0)
+            .sort((a, b) => b.lastAppearance - a.lastAppearance);
 
         // Trim actors to max of 5 for display:
         actors = actors.slice(0, 5);
@@ -250,7 +256,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                                     fontWeight: 'bold',
                                     color: 'rgba(0, 255, 136, 1)'
                                 }}>
-                                    {save.actors[save.playerId].name} - Turn {save.turn}
+                                    {save.actors[save.playerId].name} - Day {save.currentDate || 'Unknown'}
                                 </div>
                             </div>
                         </>

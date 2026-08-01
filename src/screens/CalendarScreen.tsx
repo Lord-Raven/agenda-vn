@@ -96,11 +96,13 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const currentDateKey = save.currentDate || formatDateKey(new Date());
 
     const allEvents = useMemo(
-        () => [...(save.upcomingEvents || [])].sort((left, right) => left.date.localeCompare(right.date)),
-        [save.upcomingEvents],
+        () => [...(save.upcomingEvents || [])]
+            .filter((event) => (event.date || "") >= currentDateKey)
+            .sort((left, right) => left.date.localeCompare(right.date)),
+        [save.upcomingEvents, currentDateKey],
     );
     const upcomingEvents = useMemo(
-        () => allEvents.filter((event) => event.status === "upcoming"),
+        () => allEvents,
         [allEvents],
     );
     // In this screen, "today" is anchored to the next event date to match narrative progression.
@@ -510,8 +512,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             {formatDate(detailEvent.date)} · {save.atlas[detailEvent.locationId]?.name || "Unknown Location"}
                                         </Typography>
                                     </Box>
-                                    <Typography sx={{ color: detailEvent.status === "upcoming" ? "var(--agenda-verdant)" : "rgba(185, 210, 227, 0.8)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
-                                        {detailEvent.status}
+                                    <Typography sx={{ color: "var(--agenda-verdant)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
+                                        Potential Event
                                     </Typography>
                                 </Box>
 
@@ -563,7 +565,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 </Box>
 
                                 <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap" }}>
-                                    {detailEvent.date === todayDateKey && detailEvent.status === "upcoming" && (
+                                    {detailEvent.date === todayDateKey && (
                                         <Button
                                             variant="primary"
                                             onClick={() => openEvent(detailEvent.id)}

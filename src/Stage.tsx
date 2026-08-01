@@ -1,8 +1,7 @@
 import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character} from "@chub-ai/stages-ts";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
-import { Actor, findBestNameMatch, loadSupportedActor, getActorLore, getEmotionImage } from "./content/Actor";
-import { Emotion } from "./content/Emotion";
+import { Actor, findBestNameMatch, loadSupportedActor } from "./content/Actor";
 import { Item } from "./content/Item";
 import { generateContext, Skit, SkitType } from "./content/Skit";
 import { createDefaultAtlas, getLinkedLocationLore, Location } from "./content/Location";
@@ -35,7 +34,6 @@ export type SaveType = {
     atlas: {[key: string]: Location};
     inventory: Item[];
     timeline: TimelineEntry[];
-    turn: number;
     startingDate?: string;
     timestamp: number; // Time of last save
     textToSpeech?: boolean;
@@ -151,10 +149,8 @@ export type CalendarEvent = {
     locationId: string;
     actorIds: string[];
     description: string;
-    hiddenAgenda: string;
-    status: 'upcoming' | 'played' | 'skipped';
+    guidance: string;
     participantActorIds?: string[];
-    guidance?: string;
     recurrence?: CalendarEventRecurrence;
     recurrenceParentId?: string;
     recurrenceInstanceIndex?: number;
@@ -236,8 +232,8 @@ type ExpeditionChoice = {
 }
 
 type TimelineEntry = {
-    turn: number;
-    description: string;
+    calendarEventId?: string;
+    date?: string;
     skit?: Skit;
 }
 
@@ -408,7 +404,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             atlas: createDefaultAtlas(),
             inventory: [],
             timeline: [],
-            turn: 0,
             startingDate,
             timestamp: Date.now(),
             currentDate: startingDate,
@@ -491,8 +486,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             // Push intro to timeline to start the game:
             newSave.timeline.push({
-                turn: 0,
-                description: 'Introduction to the world',
+                calendarEventId: undefined,
+                date: newSave.currentDate || this.getStartingDate(newSave),
                 skit: introSkit
             });
 
@@ -552,7 +547,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.ensureCalendarState(save);
 
         return (save.upcomingEvents || [])
-            .filter(event => event.status === 'upcoming' && event.date >= (save.currentDate || '0000-01-01'))
+            .filter(event => event.date >= (save.currentDate || '0000-01-01'))
             .sort((a, b) => a.date.localeCompare(b.date));
     }
 
@@ -560,8 +555,30 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const save = this.getSave();
         this.ensureCalendarState(save);
 
-        return (save.upcomingEvents || [])
-            .filter(event => (event.recurrenceInstanceIndex || 0) <= 0)
+        const groupedBySeries = new Map<string, CalendarEvent[]>();
+        (save.upcomingEvents || []).forEach((event) => {
+            if (!this.isFutureEvent(event)) {
+                return;
+            }
+            const seriesId = event.recurrenceParentId || event.id;
+            const existing = groupedBySeries.get(seriesId) || [];
+            existing.push(event);
+            groupedBySeries.set(seriesId, existing);
+        });
+
+        return Array.from(groupedBySeries.values())
+            .map((seriesEvents) => {
+                const sortedSeries = [...seriesEvents].sort((left, right) => {
+                    const leftIndex = Number.isFinite(left.recurrenceInstanceIndex) ? Number(left.recurrenceInstanceIndex) : 0;
+                    const rightIndex = Number.isFinite(right.recurrenceInstanceIndex) ? Number(right.recurrenceInstanceIndex) : 0;
+                    if (leftIndex !== rightIndex) {
+                        return leftIndex - rightIndex;
+                    }
+                    return left.date.localeCompare(right.date);
+                });
+                return sortedSeries[0];
+            })
+            .filter((event): event is CalendarEvent => Boolean(event))
             .sort((a, b) => a.date.localeCompare(b.date));
     }
 
@@ -585,9 +602,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actorIds,
             participantActorIds: [...actorIds],
             description: '',
-            hiddenAgenda: '',
-            guidance: '',
-            status: 'upcoming',
+            guidance: ''
         };
     }
 
@@ -641,13 +656,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return null;
         }
 
-        nextEvent.status = 'skipped';
-        save.turn = this.getDayDifference(this.getStartingDate(save), nextEvent.date);
         save.currentDate = nextEvent.date;
         save.timeline.push({
-            turn: save.turn,
-            description: `Skipped event: ${nextEvent.name} at ${save.atlas[nextEvent.locationId]?.name || 'Unknown Location'}.`,
+            calendarEventId: nextEvent.id,
+            date: nextEvent.date,
         });
+        save.upcomingEvents = (save.upcomingEvents || []).filter(event => event.id !== nextEvent.id);
 
         this.rebuildUpcomingEvents(save);
         this.saveGame();
@@ -658,7 +672,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const save = this.getSave();
         this.ensureCalendarState(save);
 
-        const selectedEvent = (save.upcomingEvents || []).find(event => event.id === eventId && event.status === 'upcoming');
+        const selectedEvent = (save.upcomingEvents || []).find(event => event.id === eventId);
         if (!selectedEvent) {
             return null;
         }
@@ -671,24 +685,23 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const skit = new Skit({
             skitType: SkitType.SOCIAL,
             initialLocationId: selectedLocation.id,
-            guidance: selectedEvent.hiddenAgenda || selectedEvent.guidance || selectedEvent.description,
+            guidance: selectedEvent.guidance || selectedEvent.description,
             script: [],
             initialActors: selectedEvent.actorIds || selectedEvent.participantActorIds || [],
             summary: '',
         });
 
-        selectedEvent.status = 'played';
-        save.turn = this.getDayDifference(this.getStartingDate(save), selectedEvent.date);
         save.currentDate = selectedEvent.date;
         if (!save.timeline) {
             save.timeline = [];
         }
 
         save.timeline.push({
-            turn: save.turn,
-            description: `Event: ${selectedEvent.name}`,
+            calendarEventId: selectedEvent.id,
+            date: selectedEvent.date,
             skit,
         });
+        save.upcomingEvents = (save.upcomingEvents || []).filter(event => event.id !== selectedEvent.id);
 
         this.rebuildUpcomingEvents(save);
         this.saveGame();
@@ -819,11 +832,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         ));
         const locationName = save.atlas[locationId]?.name || 'an unknown location';
         const description = `${event.description || ''}`.trim() || `${name} at ${locationName}.`;
-        const hiddenAgenda = `${event.hiddenAgenda || event.guidance || description || name}`.trim();
-        const guidance = `${event.guidance || hiddenAgenda || description || name}`.trim();
-        const normalizedStatus: CalendarEvent['status'] = event.status === 'played' || event.status === 'skipped'
-            ? event.status
-            : 'upcoming';
+        const guidance = `${event.guidance || description || name}`.trim();
 
         return {
             ...event,
@@ -834,9 +843,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actorIds,
             participantActorIds: [...actorIds],
             description,
-            hiddenAgenda,
             guidance,
-            status: normalizedStatus,
             recurrence: this.normalizeCalendarEventRecurrence(event.recurrence, date),
             recurrenceParentId: undefined,
             recurrenceInstanceIndex: undefined,
@@ -918,7 +925,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 ...event,
                 id: `${event.id}-r${iteration}`,
                 date: nextDate,
-                status: 'upcoming',
                 recurrenceParentId: event.id,
                 recurrenceInstanceIndex: iteration,
             });
@@ -992,9 +998,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actorIds,
             participantActorIds: [...actorIds],
             description,
-            hiddenAgenda,
             guidance: hiddenAgenda,
-            status: 'upcoming',
             recurrence,
         };
     }
@@ -1011,24 +1015,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private getStartingDate(save: SaveType): string {
-        if (save.startingDate) {
-            return save.startingDate;
-        }
 
-        if (save.currentDate) {
-            const derivedStartingDate = this.addDays(save.currentDate, -(save.turn || 0));
-            save.startingDate = derivedStartingDate;
-            return derivedStartingDate;
-        }
-
-        const fallbackDate = this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10);
-        save.startingDate = fallbackDate;
-        return fallbackDate;
-    }
-
-    private syncCurrentDateToTurn(save: SaveType) {
-        const startingDate = this.getStartingDate(save);
-        save.currentDate = this.addDays(startingDate, save.turn || 0);
+        return save.startingDate || this.getConfiguration().startingDate || save.currentDate || new Date().toISOString().slice(0, 10);
     }
 
     private buildEventName(locationName: string, participantNames: string[]): string {
@@ -1044,12 +1032,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private ensureCalendarState(save: SaveType) {
-        const startingDate = this.getStartingDate(save);
-        if (typeof save.turn !== 'number' || Number.isNaN(save.turn)) {
-            save.turn = 0;
-        }
-
-        save.currentDate = this.addDays(startingDate, save.turn);
 
         if (!save.upcomingEvents) {
             save.upcomingEvents = [];
@@ -1060,8 +1042,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actorIds: event.actorIds || event.participantActorIds || [],
             participantActorIds: event.participantActorIds || event.actorIds || [],
             description: event.description || event.guidance || `${event.name} at ${save.atlas[event.locationId]?.name || 'an unknown location'}.`,
-            hiddenAgenda: event.hiddenAgenda || event.guidance || event.description || event.name,
-            guidance: event.guidance || event.hiddenAgenda || event.description || event.name,
+            guidance: event.guidance || event.description || event.name,
             recurrence: this.normalizeCalendarEventRecurrence(event.recurrence, event.date),
             recurrenceParentId: event.recurrenceParentId || undefined,
             recurrenceInstanceIndex: Number.isFinite(event.recurrenceInstanceIndex)
@@ -1135,7 +1116,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         );
 
         const generatedEvents: CalendarEvent[] = [];
-        const upcomingEvents = (save.upcomingEvents || []).filter(event => event.status === 'upcoming');
+        const upcomingEvents = (save.upcomingEvents || []).filter(event => this.isFutureEvent(event));
         const sortedExistingEvents = [...upcomingEvents].sort((a, b) => a.date.localeCompare(b.date));
         let dateCursor = sortedExistingEvents.length > 0
             ? sortedExistingEvents[sortedExistingEvents.length - 1].date
@@ -1171,27 +1152,30 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 actorIds: participants.map(actor => actor.id),
                 participantActorIds: participants.map(actor => actor.id),
                 description,
-                hiddenAgenda,
                 guidance: hiddenAgenda,
-                status: 'upcoming',
             });
         }
 
         return generatedEvents;
     }
 
+    private isFutureEvent(event: CalendarEvent): boolean {
+        const save = this.getSave();
+        const currentDate = save.currentDate || this.getStartingDate(save);
+        return `${event.date || ''}`.trim() >= currentDate;
+    }
+
     async rebuildUpcomingEvents(save: SaveType = this.getSave(), targetEventCount: number = 6): Promise<CalendarEvent[]> {
         this.ensureCalendarState(save);
 
-        const existingEvents = save.upcomingEvents || [];
-        const existingUpcomingEvents = existingEvents
-            .filter(event => event.status === 'upcoming' && event.date >= (save.currentDate || '0000-01-01'))
+        const existingUpcomingEvents = (save.upcomingEvents || [])
+            .filter(event => this.isFutureEvent(event))
             .sort((a, b) => a.date.localeCompare(b.date));
 
         const neededEventCount = Math.max(targetEventCount - existingUpcomingEvents.length, 0);
         const newEvents = neededEventCount > 0 ? this.createCalendarEvents(save, neededEventCount) : [];
 
-        save.upcomingEvents = [...existingEvents, ...newEvents]
+        save.upcomingEvents = [...existingUpcomingEvents, ...newEvents]
             .sort((a, b) => a.date.localeCompare(b.date));
         this.saveGame();
 
@@ -1209,13 +1193,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return response?.result || '';
     }
 
-    private buildTravelTimelineDescription(location: Location): string {
-        return `Visited ${location.name}.`;
-    }
-
-    startTravelSkit(selectedLocationId: string): Skit | null {
+    startSkit(calendarEvent: CalendarEvent): Skit | null {
         const save = this.getSave();
-        const selectedLocation = save.atlas[selectedLocationId];
+        const selectedLocation = save.atlas[calendarEvent.locationId];
 
         if (!selectedLocation) {
             return null;
@@ -1226,20 +1206,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         skit = new Skit({
             skitType: SkitType.SOCIAL,
             initialLocationId: selectedLocation.id,
-            guidance: '',
+            guidance: calendarEvent.guidance || calendarEvent.description,
             script: [],
             initialActors: [],
             summary: '',
         });
 
-        save.turn += 1;
-        this.syncCurrentDateToTurn(save);
         if (!save.timeline) {
             save.timeline = [];
         }
         save.timeline.push({
-            turn: save.turn,
-            description: this.buildTravelTimelineDescription(selectedLocation),
+            calendarEventId: calendarEvent?.id,
+            date: calendarEvent?.date,
             skit,
         });
 
@@ -1251,8 +1229,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const currentSkit = this.getCurrentSkit();
         if (currentSkit) {
             currentSkit.over = true;
-            save.turn += 1;
-            this.syncCurrentDateToTurn(save);
+            // Set current date to the next date on which an event occurs (if there is one)
+            save.currentDate = this.getUpcomingEvents()[0]?.date || save.currentDate;
         }
 
         // This is where various outcomes of the skit are processed and applied to the save state
