@@ -2,17 +2,15 @@ import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
 import { getLocationDescription, Location, updateLocationDescription } from '../content/Location';
-import { Close, Save, Image as ImageIcon, Place } from '@mui/icons-material';
+import { Image as ImageIcon, Place } from '@mui/icons-material';
 import { Button, GlassPanel, TextInput, Title } from './UiComponents';
 
 interface LocationDetailPanelProps {
     location: Location;
     stage: () => Stage;
-    onClose: () => void;
-    embedded?: boolean;
 }
 
-export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onClose, embedded = false }) => {
+export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage }) => {
     const [editedLocation, setEditedLocation] = useState<{
         name: string;
         category: string;
@@ -62,27 +60,16 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         };
     }, [location.id, stage]);
 
-    const [isSaving, setIsSaving] = useState(false);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const imageUploadInputRef = useRef<HTMLInputElement>(null);
     const editedLocationRef = useRef(editedLocation);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
-    const persistLocation = (
-        nextLocation: typeof editedLocation,
-        options?: { showSavingState?: boolean; closeAfterSave?: boolean }
-    ) => {
-        const showSavingState = options?.showSavingState ?? false;
-        const closeAfterSave = options?.closeAfterSave ?? false;
-
+    const persistLocation = (nextLocation: typeof editedLocation) => {
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
             autoSaveTimeoutRef.current = null;
-        }
-
-        if (showSavingState) {
-            setIsSaving(true);
         }
 
         location.name = nextLocation.name;
@@ -94,15 +81,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
 
         stage().saveGame();
-
-        if (showSavingState) {
-            window.setTimeout(() => {
-                setIsSaving(false);
-                if (closeAfterSave) {
-                    onClose();
-                }
-            }, 500);
-        }
     };
 
     useEffect(() => {
@@ -142,10 +120,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         setEditedLocation(prev => ({ ...prev, [field]: value }));
     };
 
-    const handleSave = () => {
-        persistLocation(editedLocationRef.current, { showSavingState: true, closeAfterSave: !embedded });
-    };
-
     const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -158,31 +132,17 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         try {
             const uploadedUrl = await stage().uploadFile(`location-${location.id}.png`, file);
             handleInputChange('imageUrl', uploadedUrl);
-            location.imageUrl = uploadedUrl;
-            stage().saveGame();
-        } catch (error) {
-            console.error('Failed to upload location image:', error);
-            stage().showPriorityMessage('Failed to upload location image. Check console for details.');
-        } finally {
-            setIsUploadingImage(false);
+                    position: 'relative',
+                    background: 'transparent',
+                    backdropFilter: 'none',
             if (imageUploadInputRef.current) {
-                imageUploadInputRef.current.value = '';
-            }
-        }
-    };
+                    alignItems: 'stretch',
+                    justifyContent: 'stretch',
+                    zIndex: 'auto',
+                    padding: 0,
 
-    const clampedCoord = (value: string): number => {
-        const n = parseFloat(value);
-        if (isNaN(n)) return 0;
-        return Math.min(1, Math.max(0, n));
-    };
-
-    const labelStyle: React.CSSProperties = {
-        display: 'block',
-        color: '#00ff88',
-        fontSize: '14px',
-        fontWeight: 'bold',
-        marginBottom: '8px',
+                    height: '100%',
+                }}
     };
 
     const sectionHeadingStyle: React.CSSProperties = {
@@ -191,19 +151,19 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         fontWeight: 'bold',
         marginBottom: '15px',
         borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
-        paddingBottom: '5px',
-    };
-
-    const textareaStyle: React.CSSProperties = {
+                        width: '100%',
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                        height: '100%',
         width: '100%',
         minHeight: '100px',
         padding: '12px',
-        fontSize: '14px',
+                        variant="default"
         backgroundColor: 'rgba(0, 20, 40, 0.6)',
-        border: '2px solid rgba(0, 255, 136, 0.3)',
+                            height: '100%',
         borderRadius: '5px',
         color: '#e0f0ff',
-        fontFamily: 'inherit',
+                            padding: '20px',
         resize: 'vertical',
     };
 
@@ -212,51 +172,15 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         gridTemplateColumns: '1fr auto',
         alignItems: 'center',
         gap: '12px',
-    };
-
-    const sliderStyle: React.CSSProperties = {
-        width: '100%',
-        accentColor: '#00ff88',
-        cursor: 'pointer',
+                            position: 'static',
+                            background: 'transparent',
+                            backdropFilter: 'none',
+                            padding: 0,
+                            zIndex: 'auto',
     };
 
     const sliderValueStyle: React.CSSProperties = {
         minWidth: '56px',
-        textAlign: 'right',
-        color: '#e0f0ff',
-        fontSize: '13px',
-        fontVariantNumeric: 'tabular-nums',
-        opacity: 0.9,
-    };
-
-    return (
-        <AnimatePresence>
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                style={{
-                    position: embedded ? 'relative' : 'absolute',
-                    top: embedded ? 'auto' : 0,
-                    left: embedded ? 'auto' : 0,
-                    right: embedded ? 'auto' : 0,
-                    bottom: embedded ? 'auto' : 0,
-                    background: embedded ? 'transparent' : 'rgba(0, 10, 20, 0.85)',
-                    backdropFilter: embedded ? 'none' : 'blur(8px)',
-                    display: 'flex',
-                    alignItems: embedded ? 'stretch' : 'center',
-                    justifyContent: 'center',
-                    zIndex: embedded ? 'auto' : 1000,
-                    padding: embedded ? '0' : '10px 20px 30px',
-                    width: '100%',
-                    height: embedded ? '100%' : 'auto',
-                }}
-                onClick={(e) => {
-                    if (embedded) {
-                        return;
-                    }
-                    const selection = window.getSelection();
                     const hasSelection = selection && selection.toString().length > 0;
                     if (e.target === e.currentTarget && !hasSelection) {
                         onClose();

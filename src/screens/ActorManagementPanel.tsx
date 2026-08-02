@@ -180,8 +180,6 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                         key={selectedActor.id}
                         actor={selectedActor}
                         stage={stage}
-                        onClose={() => setSelectedActorId(null)}
-                        embedded
                     />
                 )}
             </div>

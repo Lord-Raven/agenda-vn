@@ -5,19 +5,17 @@ import { Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
-import { Close, Save, Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
+import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { Button, Chip, GlassPanel, TextInput, Title } from './UiComponents';
 
 interface ActorDetailPanelProps {
     actor: Actor;
     stage: () => Stage;
-    onClose: () => void;
-    embedded?: boolean;
 }
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 
-export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onClose, embedded = false }) => {
+export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) => {
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
     const linkedLoreEntry = getLinkedActorLore(actor.name, stage());
@@ -67,7 +65,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
         return outfits[0]?.id || '';
     });
 
-    const [isSaving, setIsSaving] = useState(false);
     const [regeneratingImages, setRegeneratingImages] = useState<Set<string>>(new Set());
     const [isFillingMissingEmotions, setIsFillingMissingEmotions] = useState(false);
     const [, forceUpdate] = useState({});
@@ -101,19 +98,11 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
 
     const persistActor = (
         nextEditedActor: typeof editedActor,
-        nextEditedOutfits: Outfit[],
-        options?: { showSavingState?: boolean; closeAfterSave?: boolean }
+        nextEditedOutfits: Outfit[]
     ) => {
-        const showSavingState = options?.showSavingState ?? false;
-        const closeAfterSave = options?.closeAfterSave ?? false;
-
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
             autoSaveTimeoutRef.current = null;
-        }
-
-        if (showSavingState) {
-            setIsSaving(true);
         }
 
         const persistedOutfits = (nextEditedOutfits.length > 0
@@ -142,15 +131,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
         actor.outfits = persistedOutfits;
 
         stage().saveGame();
-
-        if (showSavingState) {
-            window.setTimeout(() => {
-                setIsSaving(false);
-                if (closeAfterSave) {
-                    onClose();
-                }
-            }, 500);
-        }
     };
 
     useEffect(() => {
@@ -227,17 +207,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
         return trimmedPrompt;
     };
 
-    const handleCloseDetail = () => {
-        if (autoSaveTimeoutRef.current) {
-            persistActor(editedActorRef.current, editedOutfitsRef.current);
-        }
-        onClose();
-    };
-
-    const handleSave = () => {
-        persistActor(editedActorRef.current, editedOutfitsRef.current, { showSavingState: true, closeAfterSave: !embedded });
-    };
-
     const handleInputChange = (field: string, value: string | number) => {
         setEditedActor(prev => ({
             ...prev,
@@ -247,34 +216,17 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
 
     const handleOutfitChange = (field: 'name' | 'description', value: string) => {
         if (!selectedOutfitId) return;
-        setEditedOutfits((prev) => prev.map((outfit) => (
-            outfit.id === selectedOutfitId
-                ? { ...outfit, [field]: value }
-                : outfit
-        )));
-    };
-
+                    position: 'relative',
+                    background: 'transparent',
+                    backdropFilter: 'none',
     const handleSelectOutfit = (outfitId: string) => {
-        setSelectedOutfitId(outfitId);
-    };
-
-    const getNextOutfitName = (): string => {
+                    alignItems: 'stretch',
+                    justifyContent: 'stretch',
+                    zIndex: 'auto',
+                    padding: 0,
         let nextIndex = editedOutfits.length + 1;
-        let candidate = `Outfit ${nextIndex}`;
-        const usedNames = new Set(editedOutfits.map((outfit) => outfit.name.toLowerCase()));
-        while (usedNames.has(candidate.toLowerCase())) {
-            nextIndex += 1;
-            candidate = `Outfit ${nextIndex}`;
-        }
-        return candidate;
-    };
-
-    const handleCreateOutfit = () => {
-        const newOutfit: Outfit = {
-            id: generateUuid(),
-            name: getNextOutfitName(),
-            description: '',
-            prompts: {},
+                    height: '100%',
+                }}
             emotionPack: {},
         };
         setEditedOutfits((prev) => [...prev, newOutfit]);
@@ -283,76 +235,36 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
 
     const handleDeleteOutfit = () => {
         if (!selectedOutfit || editedOutfits.length <= 1) {
-            return;
-        }
-
-        if (selectedOutfit.id === actor.outfitId) {
+                        width: '100%',
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                        height: '100%',
             console.warn('Cannot delete the actor\'s currently selected outfit.');
             return;
         }
-
+                        variant="default"
         setConfirmDialog({
-            open: true,
+                            height: '100%',
             title: `Delete Outfit: ${selectedOutfit.name}`,
             message: 'This will remove the selected outfit and all of its emotion images. This cannot be undone. Continue?',
-            actions: [
+                            padding: '20px',
                 {
                     label: 'Delete Outfit',
-                    onClick: () => {
+                        {/* Header */}
                         setConfirmDialog((prev) => ({ ...prev, open: false }));
                         setEditedOutfits((prev) => {
                             const next = prev.filter((outfit) => outfit.id !== selectedOutfit.id);
                             const replacement = next[0]?.id || '';
                             setSelectedOutfitId(replacement);
-                            return next;
-                        });
-                    },
-                    variant: 'primary',
-                },
-            ],
+                            position: 'static',
+                            background: 'transparent',
+                            backdropFilter: 'none',
+                            padding: 0,
+                            zIndex: 'auto',
         });
     };
 
     const buildOutfitsExport = () => ({
-        outfits: editedOutfits.map((outfit) => ({
-            id: outfit.name,
-            name: outfit.name,
-            description: outfit.description,
-            prompts: { ...(outfit.prompts || {}) },
-            emotionPack: { ...(outfit.emotionPack || {}) },
-        })),
-    });
-
-    const formatAsJavascriptObject = (value: unknown, indentLevel = 0): string => {
-        const indent = '  '.repeat(indentLevel);
-        const childIndent = '  '.repeat(indentLevel + 1);
-
-        if (value === null) return 'null';
-        if (typeof value === 'string') return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-        if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-
-        if (Array.isArray(value)) {
-            if (value.length === 0) return '[]';
-            const items = value.map((item) => `${childIndent}${formatAsJavascriptObject(item, indentLevel + 1)}`);
-            return `[
-${items.join(',\n')}
-${indent}]`;
-        }
-
-        if (typeof value === 'object') {
-            const entries = Object.entries(value as Record<string, unknown>);
-            if (entries.length === 0) return '{}';
-
-            const objectEntries = entries.map(([key, entryValue]) => {
-                const isValidIdentifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key);
-                const displayKey = isValidIdentifier ? key : `'${key.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-                return `${childIndent}${displayKey}: ${formatAsJavascriptObject(entryValue, indentLevel + 1)}`;
-            });
-
-            return `{
-${objectEntries.join(',\n')}
-${indent}}`;
-        }
 
         return 'undefined';
     };

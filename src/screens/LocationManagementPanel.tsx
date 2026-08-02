@@ -216,8 +216,6 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                         key={selectedLocation.id}
                         location={selectedLocation}
                         stage={stage}
-                        onClose={() => setSelectedLocationId(null)}
-                        embedded
                     />
                 )}
             </div>
