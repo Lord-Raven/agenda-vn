@@ -66,7 +66,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
-    const persistLocation = (nextLocation: typeof editedLocation) => {
+    const persistLocation = (
+        nextLocation: typeof editedLocation
+    ) => {
+
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
             autoSaveTimeoutRef.current = null;
@@ -132,17 +135,31 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         try {
             const uploadedUrl = await stage().uploadFile(`location-${location.id}.png`, file);
             handleInputChange('imageUrl', uploadedUrl);
-                    position: 'relative',
-                    background: 'transparent',
-                    backdropFilter: 'none',
+            location.imageUrl = uploadedUrl;
+            stage().saveGame();
+        } catch (error) {
+            console.error('Failed to upload location image:', error);
+            stage().showPriorityMessage('Failed to upload location image. Check console for details.');
+        } finally {
+            setIsUploadingImage(false);
             if (imageUploadInputRef.current) {
-                    alignItems: 'stretch',
-                    justifyContent: 'stretch',
-                    zIndex: 'auto',
-                    padding: 0,
+                imageUploadInputRef.current.value = '';
+            }
+        }
+    };
 
-                    height: '100%',
-                }}
+    const clampedCoord = (value: string): number => {
+        const n = parseFloat(value);
+        if (isNaN(n)) return 0;
+        return Math.min(1, Math.max(0, n));
+    };
+
+    const labelStyle: React.CSSProperties = {
+        display: 'block',
+        color: '#00ff88',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        marginBottom: '8px',
     };
 
     const sectionHeadingStyle: React.CSSProperties = {
@@ -151,19 +168,19 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         fontWeight: 'bold',
         marginBottom: '15px',
         borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
-                        width: '100%',
-                        maxWidth: 'none',
-                        maxHeight: 'none',
-                        height: '100%',
+        paddingBottom: '5px',
+    };
+
+    const textareaStyle: React.CSSProperties = {
         width: '100%',
         minHeight: '100px',
         padding: '12px',
-                        variant="default"
+        fontSize: '14px',
         backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                            height: '100%',
+        border: '2px solid rgba(0, 255, 136, 0.3)',
         borderRadius: '5px',
         color: '#e0f0ff',
-                            padding: '20px',
+        fontFamily: 'inherit',
         resize: 'vertical',
     };
 
@@ -172,19 +189,40 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         gridTemplateColumns: '1fr auto',
         alignItems: 'center',
         gap: '12px',
-                            position: 'static',
-                            background: 'transparent',
-                            backdropFilter: 'none',
-                            padding: 0,
-                            zIndex: 'auto',
+    };
+
+    const sliderStyle: React.CSSProperties = {
+        width: '100%',
+        accentColor: '#00ff88',
+        cursor: 'pointer',
     };
 
     const sliderValueStyle: React.CSSProperties = {
         minWidth: '56px',
-                    const hasSelection = selection && selection.toString().length > 0;
-                    if (e.target === e.currentTarget && !hasSelection) {
-                        onClose();
-                    }
+        textAlign: 'right',
+        color: '#e0f0ff',
+        fontSize: '13px',
+        fontVariantNumeric: 'tabular-nums',
+        opacity: 0.9,
+    };
+
+    return (
+        <AnimatePresence>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                style={{
+                    position: 'relative',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'stretch',
+                    justifyContent: 'center',
+                    zIndex: 'auto',
+                    padding: '0',
+                    width: '100%',
+                    height: '100%',
                 }}
             >
                 <motion.div
@@ -194,72 +232,37 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                     transition={{ duration: 0.3, ease: 'easeOut' }}
                     onClick={(e) => e.stopPropagation()}
                     style={{
-                        width: embedded ? '100%' : '90vw',
-                        maxWidth: embedded ? 'none' : '1400px',
-                        maxHeight: embedded ? 'none' : '90vh',
-                        height: embedded ? '100%' : 'auto',
+                        width: '100%',
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                        height: '100%',
                     }}
                 >
                     <GlassPanel
-                        variant={embedded ? 'default' : 'bright'}
+                        variant="default"
                         style={{
-                            height: embedded ? '100%' : '90vh',
+                            height: '100%',
                             overflow: 'auto',
                             position: 'relative',
-                            padding: embedded ? '20px' : '30px',
+                            padding: '20px',
                         }}
                     >
                         {/* Header */}
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
+                            justifyContent: 'flex-start',
                             marginBottom: '20px',
-                            position: embedded ? 'static' : 'sticky',
-                            top: embedded ? 'auto' : 0,
-                            background: embedded ? 'transparent' : 'rgba(0, 20, 40, 0.95)',
-                            backdropFilter: embedded ? 'none' : 'blur(8px)',
-                            padding: embedded ? '0' : '10px 0',
-                            zIndex: embedded ? 'auto' : 10,
+                            position: 'static',
+                            top: 'auto',
+                            background: 'transparent',
+                            backdropFilter: 'none',
+                            padding: '0',
+                            zIndex: 'auto',
                         }}>
                             <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                                 Location Details: {editedLocation.name}
                             </Title>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <Button
-                                    onClick={handleSave}
-                                    disabled={isSaving}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                                >
-                                    <Save style={{ fontSize: '20px' }} />
-                                    {isSaving ? 'Saving...' : 'Save Changes'}
-                                </Button>
-                                {embedded ? (
-                                    <Button variant="secondary" onClick={onClose} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Close style={{ fontSize: '20px' }} />
-                                        Deselect
-                                    </Button>
-                                ) : (
-                                    <motion.button
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
-                                        onClick={onClose}
-                                        style={{
-                                            background: 'transparent',
-                                            border: 'none',
-                                            color: 'rgba(0, 255, 136, 0.7)',
-                                            cursor: 'pointer',
-                                            fontSize: '24px',
-                                            padding: '5px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                        }}
-                                    >
-                                        <Close />
-                                    </motion.button>
-                                )}
-                            </div>
                         </div>
 
                         {/* Form */}

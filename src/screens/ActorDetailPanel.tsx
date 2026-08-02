@@ -100,6 +100,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
         nextEditedActor: typeof editedActor,
         nextEditedOutfits: Outfit[]
     ) => {
+
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
             autoSaveTimeoutRef.current = null;
@@ -216,17 +217,34 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
 
     const handleOutfitChange = (field: 'name' | 'description', value: string) => {
         if (!selectedOutfitId) return;
-                    position: 'relative',
-                    background: 'transparent',
-                    backdropFilter: 'none',
+        setEditedOutfits((prev) => prev.map((outfit) => (
+            outfit.id === selectedOutfitId
+                ? { ...outfit, [field]: value }
+                : outfit
+        )));
+    };
+
     const handleSelectOutfit = (outfitId: string) => {
-                    alignItems: 'stretch',
-                    justifyContent: 'stretch',
-                    zIndex: 'auto',
-                    padding: 0,
+        setSelectedOutfitId(outfitId);
+    };
+
+    const getNextOutfitName = (): string => {
         let nextIndex = editedOutfits.length + 1;
-                    height: '100%',
-                }}
+        let candidate = `Outfit ${nextIndex}`;
+        const usedNames = new Set(editedOutfits.map((outfit) => outfit.name.toLowerCase()));
+        while (usedNames.has(candidate.toLowerCase())) {
+            nextIndex += 1;
+            candidate = `Outfit ${nextIndex}`;
+        }
+        return candidate;
+    };
+
+    const handleCreateOutfit = () => {
+        const newOutfit: Outfit = {
+            id: generateUuid(),
+            name: getNextOutfitName(),
+            description: '',
+            prompts: {},
             emotionPack: {},
         };
         setEditedOutfits((prev) => [...prev, newOutfit]);
@@ -235,36 +253,76 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
 
     const handleDeleteOutfit = () => {
         if (!selectedOutfit || editedOutfits.length <= 1) {
-                        width: '100%',
-                        maxWidth: 'none',
-                        maxHeight: 'none',
-                        height: '100%',
+            return;
+        }
+
+        if (selectedOutfit.id === actor.outfitId) {
             console.warn('Cannot delete the actor\'s currently selected outfit.');
             return;
         }
-                        variant="default"
+
         setConfirmDialog({
-                            height: '100%',
+            open: true,
             title: `Delete Outfit: ${selectedOutfit.name}`,
             message: 'This will remove the selected outfit and all of its emotion images. This cannot be undone. Continue?',
-                            padding: '20px',
+            actions: [
                 {
                     label: 'Delete Outfit',
-                        {/* Header */}
+                    onClick: () => {
                         setConfirmDialog((prev) => ({ ...prev, open: false }));
                         setEditedOutfits((prev) => {
                             const next = prev.filter((outfit) => outfit.id !== selectedOutfit.id);
                             const replacement = next[0]?.id || '';
                             setSelectedOutfitId(replacement);
-                            position: 'static',
-                            background: 'transparent',
-                            backdropFilter: 'none',
-                            padding: 0,
-                            zIndex: 'auto',
+                            return next;
+                        });
+                    },
+                    variant: 'primary',
+                },
+            ],
         });
     };
 
     const buildOutfitsExport = () => ({
+        outfits: editedOutfits.map((outfit) => ({
+            id: outfit.name,
+            name: outfit.name,
+            description: outfit.description,
+            prompts: { ...(outfit.prompts || {}) },
+            emotionPack: { ...(outfit.emotionPack || {}) },
+        })),
+    });
+
+    const formatAsJavascriptObject = (value: unknown, indentLevel = 0): string => {
+        const indent = '  '.repeat(indentLevel);
+        const childIndent = '  '.repeat(indentLevel + 1);
+
+        if (value === null) return 'null';
+        if (typeof value === 'string') return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+        if (Array.isArray(value)) {
+            if (value.length === 0) return '[]';
+            const items = value.map((item) => `${childIndent}${formatAsJavascriptObject(item, indentLevel + 1)}`);
+            return `[
+${items.join(',\n')}
+${indent}]`;
+        }
+
+        if (typeof value === 'object') {
+            const entries = Object.entries(value as Record<string, unknown>);
+            if (entries.length === 0) return '{}';
+
+            const objectEntries = entries.map(([key, entryValue]) => {
+                const isValidIdentifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key);
+                const displayKey = isValidIdentifier ? key : `'${key.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+                return `${childIndent}${displayKey}: ${formatAsJavascriptObject(entryValue, indentLevel + 1)}`;
+            });
+
+            return `{
+${objectEntries.join(',\n')}
+${indent}}`;
+        }
 
         return 'undefined';
     };
@@ -624,33 +682,15 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
                 style={{
-                    position: embedded ? 'relative' : 'absolute',
-                    top: embedded ? 'auto' : 0,
-                    left: embedded ? 'auto' : 0,
-                    right: embedded ? 'auto' : 0,
-                    bottom: embedded ? 'auto' : 0,
-                    background: embedded ? 'transparent' : 'rgba(0, 10, 20, 0.85)',
-                    backdropFilter: embedded ? 'none' : 'blur(8px)',
+                    position: 'relative',
+                    background: 'transparent',
                     display: 'flex',
-                    alignItems: embedded ? 'stretch' : 'center',
+                    alignItems: 'stretch',
                     justifyContent: 'center',
-                    zIndex: embedded ? 'auto' : 1000,
-                    padding: embedded ? '0' : '10px 20px 30px',
+                    zIndex: 'auto',
+                    padding: '0',
                     width: '100%',
-                    height: embedded ? '100%' : 'auto',
-                }}
-                onClick={(e) => {
-                    if (embedded) {
-                        return;
-                    }
-                    // Close if clicking backdrop
-                    // Don't close if user is selecting text
-                    const selection = window.getSelection();
-                    const hasSelection = selection && selection.toString().length > 0;
-                    
-                    if (e.target === e.currentTarget && !hasSelection) {
-                        handleCloseDetail();
-                    }
+                    height: '100%',
                 }}
             >
                 <motion.div
@@ -660,76 +700,37 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
                     transition={{ duration: 0.3, ease: 'easeOut' }}
                     onClick={(e) => e.stopPropagation()}
                     style={{
-                        width: embedded ? '100%' : '90vw',
-                        maxWidth: embedded ? 'none' : '1400px',
-                        maxHeight: embedded ? 'none' : '90vh',
-                        height: embedded ? '100%' : 'auto',
+                        width: '100%',
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                        height: '100%',
                     }}
                 >
                     <GlassPanel 
-                        variant={embedded ? 'default' : 'bright'}
+                        variant="default"
                         style={{
-                            height: embedded ? '100%' : '90vh',
+                            height: '100%',
                             overflow: 'auto',
                             position: 'relative',
-                            padding: embedded ? '20px' : '30px',
+                            padding: '20px',
                         }}
                     >
-                        {/* Header with close button */}
+                        {/* Header */}
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
+                            justifyContent: 'flex-start',
                             marginBottom: '20px',
-                            position: embedded ? 'static' : 'sticky',
-                            top: embedded ? 'auto' : 0,
-                            background: embedded ? 'transparent' : 'rgba(0, 20, 40, 0.95)',
-                            backdropFilter: embedded ? 'none' : 'blur(8px)',
-                            padding: embedded ? '0' : '10px 0',
-                            zIndex: embedded ? 'auto' : 10,
+                            position: 'static',
+                            top: 'auto',
+                            background: 'transparent',
+                            backdropFilter: 'none',
+                            padding: '0',
+                            zIndex: 'auto',
                         }}>
                             <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                                 Actor Details: {editedActor.name}
                             </Title>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <Button
-                                    onClick={handleSave}
-                                    disabled={isSaving}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}
-                                >
-                                    <Save style={{ fontSize: '20px' }} />
-                                    {isSaving ? 'Saving...' : 'Save Changes'}
-                                </Button>
-                                {embedded ? (
-                                    <Button variant="secondary" onClick={handleCloseDetail} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Close style={{ fontSize: '20px' }} />
-                                        Deselect
-                                    </Button>
-                                ) : (
-                                    <motion.button
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
-                                        onClick={handleCloseDetail}
-                                        style={{
-                                            background: 'transparent',
-                                            border: 'none',
-                                            color: 'rgba(0, 255, 136, 0.7)',
-                                            cursor: 'pointer',
-                                            fontSize: '24px',
-                                            padding: '5px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
-                                        }}
-                                    >
-                                        <Close />
-                                    </motion.button>
-                                )}
-                            </div>
                         </div>
 
                         {/* Form Content */}
