@@ -1,4 +1,4 @@
-import { FC, useMemo, useRef, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
 import { getLocationDescription, Location, updateLocationDescription } from '../content/Location';
@@ -65,28 +65,85 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const imageUploadInputRef = useRef<HTMLInputElement>(null);
+    const editedLocationRef = useRef(editedLocation);
+    const autoSaveTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const didMountRef = useRef(false);
+
+    const persistLocation = (
+        nextLocation: typeof editedLocation,
+        options?: { showSavingState?: boolean; closeAfterSave?: boolean }
+    ) => {
+        const showSavingState = options?.showSavingState ?? false;
+        const closeAfterSave = options?.closeAfterSave ?? false;
+
+        if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+            autoSaveTimeoutRef.current = null;
+        }
+
+        if (showSavingState) {
+            setIsSaving(true);
+        }
+
+        location.name = nextLocation.name;
+        location.category = nextLocation.category.trim();
+        updateLocationDescription(location.id, nextLocation.description, stage());
+        location.themeColor = nextLocation.themeColor;
+        location.lightColor = nextLocation.lightColor;
+        location.imageUrl = nextLocation.imageUrl;
+        location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
+
+        stage().saveGame();
+
+        if (showSavingState) {
+            window.setTimeout(() => {
+                setIsSaving(false);
+                if (closeAfterSave) {
+                    onClose();
+                }
+            }, 500);
+        }
+    };
+
+    useEffect(() => {
+        editedLocationRef.current = editedLocation;
+    }, [editedLocation]);
+
+    useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
+
+        if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+        }
+
+        autoSaveTimeoutRef.current = window.setTimeout(() => {
+            persistLocation(editedLocationRef.current);
+        }, 300);
+
+        return () => {
+            if (autoSaveTimeoutRef.current) {
+                clearTimeout(autoSaveTimeoutRef.current);
+            }
+        };
+    }, [editedLocation]);
+
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimeoutRef.current) {
+                persistLocation(editedLocationRef.current);
+            }
+        };
+    }, []);
 
     const handleInputChange = (field: string, value: string | number | boolean) => {
         setEditedLocation(prev => ({ ...prev, [field]: value }));
     };
 
     const handleSave = () => {
-        setIsSaving(true);
-
-        location.name = editedLocation.name;
-        location.category = editedLocation.category.trim();
-        updateLocationDescription(location.id, editedLocation.description, stage());
-        location.themeColor = editedLocation.themeColor;
-        location.lightColor = editedLocation.lightColor;
-        location.imageUrl = editedLocation.imageUrl;
-        location.focalPoint = { x: editedLocation.focalX, y: editedLocation.focalY };
-
-        stage().saveGame();
-
-        setTimeout(() => {
-            setIsSaving(false);
-            onClose();
-        }, 500);
+        persistLocation(editedLocationRef.current, { showSavingState: true, closeAfterSave: !embedded });
     };
 
     const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

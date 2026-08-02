@@ -4,7 +4,7 @@ import { Person } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Button } from './UiComponents';
-import { ActorDetailPanel } from './ActorDetailjPanel';
+import { ActorDetailPanel } from './ActorDetailPanel';
 
 interface ActorManagementPanelProps {
     stage: () => Stage;
@@ -177,6 +177,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                     </div>
                 ) : (
                     <ActorDetailPanel
+                        key={selectedActor.id}
                         actor={selectedActor}
                         stage={stage}
                         onClose={() => setSelectedActorId(null)}

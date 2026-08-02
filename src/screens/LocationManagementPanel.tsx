@@ -213,6 +213,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                     </div>
                 ) : (
                     <LocationDetailPanel
+                        key={selectedLocation.id}
                         location={selectedLocation}
                         stage={stage}
                         onClose={() => setSelectedLocationId(null)}

@@ -20,7 +20,6 @@ const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onClose, embedded = false }) => {
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
-    const initialOutfitIdRef = useRef(actor.outfitId);
     const linkedLoreEntry = getLinkedActorLore(actor.name, stage());
 
     const getClonedOutfits = (): Outfit[] => {
@@ -89,7 +88,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
         actions?: Array<{ label: string; onClick: () => void; variant?: 'primary' | 'secondary' }>;
         onConfirm?: () => void;
     }>({ open: false, title: '', message: '' });
-    const initialOutfitsRef = useRef<Outfit[]>(getClonedOutfits());
+    const editedActorRef = useRef(editedActor);
+    const editedOutfitsRef = useRef(editedOutfits);
+    const autoSaveTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const didMountRef = useRef(false);
 
     const cloneOutfits = (outfits: Outfit[]) => outfits.map((outfit) => ({
         ...outfit,
@@ -97,9 +99,100 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
         emotionPack: { ...(outfit.emotionPack || {}) },
     }));
 
+    const persistActor = (
+        nextEditedActor: typeof editedActor,
+        nextEditedOutfits: Outfit[],
+        options?: { showSavingState?: boolean; closeAfterSave?: boolean }
+    ) => {
+        const showSavingState = options?.showSavingState ?? false;
+        const closeAfterSave = options?.closeAfterSave ?? false;
+
+        if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+            autoSaveTimeoutRef.current = null;
+        }
+
+        if (showSavingState) {
+            setIsSaving(true);
+        }
+
+        const persistedOutfits = (nextEditedOutfits.length > 0
+            ? nextEditedOutfits
+            : [{
+                id: generateUuid(),
+                name: ORIGINAL_OUTFIT_NAME,
+                description: '',
+                prompts: {},
+                emotionPack: {},
+            }]).map((outfit) => ({
+                ...outfit,
+                prompts: { ...(outfit.prompts || {}) },
+                emotionPack: { ...(outfit.emotionPack || {}) },
+            }));
+
+        actor.name = nextEditedActor.name;
+        actor.description = nextEditedActor.description;
+        actor.profile = nextEditedActor.profile;
+        if (linkedLoreEntry) {
+            updateActorLore(actor.id, nextEditedActor.lore, stage());
+        }
+        actor.voiceId = nextEditedActor.voiceId;
+        actor.themeColor = nextEditedActor.themeColor;
+        actor.themeFontFamily = nextEditedActor.themeFontFamily;
+        actor.outfits = persistedOutfits;
+
+        stage().saveGame();
+
+        if (showSavingState) {
+            window.setTimeout(() => {
+                setIsSaving(false);
+                if (closeAfterSave) {
+                    onClose();
+                }
+            }, 500);
+        }
+    };
+
     useEffect(() => {
         actor.outfits = editedOutfits;
     }, [actor, editedOutfits]);
+
+    useEffect(() => {
+        editedActorRef.current = editedActor;
+    }, [editedActor]);
+
+    useEffect(() => {
+        editedOutfitsRef.current = editedOutfits;
+    }, [editedOutfits]);
+
+    useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
+
+        if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+        }
+
+        autoSaveTimeoutRef.current = window.setTimeout(() => {
+            persistActor(editedActorRef.current, editedOutfitsRef.current);
+        }, 300);
+
+        return () => {
+            if (autoSaveTimeoutRef.current) {
+                clearTimeout(autoSaveTimeoutRef.current);
+            }
+        };
+    }, [editedActor, editedOutfits]);
+
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimeoutRef.current) {
+                persistActor(editedActorRef.current, editedOutfitsRef.current);
+            }
+        };
+    }, []);
 
     const selectedOutfit = editedOutfits.find((outfit) => outfit.id === selectedOutfitId) || editedOutfits[0] || null;
     const getSelectedOutfitImageUrl = (emotion: Emotion | 'base'): string => selectedOutfit?.emotionPack?.[emotion] || '';
@@ -135,56 +228,14 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
     };
 
     const handleCloseDetail = () => {
-        actor.outfits = initialOutfitsRef.current.map((outfit) => ({
-            ...outfit,
-            prompts: { ...(outfit.prompts || {}) },
-            emotionPack: { ...(outfit.emotionPack || {}) },
-        }));
-        actor.outfitId = initialOutfitIdRef.current;
+        if (autoSaveTimeoutRef.current) {
+            persistActor(editedActorRef.current, editedOutfitsRef.current);
+        }
         onClose();
     };
 
     const handleSave = () => {
-        setIsSaving(true);
-
-        const nextOutfits = editedOutfits.length > 0
-            ? editedOutfits
-            : [{
-                id: generateUuid(),
-                name: ORIGINAL_OUTFIT_NAME,
-                description: '',
-                prompts: {},
-                emotionPack: {},
-            }];
-
-        // Update the actor in the save
-        actor.name = editedActor.name;
-        actor.description = editedActor.description;
-        actor.profile = editedActor.profile;
-        if (linkedLoreEntry) {
-            updateActorLore(actor.id, editedActor.lore, stage());
-        }
-        actor.voiceId = editedActor.voiceId;
-        actor.themeColor = editedActor.themeColor;
-        actor.themeFontFamily = editedActor.themeFontFamily;
-        actor.outfits = nextOutfits.map((outfit) => ({
-            ...outfit,
-            prompts: { ...(outfit.prompts || {}) },
-            emotionPack: { ...(outfit.emotionPack || {}) },
-        }));
-        initialOutfitsRef.current = actor.outfits.map((outfit) => ({
-            ...outfit,
-            prompts: { ...(outfit.prompts || {}) },
-            emotionPack: { ...(outfit.emotionPack || {}) },
-        }));
-
-        // Save the game
-        stage().saveGame();
-        
-        setTimeout(() => {
-            setIsSaving(false);
-            onClose();
-        }, 500);
+        persistActor(editedActorRef.current, editedOutfitsRef.current, { showSavingState: true, closeAfterSave: !embedded });
     };
 
     const handleInputChange = (field: string, value: string | number) => {
