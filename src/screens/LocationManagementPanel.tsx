@@ -20,13 +20,20 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         return Object.values(stage().getSave().atlas || {}).sort(sortByName);
     }, [stage]);
 
-    const ardeiaLocations = useMemo(() => {
-        return locations.filter((location) => location.id.startsWith('ardeia-') || location.imageUrl?.toLowerCase().includes('/ardeia/')).sort(sortByName);
+    // Create a map of locations by their category property. locationsByCategory[category] = array of locations in that category.
+    const locationsByCategory = useMemo(() => {
+        const categoryMap: Record<string, Location[]> = {};
+        for (const location of locations) {
+            const category = location.category || 'Uncategorized';
+            if (!categoryMap[category]) {
+                categoryMap[category] = [];
+            }
+            categoryMap[category].push(location);
+        }
+        return Object.entries(categoryMap)
+            .map(([title, entries]) => ({ title, entries: entries.sort(sortByName) }))
+            .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
     }, [locations]);
-
-    const outsideLocations = useMemo(() => {
-        return locations.filter((location) => !ardeiaLocations.includes(location));
-    }, [locations, ardeiaLocations]);
 
     const selectedLocation = useMemo(() => {
         if (!selectedLocationId) {
@@ -151,10 +158,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                     </div>
                 ) : (
                     <>
-                        {[
-                            { title: 'Ardeia', entries: ardeiaLocations },
-                            { title: 'Outside', entries: outsideLocations },
-                        ].map((section) => (
+                        {locationsByCategory.map((section) => (
                             <div key={section.title}>
                                 <div
                                     style={{

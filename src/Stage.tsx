@@ -474,7 +474,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             const introSkit = new Skit({
                 skitType: SkitType.INTRO,
                 initialLocationId: generatedIntroSeed?.locationId || defaultLocationId,
-                guidance: generatedIntroSeed?.guidance || `${this.getPlayerActor()?.name || 'The player'} begins their first day in Ardeia, meeting someone who reveals both the fragile hope and hidden danger of this world.`,
+                guidance: generatedIntroSeed?.guidance || `${this.getPlayerActor()?.name || 'The player'} is briefly introduced to the concept of the world or setting.`,
                 script: [],
                 initialActors: generatedIntroSeed?.initialActorIds?.length ? generatedIntroSeed.initialActorIds : defaultInitialActors,
                 summary: ''
@@ -1117,7 +1117,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 break;
             }
 
-            const participantCount = Math.min(availableActors.length, location.id.startsWith('ardeia-') ? 3 : 2);
+            const participantCount = Math.min(availableActors.length, 1 + Math.floor(Math.random() * 3));
             const participants = participantCount > 0
                 ? this.takeRandomDistinct(availableActors, Math.max(1, participantCount))
                 : [];
@@ -1420,7 +1420,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     ACTOR_SEED_FIELDS,
                     {
                         name: 'Mirel',
-                        profile: 'Mirel is observant, practical, and quietly theatrical when she tells stories. She scavenges old transit hubs for useful artifacts and treats every social exchange like a puzzle. She wants status in Ardeia but fears becoming dependent on anyone.',
+                        profile: 'Mirel is observant, practical, and quietly theatrical when she tells stories. She scavenges old transit hubs for useful artifacts and treats every social exchange like a puzzle. She wants status but fears becoming dependent on anyone.',
                         description: 'A lean woman with short copper hair, soot-smudged skin, and alert amber eyes. She wears layered expedition gear with salvaged metallic charms and a patched hooded cloak.',
                     },
                     { includeEndTag: true },
@@ -1485,7 +1485,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         buildStructuredExampleResponse(
                             INTRO_SKIT_FIELDS,
                             {
-                                guidance: `${this.getPlayerActor()?.name || 'The player'} arrives expecting a normal beginning, but the first conversation immediately reveals that Ardeia is stranger, more intimate, and more precarious than it first appears.`,
+                                guidance: `${this.getPlayerActor()?.name || 'The player'} arrives expecting a normal beginning, but the first conversation immediately reveals this world is stranger, more intimate, and more precarious than it first appears.`,
                                 location: locations[0]?.name || 'Unknown Location',
                                 participants: preferredActor ? preferredActor.name : '',
                             },

@@ -28,10 +28,6 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
 
     // Get all locations from the save atlas
     const locations = Object.values(stage().getSave().atlas || {}).sort(sortByName);
-    const ardeiaLocations = locations.filter(location =>
-        location.id.startsWith('ardeia-') || location.imageUrl?.toLowerCase().includes('/ardeia/')
-    ).sort(sortByName);
-    const outsideLocations = locations.filter(location => !ardeiaLocations.includes(location));
 
     return (
         <>

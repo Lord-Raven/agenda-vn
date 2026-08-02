@@ -1,4 +1,4 @@
-import { FC, useRef, useState } from 'react';
+import { FC, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
 import { getLocationDescription, Location, updateLocationDescription } from '../content/Location';
@@ -15,6 +15,7 @@ interface LocationDetailPanelProps {
 export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onClose, embedded = false }) => {
     const [editedLocation, setEditedLocation] = useState<{
         name: string;
+        category: string;
         description: string;
         themeColor: string;
         lightColor: string;
@@ -23,6 +24,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         focalY: number;
     }>({
         name: location.name,
+        category: location.category ?? '',
         description: getLocationDescription(location.id, stage()),
         themeColor: location.themeColor,
         lightColor: location.lightColor,
@@ -30,6 +32,35 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         focalX: location.focalPoint?.x ?? 0.5,
         focalY: location.focalPoint?.y ?? 0.5,
     });
+
+    const categoryInputListId = `location-category-options-${location.id}`;
+    const categorySuggestions = useMemo(() => {
+        const seenCategories = new Set<string>();
+        let hasUncategorized = false;
+
+        for (const candidate of Object.values(stage().getSave().atlas || {})) {
+            if (candidate.id === location.id) {
+                continue;
+            }
+
+            const normalizedCategory = (candidate.category || '').trim();
+            if (!normalizedCategory) {
+                hasUncategorized = true;
+                continue;
+            }
+
+            const dedupeKey = normalizedCategory.toLocaleLowerCase();
+            if (!seenCategories.has(dedupeKey)) {
+                seenCategories.add(dedupeKey);
+            }
+        }
+
+        const values = Array.from(seenCategories).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        return {
+            hasUncategorized,
+            values,
+        };
+    }, [location.id, stage]);
 
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -43,6 +74,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         setIsSaving(true);
 
         location.name = editedLocation.name;
+        location.category = editedLocation.category.trim();
         updateLocationDescription(location.id, editedLocation.description, stage());
         location.themeColor = editedLocation.themeColor;
         location.lightColor = editedLocation.lightColor;
@@ -264,6 +296,24 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                             onChange={(e) => handleInputChange('name', e.target.value)}
                                             placeholder="Location name"
                                         />
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>Category</label>
+                                        <TextInput
+                                            fullWidth
+                                            value={editedLocation.category}
+                                            onChange={(e) => handleInputChange('category', e.target.value)}
+                                            placeholder="Choose or type a category (leave blank for Uncategorized)"
+                                            list={categoryInputListId}
+                                        />
+                                        <datalist id={categoryInputListId}>
+                                            {categorySuggestions.hasUncategorized && (
+                                                <option value="">Uncategorized</option>
+                                            )}
+                                            {categorySuggestions.values.map((category) => (
+                                                <option key={category} value={category} />
+                                            ))}
+                                        </datalist>
                                     </div>
                                     <div>
                                         <label style={labelStyle}>Description</label>

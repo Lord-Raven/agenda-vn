@@ -48,8 +48,9 @@ export class Location {
     id: string = '';
     name: string = '';
     description: string = '';
+	category: string = ''; // A category for filtering or organization in the UI. Could be a region ("house", "city") or could be a type of location ("dungeons", "shops"); it is for organizational and not gameplay purposes.
     imageUrl: string = ''; // URL for an image representing this location, used as background in skits or location displays.
-    focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location into map cells.
+    focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
 	lightColor: string = ''; // This is the lighting color for the location, used to tint character images in skits. If not set, default to white (#ffffff).
     themeColor: string = ''; // A color associated with this location, used for UI theming.
 
