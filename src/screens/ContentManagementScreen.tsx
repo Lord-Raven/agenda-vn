@@ -1,12 +1,10 @@
 import React, { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
-import { Actor, getEmotionImage } from '../content/Actor';
-import { Location } from '../content/Location';
 import { Close, Person, Book, Place, Tune, CalendarMonth, Palette } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from './UiComponents';
-import { ActorDetailPanel } from './ActorDetailjPanel';
-import { LocationDetailPanel } from './LocationDetailPanel';
+import { ActorManagementPanel } from './ActorManagementPanel';
+import { LocationManagementPanel } from './LocationManagementPanel';
 import { LorebookManagementPanel } from './LorebookManagementPanel';
 import { StyleManagementPanel } from './StyleManagementPanel';
 import { GameManagementPanel } from './GameManagementPanel';
@@ -21,8 +19,6 @@ type TabType = 'style' | 'game' | 'lorebook' | 'actors' | 'locations' | 'calenda
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [activeTab, setActiveTab] = useState<TabType>('style');
-    const [selectedActor, setSelectedActor] = useState<Actor | null>(null);
-    const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
     const sortByName = <T extends { name?: string }>(a: T, b: T) =>
         (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), undefined, { sensitivity: 'base' });
@@ -36,84 +32,6 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
         location.id.startsWith('ardeia-') || location.imageUrl?.toLowerCase().includes('/ardeia/')
     ).sort(sortByName);
     const outsideLocations = locations.filter(location => !ardeiaLocations.includes(location));
-
-    const handleActorClick = (actor: Actor) => {
-        setSelectedActor(actor);
-    };
-
-    const handleCloseDetail = () => {
-        setSelectedActor(null);
-        stage().saveGame();
-    };
-
-    const handleLocationClick = (location: Location) => {
-        setSelectedLocation(location);
-    };
-
-    const handleCreateActor = () => {
-        const save = stage().getSave();
-        const baseName = 'New Actor';
-        const usedNames = new Set(Object.values(save.actors || {}).map(actor => actor.name?.trim().toLowerCase()));
-
-        let candidateName = baseName;
-        let counter = 1;
-        while (usedNames.has(candidateName.toLowerCase())) {
-            candidateName = `New Actor ${counter}`;
-            counter += 1;
-        }
-
-        const actor = new Actor({
-            name: candidateName,
-            description: '',
-            profile: '',
-            outfitId: '',
-            outfits: [],
-            themeColor: '',
-            themeFontFamily: '',
-            voiceId: '',
-            statMap: {},
-        });
-
-        save.actors[actor.id] = actor;
-        stage().saveGame();
-        setSelectedActor(actor);
-        setSelectedLocation(null);
-        setActiveTab('actors');
-    };
-
-    const handleCreateLocation = () => {
-        const save = stage().getSave();
-        const baseName = 'New Location';
-        const usedNames = new Set(Object.values(save.atlas || {}).map(location => location.name?.trim().toLowerCase()));
-
-        let candidateName = baseName;
-        let counter = 1;
-        while (usedNames.has(candidateName.toLowerCase())) {
-            candidateName = `New Location ${counter}`;
-            counter += 1;
-        }
-
-        const location = new Location({
-            name: candidateName,
-            description: '',
-            imageUrl: '',
-            focalPoint: { x: 0.5, y: 0.5 },
-            lightColor: '',
-            themeColor: '',
-        });
-
-        save.atlas = save.atlas || {};
-        save.atlas[location.id] = location;
-        stage().saveGame();
-        setSelectedLocation(location);
-        setSelectedActor(null);
-        setActiveTab('locations');
-    };
-
-    const handleCloseLocationDetail = () => {
-        setSelectedLocation(null);
-        stage().saveGame();
-    };
 
     return (
         <>
@@ -315,243 +233,18 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
 
                                 {/* Actors Tab */}
                                 {activeTab === 'actors' && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', padding: '10px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                            <Button
-                                                onClick={handleCreateActor}
-                                                variant="primary"
-                                                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                                            >
-                                                <Person />
-                                                Add New Actor
-                                            </Button>
-                                        </div>
-                                        <div style={{
-                                            display: 'grid',
-                                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                                            gap: '15px',
-                                        }}>
-                                        {actors.length === 0 ? (
-                                            <div style={{
-                                                gridColumn: '1 / -1',
-                                                textAlign: 'center',
-                                                padding: '40px',
-                                                color: 'rgba(224, 240, 255, 0.6)',
-                                                fontSize: '16px',
-                                            }}>
-                                                No actors found in the current save.
-                                            </div>
-                                        ) : (
-                                            actors.map(actor => (
-                                                <motion.div
-                                                    key={actor.id}
-                                                    whileHover={{ scale: 1.05, y: -5 }}
-                                                    whileTap={{ scale: 0.95 }}
-                                                    onClick={() => handleActorClick(actor)}
-                                                    style={{
-                                                        cursor: 'pointer',
-                                                        backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                        border: '2px solid rgba(0, 255, 136, 0.3)',
-                                                        borderRadius: '8px',
-                                                        padding: '15px',
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        alignItems: 'center',
-                                                        gap: '10px',
-                                                        transition: 'border-color 0.2s',
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.6)';
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.3)';
-                                                    }}
-                                                >
-                                                    {/* Actor Avatar */}
-                                                    <div
-                                                        style={{
-                                                            width: '120px',
-                                                            height: '120px',
-                                                            borderRadius: '50%',
-                                                            backgroundColor: 'rgba(0, 20, 40, 0.8)',
-                                                            border: `3px solid ${actor.themeColor}`,
-                                                            backgroundImage: getEmotionImage(actor, 'neutral') || getEmotionImage(actor, 'base')
-                                                                ? `url(${getEmotionImage(actor, 'neutral') || getEmotionImage(actor, 'base')})`
-                                                                : 'none',
-                                                            backgroundSize: 'cover',
-                                                            backgroundPosition: 'top center',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                        }}
-                                                    >
-                                                        {!getEmotionImage(actor, 'neutral') && !getEmotionImage(actor, 'base') && (
-                                                            <Person style={{ fontSize: '50px', color: 'rgba(0, 255, 136, 0.3)' }} />
-                                                        )}
-                                                    </div>
-                                                    
-                                                    {/* Actor Name */}
-                                                    <div style={{ textAlign: 'center' }}>
-                                                        <div
-                                                            style={{
-                                                                color: '#00ff88',
-                                                                fontSize: '16px',
-                                                                fontWeight: 'bold',
-                                                                fontFamily: actor.themeFontFamily,
-                                                            }}
-                                                        >
-                                                            {actor.name}
-                                                        </div>
-                                                    </div>
-                                                </motion.div>
-                                            ))
-                                        )}
-                                        </div>
-                                    </div>
+                                    <ActorManagementPanel stage={stage} />
                                 )}
 
                                 {/* Locations Tab */}
                                 {activeTab === 'locations' && (
-                                    <div style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '25px',
-                                        padding: '10px',
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                            <Button
-                                                onClick={handleCreateLocation}
-                                                variant="primary"
-                                                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                                            >
-                                                <Place />
-                                                Add New Location
-                                            </Button>
-                                        </div>
-                                        {locations.length === 0 ? (
-                                            <div style={{
-                                                textAlign: 'center',
-                                                padding: '40px',
-                                                color: 'rgba(224, 240, 255, 0.6)',
-                                                fontSize: '16px',
-                                            }}>
-                                                No locations found in the current save.
-                                            </div>
-                                        ) : (
-                                            <>
-                                                {[
-                                                    { title: 'Ardeia', entries: ardeiaLocations },
-                                                    { title: 'Outside', entries: outsideLocations },
-                                                ].map(section => (
-                                                    <div key={section.title}>
-                                                        <div style={{
-                                                            color: 'rgba(224, 240, 255, 0.9)',
-                                                            fontSize: '18px',
-                                                            fontWeight: 'bold',
-                                                            marginBottom: '12px',
-                                                            borderBottom: '1px solid rgba(0, 255, 136, 0.25)',
-                                                            paddingBottom: '6px',
-                                                        }}>
-                                                            {section.title}
-                                                        </div>
-                                                        {section.entries.length === 0 ? (
-                                                            <div style={{
-                                                                color: 'rgba(224, 240, 255, 0.6)',
-                                                                fontSize: '14px',
-                                                                fontStyle: 'italic',
-                                                            }}>
-                                                                No locations.
-                                                            </div>
-                                                        ) : (
-                                                            <div style={{
-                                                                display: 'grid',
-                                                                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                                                                gap: '15px',
-                                                            }}>
-                                                                {section.entries.map(location => (
-                                                                    <motion.div
-                                                                        key={location.id}
-                                                                        whileHover={{ scale: 1.05, y: -5 }}
-                                                                        whileTap={{ scale: 0.95 }}
-                                                                        onClick={() => handleLocationClick(location)}
-                                                                        style={{
-                                                                            cursor: 'pointer',
-                                                                            backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                                            border: `2px solid ${location.themeColor || 'rgba(0, 255, 136, 0.3)'}`,
-                                                                            borderRadius: '8px',
-                                                                            padding: '15px',
-                                                                            display: 'flex',
-                                                                            flexDirection: 'column',
-                                                                            alignItems: 'center',
-                                                                            gap: '10px',
-                                                                        }}
-                                                                    >
-                                                                        {/* Location Thumbnail */}
-                                                                        <div
-                                                                            style={{
-                                                                                width: '120px',
-                                                                                height: '80px',
-                                                                                borderRadius: '6px',
-                                                                                backgroundColor: 'rgba(0, 20, 40, 0.8)',
-                                                                                border: `2px solid ${location.themeColor || 'rgba(0, 255, 136, 0.3)'}`,
-                                                                                backgroundImage: location.imageUrl ? `url(${location.imageUrl})` : 'none',
-                                                                                backgroundSize: 'cover',
-                                                                                backgroundPosition: `${(location.focalPoint?.x ?? 0.5) * 100}% ${(location.focalPoint?.y ?? 0.5) * 100}%`,
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                justifyContent: 'center',
-                                                                                overflow: 'hidden',
-                                                                            }}
-                                                                        >
-                                                                            {!location.imageUrl && (
-                                                                                <Place style={{ fontSize: '36px', color: 'rgba(0, 255, 136, 0.3)' }} />
-                                                                            )}
-                                                                        </div>
-
-                                                                        {/* Location Name */}
-                                                                        <div
-                                                                            style={{
-                                                                                color: location.themeColor || '#00ff88',
-                                                                                fontSize: '14px',
-                                                                                fontWeight: 'bold',
-                                                                                textAlign: 'center',
-                                                                            }}
-                                                                        >
-                                                                            {location.name}
-                                                                        </div>
-                                                                    </motion.div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </>
-                                        )}
-                                    </div>
+                                    <LocationManagementPanel stage={stage} />
                                 )}
                             </div>
                         </GlassPanel>
                     </motion.div>
                 </motion.div>
             </AnimatePresence>
-
-            {/* Actor Detail Modal */}
-            {selectedActor && (
-                <ActorDetailPanel
-                    actor={selectedActor}
-                    stage={stage}
-                    onClose={handleCloseDetail}
-                />
-            )}
-
-            {/* Location Detail Modal */}
-            {selectedLocation && (
-                <LocationDetailPanel
-                    location={selectedLocation}
-                    stage={stage}
-                    onClose={handleCloseLocationDetail}
-                />
-            )}
         </>
     );
 };

@@ -9,9 +9,10 @@ interface LocationDetailPanelProps {
     location: Location;
     stage: () => Stage;
     onClose: () => void;
+    embedded?: boolean;
 }
 
-export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onClose }) => {
+export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onClose, embedded = false }) => {
     const [editedLocation, setEditedLocation] = useState<{
         name: string;
         description: string;
@@ -147,20 +148,25 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
                 style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 10, 20, 0.85)',
-                    backdropFilter: 'blur(8px)',
+                    position: embedded ? 'relative' : 'absolute',
+                    top: embedded ? 'auto' : 0,
+                    left: embedded ? 'auto' : 0,
+                    right: embedded ? 'auto' : 0,
+                    bottom: embedded ? 'auto' : 0,
+                    background: embedded ? 'transparent' : 'rgba(0, 10, 20, 0.85)',
+                    backdropFilter: embedded ? 'none' : 'blur(8px)',
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: embedded ? 'stretch' : 'center',
                     justifyContent: 'center',
-                    zIndex: 1000,
-                    padding: '10px 20px 30px',
+                    zIndex: embedded ? 'auto' : 1000,
+                    padding: embedded ? '0' : '10px 20px 30px',
+                    width: '100%',
+                    height: embedded ? '100%' : 'auto',
                 }}
                 onClick={(e) => {
+                    if (embedded) {
+                        return;
+                    }
                     const selection = window.getSelection();
                     const hasSelection = selection && selection.toString().length > 0;
                     if (e.target === e.currentTarget && !hasSelection) {
@@ -175,18 +181,19 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                     transition={{ duration: 0.3, ease: 'easeOut' }}
                     onClick={(e) => e.stopPropagation()}
                     style={{
-                        width: '90vw',
-                        maxWidth: '1400px',
-                        maxHeight: '90vh',
+                        width: embedded ? '100%' : '90vw',
+                        maxWidth: embedded ? 'none' : '1400px',
+                        maxHeight: embedded ? 'none' : '90vh',
+                        height: embedded ? '100%' : 'auto',
                     }}
                 >
                     <GlassPanel
-                        variant="bright"
+                        variant={embedded ? 'default' : 'bright'}
                         style={{
-                            height: '90vh',
+                            height: embedded ? '100%' : '90vh',
                             overflow: 'auto',
                             position: 'relative',
-                            padding: '30px',
+                            padding: embedded ? '20px' : '30px',
                         }}
                     >
                         {/* Header */}
@@ -195,12 +202,12 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             marginBottom: '20px',
-                            position: 'sticky',
-                            top: 0,
-                            background: 'rgba(0, 20, 40, 0.95)',
-                            backdropFilter: 'blur(8px)',
-                            padding: '10px 0',
-                            zIndex: 10,
+                            position: embedded ? 'static' : 'sticky',
+                            top: embedded ? 'auto' : 0,
+                            background: embedded ? 'transparent' : 'rgba(0, 20, 40, 0.95)',
+                            backdropFilter: embedded ? 'none' : 'blur(8px)',
+                            padding: embedded ? '0' : '10px 0',
+                            zIndex: embedded ? 'auto' : 10,
                         }}>
                             <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                                 Location Details: {editedLocation.name}
@@ -214,24 +221,31 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                     <Save style={{ fontSize: '20px' }} />
                                     {isSaving ? 'Saving...' : 'Save Changes'}
                                 </Button>
-                                <motion.button
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={onClose}
-                                    style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: 'rgba(0, 255, 136, 0.7)',
-                                        cursor: 'pointer',
-                                        fontSize: '24px',
-                                        padding: '5px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                    }}
-                                >
-                                    <Close />
-                                </motion.button>
+                                {embedded ? (
+                                    <Button variant="secondary" onClick={onClose} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Close style={{ fontSize: '20px' }} />
+                                        Deselect
+                                    </Button>
+                                ) : (
+                                    <motion.button
+                                        whileHover={{ scale: 1.1 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        onClick={onClose}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'rgba(0, 255, 136, 0.7)',
+                                            cursor: 'pointer',
+                                            fontSize: '24px',
+                                            padding: '5px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Close />
+                                    </motion.button>
+                                )}
                             </div>
                         </div>
 
