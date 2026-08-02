@@ -90,7 +90,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onCl
     }>({ open: false, title: '', message: '' });
     const editedActorRef = useRef(editedActor);
     const editedOutfitsRef = useRef(editedOutfits);
-    const autoSaveTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
     const cloneOutfits = (outfits: Outfit[]) => outfits.map((outfit) => ({

@@ -13,6 +13,35 @@ interface ActorManagementPanelProps {
 export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) => {
     const [selectedActorId, setSelectedActorId] = useState<string | null>(null);
 
+    const shellStyle: React.CSSProperties = {
+        display: 'grid',
+        gridTemplateColumns: 'minmax(280px, 360px) 1fr',
+        gap: '20px',
+        flex: 1,
+        minHeight: 0,
+    };
+
+    const sidebarStyle: React.CSSProperties = {
+        background: 'rgba(0, 20, 40, 0.45)',
+        border: '1px solid rgba(0, 255, 136, 0.25)',
+        borderRadius: '12px',
+        padding: '14px',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+    };
+
+    const detailPaneStyle: React.CSSProperties = {
+        background: 'rgba(0, 20, 40, 0.45)',
+        border: '1px solid rgba(0, 255, 136, 0.25)',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+    };
+
     const sortByName = <T extends { name?: string }>(a: T, b: T) =>
         (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), undefined, { sensitivity: 'base' });
 
@@ -60,27 +89,8 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
     };
 
     return (
-        <div
-            style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(280px, 360px) 1fr',
-                gap: '20px',
-                flex: 1,
-                minHeight: 0,
-            }}
-        >
-            <div
-                style={{
-                    background: 'rgba(0, 20, 40, 0.45)',
-                    border: '1px solid rgba(0, 255, 136, 0.25)',
-                    borderRadius: '12px',
-                    padding: '14px',
-                    overflowY: 'auto',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                }}
-            >
+        <div style={shellStyle}>
+            <div style={sidebarStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                     <div style={{ color: 'rgba(0, 255, 136, 0.9)', fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                         Actors ({actors.length})
@@ -153,17 +163,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                 )}
             </div>
 
-            <div
-                style={{
-                    background: 'rgba(0, 20, 40, 0.45)',
-                    border: '1px solid rgba(0, 255, 136, 0.25)',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minHeight: 0,
-                }}
-            >
+            <div style={detailPaneStyle}>
                 {!selectedActor ? (
                     <div
                         style={{

@@ -66,7 +66,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const imageUploadInputRef = useRef<HTMLInputElement>(null);
     const editedLocationRef = useRef(editedLocation);
-    const autoSaveTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
     const persistLocation = (
