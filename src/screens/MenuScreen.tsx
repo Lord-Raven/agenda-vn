@@ -167,6 +167,58 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                 {/* Background grid effect */}
                 <GridOverlay />
 
+                {/* Title above menu panel */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.25, duration: 0.45 }}
+                    style={{
+                        width: 'min(580px, 94vw)',
+                        marginBottom: 'clamp(8px, 1.5vh, 14px)',
+                        transform: 'translateX(clamp(-12px, -1.8vw, -6px))',
+                        zIndex: 10,
+                    }}
+                >
+                    {configuredTitleImageUrl ? (
+                        <motion.img
+                            initial={{ opacity: 0, y: -14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.35, duration: 0.45, ease: 'easeOut' }}
+                            src={configuredTitleImageUrl}
+                            alt={configuredTitle}
+                            style={{
+                                display: 'block',
+                                width: '100%',
+                                maxHeight: 'min(250px, 30vh)',
+                                objectFit: 'contain',
+                                margin: '0 auto',
+                                filter: 'drop-shadow(0 10px 28px rgba(0, 0, 0, 0.32))',
+                            }}
+                        />
+                    ) : (
+                        <motion.h1
+                            initial={{ opacity: 0, y: -14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.35, duration: 0.45, ease: 'easeOut' }}
+                            style={{
+                                margin: 0,
+                                textAlign: 'center',
+                                color: 'var(--agenda-primary)',
+                                fontFamily: 'var(--agenda-font-flavor)',
+                                fontSize: 'clamp(2.4rem, 8vw, 4.6rem)',
+                                fontWeight: 700,
+                                letterSpacing: '0.08em',
+                                lineHeight: 0.95,
+                                textTransform: 'uppercase',
+                                textShadow: '0 10px 28px rgba(0, 0, 0, 0.32)',
+                                overflowWrap: 'anywhere',
+                            }}
+                        >
+                            {configuredTitle}
+                        </motion.h1>
+                    )}
+                </motion.div>
+
                 {/* Main menu container */}
                 <motion.div
                     initial={{ opacity: 0, y: 50 }}
@@ -186,57 +238,6 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                         zIndex: 10,
                     }}
                 >
-                    {/* Logo - need some title text here. */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.3, duration: 0.5 }}
-                        style={{
-                            marginBottom: 'clamp(18px, 3vh, 28px)',
-                            marginInline: 'clamp(-14px, -2.8vw, -24px)',
-                        }}
-                    >
-                        {configuredTitleImageUrl ? (
-                            <motion.img
-                                initial={{ opacity: 0, y: -14 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.4, duration: 0.45, ease: 'easeOut' }}
-                                src={configuredTitleImageUrl}
-                                alt={configuredTitle}
-                                style={{
-                                    display: 'block',
-                                    width: 'calc(100% + clamp(28px, 5.6vw, 48px))',
-                                    maxWidth: 'min(580px, 94vw)',
-                                    maxHeight: 'min(320px, 36vh)',
-                                    objectFit: 'contain',
-                                    margin: '0 auto',
-                                    filter: 'drop-shadow(0 10px 28px rgba(0, 0, 0, 0.32))',
-                                }}
-                            />
-                        ) : (
-                            <motion.h1
-                                initial={{ opacity: 0, y: -14 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.4, duration: 0.45, ease: 'easeOut' }}
-                                style={{
-                                    margin: 0,
-                                    textAlign: 'center',
-                                    color: 'var(--agenda-primary)',
-                                    fontFamily: 'var(--agenda-font-flavor)',
-                                    fontSize: 'clamp(2.4rem, 8vw, 4.6rem)',
-                                    fontWeight: 700,
-                                    letterSpacing: '0.08em',
-                                    lineHeight: 0.95,
-                                    textTransform: 'uppercase',
-                                    textShadow: '0 10px 28px rgba(0, 0, 0, 0.32)',
-                                    overflowWrap: 'anywhere',
-                                }}
-                            >
-                                {configuredTitle}
-                            </motion.h1>
-                        )}
-                    </motion.div>
-
                     {/* Menu sections */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(10px, 2vh, 15px)' }}>
                             <div>
