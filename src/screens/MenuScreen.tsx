@@ -174,7 +174,6 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                     transition={{ delay: 0.25, duration: 0.45 }}
                     style={{
                         width: 'min(580px, 94vw)',
-                        marginBottom: 'clamp(8px, 1.5vh, 14px)',
                         transform: 'translateX(clamp(-12px, -1.8vw, -6px))',
                         zIndex: 10,
                     }}
@@ -189,7 +188,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                             style={{
                                 display: 'block',
                                 width: '100%',
-                                maxHeight: 'min(250px, 30vh)',
+                                maxHeight: 'min(300px, 30vh)',
                                 objectFit: 'contain',
                                 margin: '0 auto',
                                 filter: 'drop-shadow(0 10px 28px rgba(0, 0, 0, 0.32))',
