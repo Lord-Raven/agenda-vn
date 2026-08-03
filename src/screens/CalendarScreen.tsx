@@ -85,6 +85,54 @@ const getEventStartSlotIndex = (event: CalendarEvent) => {
     return TIME_OF_DAY_ORDER.indexOf(first);
 };
 
+const getEventEndSlotIndex = (event: CalendarEvent) => {
+    const slots = getDurationSlots(event);
+    const last = slots[slots.length - 1] || 'evening';
+    return TIME_OF_DAY_ORDER.indexOf(last);
+};
+
+const compareEventSchedule = (left: CalendarEvent, right: CalendarEvent) => {
+    const dateCompare = `${left.date || ""}`.localeCompare(`${right.date || ""}`);
+    if (dateCompare !== 0) {
+        return dateCompare;
+    }
+
+    const timeCompare = getEventStartSlotIndex(left) - getEventStartSlotIndex(right);
+    if (timeCompare !== 0) {
+        return timeCompare;
+    }
+
+    return `${left.id || ""}`.localeCompare(`${right.id || ""}`);
+};
+
+const isPastDate = (targetDate: string, currentDate: string) => targetDate < currentDate;
+
+const isPastSlot = (targetDate: string, currentDate: string, currentSlotIndex: number, slotIndex: number) => {
+    if (targetDate < currentDate) {
+        return true;
+    }
+    if (targetDate > currentDate) {
+        return false;
+    }
+    return slotIndex < currentSlotIndex;
+};
+
+const isPastEvent = (event: CalendarEvent, currentDate: string, currentSlotIndex: number) => {
+    if (isPastDate(event.date, currentDate)) {
+        return true;
+    }
+    if (event.date > currentDate) {
+        return false;
+    }
+    return getEventEndSlotIndex(event) < currentSlotIndex;
+};
+
+const doesEventOccupySlot = (event: CalendarEvent, slotIndex: number) => {
+    const start = getEventStartSlotIndex(event);
+    const end = getEventEndSlotIndex(event);
+    return slotIndex >= start && slotIndex <= end;
+};
+
 const formatDurationSummary = (event: CalendarEvent) => {
     const slots = getDurationSlots(event);
     if (slots.length === 0) {
@@ -120,22 +168,21 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const save = stageInstance.getSave();
     const currentDateKey = save.currentDate || formatDateKey(new Date());
     const currentTimeOfDay = save.currentTimeOfDay || 'morning';
+    const currentSlotIndex = Math.max(TIME_OF_DAY_ORDER.indexOf(currentTimeOfDay), 0);
 
     const allEvents = useMemo(
-        () => [...stageInstance.getUpcomingEvents()],
+        () => [...(save.upcomingEvents || [])].sort((left, right) => compareEventSchedule(left, right)),
         [save.upcomingEvents, save.currentDate, save.currentTimeOfDay, stageInstance],
     );
-    const upcomingEvents = useMemo(
-        () => allEvents,
-        [allEvents],
-    );
+    const upcomingEvents = useMemo(() => [...stageInstance.getUpcomingEvents()], [save.upcomingEvents, save.currentDate, save.currentTimeOfDay, stageInstance]);
     // In this screen, "today" is anchored to the next event date to match narrative progression.
     const todayDateKey = upcomingEvents[0]?.date || currentDateKey;
     const todayDate = parseDateKey(todayDateKey);
     const nextEventId = upcomingEvents[0]?.id;
 
     const [viewMonth, setViewMonth] = useState(() => startOfMonth(todayDate));
-    const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
+    const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+    const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [activeDateKey, setActiveDateKey] = useState<string | null>(null);
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
@@ -169,8 +216,15 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const openEvent = (eventId: string) => {
         const opened = stageInstance.startCalendarEventSkit(eventId);
         if (opened) {
+            setSelectedDateKey(null);
+            setSelectedEventId(null);
             setScreenType(ScreenType.SKIT);
         }
+    };
+
+    const openDateDetails = (dateKey: string) => {
+        setSelectedDateKey(dateKey);
+        setSelectedEventId(null);
     };
 
     const skipEvent = () => {
@@ -350,6 +404,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                         key={dateKey}
                                         onHoverStart={hasEvents ? () => setActiveDateKey(dateKey) : undefined}
                                         onFocusCapture={hasEvents ? () => setActiveDateKey(dateKey) : undefined}
+                                        onClick={hasEvents ? () => openDateDetails(dateKey) : undefined}
                                         whileHover={hasEvents ? { scale: 1.05 } : undefined}
                                         whileTap={hasEvents ? { scale: 0.995 } : undefined}
                                         style={{
@@ -432,26 +487,15 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         .map((actorId) => save.actors[actorId])
                                                         .filter(Boolean) as Actor[];
                                                     const leadActor = participants[0];
+                                                    const eventPast = isPastEvent(eventItem, currentDateKey, currentSlotIndex);
 
                                                     return (
-                                                        <motion.button
+                                                        <Box
                                                             key={eventItem.id}
-                                                            type="button"
-                                                            onClick={(event) => {
-                                                                event.stopPropagation();
-                                                                setDetailEvent(eventItem);
-                                                            }}
-                                                            onMouseEnter={() => setTooltip(`View event: ${eventItem.name}`, EventAvailable)}
-                                                            onMouseLeave={clearTooltip}
-                                                            whileHover={{ scale: 1.05 }}
-                                                            whileTap={{ scale: 0.995 }}
                                                             style={{
-                                                                appearance: "none",
-                                                                border: 0,
                                                                 padding: 0,
-                                                                background: "transparent",
-                                                                textAlign: "left",
                                                                 width: "100%",
+                                                                opacity: eventPast ? 0.45 : 1,
                                                             }}
                                                         >
                                                             <Box
@@ -519,7 +563,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                     {eventItem.recurrence ? "↻ " : ""}{eventItem.name} · {formatDurationSummary(eventItem)}
                                                                 </Typography>
                                                             </Box>
-                                                        </motion.button>
+                                                        </Box>
                                                     );
                                                 })}
                                             </Box>
@@ -532,13 +576,16 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
             </Box>
 
             <AnimatePresence>
-                {detailEvent && (
+                {selectedDateKey && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        onClick={() => setDetailEvent(null)}
+                        onClick={() => {
+                            setSelectedDateKey(null);
+                            setSelectedEventId(null);
+                        }}
                         style={{
                             position: "fixed",
                             inset: 0,
@@ -557,90 +604,145 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             exit={{ opacity: 0, y: 12, scale: 0.97 }}
                             transition={{ duration: 0.24, ease: "easeOut" }}
                             onClick={(event) => event.stopPropagation()}
-                            style={{ width: "min(720px, 92vw)" }}
+                            style={{ width: "min(1100px, 94vw)" }}
                         >
-                            <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                            <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "88vh" }}>
+                                {(() => {
+                                    const dateEvents = eventsByDate.get(selectedDateKey) || [];
+                                    const selectedEvent = dateEvents.find((eventItem) => eventItem.id === selectedEventId) || null;
+                                    const selectedEventPast = selectedEvent ? isPastEvent(selectedEvent, currentDateKey, currentSlotIndex) : true;
+
+                                    return (
+                                        <>
                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2, flexWrap: "wrap" }}>
                                     <Box>
                                         <Typography sx={{ color: "#edf2f2", fontWeight: 700, fontSize: { xs: "1rem", md: "1.2rem" } }}>
-                                            {detailEvent.name}
+                                            Events on {formatDate(selectedDateKey)}
                                         </Typography>
                                         <Typography sx={{ color: "rgba(185, 210, 227, 0.9)", fontSize: "0.88rem" }}>
-                                            {formatDate(detailEvent.date)} · {formatDurationSummary(detailEvent)} · {save.atlas[detailEvent.locationId]?.name || "Unknown Location"}
+                                            Select an event, then confirm to begin.
                                         </Typography>
                                     </Box>
                                     <Typography sx={{ color: "var(--agenda-active)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
-                                        Potential Event
+                                        Current Time: {formatTimeOfDay(currentTimeOfDay)}
                                     </Typography>
                                 </Box>
 
-                                <Typography sx={{ color: "#edf2f2", lineHeight: 1.55 }}>
-                                    {detailEvent.description}
-                                </Typography>
-
-                                {detailEvent.recurrence && (
-                                    <Typography sx={{ color: "rgba(185, 210, 227, 0.9)", fontSize: "0.84rem", letterSpacing: "0.02em" }}>
-                                        {formatRecurrenceSummary(detailEvent.recurrence)}
-                                    </Typography>
-                                )}
-
-                                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8 }}>
-                                    {(detailEvent.actorIds || detailEvent.participantActorIds || []).map((actorId) => {
-                                        const actor = save.actors[actorId];
-                                        if (!actor) {
-                                            return null;
-                                        }
+                                <Box
+                                    sx={{
+                                        display: "grid",
+                                        gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" },
+                                        gap: 1,
+                                        minHeight: 0,
+                                        overflowY: "auto",
+                                    }}
+                                >
+                                    {TIME_OF_DAY_ORDER.map((slot, slotIndex) => {
+                                        const slotIsPast = isPastSlot(selectedDateKey, currentDateKey, currentSlotIndex, slotIndex);
+                                        const slotEvents = dateEvents
+                                            .filter((eventItem) => doesEventOccupySlot(eventItem, slotIndex))
+                                            .sort((left, right) => compareEventSchedule(left, right));
 
                                         return (
                                             <Box
-                                                key={`${detailEvent.id}-${actor.id}`}
+                                                key={slot}
                                                 sx={{
+                                                    border: "1px solid var(--agenda-calendar-card-border)",
+                                                    borderRadius: "10px",
+                                                    padding: "10px",
+                                                    background: "rgba(14, 21, 34, 0.62)",
+                                                    opacity: slotIsPast ? 0.42 : 1,
                                                     display: "flex",
-                                                    alignItems: "center",
-                                                    gap: 0.75,
-                                                    backgroundColor: "rgba(17, 24, 39, 0.68)",
-                                                    border: `1px solid ${actor.themeColor || "rgba(138, 176, 204, 0.44)"}`,
-                                                    borderRadius: "999px",
-                                                    padding: "4px 10px 4px 4px",
+                                                    flexDirection: "column",
+                                                    gap: 0.8,
+                                                    minHeight: 220,
                                                 }}
                                             >
-                                                <Box
-                                                    sx={{
-                                                        width: 26,
-                                                        height: 26,
-                                                        borderRadius: "50%",
-                                                        border: "1px solid rgba(237, 242, 242, 0.34)",
-                                                        backgroundImage: `url(${getEmotionImage(actor, "neutral", stageInstance, actor.outfitId)})`,
-                                                        backgroundSize: "cover",
-                                                        backgroundPosition: "top center",
-                                                    }}
-                                                />
-                                                <Typography sx={{ color: "rgba(237, 242, 242, 0.96)", fontSize: "0.8rem" }}>{actor.name}</Typography>
+                                                <Typography sx={{ color: "var(--agenda-primary)", fontWeight: 700, fontSize: "0.82rem", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                                                    {formatTimeOfDay(slot)}
+                                                </Typography>
+
+                                                {slotEvents.length === 0 && (
+                                                    <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.8rem", fontStyle: "italic", opacity: 0.7 }}>
+                                                        No events
+                                                    </Typography>
+                                                )}
+
+                                                {slotEvents.map((eventItem) => {
+                                                    const participants = (eventItem.actorIds || eventItem.participantActorIds || [])
+                                                        .map((actorId) => save.actors[actorId])
+                                                        .filter(Boolean) as Actor[];
+                                                    const leadActor = participants[0];
+                                                    const eventIsPast = isPastEvent(eventItem, currentDateKey, currentSlotIndex);
+                                                    const selected = selectedEventId === eventItem.id;
+
+                                                    return (
+                                                        <motion.button
+                                                            key={`${slot}-${eventItem.id}`}
+                                                            type="button"
+                                                            onClick={() => setSelectedEventId(eventItem.id)}
+                                                            whileHover={{ scale: 1.02 }}
+                                                            whileTap={{ scale: 0.995 }}
+                                                            style={{
+                                                                appearance: "none",
+                                                                border: selected
+                                                                    ? `2px solid ${leadActor?.themeColor || "rgba(137, 205, 135, 0.95)"}`
+                                                                    : `1px solid ${leadActor?.themeColor || "rgba(138, 176, 204, 0.5)"}`,
+                                                                borderRadius: "9px",
+                                                                padding: "8px",
+                                                                background: selected
+                                                                    ? "linear-gradient(145deg, rgba(39, 58, 60, 0.96), rgba(21, 26, 40, 0.96))"
+                                                                    : `${leadActor?.themeColor || "#8ab0cc"}1f`,
+                                                                textAlign: "left",
+                                                                width: "100%",
+                                                                cursor: "pointer",
+                                                                opacity: eventIsPast ? 0.4 : 1,
+                                                            }}
+                                                        >
+                                                            <Typography sx={{ color: "rgba(240, 246, 246, 0.98)", fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>
+                                                                {eventItem.recurrence ? "↻ " : ""}{eventItem.name}
+                                                            </Typography>
+                                                            <Typography sx={{ color: "rgba(185, 210, 227, 0.92)", fontSize: "0.72rem", mt: 0.4 }}>
+                                                                {formatDurationSummary(eventItem)} · {save.atlas[eventItem.locationId]?.name || "Unknown Location"}
+                                                            </Typography>
+                                                            {eventItem.recurrence && (
+                                                                <Typography sx={{ color: "rgba(185, 210, 227, 0.84)", fontSize: "0.67rem", mt: 0.3 }}>
+                                                                    {formatRecurrenceSummary(eventItem.recurrence)}
+                                                                </Typography>
+                                                            )}
+                                                        </motion.button>
+                                                    );
+                                                })}
                                             </Box>
                                         );
                                     })}
                                 </Box>
 
                                 <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap" }}>
-                                    {detailEvent.id === nextEventId && (
-                                        <Button
-                                            variant="primary"
-                                            onClick={() => openEvent(detailEvent.id)}
-                                            onMouseEnter={() => setTooltip(`Open event: ${detailEvent.name}`, EventAvailable)}
-                                            onMouseLeave={clearTooltip}
-                                            style={{ padding: "10px 14px" }}
-                                        >
-                                            Confirm
-                                        </Button>
-                                    )}
+                                    <Button
+                                        variant="primary"
+                                        onClick={() => selectedEventId && openEvent(selectedEventId)}
+                                        onMouseEnter={() => selectedEvent ? setTooltip(`Open event: ${selectedEvent.name}`, EventAvailable) : undefined}
+                                        onMouseLeave={clearTooltip}
+                                        disabled={!selectedEvent || selectedEventPast}
+                                        style={{ padding: "10px 14px", opacity: !selectedEvent || selectedEventPast ? 0.5 : 1 }}
+                                    >
+                                        Confirm
+                                    </Button>
                                     <Button
                                         variant="secondary"
-                                        onClick={() => setDetailEvent(null)}
+                                        onClick={() => {
+                                            setSelectedDateKey(null);
+                                            setSelectedEventId(null);
+                                        }}
                                         style={{ padding: "10px 14px" }}
                                     >
                                         Back
                                     </Button>
                                 </Box>
+                                        </>
+                                    );
+                                })()}
                             </GlassPanel>
                         </motion.div>
                     </motion.div>
