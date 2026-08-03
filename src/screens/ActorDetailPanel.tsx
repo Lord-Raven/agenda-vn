@@ -1,6 +1,6 @@
 import { FC, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Popover } from '@mui/material';
 import { Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore } from '../content/Actor';
@@ -14,6 +14,33 @@ interface ActorDetailPanelProps {
 }
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
+const FALLBACK_THEME_COLOR = '#8ab0cc';
+const THEME_COLOR_SWATCHES = [
+    '#8ab0cc',
+    '#89cd87',
+    '#e3c77d',
+    '#c89eb8',
+    '#7ddad7',
+    '#f08f6b',
+    '#6f88d9',
+    '#d96f91',
+    '#f2f2f2',
+    '#7a7b6b',
+] as const;
+
+const normalizeHexColor = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+        return trimmed;
+    }
+
+    if (/^#[0-9a-fA-F]{3}$/.test(trimmed)) {
+        const [r, g, b] = trimmed.slice(1);
+        return `#${r}${r}${g}${g}${b}${b}`;
+    }
+
+    return null;
+};
 
 export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) => {
     type ImageTarget = 'base' | Emotion;
@@ -85,6 +112,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
         actions?: Array<{ label: string; onClick: () => void; variant?: 'primary' | 'secondary' }>;
         onConfirm?: () => void;
     }>({ open: false, title: '', message: '' });
+    const [themeColorPickerAnchorEl, setThemeColorPickerAnchorEl] = useState<HTMLElement | null>(null);
     const editedActorRef = useRef(editedActor);
     const editedOutfitsRef = useRef(editedOutfits);
     const autoSaveTimeoutRef = useRef<number | null>(null);
@@ -222,6 +250,21 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
                 ? { ...outfit, [field]: value }
                 : outfit
         )));
+    };
+
+    const currentThemeColorPreview = normalizeHexColor(editedActor.themeColor) || FALLBACK_THEME_COLOR;
+    const isThemeColorPickerOpen = Boolean(themeColorPickerAnchorEl);
+
+    const handleOpenThemeColorPicker = (event: React.MouseEvent<HTMLElement>) => {
+        setThemeColorPickerAnchorEl(event.currentTarget);
+    };
+
+    const handleCloseThemeColorPicker = () => {
+        setThemeColorPickerAnchorEl(null);
+    };
+
+    const handleSelectThemeColorSwatch = (color: string) => {
+        handleInputChange('themeColor', color);
     };
 
     const handleSelectOutfit = (outfitId: string) => {
@@ -939,16 +982,96 @@ ${indent}}`;
                                                 placeholder="#RRGGBB"
                                                 style={{ flex: 1 }}
                                             />
-                                            <div
+                                            <button
+                                                type="button"
+                                                onClick={handleOpenThemeColorPicker}
+                                                aria-label="Open theme color picker"
+                                                title="Open theme color picker"
                                                 style={{
                                                     width: '50px',
                                                     height: '38px',
-                                                    backgroundColor: editedActor.themeColor,
+                                                    backgroundColor: currentThemeColorPreview,
                                                     border: '2px solid rgba(0, 255, 136, 0.3)',
                                                     borderRadius: '5px',
+                                                    cursor: 'pointer',
+                                                    padding: 0,
                                                 }}
                                             />
                                         </div>
+                                        <Popover
+                                            open={isThemeColorPickerOpen}
+                                            anchorEl={themeColorPickerAnchorEl}
+                                            onClose={handleCloseThemeColorPicker}
+                                            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                                            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                                            slotProps={{
+                                                paper: {
+                                                    style: {
+                                                        marginTop: '8px',
+                                                        backgroundColor: 'rgba(0, 20, 40, 0.95)',
+                                                        border: '2px solid rgba(0, 255, 136, 0.3)',
+                                                        borderRadius: '8px',
+                                                        color: '#e0f0ff',
+                                                        minWidth: '260px',
+                                                        padding: '12px',
+                                                    },
+                                                },
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                <div style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+                                                    Choose theme color
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        display: 'grid',
+                                                        gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+                                                        gap: '8px',
+                                                    }}
+                                                >
+                                                    {THEME_COLOR_SWATCHES.map((color) => {
+                                                        const isSelected = normalizeHexColor(editedActor.themeColor)?.toLowerCase() === color.toLowerCase();
+                                                        return (
+                                                            <button
+                                                                key={color}
+                                                                type="button"
+                                                                onClick={() => handleSelectThemeColorSwatch(color)}
+                                                                title={color}
+                                                                aria-label={`Set theme color ${color}`}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    aspectRatio: '1',
+                                                                    borderRadius: '6px',
+                                                                    border: isSelected ? '2px solid #ffffff' : '2px solid rgba(255, 255, 255, 0.25)',
+                                                                    backgroundColor: color,
+                                                                    cursor: 'pointer',
+                                                                    boxShadow: isSelected ? '0 0 0 1px rgba(0, 255, 136, 0.7)' : 'none',
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <input
+                                                        type="color"
+                                                        value={currentThemeColorPreview}
+                                                        onChange={(e) => handleInputChange('themeColor', e.target.value)}
+                                                        style={{
+                                                            width: '44px',
+                                                            height: '32px',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            background: 'transparent',
+                                                            cursor: 'pointer',
+                                                            padding: 0,
+                                                        }}
+                                                    />
+                                                    <span style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+                                                        Custom color
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </Popover>
                                     </div>
 
                                     {/* Font Family */}

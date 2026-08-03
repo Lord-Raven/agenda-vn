@@ -239,7 +239,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                             animate={{ x: expandedSection === 'attribution' ? -14 : 14 }}
                                             transition={{ type: 'spring', stiffness: 320, damping: 28, mass: 0.8 }}
                                         >
-                                            {configuredTitle}
+                                            {"Agenda VN"}
                                         </motion.span>
                                     </motion.span>
                                 </span>
@@ -270,7 +270,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                                 overflowWrap: 'break-word',
                                             }}
                                         >
-                                            {`This project is powered by the ${configuredTitle} system by JakeH.`}
+                                            {`This project is powered by the Agenda VN system by JakeH, a stage that allows for the creation of generative visual novels.`}
 
                                         </div>
                                     </motion.div>
