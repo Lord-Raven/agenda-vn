@@ -51,11 +51,6 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                         zIndex: 1000,
                         padding: '10px 20px 30px',
                     }}
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) {
-                            onClose();
-                        }
-                    }}
                 >
                     <motion.div
                         initial={{ scale: 0.9, y: 50 }}

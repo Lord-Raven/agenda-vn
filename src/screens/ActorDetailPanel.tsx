@@ -704,11 +704,7 @@ ${indent}}`;
                     height: '100%',
                 }}
             >
-                <motion.div
-                    initial={{ scale: 0.9, y: 50 }}
-                    animate={{ scale: 1, y: 0 }}
-                    exit={{ scale: 0.9, y: 50 }}
-                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                <div
                     onClick={(e) => e.stopPropagation()}
                     style={{
                         width: '100%',
@@ -1363,7 +1359,7 @@ ${indent}}`;
                             </section>
                         </div>
                     </GlassPanel>
-                </motion.div>
+                </div>
             </motion.div>
 
             {/* Confirmation Dialog */}
