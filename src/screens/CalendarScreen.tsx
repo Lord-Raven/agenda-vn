@@ -315,8 +315,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 return (
                                     <motion.div
                                         key={dateKey}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.995 }}
+                                        whileHover={{ scale: 1.05, zIndex: 1000 }}
+                                        whileTap={{ scale: 0.995, zIndex: 1000 }}
                                         style={{
                                             appearance: "none",
                                             border: 0,
@@ -325,6 +325,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             textAlign: "left",
                                             width: "100%",
                                             height: "100%",
+                                            zIndex: 1,
                                         }}
                                     >
                                         <Box
@@ -386,8 +387,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                             }}
                                                             onMouseEnter={() => setTooltip(`View event: ${eventItem.name}`, EventAvailable)}
                                                             onMouseLeave={clearTooltip}
-                                                            whileHover={{ scale: 1.01 }}
-                                                            whileTap={{ scale: 0.99 }}
+                                                            whileHover={{ scale: 1.05 }}
+                                                            whileTap={{ scale: 0.995 }}
                                                             style={{
                                                                 appearance: "none",
                                                                 border: 0,
