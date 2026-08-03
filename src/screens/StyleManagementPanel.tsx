@@ -93,6 +93,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                                     type="color"
                                     value={uiSettings[key as keyof UiSettings] as string}
                                     onChange={(e) => setUiSettings(prev => ({ ...prev, [key as keyof UiSettings]: e.target.value }))}
+                                    className="palette-color-input"
                                     style={{ width: '58px', height: '36px', border: '1px solid var(--agenda-border)', borderRadius: 8, background: 'transparent' }}
                                 />
                                 <TextInput

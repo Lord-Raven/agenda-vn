@@ -65,5 +65,8 @@ export class Location {
             const colors = ['#8ab0cc', '#89cd87', '#7a7b6b', '#b98f6e', '#2e354d'];
             this.themeColor = colors[Math.floor(Math.random() * colors.length)];
         }
+		if (!this.lightColor) {
+			this.lightColor = '#ffffff';
+		}
     }
 }
