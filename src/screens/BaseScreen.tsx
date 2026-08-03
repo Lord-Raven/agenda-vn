@@ -7,7 +7,7 @@ import { MenuScreen } from './MenuScreen';
 import { TooltipBar } from './TooltipBar';
 import { theme } from './Theme';
 import { CalendarScreen } from './CalendarScreen';
-import { SkitScreen } from './CalendarSkitScreen';
+import { SkitScreen } from './SkitScreen';
 import { LoadingScreen } from './LoadingScreen';
 
 /*

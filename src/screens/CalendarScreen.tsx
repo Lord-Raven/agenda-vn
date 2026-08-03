@@ -315,7 +315,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 return (
                                     <motion.div
                                         key={dateKey}
-                                        whileHover={{ scale: 1.01 }}
+                                        whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.995 }}
                                         style={{
                                             appearance: "none",
