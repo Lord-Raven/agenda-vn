@@ -1,13 +1,35 @@
 import React, { FC, useMemo, useState } from 'react';
-import { Stage, CalendarEvent, CalendarEventRecurrence } from '../Stage';
+import { Stage } from '../Stage';
+import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
 import { Button, GlassPanel, TextInput, Title } from './UiComponents';
 
 interface CalendarEventManagementPanelProps {
     stage: () => Stage;
 }
 
+const TIME_OF_DAY_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
+
+const formatTimeOfDay = (timeOfDay: CalendarTimeOfDay) => `${timeOfDay[0].toUpperCase()}${timeOfDay.slice(1)}`;
+
+const normalizeDuration = (duration: CalendarEvent['duration']): CalendarTimeOfDay[] => {
+    const unique = Array.from(new Set((duration || []).filter((slot): slot is CalendarTimeOfDay => TIME_OF_DAY_ORDER.includes(slot as CalendarTimeOfDay))));
+    if (unique.length === 0) {
+        return [...ALL_DAY_DURATION];
+    }
+    return unique.sort((left, right) => TIME_OF_DAY_ORDER.indexOf(left) - TIME_OF_DAY_ORDER.indexOf(right));
+};
+
+const durationSummary = (duration: CalendarTimeOfDay[]) => {
+    const slots = normalizeDuration(duration);
+    if (slots.length === 1) {
+        return formatTimeOfDay(slots[0]);
+    }
+    return `${formatTimeOfDay(slots[0])} - ${formatTimeOfDay(slots[slots.length - 1])}`;
+};
+
 const cloneEvent = (event: CalendarEvent): CalendarEvent => ({
     ...event,
+    duration: normalizeDuration(event.duration),
     actorIds: [...(event.actorIds || event.participantActorIds || [])],
     participantActorIds: [...(event.participantActorIds || event.actorIds || [])],
     recurrence: event.recurrence ? { ...event.recurrence } : undefined,
@@ -107,7 +129,22 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
         setDraft(prev => ({
             ...prev,
             ...patch,
+            duration: normalizeDuration(patch.duration ?? prev.duration),
         }));
+    };
+
+    const toggleDurationSlot = (slot: CalendarTimeOfDay) => {
+        setDraft(prev => {
+            const existing = normalizeDuration(prev.duration);
+            const nextDuration = existing.includes(slot)
+                ? existing.filter(item => item !== slot)
+                : [...existing, slot];
+
+            return {
+                ...prev,
+                duration: normalizeDuration(nextDuration),
+            };
+        });
     };
 
     const toggleActor = (actorId: string) => {
@@ -196,6 +233,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                         >
                             <div style={{ fontWeight: 700, marginBottom: 4 }}>{event.name}</div>
                             <div style={{ fontSize: '13px', color: 'var(--agenda-inactive)' }}>{event.date}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--agenda-inactive)' }}>{durationSummary(event.duration)}</div>
                             <div style={{ fontSize: '12px', color: 'var(--agenda-inactive)' }}>{recurrenceSummary(event.recurrence)}</div>
                         </button>
                     ))}
@@ -237,6 +275,31 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                                 <option key={location.id} value={location.id}>{location.name}</option>
                             ))}
                         </select>
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>
+                            Duration Slots ({durationSummary(draft.duration)})
+                        </label>
+                        <div style={{
+                            border: '1px solid var(--agenda-border)',
+                            borderRadius: 8,
+                            padding: 10,
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                            gap: '6px 10px',
+                        }}>
+                            {TIME_OF_DAY_ORDER.map(slot => (
+                                <label key={slot} style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--agenda-text-primary)' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={normalizeDuration(draft.duration).includes(slot)}
+                                        onChange={() => toggleDurationSlot(slot)}
+                                    />
+                                    {formatTimeOfDay(slot)}
+                                </label>
+                            ))}
+                        </div>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>

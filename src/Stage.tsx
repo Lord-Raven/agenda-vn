@@ -2,6 +2,7 @@ import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, findBestNameMatch, loadSupportedActor } from "./content/Actor";
+import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, Skit, SkitType } from "./content/Skit";
 import { createDefaultAtlas, getLinkedLocationLore, Location } from "./content/Location";
@@ -41,6 +42,7 @@ export type SaveType = {
     lorebook?: Lore[];
     expeditionChoices?: ExpeditionChoice[];
     currentDate?: string;
+    currentTimeOfDay?: CalendarTimeOfDay;
     upcomingEvents?: CalendarEvent[];
     agendaConfig?: {
         title: string;
@@ -143,27 +145,9 @@ const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
     },
 ];
 
-export type CalendarEvent = {
-    id: string;
-    name: string;
-    date: string; // YYYY-MM-DD
-    locationId: string;
-    actorIds: string[];
-    description: string;
-    guidance: string;
-    participantActorIds?: string[];
-    recurrence?: CalendarEventRecurrence;
-    recurrenceParentId?: string;
-    recurrenceInstanceIndex?: number;
-}
+const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
 
-export type CalendarEventRecurrenceFrequency = 'daily' | 'weekly' | 'monthly';
 
-export type CalendarEventRecurrence = {
-    frequency: CalendarEventRecurrenceFrequency;
-    interval: number;
-    untilDate: string;
-}
 
 // Represents a piece of context to be included in generative requests. Has a title and text body/array of sub-segments
 export type ContextSegment = {
@@ -421,6 +405,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             timeline: [],
             timestamp: Date.now(),
             currentDate: startingDate,
+            currentTimeOfDay: 'morning',
             upcomingEvents: [],
             agendaConfig: {
                 title: this.getConfiguration().title || 'Agenda VN',
@@ -560,8 +545,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.ensureCalendarState(save);
 
         return (save.upcomingEvents || [])
-            .filter(event => event.date >= (save.currentDate || '0000-01-01'))
-            .sort((a, b) => a.date.localeCompare(b.date));
+            .filter(event => this.isFutureEvent(event))
+            .sort((a, b) => this.compareCalendarEvents(a, b));
     }
 
     getManagedCalendarEvents(): CalendarEvent[] {
@@ -587,12 +572,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     if (leftIndex !== rightIndex) {
                         return leftIndex - rightIndex;
                     }
-                    return left.date.localeCompare(right.date);
+                    return this.compareCalendarEvents(left, right);
                 });
                 return sortedSeries[0];
             })
             .filter((event): event is CalendarEvent => Boolean(event))
-            .sort((a, b) => a.date.localeCompare(b.date));
+            .sort((a, b) => this.compareCalendarEvents(a, b));
     }
 
     createCalendarEventDraft(): CalendarEvent {
@@ -611,6 +596,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             id: this.createCalendarEventId(),
             name: 'New Event',
             date,
+            duration: [...ALL_DAY_DURATION],
             locationId: fallbackLocation?.id || '',
             actorIds,
             participantActorIds: [...actorIds],
@@ -633,7 +619,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         this.removeCalendarEventSeries(save, seriesId);
         save.upcomingEvents = [...(save.upcomingEvents || []), ...this.expandRecurringEvent(normalizedBaseEvent)]
-            .sort((a, b) => a.date.localeCompare(b.date));
+            .sort((a, b) => this.compareCalendarEvents(a, b));
         this.saveGame();
 
         return normalizedBaseEvent;
@@ -669,7 +655,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return null;
         }
 
-        save.currentDate = nextEvent.date;
+        this.advanceCalendarAfterEvent(save, nextEvent);
         save.timeline.push({
             calendarEventId: nextEvent.id,
             date: nextEvent.date,
@@ -704,7 +690,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             summary: '',
         });
 
-        save.currentDate = selectedEvent.date;
+        this.advanceCalendarAfterEvent(save, selectedEvent);
         if (!save.timeline) {
             save.timeline = [];
         }
@@ -830,6 +816,81 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         });
     }
 
+    private normalizeCalendarTimeOfDay(value: unknown): CalendarTimeOfDay | undefined {
+        const normalized = `${value || ''}`.trim().toLowerCase();
+        if (normalized === 'morning' || normalized === 'afternoon' || normalized === 'evening' || normalized === 'night') {
+            return normalized;
+        }
+        return undefined;
+    }
+
+    private calendarTimeOrder(timeOfDay?: CalendarTimeOfDay): number {
+        const resolved = this.normalizeCalendarTimeOfDay(timeOfDay) || 'morning';
+        const index = CALENDAR_TIME_ORDER.indexOf(resolved);
+        return index >= 0 ? index : 0;
+    }
+
+    private normalizeCalendarEventDuration(duration: unknown): CalendarTimeOfDay[] {
+        const candidateSlots = Array.isArray(duration)
+            ? duration
+            : typeof duration === 'string'
+                ? duration.split(',')
+                : [];
+        const normalizedSlots = Array.from(new Set(
+            candidateSlots
+                .map((slot) => this.normalizeCalendarTimeOfDay(slot))
+                .filter((slot): slot is CalendarTimeOfDay => Boolean(slot)),
+        ));
+
+        if (normalizedSlots.length === 0) {
+            return [...ALL_DAY_DURATION];
+        }
+
+        return normalizedSlots.sort((left, right) => this.calendarTimeOrder(left) - this.calendarTimeOrder(right));
+    }
+
+    private getEventStartTimeOfDay(event: CalendarEvent): CalendarTimeOfDay {
+        return this.normalizeCalendarEventDuration(event.duration)[0] || 'morning';
+    }
+
+    private getEventEndTimeOfDay(event: CalendarEvent): CalendarTimeOfDay {
+        const duration = this.normalizeCalendarEventDuration(event.duration);
+        return duration[duration.length - 1] || 'evening';
+    }
+
+    private getNextTimeOfDay(timeOfDay: CalendarTimeOfDay): CalendarTimeOfDay {
+        const index = this.calendarTimeOrder(timeOfDay);
+        return CALENDAR_TIME_ORDER[Math.min(index + 1, CALENDAR_TIME_ORDER.length - 1)];
+    }
+
+    private compareCalendarEvents(left: CalendarEvent, right: CalendarEvent): number {
+        const dateCompare = `${left.date || ''}`.localeCompare(`${right.date || ''}`);
+        if (dateCompare !== 0) {
+            return dateCompare;
+        }
+
+        const timeCompare = this.calendarTimeOrder(this.getEventStartTimeOfDay(left)) - this.calendarTimeOrder(this.getEventStartTimeOfDay(right));
+        if (timeCompare !== 0) {
+            return timeCompare;
+        }
+
+        return `${left.id || ''}`.localeCompare(`${right.id || ''}`);
+    }
+
+    private advanceCalendarAfterEvent(save: SaveType, event: CalendarEvent) {
+        const eventDate = `${event.date || ''}`.trim() || save.currentDate || this.getStartingDate(save);
+        const endingTimeOfDay = this.getEventEndTimeOfDay(event);
+
+        if (endingTimeOfDay === 'night') {
+            save.currentDate = this.addDays(eventDate, 1);
+            save.currentTimeOfDay = 'morning';
+            return;
+        }
+
+        save.currentDate = eventDate;
+        save.currentTimeOfDay = this.getNextTimeOfDay(endingTimeOfDay);
+    }
+
     private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType): CalendarEvent {
         const allLocations = Object.values(save.atlas || {});
         const fallbackLocationId = allLocations[0]?.id || '';
@@ -852,6 +913,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             id: `${event.id || this.createCalendarEventId()}`,
             name,
             date,
+            duration: this.normalizeCalendarEventDuration(event.duration),
             locationId,
             actorIds,
             participantActorIds: [...actorIds],
@@ -1007,6 +1069,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
             name: eventName,
             date: resolvedDate,
+            duration: this.normalizeCalendarEventDuration(source.duration ?? source.Duration ?? source.timeOfDay ?? source.TimeOfDay),
             locationId: matchedLocation.id,
             actorIds,
             participantActorIds: [...actorIds],
@@ -1046,6 +1109,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private ensureCalendarState(save: SaveType) {
 
+        if (!save.currentDate) {
+            save.currentDate = this.getStartingDate(save);
+        }
+
+        save.currentTimeOfDay = this.normalizeCalendarTimeOfDay(save.currentTimeOfDay) || 'morning';
+
         if (!save.upcomingEvents) {
             save.upcomingEvents = [];
         }
@@ -1054,6 +1123,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             ...event,
             actorIds: event.actorIds || event.participantActorIds || [],
             participantActorIds: event.participantActorIds || event.actorIds || [],
+            duration: this.normalizeCalendarEventDuration(event.duration),
             description: event.description || event.guidance || `${event.name} at ${save.atlas[event.locationId]?.name || 'an unknown location'}.`,
             guidance: event.guidance || event.description || event.name,
             recurrence: this.normalizeCalendarEventRecurrence(event.recurrence, event.date),
@@ -1165,6 +1235,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${i}`,
                 name: eventName,
                 date: dateCursor,
+                duration: [...ALL_DAY_DURATION],
                 locationId: location.id,
                 actorIds: participants.map(actor => actor.id),
                 participantActorIds: participants.map(actor => actor.id),
@@ -1179,7 +1250,22 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private isFutureEvent(event: CalendarEvent): boolean {
         const save = this.getSave();
         const currentDate = save.currentDate || this.getStartingDate(save);
-        return `${event.date || ''}`.trim() >= currentDate;
+        const eventDate = `${event.date || ''}`.trim();
+        if (!eventDate) {
+            return false;
+        }
+
+        if (eventDate > currentDate) {
+            return true;
+        }
+
+        if (eventDate < currentDate) {
+            return false;
+        }
+
+        const currentTimeOrder = this.calendarTimeOrder(save.currentTimeOfDay || 'morning');
+        const eventStartTimeOrder = this.calendarTimeOrder(this.getEventStartTimeOfDay(event));
+        return eventStartTimeOrder >= currentTimeOrder;
     }
 
     async rebuildUpcomingEvents(save: SaveType = this.getSave(), targetEventCount: number = 6): Promise<CalendarEvent[]> {
@@ -1187,13 +1273,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const existingUpcomingEvents = (save.upcomingEvents || [])
             .filter(event => this.isFutureEvent(event))
-            .sort((a, b) => a.date.localeCompare(b.date));
+            .sort((a, b) => this.compareCalendarEvents(a, b));
 
         const neededEventCount = Math.max(targetEventCount - existingUpcomingEvents.length, 0);
         const newEvents = neededEventCount > 0 ? this.createCalendarEvents(save, neededEventCount) : [];
 
         save.upcomingEvents = [...existingUpcomingEvents, ...newEvents]
-            .sort((a, b) => a.date.localeCompare(b.date));
+            .sort((a, b) => this.compareCalendarEvents(a, b));
         this.saveGame();
 
         return save.upcomingEvents;
@@ -1246,8 +1332,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const currentSkit = this.getCurrentSkit();
         if (currentSkit) {
             currentSkit.over = true;
-            // Set current date to the next date on which an event occurs (if there is one)
-            save.currentDate = this.getUpcomingEvents()[0]?.date || save.currentDate;
         }
 
         // This is where various outcomes of the skit are processed and applied to the save state

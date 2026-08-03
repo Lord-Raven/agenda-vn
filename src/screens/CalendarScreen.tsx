@@ -1,5 +1,5 @@
 import { FC, useEffect, useMemo, useState } from "react";
-import type { CalendarEvent, CalendarEventRecurrence } from "../Stage";
+import type { CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from "../content/CalendarEvent";
 import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { Box, Typography } from "@mui/material";
@@ -20,6 +20,7 @@ const CALENDAR_BACKGROUND_IMAGE = "https://avatars.charhub.io/avatars/uploads/im
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const CALENDAR_ROW_COUNT = 6;
 const MAX_EVENT_LINES_PER_DAY = 3;
+const TIME_OF_DAY_ORDER: CalendarTimeOfDay[] = ["morning", "afternoon", "evening", "night"];
 
 const parseDateKey = (dateText: string) => new Date(`${dateText}T00:00:00Z`);
 
@@ -72,6 +73,29 @@ const formatRecurrenceSummary = (recurrence?: CalendarEventRecurrence | null) =>
     return `Repeats every ${interval} ${unit} until ${formatDate(recurrence.untilDate)}`;
 };
 
+const formatTimeOfDay = (timeOfDay: CalendarTimeOfDay) => `${timeOfDay[0].toUpperCase()}${timeOfDay.slice(1)}`;
+
+const getDurationSlots = (event: CalendarEvent) => {
+    const unique = Array.from(new Set((event.duration || []).filter((slot): slot is CalendarTimeOfDay => TIME_OF_DAY_ORDER.includes(slot as CalendarTimeOfDay))));
+    return unique.sort((left, right) => TIME_OF_DAY_ORDER.indexOf(left) - TIME_OF_DAY_ORDER.indexOf(right));
+};
+
+const getEventStartSlotIndex = (event: CalendarEvent) => {
+    const first = getDurationSlots(event)[0] || 'morning';
+    return TIME_OF_DAY_ORDER.indexOf(first);
+};
+
+const formatDurationSummary = (event: CalendarEvent) => {
+    const slots = getDurationSlots(event);
+    if (slots.length === 0) {
+        return "All Day";
+    }
+    if (slots.length === 1) {
+        return formatTimeOfDay(slots[0]);
+    }
+    return `${formatTimeOfDay(slots[0])} - ${formatTimeOfDay(slots[slots.length - 1])}`;
+};
+
 const buildMonthGrid = (monthDate: Date) => {
     const monthStart = startOfMonth(monthDate);
     const leadingDays = monthStart.getUTCDay();
@@ -83,6 +107,7 @@ const buildMonthGrid = (monthDate: Date) => {
 const groupEventsByDate = (events: CalendarEvent[]) => events.reduce((grouped, event) => {
     const bucket = grouped.get(event.date) || [];
     bucket.push(event);
+    bucket.sort((left, right) => getEventStartSlotIndex(left) - getEventStartSlotIndex(right));
     grouped.set(event.date, bucket);
     return grouped;
 }, new Map<string, CalendarEvent[]>());
@@ -94,12 +119,11 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const currentDateKey = save.currentDate || formatDateKey(new Date());
+    const currentTimeOfDay = save.currentTimeOfDay || 'morning';
 
     const allEvents = useMemo(
-        () => [...(save.upcomingEvents || [])]
-            .filter((event) => (event.date || "") >= currentDateKey)
-            .sort((left, right) => left.date.localeCompare(right.date)),
-        [save.upcomingEvents, currentDateKey],
+        () => [...stageInstance.getUpcomingEvents()],
+        [save.upcomingEvents, save.currentDate, save.currentTimeOfDay, stageInstance],
     );
     const upcomingEvents = useMemo(
         () => allEvents,
@@ -108,6 +132,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     // In this screen, "today" is anchored to the next event date to match narrative progression.
     const todayDateKey = upcomingEvents[0]?.date || currentDateKey;
     const todayDate = parseDateKey(todayDateKey);
+    const nextEventId = upcomingEvents[0]?.id;
 
     const [viewMonth, setViewMonth] = useState(() => startOfMonth(todayDate));
     const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
@@ -204,7 +229,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                         <Button
                             variant="primary"
                             onClick={skipEvent}
-                            onMouseEnter={() => setTooltip("Skip to the next event date", EventBusy)}
+                            onMouseEnter={() => setTooltip("Skip to the next available time slot", EventBusy)}
                             onMouseLeave={clearTooltip}
                             style={{ padding: "10px 14px" }}
                         >
@@ -226,6 +251,10 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 }}
                             >
                                 {formatMonthLabel(viewMonth)}
+                            </Typography>
+
+                            <Typography sx={{ color: "var(--agenda-inactive)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
+                                Current Time: {formatTimeOfDay(currentTimeOfDay)}
                             </Typography>
 
                             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, opacity: 0.82 }}>
@@ -487,7 +516,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                         WebkitTextStroke: `0.6px ${leadActor?.themeColor || "rgba(12, 18, 28, 0.95)"}`,
                                                                     }}
                                                                 >
-                                                                    {eventItem.recurrence ? "↻ " : ""}{eventItem.name}
+                                                                    {eventItem.recurrence ? "↻ " : ""}{eventItem.name} · {formatDurationSummary(eventItem)}
                                                                 </Typography>
                                                             </Box>
                                                         </motion.button>
@@ -537,7 +566,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             {detailEvent.name}
                                         </Typography>
                                         <Typography sx={{ color: "rgba(185, 210, 227, 0.9)", fontSize: "0.88rem" }}>
-                                            {formatDate(detailEvent.date)} · {save.atlas[detailEvent.locationId]?.name || "Unknown Location"}
+                                            {formatDate(detailEvent.date)} · {formatDurationSummary(detailEvent)} · {save.atlas[detailEvent.locationId]?.name || "Unknown Location"}
                                         </Typography>
                                     </Box>
                                     <Typography sx={{ color: "var(--agenda-active)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
@@ -593,7 +622,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 </Box>
 
                                 <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap" }}>
-                                    {detailEvent.date === todayDateKey && (
+                                    {detailEvent.id === nextEventId && (
                                         <Button
                                             variant="primary"
                                             onClick={() => openEvent(detailEvent.id)}
