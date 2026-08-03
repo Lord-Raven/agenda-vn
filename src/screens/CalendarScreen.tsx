@@ -111,6 +111,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
     const [viewMonth, setViewMonth] = useState(() => startOfMonth(todayDate));
     const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
+    const [activeDateKey, setActiveDateKey] = useState<string | null>(null);
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
@@ -313,12 +314,15 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 const isToday = isSameDate(cellDate, todayDate);
                                 const cellEvents = eventsByDate.get(dateKey) || [];
                                 const hasEvents = cellEvents.length > 0;
+                                const isActiveDate = hasEvents && activeDateKey === dateKey;
 
                                 return (
                                     <motion.div
                                         key={dateKey}
-                                        whileHover={hasEvents ? { scale: 1.05, zIndex: 1000 } : undefined}
-                                        whileTap={hasEvents ? { scale: 0.995, zIndex: 1000 } : undefined}
+                                        onHoverStart={hasEvents ? () => setActiveDateKey(dateKey) : undefined}
+                                        onFocusCapture={hasEvents ? () => setActiveDateKey(dateKey) : undefined}
+                                        whileHover={hasEvents ? { scale: 1.05 } : undefined}
+                                        whileTap={hasEvents ? { scale: 0.995 } : undefined}
                                         style={{
                                             appearance: "none",
                                             border: 0,
@@ -327,7 +331,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             textAlign: "left",
                                             width: "100%",
                                             height: "100%",
-                                            zIndex: 1,
+                                            zIndex: isActiveDate ? 4 : 1,
                                             position: "relative",
                                             transformOrigin: "center",
                                             cursor: hasEvents ? "pointer" : "default",
@@ -356,11 +360,29 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                 padding: "10px",
                                                 overflow: "hidden",
                                                 position: "relative",
+                                                zIndex: 0,
+                                                "&::before": hasEvents
+                                                    ? {
+                                                        content: '""',
+                                                        position: "absolute",
+                                                        inset: isActiveDate ? "-1px" : "0px",
+                                                        background: isCurrentMonth
+                                                            ? "linear-gradient(178deg, rgba(46, 53, 77, 0.98), rgba(28, 34, 52, 0.96))"
+                                                            : "rgba(18, 24, 38, 0.96)",
+                                                        border: "1px solid var(--agenda-calendar-card-border)",
+                                                        opacity: isActiveDate ? 1 : 0,
+                                                        transition: "opacity 180ms ease",
+                                                        pointerEvents: "none",
+                                                        zIndex: 0,
+                                                    }
+                                                    : undefined,
                                             }}
                                         >
                                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 1 }}>
                                                 <Typography
                                                     sx={{
+                                                        position: "relative",
+                                                        zIndex: 1,
                                                         color: isToday ? "var(--agenda-active)" : "var(--agenda-primary)",
                                                         fontWeight: 700,
                                                         fontSize: { xs: "0.82rem", md: "0.92rem" },
@@ -369,13 +391,13 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                     {cellDate.getUTCDate()}
                                                 </Typography>
                                                 {isToday && (
-                                                    <Typography sx={{ color: "var(--agenda-active)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                                                    <Typography sx={{ position: "relative", zIndex: 1, color: "var(--agenda-active)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>
                                                         Today
                                                     </Typography>
                                                 )}
                                             </Box>
 
-                                            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, overflow: "hidden" }}>
+                                            <Box sx={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 0.5, overflow: "hidden" }}>
                                                 {cellEvents.slice(0, MAX_EVENT_LINES_PER_DAY).map((eventItem) => {
                                                     const participants = (eventItem.actorIds || eventItem.participantActorIds || [])
                                                         .map((actorId) => save.actors[actorId])

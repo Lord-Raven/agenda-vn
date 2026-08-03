@@ -318,13 +318,11 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                     <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Title Image Prompt</label>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'start' }}>
-                            <textarea
-                                className="input-base"
+                            <TextInput
+                                fullWidth
                                 value={titleImagePrompt}
                                 onChange={(e) => setTitleImagePrompt(e.target.value)}
-                                rows={3}
                                 placeholder="Describe the title image style, atmosphere, and composition."
-                                style={{ width: '100%', resize: 'vertical' }}
                             />
                             <Button
                                 variant="secondary"
