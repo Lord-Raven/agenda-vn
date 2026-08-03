@@ -8,7 +8,7 @@ import React, { FC, ReactNode } from 'react';
 import { Actor } from '../content/Actor';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HourglassTop, HourglassBottom } from '@mui/icons-material';
-import { Box, lighten, Chip as MuiChip, Typography } from '@mui/material';
+import { Box, lighten, Chip as MuiChip, Popover, Typography } from '@mui/material';
 import { useTooltip } from './TooltipContext';
 
 /* ===============================================
@@ -289,6 +289,199 @@ export const TextInput: FC<TextInputProps> = ({
 			}}
 			{...props}
 		/>
+	);
+};
+
+interface ColorPickerInputProps {
+	value: string;
+	onChange: (value: string) => void;
+	placeholder?: string;
+	swatches?: readonly string[];
+	fallbackColor?: string;
+	popoverTitle?: string;
+	inputStyle?: React.CSSProperties;
+	containerStyle?: React.CSSProperties;
+	swatchButtonStyle?: React.CSSProperties;
+}
+
+const DEFAULT_COLOR_SWATCHES = [
+	'#8ab0cc',
+	'#89cd87',
+	'#e3c77d',
+	'#c89eb8',
+	'#7ddad7',
+	'#f08f6b',
+	'#6f88d9',
+	'#d96f91',
+	'#f2f2f2',
+	'#7a7b6b',
+] as const;
+
+export const normalizeHexColor = (value: string): string | null => {
+	const trimmed = value.trim();
+	if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+		return trimmed;
+	}
+
+	if (/^#[0-9a-fA-F]{3}$/.test(trimmed)) {
+		const [r, g, b] = trimmed.slice(1);
+		return `#${r}${r}${g}${g}${b}${b}`;
+	}
+
+	return null;
+};
+
+export const buildHexColorSwatches = (
+	preferred: Array<string | null | undefined>,
+	fallback: readonly string[] = DEFAULT_COLOR_SWATCHES,
+	max = 10,
+): string[] => {
+	const unique = new Set<string>();
+	const merged = [...preferred, ...fallback];
+	const result: string[] = [];
+
+	for (const color of merged) {
+		if (!color) {
+			continue;
+		}
+
+		const normalized = normalizeHexColor(color);
+		if (!normalized) {
+			continue;
+		}
+
+		const key = normalized.toLowerCase();
+		if (!unique.has(key)) {
+			unique.add(key);
+			result.push(normalized);
+		}
+
+		if (result.length >= max) {
+			break;
+		}
+	}
+
+	return result;
+};
+
+export const ColorPickerInput: FC<ColorPickerInputProps> = ({
+	value,
+	onChange,
+	placeholder = '#RRGGBB',
+	swatches = DEFAULT_COLOR_SWATCHES,
+	fallbackColor = '#8ab0cc',
+	popoverTitle = 'Choose color',
+	inputStyle,
+	containerStyle,
+	swatchButtonStyle,
+}) => {
+	const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
+	const normalizedColor = normalizeHexColor(value);
+	const previewColor = normalizedColor || fallbackColor;
+	const isPopoverOpen = Boolean(anchorEl);
+	const displaySwatches = buildHexColorSwatches([...swatches], DEFAULT_COLOR_SWATCHES, 10);
+
+	return (
+		<>
+			<div style={{ display: 'flex', gap: '10px', alignItems: 'center', ...containerStyle }}>
+				<TextInput
+					value={value}
+					onChange={(e) => onChange(e.target.value)}
+					placeholder={placeholder}
+					style={{ flex: 1, ...inputStyle }}
+				/>
+				<button
+					type="button"
+					onClick={(event) => setAnchorEl(event.currentTarget)}
+					aria-label="Open color picker"
+					title="Open color picker"
+					style={{
+						width: '50px',
+						height: '38px',
+						backgroundColor: previewColor,
+						border: '2px solid rgba(0, 255, 136, 0.3)',
+						borderRadius: '5px',
+						cursor: 'pointer',
+						padding: 0,
+						...swatchButtonStyle,
+					}}
+				/>
+			</div>
+			<Popover
+				open={isPopoverOpen}
+				anchorEl={anchorEl}
+				onClose={() => setAnchorEl(null)}
+				anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+				transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+				slotProps={{
+					paper: {
+						style: {
+							marginTop: '8px',
+							backgroundColor: 'rgba(0, 20, 40, 0.95)',
+							border: '2px solid rgba(0, 255, 136, 0.3)',
+							borderRadius: '8px',
+							color: '#e0f0ff',
+							minWidth: '260px',
+							padding: '12px',
+						},
+					},
+				}}
+			>
+				<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+					<div style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+						{popoverTitle}
+					</div>
+					<div
+						style={{
+							display: 'grid',
+							gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+							gap: '8px',
+						}}
+					>
+						{displaySwatches.map((color) => {
+							const isSelected = normalizedColor?.toLowerCase() === color.toLowerCase();
+							return (
+								<button
+									key={color}
+									type="button"
+									onClick={() => onChange(color)}
+									title={color}
+									aria-label={`Set color ${color}`}
+									style={{
+										width: '100%',
+										aspectRatio: '1',
+										borderRadius: '6px',
+										border: isSelected ? '2px solid #ffffff' : '2px solid rgba(255, 255, 255, 0.25)',
+										backgroundColor: color,
+										cursor: 'pointer',
+										boxShadow: isSelected ? '0 0 0 1px rgba(0, 255, 136, 0.7)' : 'none',
+									}}
+								/>
+							);
+						})}
+					</div>
+					<div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+						<input
+							type="color"
+							value={previewColor}
+							onChange={(e) => onChange(e.target.value)}
+							style={{
+								width: '44px',
+								height: '32px',
+								border: 'none',
+								borderRadius: '4px',
+								background: 'transparent',
+								cursor: 'pointer',
+								padding: 0,
+							}}
+						/>
+						<span style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+							Custom color
+						</span>
+					</div>
+				</div>
+			</Popover>
+		</>
 	);
 };
 

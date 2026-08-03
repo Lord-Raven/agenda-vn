@@ -1,6 +1,6 @@
-import React, { FC, useState } from 'react';
+import React, { FC, useMemo, useState } from 'react';
 import { Stage, UiSettings } from '../Stage';
-import { Button, GlassPanel, TextInput, Title } from './UiComponents';
+import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
 
 interface StyleManagementPanelProps {
     stage: () => Stage;
@@ -34,6 +34,59 @@ const applyUiSettingsToRoot = (uiSettings: UiSettings) => {
 export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) => {
     const stageInstance = stage();
     const [uiSettings, setUiSettings] = useState<UiSettings>(() => ({ ...stageInstance.getUiSettings() }));
+
+    const styleColorFields: Array<{ label: string; key: keyof UiSettings }> = [
+        { label: 'Primary Text', key: 'primaryColor' },
+        { label: 'Secondary Text', key: 'inactiveColor' },
+        { label: 'Active Text', key: 'activeColor' },
+        { label: 'Accent Text', key: 'accentColor' },
+        { label: 'Background Deep', key: 'bgDeepColor' },
+        { label: 'Background Mid', key: 'bgMidColor' },
+        { label: 'Background Soft', key: 'bgSoftColor' },
+    ];
+
+    const groupedStyleSwatches = useMemo(() => ({
+        text: buildHexColorSwatches([
+            uiSettings.primaryColor,
+            uiSettings.inactiveColor,
+            uiSettings.activeColor,
+            uiSettings.accentColor,
+        ]),
+        background: buildHexColorSwatches([
+            uiSettings.bgDeepColor,
+            uiSettings.bgMidColor,
+            uiSettings.bgSoftColor,
+        ]),
+        all: buildHexColorSwatches([
+            uiSettings.primaryColor,
+            uiSettings.inactiveColor,
+            uiSettings.activeColor,
+            uiSettings.accentColor,
+            uiSettings.bgDeepColor,
+            uiSettings.bgMidColor,
+            uiSettings.bgSoftColor,
+        ]),
+    }), [
+        uiSettings.activeColor,
+        uiSettings.accentColor,
+        uiSettings.bgDeepColor,
+        uiSettings.bgMidColor,
+        uiSettings.bgSoftColor,
+        uiSettings.inactiveColor,
+        uiSettings.primaryColor,
+    ]);
+
+    const getSwatchesForStyleKey = (key: keyof UiSettings): string[] => {
+        if (key === 'primaryColor' || key === 'inactiveColor' || key === 'activeColor' || key === 'accentColor') {
+            return groupedStyleSwatches.text;
+        }
+
+        if (key === 'bgDeepColor' || key === 'bgMidColor' || key === 'bgSoftColor') {
+            return groupedStyleSwatches.background;
+        }
+
+        return groupedStyleSwatches.all;
+    };
 
     const saveStyleSettings = () => {
         stageInstance.updateUiSettings(uiSettings);
@@ -77,31 +130,16 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                         />
                     </div>
 
-                    {[
-                        ['Primary Text', 'primaryColor'],
-                        ['Secondary Text', 'inactiveColor'],
-                        ['Active Text', 'activeColor'],
-                        ['Accent Text', 'accentColor'],
-                        ['Background Deep', 'bgDeepColor'],
-                        ['Background Mid', 'bgMidColor'],
-                        ['Background Soft', 'bgSoftColor'],
-                    ].map(([label, key]) => (
-                        <div key={key as keyof UiSettings}>
+                    {styleColorFields.map(({ label, key }) => (
+                        <div key={key}>
                             <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>{label}</label>
-                            <div style={{ display: 'grid', gridTemplateColumns: '58px 1fr', gap: '8px', alignItems: 'center' }}>
-                                <input
-                                    type="color"
-                                    value={uiSettings[key as keyof UiSettings] as string}
-                                    onChange={(e) => setUiSettings(prev => ({ ...prev, [key as keyof UiSettings]: e.target.value }))}
-                                    className="palette-color-input"
-                                    style={{ width: '58px', height: '36px', border: '1px solid var(--agenda-border)', borderRadius: 8, background: 'transparent' }}
-                                />
-                                <TextInput
-                                    fullWidth
-                                    value={uiSettings[key as keyof UiSettings] as string}
-                                    onChange={(e) => setUiSettings(prev => ({ ...prev, [key as keyof UiSettings]: e.target.value }))}
-                                />
-                            </div>
+                            <ColorPickerInput
+                                value={uiSettings[key] as string}
+                                onChange={(value) => setUiSettings(prev => ({ ...prev, [key]: value }))}
+                                popoverTitle={`Choose ${label}`}
+                                swatches={getSwatchesForStyleKey(key)}
+                                inputStyle={{ width: '100%' }}
+                            />
                         </div>
                     ))}
 

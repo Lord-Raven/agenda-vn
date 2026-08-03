@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
 import { getLocationDescription, Location, updateLocationDescription } from '../content/Location';
 import { Image as ImageIcon, Place } from '@mui/icons-material';
-import { Button, GlassPanel, TextInput, Title } from './UiComponents';
+import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
 
 interface LocationDetailPanelProps {
     location: Location;
@@ -206,6 +206,48 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         opacity: 0.9,
     };
 
+    const locationThemeColorSwatches = useMemo(() => {
+        const locations = Object.values(stage().getSave().atlas || {});
+        const targetCategory = (editedLocation.category || '').trim().toLowerCase();
+
+        const sameCategoryThemeColors = locations
+            .filter((candidate) => candidate.id !== location.id)
+            .filter((candidate) => (candidate.category || '').trim().toLowerCase() === targetCategory)
+            .map((candidate) => candidate.themeColor);
+
+        const otherThemeColors = locations
+            .filter((candidate) => candidate.id !== location.id)
+            .filter((candidate) => (candidate.category || '').trim().toLowerCase() !== targetCategory)
+            .map((candidate) => candidate.themeColor);
+
+        return buildHexColorSwatches([
+            editedLocation.themeColor,
+            ...sameCategoryThemeColors,
+            ...otherThemeColors,
+        ]);
+    }, [editedLocation.category, editedLocation.themeColor, location.id, stage]);
+
+    const locationLightColorSwatches = useMemo(() => {
+        const locations = Object.values(stage().getSave().atlas || {});
+        const targetCategory = (editedLocation.category || '').trim().toLowerCase();
+
+        const sameCategoryLightColors = locations
+            .filter((candidate) => candidate.id !== location.id)
+            .filter((candidate) => (candidate.category || '').trim().toLowerCase() === targetCategory)
+            .map((candidate) => candidate.lightColor);
+
+        const otherLightColors = locations
+            .filter((candidate) => candidate.id !== location.id)
+            .filter((candidate) => (candidate.category || '').trim().toLowerCase() !== targetCategory)
+            .map((candidate) => candidate.lightColor);
+
+        return buildHexColorSwatches([
+            editedLocation.lightColor,
+            ...sameCategoryLightColors,
+            ...otherLightColors,
+        ]);
+    }, [editedLocation.category, editedLocation.lightColor, location.id, stage]);
+
     return (
         <AnimatePresence>
             <motion.div
@@ -317,43 +359,25 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                     <div>
                                         <label style={labelStyle}>Theme Color</label>
-                                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                            <TextInput
-                                                value={editedLocation.themeColor}
-                                                onChange={(e) => handleInputChange('themeColor', e.target.value)}
-                                                placeholder="#RRGGBB"
-                                                style={{ flex: 1 }}
-                                            />
-                                            <div
-                                                style={{
-                                                    width: '50px',
-                                                    height: '38px',
-                                                    backgroundColor: editedLocation.themeColor,
-                                                    border: '2px solid rgba(0, 255, 136, 0.3)',
-                                                    borderRadius: '5px',
-                                                }}
-                                            />
-                                        </div>
+                                        <ColorPickerInput
+                                            value={editedLocation.themeColor}
+                                            onChange={(value) => handleInputChange('themeColor', value)}
+                                            placeholder="#RRGGBB"
+                                            popoverTitle="Choose theme color"
+                                            swatches={locationThemeColorSwatches}
+                                            inputStyle={{ flex: 1 }}
+                                        />
                                     </div>
                                     <div>
                                         <label style={labelStyle}>Light Color</label>
-                                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                            <TextInput
-                                                value={editedLocation.lightColor}
-                                                onChange={(e) => handleInputChange('lightColor', e.target.value)}
-                                                placeholder="#RRGGBB"
-                                                style={{ flex: 1 }}
-                                            />
-                                            <div
-                                                style={{
-                                                    width: '50px',
-                                                    height: '38px',
-                                                    backgroundColor: editedLocation.lightColor,
-                                                    border: '2px solid rgba(0, 255, 136, 0.3)',
-                                                    borderRadius: '5px',
-                                                }}
-                                            />
-                                        </div>
+                                        <ColorPickerInput
+                                            value={editedLocation.lightColor}
+                                            onChange={(value) => handleInputChange('lightColor', value)}
+                                            placeholder="#RRGGBB"
+                                            popoverTitle="Choose light color"
+                                            swatches={locationLightColorSwatches}
+                                            inputStyle={{ flex: 1 }}
+                                        />
                                     </div>
                                 </div>
                             </section>
