@@ -191,7 +191,10 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.3, duration: 0.5 }}
-                        style={{ marginBottom: 'clamp(18px, 3vh, 28px)' }}
+                        style={{
+                            marginBottom: 'clamp(18px, 3vh, 28px)',
+                            marginInline: 'clamp(-14px, -2.8vw, -24px)',
+                        }}
                     >
                         {configuredTitleImageUrl ? (
                             <motion.img
@@ -202,9 +205,9 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                 alt={configuredTitle}
                                 style={{
                                     display: 'block',
-                                    width: '100%',
-                                    maxWidth: 'min(520px, 90vw)',
-                                    maxHeight: '240px',
+                                    width: 'calc(100% + clamp(28px, 5.6vw, 48px))',
+                                    maxWidth: 'min(580px, 94vw)',
+                                    maxHeight: 'min(320px, 36vh)',
                                     objectFit: 'contain',
                                     margin: '0 auto',
                                     filter: 'drop-shadow(0 10px 28px rgba(0, 0, 0, 0.32))',
