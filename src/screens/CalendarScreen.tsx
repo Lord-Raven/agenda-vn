@@ -302,7 +302,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 border: "1px solid var(--agenda-calendar-card-border)",
                                 borderTop: 0,
                                 borderRadius: "0 0 12px 12px",
-                                overflow: "hidden",
+                                overflow: "visible",
+                                isolation: "isolate",
                                 background: "var(--agenda-calendar-card-bg)",
                             }}
                         >
@@ -311,12 +312,13 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 const isCurrentMonth = cellDate.getUTCMonth() === viewMonth.getUTCMonth();
                                 const isToday = isSameDate(cellDate, todayDate);
                                 const cellEvents = eventsByDate.get(dateKey) || [];
+                                const hasEvents = cellEvents.length > 0;
 
                                 return (
                                     <motion.div
                                         key={dateKey}
-                                        whileHover={{ scale: 1.05, zIndex: 1000 }}
-                                        whileTap={{ scale: 0.995, zIndex: 1000 }}
+                                        whileHover={hasEvents ? { scale: 1.05, zIndex: 1000 } : undefined}
+                                        whileTap={hasEvents ? { scale: 0.995, zIndex: 1000 } : undefined}
                                         style={{
                                             appearance: "none",
                                             border: 0,
@@ -326,6 +328,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             width: "100%",
                                             height: "100%",
                                             zIndex: 1,
+                                            position: "relative",
+                                            transformOrigin: "center",
+                                            cursor: hasEvents ? "pointer" : "default",
                                         }}
                                     >
                                         <Box
