@@ -108,7 +108,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                     >
                         {currentSkit.initialLocationId
                             ? (stage().getSave().atlas[currentSkit.initialLocationId]?.name || currentSkit.initialLocationId)
-                            : (stage().getUiSettings().gameTitle || "Agenda VN")}
+                            : (stage().getConfiguration().title || "Agenda VN")}
                     </Typography>
                 </Box>
 
