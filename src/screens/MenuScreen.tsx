@@ -174,7 +174,6 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                     transition={{ delay: 0.25, duration: 0.45 }}
                     style={{
                         width: 'min(580px, 94vw)',
-                        transform: 'translateX(clamp(-12px, -1.8vw, -6px))',
                         zIndex: 10,
                     }}
                 >
