@@ -1,6 +1,8 @@
 import React, { FC, useMemo, useState } from 'react';
+import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { ActorStat, ContextSegment, CustomSetting, Stage } from '../Stage';
 import { Button, GlassPanel, TextInput, Title } from './UiComponents';
+import { ImageUrlUploadField } from './ImageUrlUploadField';
 
 interface GameManagementPanelProps {
     stage: () => Stage;
@@ -79,6 +81,11 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const save = stageInstance.getSave();
     const configuration = stageInstance.getConfiguration();
 
+    const [title, setTitle] = useState<string>(() => configuration.title || '');
+    const [titleImageUrl, setTitleImageUrl] = useState<string>(() => configuration.titleImageUrl || '');
+    const [titleImagePrompt, setTitleImagePrompt] = useState<string>(() => configuration.titleImagePrompt || '');
+    const [isUploadingTitleImage, setIsUploadingTitleImage] = useState(false);
+    const [isGeneratingTitleImage, setIsGeneratingTitleImage] = useState(false);
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
     const [contextSegments, setContextSegments] = useState<ContextSegment[]>(() =>
         (configuration.context || []).map(cloneSegment),
@@ -113,15 +120,22 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             context: contextSegments,
             settings: customSettings,
             actorStats,
+            title,
+            titleImageUrl,
+            titleImagePrompt: titleImagePrompt,
             startingDate,
         });
 
         const currentSave = stageInstance.getSave();
         currentSave.agendaConfig = {
+            title: title,
+            titleImageUrl: titleImageUrl,
+            titleImagePrompt: titleImagePrompt,
             context: contextSegments.map(cloneSegment),
             settings: customSettings.map(cloneSetting),
             selectedSettings: validSelections,
             actorStats: actorStats.map(cloneActorStat),
+            startingDate: startingDate,
         };
 
         const statNames = new Set(actorStats.map(stat => stat.name.trim()).filter(Boolean));
@@ -149,6 +163,48 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         });
 
         stageInstance.saveGame();
+    };
+
+    const handleTitleImageUpload = async (file: File) => {
+        setIsUploadingTitleImage(true);
+        try {
+            const uploadedUrl = await stageInstance.uploadFile('game-title-image.png', file);
+            setTitleImageUrl(uploadedUrl);
+            stageInstance.showPriorityMessage('Title image uploaded. Save to keep this in configuration.');
+        } catch (error) {
+            console.error('Failed to upload title image:', error);
+            stageInstance.showPriorityMessage('Failed to upload title image. Check console for details.');
+        } finally {
+            setIsUploadingTitleImage(false);
+        }
+    };
+
+    const handleGenerateTitleImage = async () => {
+        if (isGeneratingTitleImage) {
+            return;
+        }
+
+        setIsGeneratingTitleImage(true);
+        try {
+            // Keep generation aligned with unsaved local edits before calling stage generation.
+            stageInstance.updateConfiguration({
+                title,
+                titleImagePrompt,
+            });
+
+            const generatedUrl = await stageInstance.generateTitleImage();
+            if (generatedUrl?.trim()) {
+                setTitleImageUrl(generatedUrl);
+                stageInstance.showPriorityMessage('Generated a new title image. Save to keep this in configuration.');
+            } else {
+                stageInstance.showPriorityMessage('No title image was generated. Try adjusting the prompt.');
+            }
+        } catch (error) {
+            console.error('Failed to generate title image:', error);
+            stageInstance.showPriorityMessage('Failed to generate title image. Check console for details.');
+        } finally {
+            setIsGeneratingTitleImage(false);
+        }
     };
 
     const updateContextSegment = (index: number, patch: Partial<ContextSegment>) => {
@@ -239,6 +295,16 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             <GlassPanel variant="default" style={{ padding: '18px' }}>
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Game Settings</Title>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+
+                    <div>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Game Title</label>
+                        <TextInput
+                            fullWidth
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Agenda VN"
+                        />
+                    </div>
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Start Date</label>
                         <TextInput
@@ -246,6 +312,44 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             type="date"
                             value={startingDate}
                             onChange={(e) => setStartingDate(e.target.value)}
+                        />
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Title Image Prompt</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'start' }}>
+                            <textarea
+                                className="input-base"
+                                value={titleImagePrompt}
+                                onChange={(e) => setTitleImagePrompt(e.target.value)}
+                                rows={3}
+                                placeholder="Describe the title image style, atmosphere, and composition."
+                                style={{ width: '100%', resize: 'vertical' }}
+                            />
+                            <Button
+                                variant="secondary"
+                                onClick={handleGenerateTitleImage}
+                                disabled={isGeneratingTitleImage}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', justifySelf: 'stretch' }}
+                            >
+                                <AutoAwesome style={{ fontSize: '18px' }} />
+                                {isGeneratingTitleImage ? 'Generating...' : 'Generate'}
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <ImageUrlUploadField
+                            imageUrl={titleImageUrl}
+                            onImageUrlChange={setTitleImageUrl}
+                            onUploadFile={handleTitleImageUpload}
+                            isUploading={isUploadingTitleImage}
+                            inputLabel="Title Image URL"
+                            uploadButtonLabel="Upload Title Image"
+                            previewBorder="3px solid var(--agenda-border-strong)"
+                            previewBackgroundPosition="50% 40%"
+                            previewPlaceholder={<ImageIcon style={{ fontSize: '46px', color: 'rgba(138, 176, 204, 0.35)' }} />}
+                            onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
                         />
                     </div>
                 </div>

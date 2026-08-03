@@ -100,16 +100,6 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>UI Theme</Title>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Game Title</label>
-                        <TextInput
-                            fullWidth
-                            value={uiSettings.gameTitle}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, gameTitle: e.target.value }))}
-                            placeholder="Agenda VN"
-                        />
-                    </div>
-
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>UI Font Family</label>
                         <TextInput

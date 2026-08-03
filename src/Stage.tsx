@@ -1,5 +1,5 @@
 import {ReactElement} from "react";
-import {StageBase, StageResponse, InitialData, Message, User, Character} from "@chub-ai/stages-ts";
+import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, findBestNameMatch, loadSupportedActor } from "./content/Actor";
 import { Item } from "./content/Item";
@@ -34,7 +34,6 @@ export type SaveType = {
     atlas: {[key: string]: Location};
     inventory: Item[];
     timeline: TimelineEntry[];
-    startingDate?: string;
     timestamp: number; // Time of last save
     textToSpeech?: boolean;
     disableImpersonation?: boolean;
@@ -44,17 +43,20 @@ export type SaveType = {
     currentDate?: string;
     upcomingEvents?: CalendarEvent[];
     agendaConfig?: {
+        title: string;
+        titleImageUrl?: string;
+        titleImagePrompt?: string;
         context: ContextSegment[];
         settings: CustomSetting[];
         selectedSettings: {[key: string]: string};
         actorStats?: ActorStat[];
+        startingDate?: string;
     };
     uiSettings?: UiSettings;
     betaMode?: boolean;
 }
 
 export type UiSettings = {
-    gameTitle: string;
     uiFontFamily: string;
     flavorFontFamily: string;
     primaryColor: string; // Used for default UI text color. was "fog"
@@ -74,7 +76,6 @@ export type UiSettings = {
 }
 
 const DEFAULT_UI_SETTINGS: UiSettings = {
-    gameTitle: 'Agenda VN',
     uiFontFamily: '"Geologica", sans-serif',
     flavorFontFamily: '"Lora", Georgia, serif',
     accentColor: '#8ab0cc',
@@ -196,6 +197,9 @@ export type GameConfiguration = {
     context: ContextSegment[], // All defined context segments (applies to current and new games)
     settings: CustomSetting[], // All defined custom settings (applies to current and new games)
     actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
+    title: string, // Title of this game
+    titleImageUrl: string, // URL of a title image for the game
+    titleImagePrompt: string, // Prompt for generating a title image for the game
     startingDate: string; // The starting date of the game, in YYYY-MM-DD format (applies to new game)
 
 }
@@ -283,6 +287,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             context: [],
             settings: [],
             actorStats: [],
+            title: 'Agenda VN',
+            titleImageUrl: '',
+            titleImagePrompt: 'Generate a title image for a visual novel game called "Agenda VN".',
             startingDate: new Date().toISOString().slice(0, 10),
         };
     }
@@ -318,6 +325,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             settings: (this.saveData.configuration.settings || legacySettings).map(cloneCustomSetting),
             actorStats: (this.saveData.configuration.actorStats || legacyActorStats).map(cloneActorStat),
             startingDate: this.saveData.configuration.startingDate || defaultConfiguration.startingDate,
+            title: this.saveData.configuration.title || defaultConfiguration.title,
+            titleImageUrl: this.saveData.configuration.titleImageUrl || defaultConfiguration.titleImageUrl,
+            titleImagePrompt: this.saveData.configuration.titleImagePrompt || defaultConfiguration.titleImagePrompt,
         };
     }
 
@@ -332,6 +342,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.saveData.configuration = {
             ...current,
             ...updates,
+            title: updates.title ?? current.title ?? 'Agenda VN',
+            titleImageUrl: updates.titleImageUrl ?? current.titleImageUrl ?? '',
+            titleImagePrompt: updates.titleImagePrompt ?? current.titleImagePrompt ?? '',
             actors: (updates.actors ?? current.actors ?? []).map(actor => ({...actor})),
             locations: (updates.locations ?? current.locations ?? []).map(location => ({...location})),
             context: (updates.context ?? current.context ?? []).map(cloneContextSegment),
@@ -344,10 +357,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (currentSave) {
             if (!currentSave.agendaConfig) {
                 currentSave.agendaConfig = {
+                    title: "Agenda VN",
+                    titleImageUrl: "",
+                    titleImagePrompt: "Generate a title image for a visual novel game called 'Agenda VN'.",
                     context: [],
                     settings: [],
                     selectedSettings: {},
                     actorStats: [],
+                    startingDate: new Date().toISOString().slice(0, 10),
                 };
             }
             currentSave.agendaConfig.actorStats = this.saveData.configuration.actorStats.map(cloneActorStat);
@@ -402,11 +419,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             atlas: createDefaultAtlas(),
             inventory: [],
             timeline: [],
-            startingDate,
             timestamp: Date.now(),
             currentDate: startingDate,
             upcomingEvents: [],
             agendaConfig: {
+                title: this.getConfiguration().title || 'Agenda VN',
+                titleImageUrl: this.getConfiguration().titleImageUrl || '',
+                titleImagePrompt: this.getConfiguration().titleImagePrompt || '',
+                startingDate,
                 context: [],
                 settings: [],
                 selectedSettings: {},
@@ -431,6 +451,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const persistedConfiguration = this.getConfiguration();
         if (!newSave.agendaConfig) {
             newSave.agendaConfig = {
+                title: persistedConfiguration.title || 'Agenda VN',
+                titleImageUrl: persistedConfiguration.titleImageUrl || '',
+                titleImagePrompt: persistedConfiguration.titleImagePrompt || '',
+                startingDate: persistedConfiguration.startingDate || new Date().toISOString().slice(0, 10),
                 context: persistedConfiguration.context.map(cloneContextSegment),
                 settings: persistedConfiguration.settings.map(cloneCustomSetting),
                 selectedSettings: Object.fromEntries(
@@ -1005,7 +1029,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private getStartingDate(save: SaveType): string {
 
-        return save.startingDate || this.getConfiguration().startingDate || save.currentDate || new Date().toISOString().slice(0, 10);
+        return this.getConfiguration().startingDate || save.currentDate || new Date().toISOString().slice(0, 10);
     }
 
     private buildEventName(locationName: string, participantNames: string[]): string {
@@ -1041,6 +1065,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         if (!save.agendaConfig) {
             save.agendaConfig = {
+                title: this.getConfiguration().title || 'Agenda VN',
+                titleImageUrl: this.getConfiguration().titleImageUrl || '',
+                titleImagePrompt: this.getConfiguration().titleImagePrompt || '',
+                startingDate: this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10),
                 context: [],
                 settings: [],
                 selectedSettings: {},
@@ -1529,6 +1557,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         return null;
+    }
+
+    async generateTitleImage() {
+        const configuration = this.getConfiguration();
+        const titleImagePrompt = buildPrompt()
+            .addBlock('Instructions',
+                `${configuration.titleImagePrompt || ''}` +
+                `The game is titled "${configuration.title}".`,
+            )
+            .format();
+        const imageUrl = await this.makeImage({ prompt: titleImagePrompt, aspect_ratio: AspectRatio.PHOTO_HORIZONTAL, remove_background: true }, configuration.titleImageUrl || '');
+        return imageUrl;
     }
 
     async loadActors() {

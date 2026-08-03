@@ -4,6 +4,7 @@ import { Stage } from '../Stage';
 import { getLocationDescription, Location, updateLocationDescription } from '../content/Location';
 import { Image as ImageIcon, Place } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
+import { ImageUrlUploadField } from './ImageUrlUploadField';
 
 interface LocationDetailPanelProps {
     location: Location;
@@ -61,7 +62,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     }, [location.id, stage]);
 
     const [isUploadingImage, setIsUploadingImage] = useState(false);
-    const imageUploadInputRef = useRef<HTMLInputElement>(null);
     const editedLocationRef = useRef(editedLocation);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
@@ -123,14 +123,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         setEditedLocation(prev => ({ ...prev, [field]: value }));
     };
 
-    const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            stage().showPriorityMessage('Please select a valid image file.');
-            return;
-        }
-
+    const handleLocationImageUpload = async (file: File) => {
         setIsUploadingImage(true);
         try {
             const uploadedUrl = await stage().uploadFile(`location-${location.id}.png`, file);
@@ -142,9 +135,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             stage().showPriorityMessage('Failed to upload location image. Check console for details.');
         } finally {
             setIsUploadingImage(false);
-            if (imageUploadInputRef.current) {
-                imageUploadInputRef.current.value = '';
-            }
         }
     };
 
@@ -421,60 +411,16 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                     <ImageIcon />
                                     Location Image
                                 </h2>
-                                <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                                    {/* Preview */}
-                                    <div
-                                        style={{
-                                            width: '160px',
-                                            height: '120px',
-                                            borderRadius: '8px',
-                                            border: `3px solid ${editedLocation.themeColor || 'rgba(0, 255, 136, 0.3)'}`,
-                                            backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                            backgroundImage: editedLocation.imageUrl ? `url(${editedLocation.imageUrl})` : 'none',
-                                            backgroundSize: 'cover',
-                                            backgroundPosition: `${editedLocation.focalX * 100}% ${editedLocation.focalY * 100}%`,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            flexShrink: 0,
-                                            overflow: 'hidden',
-                                        }}
-                                    >
-                                        {!editedLocation.imageUrl && (
-                                            <Place style={{ fontSize: '48px', color: 'rgba(0, 255, 136, 0.3)' }} />
-                                        )}
-                                    </div>
-
-                                    {/* URL + Upload */}
-                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '200px' }}>
-                                        <div>
-                                            <label style={labelStyle}>Image URL</label>
-                                            <TextInput
-                                                fullWidth
-                                                value={editedLocation.imageUrl}
-                                                onChange={(e) => handleInputChange('imageUrl', e.target.value)}
-                                                placeholder="https://... or leave empty"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Button
-                                                onClick={() => imageUploadInputRef.current?.click()}
-                                                disabled={isUploadingImage}
-                                                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                                            >
-                                                <ImageIcon style={{ fontSize: '18px' }} />
-                                                {isUploadingImage ? 'Uploading...' : 'Upload Image'}
-                                            </Button>
-                                            <input
-                                                ref={imageUploadInputRef}
-                                                type="file"
-                                                accept="image/*"
-                                                style={{ display: 'none' }}
-                                                onChange={handleImageFileChange}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                                <ImageUrlUploadField
+                                    imageUrl={editedLocation.imageUrl}
+                                    onImageUrlChange={(value) => handleInputChange('imageUrl', value)}
+                                    onUploadFile={handleLocationImageUpload}
+                                    isUploading={isUploadingImage}
+                                    previewBorder={`3px solid ${editedLocation.themeColor || 'rgba(0, 255, 136, 0.3)'}`}
+                                    previewBackgroundPosition={`${editedLocation.focalX * 100}% ${editedLocation.focalY * 100}%`}
+                                    previewPlaceholder={<Place style={{ fontSize: '48px', color: 'rgba(0, 255, 136, 0.3)' }} />}
+                                    onInvalidFile={() => stage().showPriorityMessage('Please select a valid image file.')}
+                                />
                             </section>
 
                         </div>
