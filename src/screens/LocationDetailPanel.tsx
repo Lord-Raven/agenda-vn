@@ -47,7 +47,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                 continue;
             }
 
-            const dedupeKey = normalizedCategory.toLocaleLowerCase();
+            const dedupeKey = normalizedCategory;
             if (!seenCategories.has(dedupeKey)) {
                 seenCategories.add(dedupeKey);
             }
