@@ -609,6 +609,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "88vh" }}>
                                 {(() => {
                                     const dateEvents = eventsByDate.get(selectedDateKey) || [];
+                                    const orderedDateEvents = [...dateEvents].sort((left, right) => compareEventSchedule(left, right));
                                     const selectedEvent = dateEvents.find((eventItem) => eventItem.id === selectedEventId) || null;
                                     const selectedEventPast = selectedEvent ? isPastEvent(selectedEvent, currentDateKey, currentSlotIndex) : true;
 
@@ -630,92 +631,139 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
                                 <Box
                                     sx={{
-                                        display: "grid",
-                                        gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" },
-                                        gap: 1,
+                                        border: "1px solid var(--agenda-calendar-card-border)",
+                                        borderRadius: "12px",
+                                        background: "rgba(14, 21, 34, 0.62)",
+                                        padding: "12px",
                                         minHeight: 0,
                                         overflowY: "auto",
                                     }}
                                 >
-                                    {TIME_OF_DAY_ORDER.map((slot, slotIndex) => {
-                                        const slotIsPast = isPastSlot(selectedDateKey, currentDateKey, currentSlotIndex, slotIndex);
-                                        const slotEvents = dateEvents
-                                            .filter((eventItem) => doesEventOccupySlot(eventItem, slotIndex))
-                                            .sort((left, right) => compareEventSchedule(left, right));
+                                    <Box
+                                        sx={{
+                                            display: "grid",
+                                            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                                            gap: 1,
+                                            mb: 1.2,
+                                        }}
+                                    >
+                                        {TIME_OF_DAY_ORDER.map((slot, slotIndex) => {
+                                            const slotIsPast = isPastSlot(selectedDateKey, currentDateKey, currentSlotIndex, slotIndex);
 
-                                        return (
-                                            <Box
-                                                key={slot}
-                                                sx={{
-                                                    border: "1px solid var(--agenda-calendar-card-border)",
-                                                    borderRadius: "10px",
-                                                    padding: "10px",
-                                                    background: "rgba(14, 21, 34, 0.62)",
-                                                    opacity: slotIsPast ? 0.42 : 1,
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    gap: 0.8,
-                                                    minHeight: 220,
-                                                }}
-                                            >
-                                                <Typography sx={{ color: "var(--agenda-primary)", fontWeight: 700, fontSize: "0.82rem", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                                                    {formatTimeOfDay(slot)}
-                                                </Typography>
-
-                                                {slotEvents.length === 0 && (
-                                                    <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.8rem", fontStyle: "italic", opacity: 0.7 }}>
-                                                        No events
+                                            return (
+                                                <Box
+                                                    key={slot}
+                                                    sx={{
+                                                        minWidth: 0,
+                                                        borderLeft: slotIndex === 0 ? "none" : "1px solid rgba(138, 176, 204, 0.14)",
+                                                        pl: slotIndex === 0 ? 0 : 1,
+                                                        opacity: slotIsPast ? 0.45 : 1,
+                                                    }}
+                                                >
+                                                    <Typography sx={{ color: "var(--agenda-primary)", fontWeight: 700, fontSize: "0.78rem", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                                                        {formatTimeOfDay(slot)}
                                                     </Typography>
-                                                )}
+                                                </Box>
+                                            );
+                                        })}
+                                    </Box>
 
-                                                {slotEvents.map((eventItem) => {
-                                                    const participants = (eventItem.actorIds || eventItem.participantActorIds || [])
-                                                        .map((actorId) => save.actors[actorId])
-                                                        .filter(Boolean) as Actor[];
-                                                    const leadActor = participants[0];
-                                                    const eventIsPast = isPastEvent(eventItem, currentDateKey, currentSlotIndex);
-                                                    const selected = selectedEventId === eventItem.id;
+                                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, minHeight: 220 }}>
+                                        {orderedDateEvents.length === 0 && (
+                                            <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.8rem", fontStyle: "italic", opacity: 0.7 }}>
+                                                No events
+                                            </Typography>
+                                        )}
 
-                                                    return (
-                                                        <motion.button
-                                                            key={`${slot}-${eventItem.id}`}
-                                                            type="button"
-                                                            onClick={() => setSelectedEventId(eventItem.id)}
-                                                            whileHover={{ scale: 1.02 }}
-                                                            whileTap={{ scale: 0.995 }}
-                                                            style={{
-                                                                appearance: "none",
-                                                                border: selected
-                                                                    ? `2px solid ${leadActor?.themeColor || "rgba(137, 205, 135, 0.95)"}`
-                                                                    : `1px solid ${leadActor?.themeColor || "rgba(138, 176, 204, 0.5)"}`,
-                                                                borderRadius: "9px",
-                                                                padding: "8px",
-                                                                background: selected
-                                                                    ? "linear-gradient(145deg, rgba(39, 58, 60, 0.96), rgba(21, 26, 40, 0.96))"
-                                                                    : `${leadActor?.themeColor || "#8ab0cc"}1f`,
-                                                                textAlign: "left",
-                                                                width: "100%",
-                                                                cursor: "pointer",
-                                                                opacity: eventIsPast ? 0.4 : 1,
+                                        {orderedDateEvents.map((eventItem) => {
+                                            const participants = (eventItem.actorIds || eventItem.participantActorIds || [])
+                                                .map((actorId) => save.actors[actorId])
+                                                .filter(Boolean) as Actor[];
+                                            const leadActor = participants[0];
+                                            const eventIsPast = isPastEvent(eventItem, currentDateKey, currentSlotIndex);
+                                            const selected = selectedEventId === eventItem.id;
+                                            const startSlotIndex = Math.max(getEventStartSlotIndex(eventItem), 0);
+                                            const endSlotIndex = Math.max(getEventEndSlotIndex(eventItem), startSlotIndex);
+
+                                            return (
+                                                <Box
+                                                    key={eventItem.id}
+                                                    sx={{
+                                                        position: "relative",
+                                                        display: "grid",
+                                                        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                                                        columnGap: 1,
+                                                        alignItems: "stretch",
+                                                        '&::before': {
+                                                            content: '""',
+                                                            position: "absolute",
+                                                            inset: 0,
+                                                            borderRadius: "10px",
+                                                            background: "linear-gradient(90deg, rgba(138, 176, 204, 0.05) 0%, rgba(138, 176, 204, 0.05) 25%, rgba(138, 176, 204, 0.02) 25%, rgba(138, 176, 204, 0.02) 50%, rgba(138, 176, 204, 0.05) 50%, rgba(138, 176, 204, 0.05) 75%, rgba(138, 176, 204, 0.02) 75%, rgba(138, 176, 204, 0.02) 100%)",
+                                                            pointerEvents: "none",
+                                                        },
+                                                    }}
+                                                >
+                                                    {TIME_OF_DAY_ORDER.slice(1).map((slot) => (
+                                                        <Box
+                                                            key={`${eventItem.id}-${slot}-divider`}
+                                                            sx={{
+                                                                position: "absolute",
+                                                                top: 0,
+                                                                bottom: 0,
+                                                                width: "1px",
+                                                                background: "rgba(138, 176, 204, 0.14)",
+                                                                left: slot === "afternoon"
+                                                                    ? "25%"
+                                                                    : slot === "evening"
+                                                                        ? "50%"
+                                                                        : "75%",
+                                                                pointerEvents: "none",
                                                             }}
-                                                        >
-                                                            <Typography sx={{ color: "rgba(240, 246, 246, 0.98)", fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>
-                                                                {eventItem.recurrence ? "↻ " : ""}{eventItem.name}
+                                                        />
+                                                    ))}
+
+                                                    <motion.button
+                                                        type="button"
+                                                        onClick={() => setSelectedEventId(eventItem.id)}
+                                                        whileHover={{ scale: 1.01 }}
+                                                        whileTap={{ scale: 0.995 }}
+                                                        style={{
+                                                            appearance: "none",
+                                                            border: selected
+                                                                ? `2px solid ${leadActor?.themeColor || "rgba(137, 205, 135, 0.95)"}`
+                                                                : `1px solid ${leadActor?.themeColor || "rgba(138, 176, 204, 0.5)"}`,
+                                                            borderRadius: "9px",
+                                                            padding: "10px",
+                                                            background: selected
+                                                                ? "linear-gradient(145deg, rgba(39, 58, 60, 0.96), rgba(21, 26, 40, 0.96))"
+                                                                : `${leadActor?.themeColor || "#8ab0cc"}1f`,
+                                                            textAlign: "left",
+                                                            width: "100%",
+                                                            cursor: "pointer",
+                                                            opacity: eventIsPast ? 0.4 : 1,
+                                                            gridColumn: `${startSlotIndex + 1} / ${endSlotIndex + 2}`,
+                                                            position: "relative",
+                                                            zIndex: 1,
+                                                            minWidth: 0,
+                                                        }}
+                                                    >
+                                                        <Typography sx={{ color: "rgba(240, 246, 246, 0.98)", fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>
+                                                            {eventItem.recurrence ? "↻ " : ""}{eventItem.name}
+                                                        </Typography>
+                                                        <Typography sx={{ color: "rgba(185, 210, 227, 0.92)", fontSize: "0.72rem", mt: 0.4 }}>
+                                                            {formatDurationSummary(eventItem)} · {save.atlas[eventItem.locationId]?.name || "Unknown Location"}
+                                                        </Typography>
+                                                        {eventItem.recurrence && (
+                                                            <Typography sx={{ color: "rgba(185, 210, 227, 0.84)", fontSize: "0.67rem", mt: 0.3 }}>
+                                                                {formatRecurrenceSummary(eventItem.recurrence)}
                                                             </Typography>
-                                                            <Typography sx={{ color: "rgba(185, 210, 227, 0.92)", fontSize: "0.72rem", mt: 0.4 }}>
-                                                                {formatDurationSummary(eventItem)} · {save.atlas[eventItem.locationId]?.name || "Unknown Location"}
-                                                            </Typography>
-                                                            {eventItem.recurrence && (
-                                                                <Typography sx={{ color: "rgba(185, 210, 227, 0.84)", fontSize: "0.67rem", mt: 0.3 }}>
-                                                                    {formatRecurrenceSummary(eventItem.recurrence)}
-                                                                </Typography>
-                                                            )}
-                                                        </motion.button>
-                                                    );
-                                                })}
-                                            </Box>
-                                        );
-                                    })}
+                                                        )}
+                                                    </motion.button>
+                                                </Box>
+                                            );
+                                        })}
+                                    </Box>
                                 </Box>
 
                                 <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap" }}>
