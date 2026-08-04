@@ -1,6 +1,6 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Stage } from '../Stage';
+import { CustomSetting, SaveType, Stage } from '../Stage';
 import { GlassPanel, Title, Button, TextInput } from './UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from './TooltipContext';
@@ -32,8 +32,57 @@ interface SettingsData {
     language: string;
 }
 
+const resolveActiveCustomSettings = (stageInstance: Stage): CustomSetting[] => {
+    const saveSettings = stageInstance.getSave()?.agendaConfig?.settings || [];
+    if (saveSettings.length > 0) {
+        return saveSettings;
+    }
+
+    return stageInstance.getConfiguration()?.settings || [];
+};
+
+const buildSelectedCustomSettings = (
+    settings: CustomSetting[],
+    preferredSelections: { [key: string]: string },
+): { [key: string]: string } => {
+    const nextSelectedSettings: { [key: string]: string } = {};
+
+    settings.forEach((setting) => {
+        const optionNames = Object.keys(setting.options || {});
+        if (optionNames.length === 0) {
+            return;
+        }
+
+        const preferred = preferredSelections[setting.title];
+        nextSelectedSettings[setting.title] = preferred && optionNames.includes(preferred)
+            ? preferred
+            : optionNames[0];
+    });
+
+    return nextSelectedSettings;
+};
+
+const ensureAgendaConfig = (saveData: SaveType, stageInstance: Stage) => {
+    if (saveData.agendaConfig) {
+        return;
+    }
+
+    const configuration = stageInstance.getConfiguration();
+    saveData.agendaConfig = {
+        title: configuration.title || 'Agenda VN',
+        titleImageUrl: configuration.titleImageUrl || '',
+        titleImagePrompt: configuration.titleImagePrompt || '',
+        startingDate: configuration.startingDate,
+        context: configuration.context || [],
+        settings: configuration.settings || [],
+        selectedSettings: {},
+        actorStats: configuration.actorStats || [],
+    };
+};
+
 export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onConfirm, isNewGame = false, setScreenType }) => {
     const { setTooltip, clearTooltip } = useTooltip();
+    const stageInstance = stage();
 
     // Common languages for autocomplete
     const commonLanguages = [
@@ -47,13 +96,19 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
     // Load existing settings or use defaults
     const [settings, setSettings] = useState<SettingsData>({
-        playerName: stage().getPlayerActor()?.name || stage().primaryUser?.name || 'Player',
-        playerDescription: stage().getPlayerActor()?.profile || stage().primaryUser?.chatProfile || 'An enigmatic individual.',
-        playerColor: resolvePlayerThemeColor(stage().getPlayerActor()?.themeColor || ''),
-        textToSpeech: (stage().getSave()?.textToSpeech ?? true),
-        disableImpersonation: (stage().getSave()?.disableImpersonation ?? false),
-        betaMode: (stage().getSave()?.betaMode ?? false),
-        language: stage().getSave()?.language || 'English',
+        playerName: stageInstance.getPlayerActor()?.name || stageInstance.primaryUser?.name || 'Player',
+        playerDescription: stageInstance.getPlayerActor()?.profile || stageInstance.primaryUser?.chatProfile || 'An enigmatic individual.',
+        playerColor: resolvePlayerThemeColor(stageInstance.getPlayerActor()?.themeColor || ''),
+        textToSpeech: (stageInstance.getSave()?.textToSpeech ?? true),
+        disableImpersonation: (stageInstance.getSave()?.disableImpersonation ?? false),
+        betaMode: (stageInstance.getSave()?.betaMode ?? false),
+        language: stageInstance.getSave()?.language || 'English',
+    });
+
+    const [customSettings] = useState<CustomSetting[]>(() => resolveActiveCustomSettings(stageInstance));
+    const [selectedCustomSettings, setSelectedCustomSettings] = useState<{ [key: string]: string }>(() => {
+        const saveSelectedSettings = stageInstance.getSave()?.agendaConfig?.selectedSettings || {};
+        return buildSelectedCustomSettings(resolveActiveCustomSettings(stageInstance), saveSelectedSettings);
     });
 
     const [languageSuggestions, setLanguageSuggestions] = useState<string[]>([]);
@@ -63,10 +118,11 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     const handleSave = () => {
         console.log('Saving settings:', settings);
         const playerThemeColor = resolvePlayerThemeColor(settings.playerColor);
+        const resolvedSelectedCustomSettings = buildSelectedCustomSettings(customSettings, selectedCustomSettings);
         
         if (isNewGame) {
             console.log('Starting new game with settings');
-            stage().startNewGame({
+            stageInstance.startNewGame({
                 name: settings.playerName,
                 themeColor: playerThemeColor,
                 data: {
@@ -77,22 +133,29 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                 },
                 personality: settings.playerDescription,
             });
+
+            const newSave = stageInstance.getSave();
+            ensureAgendaConfig(newSave, stageInstance);
+            newSave.agendaConfig!.selectedSettings = resolvedSelectedCustomSettings;
             setScreenType(ScreenType.LOADING);
         } else {
             console.log('Updating settings');
-            const saveData = stage().getSave() || {};
+            const saveData = stageInstance.getSave();
 
             saveData.textToSpeech = settings.textToSpeech;
             saveData.disableImpersonation = settings.disableImpersonation;
             saveData.betaMode = settings.betaMode;
             saveData.language = settings.language;
-            const player = stage().getPlayerActor();
+            ensureAgendaConfig(saveData, stageInstance);
+            saveData.agendaConfig!.selectedSettings = resolvedSelectedCustomSettings;
+
+            const player = stageInstance.getPlayerActor();
             player.name = settings.playerName;
             player.profile = settings.playerDescription;
             player.themeColor = playerThemeColor;
         }
 
-        stage().saveGame();
+        stageInstance.saveGame();
         onConfirm();
     };
 
@@ -129,6 +192,13 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     const selectLanguage = (language: string) => {
         setSettings(prev => ({ ...prev, language }));
         setShowLanguageSuggestions(false);
+    };
+
+    const handleCustomSettingChange = (settingTitle: string, optionName: string) => {
+        setSelectedCustomSettings(prev => ({
+            ...prev,
+            [settingTitle]: optionName,
+        }));
     };
 
     return (
@@ -596,6 +666,79 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                             </AnimatePresence>
                                         </div>
                                     </div>
+
+                                    {customSettings.length > 0 && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <label
+                                                style={{
+                                                    display: 'block',
+                                                    color: '#b9d2e3',
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    marginBottom: '4px'
+                                                }}
+                                            >
+                                                Scenario Settings
+                                            </label>
+
+                                            {customSettings.map((setting) => {
+                                                const optionNames = Object.keys(setting.options || {});
+                                                const selectedOptionName = buildSelectedCustomSettings(
+                                                    [setting],
+                                                    selectedCustomSettings,
+                                                )[setting.title] || '';
+                                                const selectedOption = setting.options?.[selectedOptionName];
+
+                                                return (
+                                                    <div
+                                                        key={setting.title}
+                                                        style={{
+                                                            padding: '12px',
+                                                            borderRadius: '8px',
+                                                            background: 'rgba(28, 34, 52, 0.8)',
+                                                            border: '2px solid rgba(138, 176, 204, 0.34)',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '8px',
+                                                        }}
+                                                    >
+                                                        <div style={{ color: '#edf2f2', fontSize: '14px', fontWeight: 700 }}>
+                                                            {setting.title}
+                                                        </div>
+                                                        <div style={{ color: 'rgba(185, 210, 227, 0.8)', fontSize: '13px' }}>
+                                                            {setting.description}
+                                                        </div>
+
+                                                        {optionNames.length > 0 ? (
+                                                            <>
+                                                                <select
+                                                                    className="input-base"
+                                                                    value={selectedOptionName}
+                                                                    onChange={(e) => handleCustomSettingChange(setting.title, e.target.value)}
+                                                                    style={{ fontSize: '13px' }}
+                                                                >
+                                                                    {optionNames.map((optionName) => (
+                                                                        <option key={optionName} value={optionName}>
+                                                                            {optionName}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                                {selectedOption?.title && (
+                                                                    <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
+                                                                        {selectedOption.title}
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
+                                                                No options available for this setting.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
 
                                 </div>
                             </div>
