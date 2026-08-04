@@ -228,7 +228,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     // In this screen, "today" is anchored to the next event date to match narrative progression.
     const todayDateKey = upcomingEvents[0]?.date || currentDateKey;
     const todayDate = parseDateKey(todayDateKey);
-    const nextEventId = upcomingEvents[0]?.id;
 
     const [viewMonth, setViewMonth] = useState(() => startOfMonth(todayDate));
     const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
@@ -394,6 +393,10 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 display: "grid",
                                 gridTemplateColumns: calendarGridTemplateColumns,
                                 gap: 0,
+                                width: "100%",
+                                minWidth: 0,
+                                boxSizing: "border-box",
+                                justifyItems: "stretch",
                                 border: "1px solid var(--agenda-calendar-card-border)",
                                 borderBottom: 0,
                                 borderRadius: "12px 12px 0 0",
@@ -404,6 +407,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 <Typography
                                     key={label}
                                     sx={{
+                                        minWidth: 0,
+                                        boxSizing: "border-box",
                                         color: "var(--agenda-inactive)",
                                         letterSpacing: "0.12em",
                                         textTransform: "uppercase",
@@ -428,6 +433,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 gridTemplateColumns: calendarGridTemplateColumns,
                                 gridTemplateRows: calendarGridTemplateRows,
                                 gap: 0,
+                                width: "100%",
+                                minWidth: 0,
+                                boxSizing: "border-box",
                                 flex: 1,
                                 minHeight: 0,
                                 border: "1px solid var(--agenda-calendar-card-border)",
@@ -462,6 +470,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             textAlign: "left",
                                             width: "100%",
                                             height: "100%",
+                                            minWidth: 0,
                                             zIndex: isActiveDate ? 4 : 1,
                                             position: "relative",
                                             transformOrigin: "center",
@@ -472,6 +481,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                             sx={{
                                                 height: "100%",
                                                 minHeight: 0,
+                                                minWidth: 0,
                                                 boxSizing: "border-box",
                                                 borderRight: "1px solid var(--agenda-calendar-card-border)",
                                                 borderBottom: "1px solid var(--agenda-calendar-card-border)",
@@ -653,7 +663,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             onClick={(event) => event.stopPropagation()}
                             style={{ width: "min(1100px, 94vw)" }}
                         >
-                            <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 14, height: "88vh", maxHeight: "88vh", minHeight: 0 }}>
+                            <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 1, height: "88vh", maxHeight: "88vh", minHeight: 0 }}>
                                 {(() => {
                                     const dateEvents = eventsByDate.get(selectedDateKey) || [];
                                     const orderedDateEvents = [...dateEvents].sort((left, right) => compareEventSchedule(left, right));
