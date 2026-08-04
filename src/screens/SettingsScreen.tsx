@@ -72,6 +72,8 @@ const ensureAgendaConfig = (saveData: SaveType, stageInstance: Stage) => {
         title: configuration.title || 'Agenda VN',
         titleImageUrl: configuration.titleImageUrl || '',
         titleImagePrompt: configuration.titleImagePrompt || '',
+        backgroundImageUrl: configuration.backgroundImageUrl || '',
+        backgroundImagePrompt: configuration.backgroundImagePrompt || '',
         startingDate: configuration.startingDate,
         context: configuration.context || [],
         settings: configuration.settings || [],

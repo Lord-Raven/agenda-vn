@@ -48,6 +48,8 @@ export type SaveType = {
         title: string;
         titleImageUrl?: string;
         titleImagePrompt?: string;
+        backgroundImageUrl?: string;
+        backgroundImagePrompt?: string;
         context: ContextSegment[];
         settings: CustomSetting[];
         selectedSettings: {[key: string]: string};
@@ -184,6 +186,8 @@ export type GameConfiguration = {
     title: string, // Title of this game
     titleImageUrl: string, // URL of a title image for the game
     titleImagePrompt: string, // Prompt for generating a title image for the game
+    backgroundImageUrl: string, // URL of a background image for the menu and calendar screens
+    backgroundImagePrompt: string, // Prompt for generating a background image for the menu and calendar screens
     startingDate: string; // The starting date of the game, in YYYY-MM-DD format (applies to new game)
 
 }
@@ -274,6 +278,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             title: 'Agenda VN',
             titleImageUrl: '',
             titleImagePrompt: 'Generate a title image for a visual novel game called "Agenda VN".',
+            backgroundImageUrl: '',
+            backgroundImagePrompt: 'Generate a background image for the menu and calendar screens of a visual novel game called "Agenda VN".',
             startingDate: new Date().toISOString().slice(0, 10),
         };
     }
@@ -312,6 +318,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             title: this.saveData.configuration.title || defaultConfiguration.title,
             titleImageUrl: this.saveData.configuration.titleImageUrl || defaultConfiguration.titleImageUrl,
             titleImagePrompt: this.saveData.configuration.titleImagePrompt || defaultConfiguration.titleImagePrompt,
+            backgroundImageUrl: this.saveData.configuration.backgroundImageUrl || defaultConfiguration.backgroundImageUrl,
+            backgroundImagePrompt: this.saveData.configuration.backgroundImagePrompt || defaultConfiguration.backgroundImagePrompt,
         };
     }
 
@@ -329,6 +337,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             title: updates.title ?? current.title ?? 'Agenda VN',
             titleImageUrl: updates.titleImageUrl ?? current.titleImageUrl ?? '',
             titleImagePrompt: updates.titleImagePrompt ?? current.titleImagePrompt ?? '',
+            backgroundImageUrl: updates.backgroundImageUrl ?? current.backgroundImageUrl ?? '',
+            backgroundImagePrompt: updates.backgroundImagePrompt ?? current.backgroundImagePrompt ?? '',
             actors: (updates.actors ?? current.actors ?? []).map(actor => ({...actor})),
             locations: (updates.locations ?? current.locations ?? []).map(location => ({...location})),
             context: (updates.context ?? current.context ?? []).map(cloneContextSegment),
@@ -344,6 +354,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     title: "Agenda VN",
                     titleImageUrl: "",
                     titleImagePrompt: "Generate a title image for a visual novel game called 'Agenda VN'.",
+                    backgroundImageUrl: "",
+                    backgroundImagePrompt: "Generate a background image for the menu and calendar screens of a visual novel game called 'Agenda VN'.",
                     context: [],
                     settings: [],
                     selectedSettings: {},
@@ -411,6 +423,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 title: this.getConfiguration().title || 'Agenda VN',
                 titleImageUrl: this.getConfiguration().titleImageUrl || '',
                 titleImagePrompt: this.getConfiguration().titleImagePrompt || '',
+                backgroundImageUrl: this.getConfiguration().backgroundImageUrl || '',
+                backgroundImagePrompt: this.getConfiguration().backgroundImagePrompt || '',
                 startingDate,
                 context: [],
                 settings: [],
@@ -439,6 +453,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 title: persistedConfiguration.title || 'Agenda VN',
                 titleImageUrl: persistedConfiguration.titleImageUrl || '',
                 titleImagePrompt: persistedConfiguration.titleImagePrompt || '',
+                backgroundImageUrl: persistedConfiguration.backgroundImageUrl || '',
+                backgroundImagePrompt: persistedConfiguration.backgroundImagePrompt || '',
                 startingDate: persistedConfiguration.startingDate || new Date().toISOString().slice(0, 10),
                 context: persistedConfiguration.context.map(cloneContextSegment),
                 settings: persistedConfiguration.settings.map(cloneCustomSetting),
@@ -1138,6 +1154,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 title: this.getConfiguration().title || 'Agenda VN',
                 titleImageUrl: this.getConfiguration().titleImageUrl || '',
                 titleImagePrompt: this.getConfiguration().titleImagePrompt || '',
+                backgroundImageUrl: this.getConfiguration().backgroundImageUrl || '',
+                backgroundImagePrompt: this.getConfiguration().backgroundImagePrompt || '',
                 startingDate: this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10),
                 context: [],
                 settings: [],
@@ -1652,6 +1670,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             )
             .format();
         const imageUrl = await this.makeImage({ prompt: titleImagePrompt, aspect_ratio: AspectRatio.WIDESCREEN_HORIZONTAL, remove_background: true }, configuration.titleImageUrl || '');
+        return imageUrl;
+    }
+
+    async generateBackgroundImage() {
+        const configuration = this.getConfiguration();
+        const backgroundImagePrompt = buildPrompt()
+            .addBlock('Instructions',
+                `${configuration.backgroundImagePrompt || ''}` +
+                `The game is titled "${configuration.title}".`,
+            )
+            .format();
+        const imageUrl = await this.makeImage({ prompt: backgroundImagePrompt, aspect_ratio: AspectRatio.WIDESCREEN_HORIZONTAL }, configuration.backgroundImageUrl || '');
         return imageUrl;
     }
 

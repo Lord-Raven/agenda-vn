@@ -1,6 +1,6 @@
 import React, { FC, useMemo, useState } from 'react';
 import { Stage, UiSettings } from '../Stage';
-import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
+import { AlphaColorPickerInput, buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
 
 interface StyleManagementPanelProps {
     stage: () => Stage;
@@ -135,19 +135,23 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
 
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Border Color</label>
-                        <TextInput
-                            fullWidth
+                        <AlphaColorPickerInput
                             value={uiSettings.borderColor}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, borderColor: e.target.value }))}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, borderColor: value }))}
+                            popoverTitle="Choose Border Color"
+                            swatches={groupedStyleSwatches.all}
+                            inputStyle={{ width: '100%' }}
                         />
                     </div>
 
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Border Strong Color</label>
-                        <TextInput
-                            fullWidth
+                        <AlphaColorPickerInput
                             value={uiSettings.borderStrongColor}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, borderStrongColor: e.target.value }))}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, borderStrongColor: value }))}
+                            popoverTitle="Choose Border Strong Color"
+                            swatches={groupedStyleSwatches.all}
+                            inputStyle={{ width: '100%' }}
                         />
                     </div>
                 </div>
@@ -158,42 +162,52 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay Start</label>
-                        <TextInput
-                            fullWidth
+                        <AlphaColorPickerInput
                             value={uiSettings.calendarOverlayStart}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarOverlayStart: e.target.value }))}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarOverlayStart: value }))}
+                            popoverTitle="Choose Overlay Start"
+                            swatches={groupedStyleSwatches.all}
+                            inputStyle={{ width: '100%' }}
                         />
                     </div>
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay Mid</label>
-                        <TextInput
-                            fullWidth
+                        <AlphaColorPickerInput
                             value={uiSettings.calendarOverlayMid}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarOverlayMid: e.target.value }))}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarOverlayMid: value }))}
+                            popoverTitle="Choose Overlay Mid"
+                            swatches={groupedStyleSwatches.all}
+                            inputStyle={{ width: '100%' }}
                         />
                     </div>
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay End</label>
-                        <TextInput
-                            fullWidth
+                        <AlphaColorPickerInput
                             value={uiSettings.calendarOverlayEnd}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarOverlayEnd: e.target.value }))}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarOverlayEnd: value }))}
+                            popoverTitle="Choose Overlay End"
+                            swatches={groupedStyleSwatches.all}
+                            inputStyle={{ width: '100%' }}
                         />
                     </div>
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Card Background</label>
-                        <TextInput
-                            fullWidth
+                        <AlphaColorPickerInput
                             value={uiSettings.calendarCardBackground}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarCardBackground: e.target.value }))}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarCardBackground: value }))}
+                            popoverTitle="Choose Card Background"
+                            swatches={groupedStyleSwatches.all}
+                            inputStyle={{ width: '100%' }}
                         />
                     </div>
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Card Border</label>
-                        <TextInput
-                            fullWidth
+                        <AlphaColorPickerInput
                             value={uiSettings.calendarCardBorder}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, calendarCardBorder: e.target.value }))}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarCardBorder: value }))}
+                            popoverTitle="Choose Card Border"
+                            swatches={groupedStyleSwatches.all}
+                            inputStyle={{ width: '100%' }}
                         />
                     </div>
                 </div>

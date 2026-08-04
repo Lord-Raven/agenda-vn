@@ -16,6 +16,8 @@ interface MenuScreenProps {
     setScreenType: (type: ScreenType) => void;
 }
 
+const DEFAULT_BACKGROUND_IMAGE_URL = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
+
 export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     const [hoveredButton, setHoveredButton] = useState<string | null>(null);
     const [showSettings, setShowSettings] = useState(false);
@@ -27,6 +29,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     const [saveLoadMode, setSaveLoadMode] = React.useState<'save' | 'load'>('save');
     const configuredTitle = stage().getConfiguration().title || 'Agenda VN';
     const configuredTitleImageUrl = (stage().getConfiguration().titleImageUrl || '').trim();
+    const configuredBackgroundImageUrl = (stage().getConfiguration().backgroundImageUrl || '').trim() || DEFAULT_BACKGROUND_IMAGE_URL;
 
     // Check if a save exists (if there are any actors or the layout has been modified)
     const saveExists = () => {
@@ -149,7 +152,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
 
     return (
         <BlurredBackground
-            imageUrl="https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png"
+            imageUrl={configuredBackgroundImageUrl}
             overlay="linear-gradient(142deg, rgba(19, 24, 39, 0.78) 0%, rgba(37, 45, 66, 0.76) 52%, rgba(31, 47, 43, 0.72) 100%)"
         >
             <Box 

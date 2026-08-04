@@ -48,9 +48,9 @@ const defaultCustomSetting = (): CustomSetting => ({
 });
 
 const defaultActorStat = (): ActorStat => ({
-    name: 'Discipline',
-    description: 'How consistently this actor follows through under pressure.',
-    guidance: 'Use this to describe reliability and focus when stakes are high.',
+    name: 'Name',
+    description: 'A user-facing description of this stat.',
+    guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
     default: 50,
     displayType: 'percentage',
     min: 0,
@@ -80,12 +80,17 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const configuration = stageInstance.getConfiguration();
+    const defaultBackgroundImageUrl = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
 
     const [title, setTitle] = useState<string>(() => configuration.title || '');
     const [titleImageUrl, setTitleImageUrl] = useState<string>(() => configuration.titleImageUrl || '');
     const [titleImagePrompt, setTitleImagePrompt] = useState<string>(() => configuration.titleImagePrompt || '');
     const [isUploadingTitleImage, setIsUploadingTitleImage] = useState(false);
     const [isGeneratingTitleImage, setIsGeneratingTitleImage] = useState(false);
+    const [backgroundImageUrl, setBackgroundImageUrl] = useState<string>(() => configuration.backgroundImageUrl || '');
+    const [backgroundImagePrompt, setBackgroundImagePrompt] = useState<string>(() => configuration.backgroundImagePrompt || '');
+    const [isUploadingBackgroundImage, setIsUploadingBackgroundImage] = useState(false);
+    const [isGeneratingBackgroundImage, setIsGeneratingBackgroundImage] = useState(false);
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
     const [contextSegments, setContextSegments] = useState<ContextSegment[]>(() =>
         (configuration.context || []).map(cloneSegment),
@@ -159,6 +164,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             title,
             titleImageUrl,
             titleImagePrompt: titleImagePrompt,
+            backgroundImageUrl,
+            backgroundImagePrompt: backgroundImagePrompt,
             startingDate,
         });
 
@@ -167,6 +174,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             title: title,
             titleImageUrl: titleImageUrl,
             titleImagePrompt: titleImagePrompt,
+            backgroundImageUrl: backgroundImageUrl,
+            backgroundImagePrompt: backgroundImagePrompt,
             context: contextSegments.map(cloneSegment),
             settings: customSettings.map(cloneSetting),
             selectedSettings: validSelections,
@@ -240,6 +249,47 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             stageInstance.showPriorityMessage('Failed to generate title image. Check console for details.');
         } finally {
             setIsGeneratingTitleImage(false);
+        }
+    };
+
+    const handleBackgroundImageUpload = async (file: File) => {
+        setIsUploadingBackgroundImage(true);
+        try {
+            const uploadedUrl = await stageInstance.uploadFile('game-background-image.png', file);
+            setBackgroundImageUrl(uploadedUrl);
+            stageInstance.showPriorityMessage('Background image uploaded. Save to keep this in configuration.');
+        } catch (error) {
+            console.error('Failed to upload background image:', error);
+            stageInstance.showPriorityMessage('Failed to upload background image. Check console for details.');
+        } finally {
+            setIsUploadingBackgroundImage(false);
+        }
+    };
+
+    const handleGenerateBackgroundImage = async () => {
+        if (isGeneratingBackgroundImage) {
+            return;
+        }
+
+        setIsGeneratingBackgroundImage(true);
+        try {
+            stageInstance.updateConfiguration({
+                title,
+                backgroundImagePrompt,
+            });
+
+            const generatedUrl = await stageInstance.generateBackgroundImage();
+            if (generatedUrl?.trim()) {
+                setBackgroundImageUrl(generatedUrl);
+                stageInstance.showPriorityMessage('Generated a new background image. Save to keep this in configuration.');
+            } else {
+                stageInstance.showPriorityMessage('No background image was generated. Try adjusting the prompt.');
+            }
+        } catch (error) {
+            console.error('Failed to generate background image:', error);
+            stageInstance.showPriorityMessage('Failed to generate background image. Check console for details.');
+        } finally {
+            setIsGeneratingBackgroundImage(false);
         }
     };
 
@@ -406,6 +456,54 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             previewPlaceholder={<ImageIcon style={{ fontSize: '46px', color: 'rgba(138, 176, 204, 0.35)' }} />}
                             onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
                         />
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Background Image Prompt</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'start' }}>
+                            <TextInput
+                                fullWidth
+                                value={backgroundImagePrompt}
+                                onChange={(e) => setBackgroundImagePrompt(e.target.value)}
+                                placeholder="Describe the menu and calendar background atmosphere, setting, and composition."
+                            />
+                            <Button
+                                variant="secondary"
+                                onClick={handleGenerateBackgroundImage}
+                                disabled={isGeneratingBackgroundImage}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', justifySelf: 'stretch' }}
+                            >
+                                <AutoAwesome style={{ fontSize: '18px' }} />
+                                {isGeneratingBackgroundImage ? 'Generating...' : 'Generate'}
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <ImageUrlUploadField
+                            imageUrl={backgroundImageUrl}
+                            onImageUrlChange={setBackgroundImageUrl}
+                            onUploadFile={handleBackgroundImageUpload}
+                            isUploading={isUploadingBackgroundImage}
+                            inputLabel="Background Image URL"
+                            uploadButtonLabel="Upload Background Image"
+                            previewBorder="3px solid var(--agenda-border-strong)"
+                            previewBackgroundPosition="50% 45%"
+                            previewWidth="220px"
+                            previewHeight="124px"
+                            previewPlaceholder={<ImageIcon style={{ fontSize: '46px', color: 'rgba(138, 176, 204, 0.35)' }} />}
+                            onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
+                        />
+                        {!backgroundImageUrl && (
+                            <div style={{ color: 'var(--agenda-inactive)', fontSize: '12px', marginTop: 6 }}>
+                                Falls back to the existing default background image until you set one.
+                            </div>
+                        )}
+                        {backgroundImageUrl && backgroundImageUrl.trim() === defaultBackgroundImageUrl && (
+                            <div style={{ color: 'var(--agenda-inactive)', fontSize: '12px', marginTop: 6 }}>
+                                This matches the current built-in background image.
+                            </div>
+                        )}
                     </div>
                 </div>
             </GlassPanel>

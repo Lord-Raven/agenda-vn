@@ -27,7 +27,7 @@ interface CalendarScreenProps {
     isVerticalLayout: boolean;
 }
 
-const CALENDAR_BACKGROUND_IMAGE = "https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png";
+const DEFAULT_BACKGROUND_IMAGE_URL = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const CALENDAR_ROW_COUNT = 6;
 const MAX_EVENT_LINES_PER_DAY = 3;
@@ -214,6 +214,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const [showContentManagement, setShowContentManagement] = useState(false);
 
     const stageInstance = stage();
+    const configuredBackgroundImageUrl = (stageInstance.getConfiguration().backgroundImageUrl || '').trim() || DEFAULT_BACKGROUND_IMAGE_URL;
     const save = stageInstance.getSave();
     const currentDateKey = save.currentDate || formatDateKey(new Date());
     const currentDate = parseDateKey(currentDateKey);
@@ -312,7 +313,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                     flexDirection: "column",
                     gap: 1.5,
                     overflow: "hidden",
-                    backgroundImage: `linear-gradient(130deg, var(--agenda-calendar-overlay-start) 0%, var(--agenda-calendar-overlay-mid) 48%, var(--agenda-calendar-overlay-end) 100%), url(${CALENDAR_BACKGROUND_IMAGE})`,
+                    backgroundImage: `linear-gradient(130deg, var(--agenda-calendar-overlay-start) 0%, var(--agenda-calendar-overlay-mid) 48%, var(--agenda-calendar-overlay-end) 100%), url(${configuredBackgroundImageUrl})`,
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                     backgroundRepeat: "no-repeat",

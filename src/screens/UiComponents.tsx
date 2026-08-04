@@ -331,6 +331,85 @@ export const normalizeHexColor = (value: string): string | null => {
 	return null;
 };
 
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+const toHexChannel = (channel: number): string => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, '0');
+
+const parseRgbaColor = (value: string): { r: number; g: number; b: number; a: number } | null => {
+	const trimmed = value.trim();
+	const match = trimmed.match(/^rgba?\(([^)]+)\)$/i);
+	if (!match) {
+		return null;
+	}
+
+	const parts = match[1].split(',').map(part => part.trim());
+	if (parts.length !== 3 && parts.length !== 4) {
+		return null;
+	}
+
+	const r = Number.parseFloat(parts[0]);
+	const g = Number.parseFloat(parts[1]);
+	const b = Number.parseFloat(parts[2]);
+	const a = parts.length === 4 ? Number.parseFloat(parts[3]) : 1;
+
+	if (![r, g, b, a].every(Number.isFinite)) {
+		return null;
+	}
+
+	return {
+		r: clamp(Math.round(r), 0, 255),
+		g: clamp(Math.round(g), 0, 255),
+		b: clamp(Math.round(b), 0, 255),
+		a: clamp(a, 0, 1),
+	};
+};
+
+const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+	const normalized = normalizeHexColor(hex);
+	if (!normalized) {
+		return null;
+	}
+
+	const value = normalized.slice(1);
+	return {
+		r: Number.parseInt(value.slice(0, 2), 16),
+		g: Number.parseInt(value.slice(2, 4), 16),
+		b: Number.parseInt(value.slice(4, 6), 16),
+	};
+};
+
+const rgbToHex = (rgb: { r: number; g: number; b: number }): string => (
+	`#${toHexChannel(rgb.r)}${toHexChannel(rgb.g)}${toHexChannel(rgb.b)}`
+);
+
+const formatRgbaColor = (hex: string, alpha: number): string => {
+	const rgb = hexToRgb(hex);
+	if (!rgb) {
+		return `rgba(138, 176, 204, ${clamp(alpha, 0, 1).toFixed(2)})`;
+	}
+
+	const resolvedAlpha = clamp(Number.parseFloat(alpha.toString()), 0, 1);
+	const alphaText = Number.parseFloat(resolvedAlpha.toFixed(2)).toString();
+	return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alphaText})`;
+};
+
+const resolveColorValueForPicker = (value: string): { hexColor: string; alpha: number } | null => {
+	const normalizedHex = normalizeHexColor(value);
+	if (normalizedHex) {
+		return { hexColor: normalizedHex, alpha: 1 };
+	}
+
+	const rgba = parseRgbaColor(value);
+	if (!rgba) {
+		return null;
+	}
+
+	return {
+		hexColor: rgbToHex(rgba),
+		alpha: rgba.a,
+	};
+};
+
 export const buildHexColorSwatches = (
 	preferred: Array<string | null | undefined>,
 	fallback: readonly string[] = DEFAULT_COLOR_SWATCHES,
@@ -345,7 +424,8 @@ export const buildHexColorSwatches = (
 			continue;
 		}
 
-		const normalized = normalizeHexColor(color);
+		const resolved = resolveColorValueForPicker(color);
+		const normalized = resolved?.hexColor || null;
 		if (!normalized) {
 			continue;
 		}
@@ -376,7 +456,7 @@ export const ColorPickerInput: FC<ColorPickerInputProps> = ({
 	swatchButtonStyle,
 }) => {
 	const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
-	const normalizedColor = normalizeHexColor(value);
+	const normalizedColor = resolveColorValueForPicker(value)?.hexColor || null;
 	const previewColor = normalizedColor || fallbackColor;
 	const isPopoverOpen = Boolean(anchorEl);
 	const displaySwatches = buildHexColorSwatches([...swatches], DEFAULT_COLOR_SWATCHES, 10);
@@ -478,6 +558,163 @@ export const ColorPickerInput: FC<ColorPickerInputProps> = ({
 						<span style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
 							Custom color
 						</span>
+					</div>
+				</div>
+			</Popover>
+		</>
+	);
+};
+
+interface AlphaColorPickerInputProps {
+	value: string;
+	onChange: (value: string) => void;
+	placeholder?: string;
+	swatches?: readonly string[];
+	fallbackColor?: string;
+	fallbackAlpha?: number;
+	popoverTitle?: string;
+	inputStyle?: React.CSSProperties;
+	containerStyle?: React.CSSProperties;
+	swatchButtonStyle?: React.CSSProperties;
+}
+
+export const AlphaColorPickerInput: FC<AlphaColorPickerInputProps> = ({
+	value,
+	onChange,
+	placeholder = 'rgba(R, G, B, A)',
+	swatches = DEFAULT_COLOR_SWATCHES,
+	fallbackColor = '#8ab0cc',
+	fallbackAlpha = 0.8,
+	popoverTitle = 'Choose color and alpha',
+	inputStyle,
+	containerStyle,
+	swatchButtonStyle,
+}) => {
+	const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
+	const parsedValue = resolveColorValueForPicker(value);
+	const fallbackParsedValue = resolveColorValueForPicker(fallbackColor) || { hexColor: '#8ab0cc', alpha: clamp(fallbackAlpha, 0, 1) };
+	const currentHexColor = parsedValue?.hexColor || fallbackParsedValue.hexColor;
+	const currentAlpha = parsedValue?.alpha ?? fallbackParsedValue.alpha;
+	const previewColor = formatRgbaColor(currentHexColor, currentAlpha);
+	const displaySwatches = buildHexColorSwatches([...swatches], DEFAULT_COLOR_SWATCHES, 10);
+	const isPopoverOpen = Boolean(anchorEl);
+
+	const updateColor = (hexColor: string, alpha: number) => {
+		onChange(formatRgbaColor(hexColor, alpha));
+	};
+
+	return (
+		<>
+			<div style={{ display: 'flex', gap: '10px', alignItems: 'center', ...containerStyle }}>
+				<TextInput
+					value={value}
+					onChange={(e) => onChange(e.target.value)}
+					placeholder={placeholder}
+					style={{ flex: 1, ...inputStyle }}
+				/>
+				<button
+					type="button"
+					onClick={(event) => setAnchorEl(event.currentTarget)}
+					aria-label="Open RGBA color picker"
+					title="Open RGBA color picker"
+					style={{
+						width: '50px',
+						height: '38px',
+						backgroundColor: previewColor,
+						border: '2px solid rgba(0, 255, 136, 0.3)',
+						borderRadius: '5px',
+						cursor: 'pointer',
+						padding: 0,
+						...swatchButtonStyle,
+					}}
+				/>
+			</div>
+			<Popover
+				open={isPopoverOpen}
+				anchorEl={anchorEl}
+				onClose={() => setAnchorEl(null)}
+				anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+				transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+				slotProps={{
+					paper: {
+						style: {
+							marginTop: '8px',
+							backgroundColor: 'rgba(0, 20, 40, 0.95)',
+							border: '2px solid rgba(0, 255, 136, 0.3)',
+							borderRadius: '8px',
+							color: '#e0f0ff',
+							minWidth: '280px',
+							padding: '12px',
+						},
+					},
+				}}
+			>
+				<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+					<div style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+						{popoverTitle}
+					</div>
+					<div
+						style={{
+							display: 'grid',
+							gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+							gap: '8px',
+						}}
+					>
+						{displaySwatches.map((color) => {
+							const isSelected = currentHexColor.toLowerCase() === color.toLowerCase();
+							return (
+								<button
+									key={color}
+									type="button"
+									onClick={() => updateColor(color, currentAlpha)}
+									title={color}
+									aria-label={`Set color ${color}`}
+									style={{
+										width: '100%',
+										aspectRatio: '1',
+										borderRadius: '6px',
+										border: isSelected ? '2px solid #ffffff' : '2px solid rgba(255, 255, 255, 0.25)',
+										backgroundColor: color,
+										cursor: 'pointer',
+										boxShadow: isSelected ? '0 0 0 1px rgba(0, 255, 136, 0.7)' : 'none',
+									}}
+								/>
+							);
+						})}
+					</div>
+					<div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+						<input
+							type="color"
+							value={currentHexColor}
+							onChange={(e) => updateColor(e.target.value, currentAlpha)}
+							style={{
+								width: '44px',
+								height: '32px',
+								border: 'none',
+								borderRadius: '4px',
+								background: 'transparent',
+								cursor: 'pointer',
+								padding: 0,
+							}}
+						/>
+						<span style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+							Custom color
+						</span>
+					</div>
+					<div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+						<div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+							<span>Alpha</span>
+							<span>{Math.round(currentAlpha * 100)}%</span>
+						</div>
+						<input
+							type="range"
+							min={0}
+							max={1}
+							step={0.01}
+							value={currentAlpha}
+							onChange={(e) => updateColor(currentHexColor, Number.parseFloat(e.target.value))}
+							style={{ width: '100%', accentColor: 'var(--agenda-active)' }}
+						/>
 					</div>
 				</div>
 			</Popover>
