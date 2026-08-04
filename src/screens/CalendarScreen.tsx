@@ -88,9 +88,8 @@ const formatOrdinal = (value: number) => {
     return `${value}th`;
 };
 
-const formatActiveMonthDateLabel = (date: Date) => {
+const formatCurrentDateLabel = (date: Date) => {
     const dayOfMonth = date.getUTCDate();
-    console.log(`formatActiveMonthDateLabel: date=${date.toISOString()};${dayOfMonth}`);
     const year = date.getUTCFullYear();
     const monthString = date.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
     return `${monthString} ${formatOrdinal(dayOfMonth)}, ${year}`;
@@ -243,10 +242,10 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
         const index = monthGrid.findIndex((gridDate) => isSameDate(gridDate, currentDate));
         return index >= 0 ? Math.floor(index / 7) : -1;
     }, [monthGrid, currentDateKey]);
-    const currentWeekdayColumnIndex = currentDate.getUTCDay();
+    const currentWeekdayColumnIndex = currentDate.getUTCDay() + 1;
     const calendarGridTemplateColumns = useMemo(
         () => WEEKDAY_LABELS
-            .map((_, dayIndex) => (dayIndex === currentWeekdayColumnIndex ? "1.14fr" : "0.98fr"))
+            .map((_, dayIndex) => (dayIndex === currentWeekdayColumnIndex ? "1.21fr" : "0.97fr"))
             .join(" "),
         [currentWeekdayColumnIndex],
     );
@@ -335,7 +334,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                     gap: 1,
                                 }}
                             >
-                                {isViewingCurrentMonth ? formatActiveMonthDateLabel(viewMonth) : `(${formatMonthLabel(viewMonth)})`}
+                                {isViewingCurrentMonth ? formatCurrentDateLabel(todayDate) : `(${formatMonthLabel(viewMonth)})`}
                                 {isViewingCurrentMonth && <CurrentTimeIcon sx={{ fontSize: { xs: "1.4rem", md: "2rem" }, opacity: 0.9 }} />}
                             </Typography>
 
