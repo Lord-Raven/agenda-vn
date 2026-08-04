@@ -99,6 +99,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [collapsedCustomSettings, setCollapsedCustomSettings] = useState<boolean[]>(() =>
         (configuration.settings || []).map(() => true),
     );
+    const [collapsedActorStats, setCollapsedActorStats] = useState<boolean[]>(() =>
+        (configuration.actorStats || save.agendaConfig?.actorStats || []).map(() => true),
+    );
     const [actorStats, setActorStats] = useState<ActorStat[]>(() =>
         (configuration.actorStats || save.agendaConfig?.actorStats || []).map(cloneActorStat),
     );
@@ -109,7 +112,28 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const fieldLabelStyle: React.CSSProperties = {
         display: 'block',
         color: 'var(--agenda-inactive)',
-        marginBottom: 6,
+        marginBottom: 0,
+        fontSize: '13px',
+        lineHeight: 1.1,
+    };
+
+    const inlineFieldStyle: React.CSSProperties = {
+        display: 'grid',
+        gridTemplateColumns: '120px minmax(0, 1fr)',
+        gap: '10px',
+        alignItems: 'center',
+        marginBottom: 8,
+    };
+
+    const inlineFieldTopStyle: React.CSSProperties = {
+        ...inlineFieldStyle,
+        alignItems: 'start',
+    };
+
+    const compactChipLabelStyle: React.CSSProperties = {
+        color: 'var(--agenda-inactive)',
+        fontSize: '12px',
+        marginBottom: 4,
     };
 
     const validSelections = useMemo(() => {
@@ -261,6 +285,13 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
     const removeActorStat = (index: number) => {
         setActorStats(prev => prev.filter((_, idx) => idx !== index));
+        setCollapsedActorStats(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const toggleActorStat = (index: number) => {
+        setCollapsedActorStats(prev => prev.map((isCollapsed, idx) => (
+            idx === index ? !isCollapsed : isCollapsed
+        )));
     };
 
     const updateSettingOption = (settingIndex: number, optionName: string, segment: ContextSegment) => {
@@ -396,22 +427,25 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             {!collapsedContextBlocks[index] && (
                                 <>
                                     <div style={{ marginTop: 10 }}>
-                                        <label style={fieldLabelStyle}>Name</label>
-                                        <TextInput
-                                            fullWidth
-                                            value={segment.title}
-                                            onChange={(e) => updateContextSegment(index, { title: e.target.value })}
-                                            placeholder="Context title"
-                                            style={{ marginBottom: 8 }}
-                                        />
-                                        <label style={fieldLabelStyle}>Context</label>
-                                        <textarea
-                                            className="input-base"
-                                            value={renderSegmentBody(segment)}
-                                            onChange={(e) => updateContextSegment(index, { body: e.target.value })}
-                                            rows={4}
-                                            style={{ width: '100%', resize: 'vertical' }}
-                                        />
+                                        <div style={inlineFieldStyle}>
+                                            <label style={fieldLabelStyle}>Name</label>
+                                            <TextInput
+                                                fullWidth
+                                                value={segment.title}
+                                                onChange={(e) => updateContextSegment(index, { title: e.target.value })}
+                                                placeholder="Context title"
+                                            />
+                                        </div>
+                                        <div style={inlineFieldTopStyle}>
+                                            <label style={fieldLabelStyle}>Context</label>
+                                            <textarea
+                                                className="input-base"
+                                                value={renderSegmentBody(segment)}
+                                                onChange={(e) => updateContextSegment(index, { body: e.target.value })}
+                                                rows={4}
+                                                style={{ width: '100%', resize: 'vertical' }}
+                                            />
+                                        </div>
                                     </div>
                                     <div style={{ marginTop: 8 }}>
                                         <Button variant="danger" onClick={() => removeContextSegment(index)}>Remove Block</Button>
@@ -453,62 +487,70 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                                 {!collapsedCustomSettings[settingIndex] && (
                                     <>
                                         <div style={{ marginTop: 10 }}>
-                                            <label style={fieldLabelStyle}>Name</label>
-                                            <TextInput
-                                                fullWidth
-                                                value={setting.title}
-                                                onChange={(e) => updateCustomSetting(settingIndex, { title: e.target.value })}
-                                                placeholder="Setting title"
-                                                style={{ marginBottom: 8 }}
-                                            />
-                                            <label style={fieldLabelStyle}>Description</label>
-                                            <textarea
-                                                className="input-base"
-                                                value={setting.description}
-                                                onChange={(e) => updateCustomSetting(settingIndex, { description: e.target.value })}
-                                                rows={2}
-                                                style={{ width: '100%', resize: 'vertical', marginBottom: 8 }}
-                                            />
+                                            <div style={inlineFieldStyle}>
+                                                <label style={fieldLabelStyle}>Name</label>
+                                                <TextInput
+                                                    fullWidth
+                                                    value={setting.title}
+                                                    onChange={(e) => updateCustomSetting(settingIndex, { title: e.target.value })}
+                                                    placeholder="Setting title"
+                                                />
+                                            </div>
+                                            <div style={inlineFieldTopStyle}>
+                                                <label style={fieldLabelStyle}>Description</label>
+                                                <textarea
+                                                    className="input-base"
+                                                    value={setting.description}
+                                                    onChange={(e) => updateCustomSetting(settingIndex, { description: e.target.value })}
+                                                    rows={2}
+                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                />
+                                            </div>
 
-                                            <label style={fieldLabelStyle}>Selected Option</label>
-                                            <select
-                                                className="input-base"
-                                                value={selectedOption}
-                                                onChange={(e) => setSelectedSettings(prev => ({ ...prev, [setting.title]: e.target.value }))}
-                                                style={{ marginBottom: 10 }}
-                                            >
-                                                {optionEntries.map(([name]) => (
-                                                    <option key={name} value={name}>{name}</option>
-                                                ))}
-                                            </select>
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Default</label>
+                                                <select
+                                                    className="input-base"
+                                                    value={selectedOption}
+                                                    onChange={(e) => setSelectedSettings(prev => ({ ...prev, [setting.title]: e.target.value }))}
+                                                >
+                                                    {optionEntries.map(([name]) => (
+                                                        <option key={name} value={name}>{name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
 
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                 {optionEntries.map(([optionName, segment]) => (
                                                     <div key={`${settingIndex}-${optionName}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 8 }}>
-                                                        <label style={fieldLabelStyle}>Option Name</label>
-                                                        <TextInput
-                                                            fullWidth
-                                                            defaultValue={optionName}
-                                                            onBlur={(e) => renameSettingOption(settingIndex, optionName, e.target.value)}
-                                                            placeholder="Option name"
-                                                            style={{ marginBottom: 6 }}
-                                                        />
-                                                        <label style={fieldLabelStyle}>Context Block Name</label>
-                                                        <TextInput
-                                                            fullWidth
-                                                            value={segment.title}
-                                                            onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, title: e.target.value })}
-                                                            placeholder="Context title"
-                                                            style={{ marginBottom: 6 }}
-                                                        />
-                                                        <label style={fieldLabelStyle}>Context</label>
-                                                        <textarea
-                                                            className="input-base"
-                                                            value={typeof segment.body === 'string' ? segment.body : renderSegmentBody(segment)}
-                                                            onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, body: e.target.value })}
-                                                            rows={3}
-                                                            style={{ width: '100%', resize: 'vertical' }}
-                                                        />
+                                                        <div style={inlineFieldStyle}>
+                                                            <label style={fieldLabelStyle}>Option Name</label>
+                                                            <TextInput
+                                                                fullWidth
+                                                                defaultValue={optionName}
+                                                                onBlur={(e) => renameSettingOption(settingIndex, optionName, e.target.value)}
+                                                                placeholder="Option name"
+                                                            />
+                                                        </div>
+                                                        <div style={inlineFieldStyle}>
+                                                            <label style={fieldLabelStyle}>Context Name</label>
+                                                            <TextInput
+                                                                fullWidth
+                                                                value={segment.title}
+                                                                onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, title: e.target.value })}
+                                                                placeholder="Context title"
+                                                            />
+                                                        </div>
+                                                        <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                                            <label style={fieldLabelStyle}>Context</label>
+                                                            <textarea
+                                                                className="input-base"
+                                                                value={typeof segment.body === 'string' ? segment.body : renderSegmentBody(segment)}
+                                                                onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, body: e.target.value })}
+                                                                rows={3}
+                                                                style={{ width: '100%', resize: 'vertical' }}
+                                                            />
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -552,74 +594,122 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {actorStats.map((stat, statIndex) => (
                         <div key={`actor-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 10 }}>
-                            <TextInput
-                                fullWidth
-                                value={stat.name}
-                                onChange={(e) => updateActorStat(statIndex, { name: e.target.value })}
-                                placeholder="Stat name"
-                                style={{ marginBottom: 8 }}
-                            />
-
-                            <textarea
-                                className="input-base"
-                                value={stat.description}
-                                onChange={(e) => updateActorStat(statIndex, { description: e.target.value })}
-                                rows={2}
-                                placeholder="Describe what this stat represents."
-                                style={{ width: '100%', resize: 'vertical', marginBottom: 8 }}
-                            />
-
-                            <textarea
-                                className="input-base"
-                                value={stat.guidance}
-                                onChange={(e) => updateActorStat(statIndex, { guidance: e.target.value })}
-                                rows={2}
-                                placeholder="Guidance for using this stat in generated narrative."
-                                style={{ width: '100%', resize: 'vertical', marginBottom: 8 }}
-                            />
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginBottom: 8 }}>
-                                <TextInput
-                                    fullWidth
-                                    type="number"
-                                    value={String(stat.default)}
-                                    onChange={(e) => updateActorStat(statIndex, { default: Number(e.target.value) || 0 })}
-                                    placeholder="Default"
-                                />
-
-                                <TextInput
-                                    fullWidth
-                                    type="number"
-                                    value={typeof stat.min === 'number' ? String(stat.min) : ''}
-                                    onChange={(e) => updateActorStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                    placeholder="Min"
-                                />
-
-                                <TextInput
-                                    fullWidth
-                                    type="number"
-                                    value={typeof stat.max === 'number' ? String(stat.max) : ''}
-                                    onChange={(e) => updateActorStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                    placeholder="Max"
-                                />
-
-                                <select
-                                    className="input-base"
-                                    value={stat.displayType}
-                                    onChange={(e) => updateActorStat(statIndex, { displayType: e.target.value as ActorStat['displayType'] })}
-                                >
-                                    <option value="number">number</option>
-                                    <option value="percentage">percentage</option>
-                                    <option value="stars">stars</option>
-                                    <option value="letter grade">letter grade</option>
-                                </select>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                <div style={{ fontWeight: 600, color: 'var(--agenda-text)' }}>
+                                    {stat.name?.trim() || `Actor Stat ${statIndex + 1}`}
+                                </div>
+                                <Button variant="secondary" onClick={() => toggleActorStat(statIndex)}>
+                                    {collapsedActorStats[statIndex] ? 'Expand' : 'Collapse'}
+                                </Button>
                             </div>
 
-                            <Button variant="danger" onClick={() => removeActorStat(statIndex)}>Remove Actor Stat</Button>
+                            {!collapsedActorStats[statIndex] && (
+                                <>
+                                    <div style={{ marginTop: 10 }}>
+                                        <div style={inlineFieldStyle}>
+                                            <label style={fieldLabelStyle}>Name</label>
+                                            <TextInput
+                                                fullWidth
+                                                value={stat.name}
+                                                onChange={(e) => updateActorStat(statIndex, { name: e.target.value })}
+                                                placeholder="Stat name"
+                                            />
+                                        </div>
+
+                                        <div style={inlineFieldTopStyle}>
+                                            <label style={fieldLabelStyle}>Description</label>
+                                            <textarea
+                                                className="input-base"
+                                                value={stat.description}
+                                                onChange={(e) => updateActorStat(statIndex, { description: e.target.value })}
+                                                rows={2}
+                                                placeholder="Describe what this stat represents."
+                                                style={{ width: '100%', resize: 'vertical' }}
+                                            />
+                                        </div>
+
+                                        <div style={inlineFieldTopStyle}>
+                                            <label style={fieldLabelStyle}>Guidance</label>
+                                            <textarea
+                                                className="input-base"
+                                                value={stat.guidance}
+                                                onChange={(e) => updateActorStat(statIndex, { guidance: e.target.value })}
+                                                rows={2}
+                                                placeholder="Guidance for using this stat in generated narrative."
+                                                style={{ width: '100%', resize: 'vertical' }}
+                                            />
+                                        </div>
+
+                                        <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                            <label style={fieldLabelStyle}>Scale</label>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                                                <div>
+                                                    <div style={compactChipLabelStyle}>Default</div>
+                                                    <TextInput
+                                                        fullWidth
+                                                        type="number"
+                                                        value={String(stat.default)}
+                                                        onChange={(e) => updateActorStat(statIndex, { default: Number(e.target.value) || 0 })}
+                                                        placeholder="Default"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <div style={compactChipLabelStyle}>Min</div>
+                                                    <TextInput
+                                                        fullWidth
+                                                        type="number"
+                                                        value={typeof stat.min === 'number' ? String(stat.min) : ''}
+                                                        onChange={(e) => updateActorStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                                        placeholder="Min"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <div style={compactChipLabelStyle}>Max</div>
+                                                    <TextInput
+                                                        fullWidth
+                                                        type="number"
+                                                        value={typeof stat.max === 'number' ? String(stat.max) : ''}
+                                                        onChange={(e) => updateActorStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                                        placeholder="Max"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <div style={compactChipLabelStyle}>Display</div>
+                                                    <select
+                                                        className="input-base"
+                                                        value={stat.displayType}
+                                                        onChange={(e) => updateActorStat(statIndex, { displayType: e.target.value as ActorStat['displayType'] })}
+                                                    >
+                                                        <option value="number">number</option>
+                                                        <option value="percentage">percentage</option>
+                                                        <option value="stars">stars</option>
+                                                        <option value="letter grade">letter grade</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ marginTop: 10 }}>
+                                        <Button variant="danger" onClick={() => removeActorStat(statIndex)}>Remove Actor Stat</Button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     ))}
 
-                    <Button variant="secondary" onClick={() => setActorStats(prev => [...prev, defaultActorStat()])}>Add Actor Stat</Button>
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setActorStats(prev => [...prev, defaultActorStat()]);
+                            setCollapsedActorStats(prev => [...prev, false]);
+                        }}
+                    >
+                        Add Actor Stat
+                    </Button>
                 </div>
             </GlassPanel>
 
