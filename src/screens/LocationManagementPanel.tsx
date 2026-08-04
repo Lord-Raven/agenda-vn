@@ -5,6 +5,7 @@ import { Stage } from '../Stage';
 import { Location } from '../content/Location';
 import { Button } from './UiComponents';
 import { LocationDetailPanel } from './LocationDetailPanel';
+import { createLoreEntry } from '../content/Lore';
 
 interface LocationManagementPanelProps {
     stage: () => Stage;
@@ -94,6 +95,25 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
 
         save.atlas = save.atlas || {};
         save.atlas[location.id] = location;
+
+        // If the location has no lorebook entry, create one with the same name and description.
+        const existingLore = save.lorebook?.find((lore) => lore.type === 'location' && lore.title?.trim().toLowerCase() === location.name?.trim().toLowerCase());
+        if (!existingLore) {
+            const newLore = createLoreEntry({
+                type: 'location',
+                title: location.name,
+                content: location.description,
+                triggers: [location.name, ...location.name.split(' ').filter(word => word.length > 2 && word.charAt(word.length - 1) !== '.')],
+                enabled: true,
+                constant: false,
+                insertionOrder: 0,
+                priority: 0,
+                probability: 1.0
+            });
+            save.lorebook = save.lorebook || [];
+            save.lorebook.push(newLore);
+        }
+
         stage().saveGame();
         setSelectedLocationId(location.id);
     };

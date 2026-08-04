@@ -201,29 +201,6 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     console.log('Loading reserve actor:', definition.name);
     console.log(definition);
 
-    // Attempt to substitute words to avert bad content into something more agreeable (if the distillation still has these, then drop the card).
-    const bannedWordSubstitutes: {[key: string]: string} = {
-        // Try to age up some terms in the hopes that the character can be salvaged.
-        'underage': 'young adult',
-        'adolescent': 'young adult',
-        'youngster': 'young adult',
-        'teen': 'young adult',
-        'highschooler': 'young adult',
-        'childhood': 'formative years',
-        'childish': 'bratty',
-        'child': 'young adult',
-        // Don't bother with these; just set it to the same word so it gets discarded.
-        'toddler': 'toddler',
-        'infant': 'infant',
-        // Assume that these words are being used in an innocuous way, unless they come back in the distillation.
-        'kid': 'joke',
-        'baby': 'honey',
-        'minor': 'trivial',
-        'old-school': 'retro',
-        'high school': 'college',
-        'school': 'college'};
-
-
     const actorStats = (stage.getSave().agendaConfig?.actorStats || []).filter(stat => stat?.name?.trim());
     const actorStatFields = buildActorStatFields(actorStats);
     const distillationFields = [...DISTILLATION_FIELDS, ...actorStatFields];
@@ -338,6 +315,23 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
     if (actor.outfitId === '') {
         actor.outfitId = actor.outfits[0].id;
+    }
+
+    // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
+    const existingLore = getLinkedActorLore(actor.name, stage);
+    if (!existingLore) {
+        const newLore = createLoreEntry({
+            type: 'character',
+            title: actor.name,
+            content: actor.profile,
+            triggers: [actor.name, ...actor.name.split(' ').filter(word => word.length > 2 && word.charAt(word.length - 1) !== '.')],
+            enabled: true,
+            constant: false,
+            insertionOrder: 0,
+            priority: 0,
+            probability: 1.0
+        });
+        stage.getSave().lorebook?.push(newLore);
     }
 
     const currentOutfit = getActiveOutfit(actor);
