@@ -6,6 +6,8 @@ import { Box, Typography } from "@mui/material";
 import {
     ArrowBackRounded,
     ArrowForwardRounded,
+    Bed,
+    Bedtime,
     DarkModeRounded,
     EventAvailable,
     LightModeRounded,
@@ -13,7 +15,9 @@ import {
     NightsStayRounded,
     Settings,
     TodayRounded,
+    WbSunny,
     WbSunnyRounded,
+    WbTwilight,
 } from "@mui/icons-material";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button, GlassPanel } from "./UiComponents";
@@ -91,20 +95,21 @@ const formatOrdinal = (value: number) => {
 const formatActiveMonthDateLabel = (date: Date) => {
     const monthNumber = date.getUTCMonth() + 1;
     const year = date.getUTCFullYear();
-    return `Month ${formatOrdinal(monthNumber)}, year ${year}`;
+    const monthString = date.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
+    return `${monthString} ${formatOrdinal(monthNumber)}, ${year}`;
 };
 
 const getTimeOfDayIcon = (timeOfDay: CalendarTimeOfDay) => {
     if (timeOfDay === "morning") {
-        return WbSunnyRounded;
+        return WbTwilight;
     }
     if (timeOfDay === "afternoon") {
-        return LightModeRounded;
+        return WbSunny;
     }
     if (timeOfDay === "evening") {
-        return NightsStayRounded;
+        return Bedtime;
     }
-    return DarkModeRounded;
+    return Bed;
 };
 
 const formatRecurrenceSummary = (recurrence?: CalendarEventRecurrence | null) => {
