@@ -89,10 +89,11 @@ const formatOrdinal = (value: number) => {
 };
 
 const formatActiveMonthDateLabel = (date: Date) => {
-    const monthNumber = date.getUTCDate();
+    const dayOfMonth = date.getUTCDate();
+    console.log(`formatActiveMonthDateLabel: date=${date.toISOString()};${dayOfMonth}`);
     const year = date.getUTCFullYear();
     const monthString = date.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
-    return `${monthString} ${formatOrdinal(monthNumber)}, ${year}`;
+    return `${monthString} ${formatOrdinal(dayOfMonth)}, ${year}`;
 };
 
 const getTimeOfDayIcon = (timeOfDay: CalendarTimeOfDay) => {
@@ -663,7 +664,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             onClick={(event) => event.stopPropagation()}
                             style={{ width: "min(1100px, 94vw)" }}
                         >
-                            <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 1, height: "88vh", maxHeight: "88vh", minHeight: 0 }}>
+                            <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 1, height: "50vh", maxHeight: "88vh", minHeight: 0 }}>
                                 {(() => {
                                     const dateEvents = eventsByDate.get(selectedDateKey) || [];
                                     const orderedDateEvents = [...dateEvents].sort((left, right) => compareEventSchedule(left, right));
