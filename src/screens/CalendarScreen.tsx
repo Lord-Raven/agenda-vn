@@ -321,29 +321,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 {isViewingCurrentMonth && <CurrentTimeIcon sx={{ fontSize: { xs: "1.4rem", md: "2rem" }, opacity: 0.9 }} />}
                             </Typography>
 
-                            <Typography sx={{ color: "var(--agenda-inactive)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
-                                Current Time: {formatTimeOfDay(currentTimeOfDay)}
-                            </Typography>
-
                             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, opacity: 0.82, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setScreenType(ScreenType.MENU)}
-                                    onMouseEnter={() => setTooltip("Main menu", MenuRounded)}
-                                    onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 10px" }}
-                                >
-                                    <MenuRounded fontSize="small" />
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setShowContentManagement(true)}
-                                    onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", Settings)}
-                                    onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 10px" }}
-                                >
-                                    <Settings fontSize="small" />
-                                </Button>
+
                                 <Button
                                     variant="secondary"
                                     onClick={() => changeMonth(-1)}
@@ -370,6 +349,24 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                     style={{ padding: "8px 10px" }}
                                 >
                                     <ArrowForwardRounded fontSize="small" />
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setShowContentManagement(true)}
+                                    onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", Settings)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 10px" }}
+                                >
+                                    <Settings fontSize="small" />
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setScreenType(ScreenType.MENU)}
+                                    onMouseEnter={() => setTooltip("Main menu", MenuRounded)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 10px" }}
+                                >
+                                    <MenuRounded fontSize="small" />
                                 </Button>
                             </Box>
                         </Box>
