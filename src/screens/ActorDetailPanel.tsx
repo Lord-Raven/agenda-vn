@@ -1,7 +1,7 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
-import { Stage } from '../Stage';
+import { ActorStat, Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
@@ -15,10 +15,83 @@ interface ActorDetailPanelProps {
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 
+const clampActorStatValue = (value: number, stat: ActorStat): number => {
+    let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
+    if (typeof stat.min === 'number') {
+        resolved = Math.max(stat.min, resolved);
+    }
+    if (typeof stat.max === 'number') {
+        resolved = Math.min(stat.max, resolved);
+    }
+    return resolved;
+};
+
+const resolveActorStatRange = (stat: ActorStat): { min: number; max: number; step: number; hasRange: boolean } => {
+    if (typeof stat.min === 'number' && typeof stat.max === 'number' && stat.max > stat.min) {
+        return { min: stat.min, max: stat.max, step: 1, hasRange: true };
+    }
+
+    if (stat.displayType === 'percentage') {
+        return { min: 0, max: 100, step: 1, hasRange: true };
+    }
+
+    if (stat.displayType === 'stars') {
+        return { min: 1, max: 5, step: 1, hasRange: true };
+    }
+
+    if (stat.displayType === 'letter grade') {
+        return { min: 0, max: 100, step: 1, hasRange: true };
+    }
+
+    return { min: 0, max: 100, step: 1, hasRange: false };
+};
+
+const buildLetterGradeOptions = (stat: ActorStat): Array<{ label: string; value: number }> => {
+    const { min, max } = resolveActorStatRange(stat);
+    const labels = ['F', 'D', 'C', 'B', 'A', 'S'];
+    const span = Math.max(1, max - min);
+
+    return labels.map((label, index) => {
+        const ratio = index / (labels.length - 1);
+        const value = min + (span * ratio);
+        return {
+            label,
+            value: Number(value.toFixed(2)),
+        };
+    });
+};
+
+const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [key: string]: number } => {
+    const nextMap: { [key: string]: number } = {};
+    actorStats.forEach((stat) => {
+        const currentValue = Number(actor.statMap?.[stat.name]);
+        const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
+        const resolved = Number.isFinite(currentValue) ? currentValue : fallback;
+        nextMap[stat.name] = clampActorStatValue(resolved, stat);
+    });
+    return nextMap;
+};
+
 export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) => {
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
     const linkedLoreEntry = getLinkedActorLore(actor.name, stage());
+    const actorStats = useMemo(() => {
+        const configured = stage().getSave().agendaConfig?.actorStats || [];
+        const uniqueStatMap: { [name: string]: ActorStat } = {};
+        configured.forEach((stat) => {
+            const name = stat?.name?.trim();
+            if (!name || uniqueStatMap[name]) {
+                return;
+            }
+            uniqueStatMap[name] = {
+                ...stat,
+                name,
+                default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
+            };
+        });
+        return Object.values(uniqueStatMap);
+    }, [stage]);
 
     const getClonedOutfits = (): Outfit[] => {
         const sourceOutfits: Outfit[] = Array.isArray(actor.outfits) && actor.outfits.length > 0
@@ -57,6 +130,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
         themeFontFamily: actor.themeFontFamily,
     });
     const [editedOutfits, setEditedOutfits] = useState<Outfit[]>(() => getClonedOutfits());
+    const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: number }>(() =>
+        createInitialActorStatMap(actor, actorStats),
+    );
     const [selectedOutfitId, setSelectedOutfitId] = useState<string>(() => {
         const outfits = getClonedOutfits();
         if (actor.outfitId && outfits.some((outfit) => outfit.id === actor.outfitId)) {
@@ -87,6 +163,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
     }>({ open: false, title: '', message: '' });
     const editedActorRef = useRef(editedActor);
     const editedOutfitsRef = useRef(editedOutfits);
+    const editedStatMapRef = useRef(editedStatMap);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
@@ -98,7 +175,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
 
     const persistActor = (
         nextEditedActor: typeof editedActor,
-        nextEditedOutfits: Outfit[]
+        nextEditedOutfits: Outfit[],
+        nextEditedStatMap: { [key: string]: number }
     ) => {
 
         if (autoSaveTimeoutRef.current) {
@@ -130,6 +208,22 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
         actor.themeColor = nextEditedActor.themeColor;
         actor.themeFontFamily = nextEditedActor.themeFontFamily;
         actor.outfits = persistedOutfits;
+        actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
+
+        const activeStatNames = new Set<string>();
+        actorStats.forEach((stat) => {
+            activeStatNames.add(stat.name);
+            const candidateValue = Number(nextEditedStatMap[stat.name]);
+            const fallbackValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
+            const resolvedValue = Number.isFinite(candidateValue) ? candidateValue : fallbackValue;
+            actor.statMap[stat.name] = clampActorStatValue(resolvedValue, stat);
+        });
+
+        Object.keys(actor.statMap).forEach((statName) => {
+            if (!activeStatNames.has(statName)) {
+                delete actor.statMap[statName];
+            }
+        });
 
         stage().saveGame();
     };
@@ -147,6 +241,31 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
     }, [editedOutfits]);
 
     useEffect(() => {
+        editedStatMapRef.current = editedStatMap;
+    }, [editedStatMap]);
+
+    useEffect(() => {
+        setEditedStatMap((prev) => {
+            const next = createInitialActorStatMap(actor, actorStats);
+            actorStats.forEach((stat) => {
+                const previousValue = Number(prev[stat.name]);
+                if (Number.isFinite(previousValue)) {
+                    next[stat.name] = clampActorStatValue(previousValue, stat);
+                }
+            });
+
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(next);
+            if (prevKeys.length !== nextKeys.length) {
+                return next;
+            }
+
+            const hasDiff = nextKeys.some((key) => Number(prev[key]) !== Number(next[key]));
+            return hasDiff ? next : prev;
+        });
+    }, [actor, actorStats]);
+
+    useEffect(() => {
         if (!didMountRef.current) {
             didMountRef.current = true;
             return;
@@ -157,7 +276,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
         }
 
         autoSaveTimeoutRef.current = window.setTimeout(() => {
-            persistActor(editedActorRef.current, editedOutfitsRef.current);
+            persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current);
         }, 300);
 
         return () => {
@@ -165,12 +284,12 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
                 clearTimeout(autoSaveTimeoutRef.current);
             }
         };
-    }, [editedActor, editedOutfits]);
+    }, [editedActor, editedOutfits, editedStatMap]);
 
     useEffect(() => {
         return () => {
             if (autoSaveTimeoutRef.current) {
-                persistActor(editedActorRef.current, editedOutfitsRef.current);
+                persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current);
             }
         };
     }, []);
@@ -222,6 +341,14 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
                 ? { ...outfit, [field]: value }
                 : outfit
         )));
+    };
+
+    const handleActorStatValueChange = (stat: ActorStat, value: number) => {
+        const normalized = clampActorStatValue(value, stat);
+        setEditedStatMap((prev) => ({
+            ...prev,
+            [stat.name]: normalized,
+        }));
     };
 
     const actorThemeColorSwatches = useMemo(() => {
@@ -840,6 +967,177 @@ ${indent}}`;
                                             }}
                                         />
                                     </div>
+
+                                    {actorStats.length > 0 && (
+                                        <div style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '12px',
+                                            backgroundColor: 'rgba(0, 20, 40, 0.35)',
+                                            border: '1px solid rgba(0, 255, 136, 0.2)',
+                                            borderRadius: '8px',
+                                            padding: '12px',
+                                        }}>
+                                            <label
+                                                style={{
+                                                    display: 'block',
+                                                    color: '#00ff88',
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    marginBottom: '2px',
+                                                }}
+                                            >
+                                                Actor Stats
+                                            </label>
+
+                                            {actorStats.map((stat) => {
+                                                const value = Number(editedStatMap[stat.name]);
+                                                const displayValue = Number.isFinite(value)
+                                                    ? value
+                                                    : clampActorStatValue(Number(stat.default) || 0, stat);
+                                                const statRange = resolveActorStatRange(stat);
+                                                const starStep = (statRange.max - statRange.min) / 4;
+                                                const letterGradeOptions = buildLetterGradeOptions(stat);
+                                                const nearestGrade = letterGradeOptions.reduce((closest, option) => {
+                                                    const optionDelta = Math.abs(option.value - displayValue);
+                                                    const closestDelta = Math.abs(closest.value - displayValue);
+                                                    return optionDelta < closestDelta ? option : closest;
+                                                }, letterGradeOptions[0]);
+
+                                                return (
+                                                    <div
+                                                        key={stat.name}
+                                                        style={{
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '8px',
+                                                            border: '1px solid rgba(0, 255, 136, 0.18)',
+                                                            borderRadius: '6px',
+                                                            padding: '10px',
+                                                            backgroundColor: 'rgba(0, 10, 25, 0.45)',
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline' }}>
+                                                            <div style={{ color: '#e0f0ff', fontSize: '14px', fontWeight: 600 }}>
+                                                                {stat.name}
+                                                            </div>
+                                                            <div style={{ color: 'rgba(0, 255, 136, 0.75)', fontSize: '12px', textTransform: 'uppercase' }}>
+                                                                {stat.displayType}
+                                                            </div>
+                                                        </div>
+
+                                                        {!!stat.description?.trim() && (
+                                                            <div style={{ color: 'rgba(224, 240, 255, 0.75)', fontSize: '12px' }}>
+                                                                {stat.description}
+                                                            </div>
+                                                        )}
+
+                                                        {stat.displayType === 'stars' && (
+                                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                                {[1, 2, 3, 4, 5].map((star) => {
+                                                                    const mappedValue = Number((statRange.min + (star - 1) * starStep).toFixed(2));
+                                                                    const active = displayValue >= mappedValue - 0.001;
+                                                                    return (
+                                                                        <button
+                                                                            key={`${stat.name}-star-${star}`}
+                                                                            type="button"
+                                                                            onClick={() => handleActorStatValueChange(stat, mappedValue)}
+                                                                            style={{
+                                                                                border: '1px solid rgba(0, 255, 136, 0.35)',
+                                                                                borderRadius: '6px',
+                                                                                backgroundColor: active ? 'rgba(0, 255, 136, 0.22)' : 'rgba(0, 20, 40, 0.45)',
+                                                                                color: active ? '#00ff88' : '#9ac6c0',
+                                                                                padding: '4px 8px',
+                                                                                cursor: 'pointer',
+                                                                                fontSize: '13px',
+                                                                            }}
+                                                                        >
+                                                                            {'★'.repeat(star)}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+
+                                                        {stat.displayType === 'letter grade' && (
+                                                            <div>
+                                                                <select
+                                                                    value={nearestGrade.label}
+                                                                    onChange={(e) => {
+                                                                        const selectedOption = letterGradeOptions.find((option) => option.label === e.target.value);
+                                                                        if (!selectedOption) {
+                                                                            return;
+                                                                        }
+                                                                        handleActorStatValueChange(stat, selectedOption.value);
+                                                                    }}
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        padding: '10px',
+                                                                        fontSize: '14px',
+                                                                        backgroundColor: 'rgba(0, 20, 40, 0.6)',
+                                                                        border: '2px solid rgba(0, 255, 136, 0.3)',
+                                                                        borderRadius: '5px',
+                                                                        color: '#e0f0ff',
+                                                                        fontFamily: 'inherit',
+                                                                        cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    {letterGradeOptions.map((option) => (
+                                                                        <option key={`${stat.name}-grade-${option.label}`} value={option.label}>
+                                                                            {option.label}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        )}
+
+                                                        {(statRange.hasRange || stat.displayType === 'percentage') && (
+                                                            <input
+                                                                type="range"
+                                                                min={statRange.min}
+                                                                max={statRange.max}
+                                                                step={statRange.step}
+                                                                value={Math.min(statRange.max, Math.max(statRange.min, displayValue))}
+                                                                onChange={(e) => handleActorStatValueChange(stat, Number(e.target.value))}
+                                                                style={{ width: '100%' }}
+                                                            />
+                                                        )}
+
+                                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 120px) minmax(0, 1fr)', gap: '8px', alignItems: 'center' }}>
+                                                            <div style={{ color: 'rgba(0, 255, 136, 0.75)', fontSize: '12px' }}>
+                                                                Numeric value
+                                                            </div>
+                                                            <TextInput
+                                                                fullWidth
+                                                                type="number"
+                                                                value={Number(displayValue.toFixed(2)).toString()}
+                                                                onChange={(e) => {
+                                                                    const next = Number(e.target.value);
+                                                                    if (!Number.isFinite(next)) {
+                                                                        return;
+                                                                    }
+                                                                    handleActorStatValueChange(stat, next);
+                                                                }}
+                                                                placeholder="0"
+                                                            />
+                                                        </div>
+
+                                                        {(typeof stat.min === 'number' || typeof stat.max === 'number') && (
+                                                            <div style={{ color: 'rgba(154, 198, 192, 0.85)', fontSize: '12px' }}>
+                                                                Range: {typeof stat.min === 'number' ? stat.min : '-inf'} to {typeof stat.max === 'number' ? stat.max : '+inf'}
+                                                            </div>
+                                                        )}
+
+                                                        {!!stat.guidance?.trim() && (
+                                                            <div style={{ color: 'rgba(154, 198, 192, 0.85)', fontSize: '12px' }}>
+                                                                Guidance: {stat.guidance}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
 
                                     {linkedLoreEntry && (
                                         <div>

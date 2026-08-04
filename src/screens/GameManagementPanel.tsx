@@ -739,7 +739,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                                         </div>
 
                                         <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                            <label style={fieldLabelStyle}>Scale</label>
+                                            <label style={fieldLabelStyle}>Properties</label>
                                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
                                                 <div>
                                                     <div style={compactChipLabelStyle}>Default</div>
