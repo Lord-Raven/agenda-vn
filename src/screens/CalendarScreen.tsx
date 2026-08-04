@@ -8,15 +8,11 @@ import {
     ArrowForwardRounded,
     Bed,
     Bedtime,
-    DarkModeRounded,
     EventAvailable,
-    LightModeRounded,
     MenuRounded,
-    NightsStayRounded,
     Settings,
     TodayRounded,
     WbSunny,
-    WbSunnyRounded,
     WbTwilight,
 } from "@mui/icons-material";
 import { AnimatePresence, motion } from "framer-motion";
@@ -93,7 +89,7 @@ const formatOrdinal = (value: number) => {
 };
 
 const formatActiveMonthDateLabel = (date: Date) => {
-    const monthNumber = date.getUTCMonth() + 1;
+    const monthNumber = date.getUTCDate();
     const year = date.getUTCFullYear();
     const monthString = date.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
     return `${monthString} ${formatOrdinal(monthNumber)}, ${year}`;
@@ -220,6 +216,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const currentDateKey = save.currentDate || formatDateKey(new Date());
+    const currentDate = parseDateKey(currentDateKey);
     const currentTimeOfDay = save.currentTimeOfDay || 'morning';
     const currentSlotIndex = Math.max(TIME_OF_DAY_ORDER.indexOf(currentTimeOfDay), 0);
 
@@ -242,6 +239,27 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
+    const currentWeekRowIndex = useMemo(() => {
+        const index = monthGrid.findIndex((gridDate) => isSameDate(gridDate, currentDate));
+        return index >= 0 ? Math.floor(index / 7) : -1;
+    }, [monthGrid, currentDateKey]);
+    const currentWeekdayColumnIndex = currentDate.getUTCDay();
+    const calendarGridTemplateColumns = useMemo(
+        () => WEEKDAY_LABELS
+            .map((_, dayIndex) => (dayIndex === currentWeekdayColumnIndex ? "1.14fr" : "0.98fr"))
+            .join(" "),
+        [currentWeekdayColumnIndex],
+    );
+    const calendarGridTemplateRows = useMemo(
+        () => Array.from({ length: CALENDAR_ROW_COUNT }, (_, rowIndex) => {
+            if (currentWeekRowIndex < 0) {
+                return "1fr";
+            }
+
+            return rowIndex === currentWeekRowIndex ? "1.35fr" : "0.93fr";
+        }).join(" "),
+        [currentWeekRowIndex],
+    );
 
     useEffect(() => {
         stageInstance.loadCalendarScreen();
@@ -374,7 +392,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                         <Box
                             sx={{
                                 display: "grid",
-                                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                                gridTemplateColumns: calendarGridTemplateColumns,
                                 gap: 0,
                                 border: "1px solid var(--agenda-calendar-card-border)",
                                 borderBottom: 0,
@@ -407,8 +425,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                         <Box
                             sx={{
                                 display: "grid",
-                                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                                gridTemplateRows: `repeat(${CALENDAR_ROW_COUNT}, minmax(0, 1fr))`,
+                                gridTemplateColumns: calendarGridTemplateColumns,
+                                gridTemplateRows: calendarGridTemplateRows,
                                 gap: 0,
                                 flex: 1,
                                 minHeight: 0,
@@ -635,7 +653,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             onClick={(event) => event.stopPropagation()}
                             style={{ width: "min(1100px, 94vw)" }}
                         >
-                            <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "88vh" }}>
+                            <GlassPanel variant="bright" style={{ display: "flex", flexDirection: "column", gap: 14, height: "88vh", maxHeight: "88vh", minHeight: 0 }}>
                                 {(() => {
                                     const dateEvents = eventsByDate.get(selectedDateKey) || [];
                                     const orderedDateEvents = [...dateEvents].sort((left, right) => compareEventSchedule(left, right));
@@ -660,6 +678,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
                                 <Box
                                     sx={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        flex: 1,
                                         border: "1px solid var(--agenda-calendar-card-border)",
                                         borderRadius: "12px",
                                         background: "linear-gradient(180deg, var(--agenda-calendar-card-bg), var(--agenda-glass))",
@@ -697,7 +718,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                         })}
                                     </Box>
 
-                                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, minHeight: 220 }}>
+                                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, flex: 1, minHeight: 0 }}>
                                         {orderedDateEvents.length === 0 && (
                                             <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.8rem", fontStyle: "italic", opacity: 0.7 }}>
                                                 No events
@@ -734,25 +755,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         },
                                                     }}
                                                 >
-                                                    {TIME_OF_DAY_ORDER.slice(1).map((slot) => (
-                                                        <Box
-                                                            key={`${eventItem.id}-${slot}-divider`}
-                                                            sx={{
-                                                                position: "absolute",
-                                                                top: 0,
-                                                                bottom: 0,
-                                                                width: "1px",
-                                                                background: "var(--agenda-calendar-card-border)",
-                                                                left: slot === "afternoon"
-                                                                    ? "25%"
-                                                                    : slot === "evening"
-                                                                        ? "50%"
-                                                                        : "75%",
-                                                                pointerEvents: "none",
-                                                            }}
-                                                        />
-                                                    ))}
-
                                                     <motion.button
                                                         type="button"
                                                         onClick={() => setSelectedEventId(eventItem.id)}
@@ -765,9 +767,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                 : `1px solid ${leadActor?.themeColor || "var(--agenda-calendar-card-border)"}`,
                                                             borderRadius: "9px",
                                                             padding: "10px",
-                                                            background: selected
-                                                                ? "linear-gradient(145deg, var(--agenda-bg-soft), var(--agenda-bg-deep))"
-                                                                : (leadActor?.themeColor ? `${leadActor.themeColor}1f` : "var(--agenda-calendar-card-bg)"),
+                                                            background: "linear-gradient(145deg, var(--agenda-bg-soft), var(--agenda-bg-deep))",
                                                             textAlign: "left",
                                                             width: "100%",
                                                             cursor: "pointer",
