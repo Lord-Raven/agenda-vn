@@ -93,12 +93,24 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [customSettings, setCustomSettings] = useState<CustomSetting[]>(() =>
         (configuration.settings || []).map(cloneSetting),
     );
+    const [collapsedContextBlocks, setCollapsedContextBlocks] = useState<boolean[]>(() =>
+        (configuration.context || []).map(() => true),
+    );
+    const [collapsedCustomSettings, setCollapsedCustomSettings] = useState<boolean[]>(() =>
+        (configuration.settings || []).map(() => true),
+    );
     const [actorStats, setActorStats] = useState<ActorStat[]>(() =>
         (configuration.actorStats || save.agendaConfig?.actorStats || []).map(cloneActorStat),
     );
     const [selectedSettings, setSelectedSettings] = useState<{ [key: string]: string }>(() => ({
         ...(save.agendaConfig?.selectedSettings || {}),
     }));
+
+    const fieldLabelStyle: React.CSSProperties = {
+        display: 'block',
+        color: 'var(--agenda-inactive)',
+        marginBottom: 6,
+    };
 
     const validSelections = useMemo(() => {
         const nextSelections: { [key: string]: string } = {};
@@ -215,6 +227,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
     const removeContextSegment = (index: number) => {
         setContextSegments(prev => prev.filter((_, idx) => idx !== index));
+        setCollapsedContextBlocks(prev => prev.filter((_, idx) => idx !== index));
     };
 
     const updateCustomSetting = (index: number, patch: Partial<CustomSetting>) => {
@@ -225,6 +238,19 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
     const removeCustomSetting = (index: number) => {
         setCustomSettings(prev => prev.filter((_, idx) => idx !== index));
+        setCollapsedCustomSettings(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const toggleContextBlock = (index: number) => {
+        setCollapsedContextBlocks(prev => prev.map((isCollapsed, idx) => (
+            idx === index ? !isCollapsed : isCollapsed
+        )));
+    };
+
+    const toggleCustomSetting = (index: number) => {
+        setCollapsedCustomSettings(prev => prev.map((isCollapsed, idx) => (
+            idx === index ? !isCollapsed : isCollapsed
+        )));
     };
 
     const updateActorStat = (index: number, patch: Partial<ActorStat>) => {
@@ -358,26 +384,51 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {contextSegments.map((segment, index) => (
                         <div key={`context-${index}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 10 }}>
-                            <TextInput
-                                fullWidth
-                                value={segment.title}
-                                onChange={(e) => updateContextSegment(index, { title: e.target.value })}
-                                placeholder="Context title"
-                                style={{ marginBottom: 8 }}
-                            />
-                            <textarea
-                                className="input-base"
-                                value={renderSegmentBody(segment)}
-                                onChange={(e) => updateContextSegment(index, { body: e.target.value })}
-                                rows={4}
-                                style={{ width: '100%', resize: 'vertical' }}
-                            />
-                            <div style={{ marginTop: 8 }}>
-                                <Button variant="danger" onClick={() => removeContextSegment(index)}>Remove Block</Button>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                <div style={{ fontWeight: 600, color: 'var(--agenda-text)' }}>
+                                    {segment.title?.trim() || `Context Block ${index + 1}`}
+                                </div>
+                                <Button variant="secondary" onClick={() => toggleContextBlock(index)}>
+                                    {collapsedContextBlocks[index] ? 'Expand' : 'Collapse'}
+                                </Button>
                             </div>
+
+                            {!collapsedContextBlocks[index] && (
+                                <>
+                                    <div style={{ marginTop: 10 }}>
+                                        <label style={fieldLabelStyle}>Name</label>
+                                        <TextInput
+                                            fullWidth
+                                            value={segment.title}
+                                            onChange={(e) => updateContextSegment(index, { title: e.target.value })}
+                                            placeholder="Context title"
+                                            style={{ marginBottom: 8 }}
+                                        />
+                                        <label style={fieldLabelStyle}>Context</label>
+                                        <textarea
+                                            className="input-base"
+                                            value={renderSegmentBody(segment)}
+                                            onChange={(e) => updateContextSegment(index, { body: e.target.value })}
+                                            rows={4}
+                                            style={{ width: '100%', resize: 'vertical' }}
+                                        />
+                                    </div>
+                                    <div style={{ marginTop: 8 }}>
+                                        <Button variant="danger" onClick={() => removeContextSegment(index)}>Remove Block</Button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     ))}
-                    <Button variant="secondary" onClick={() => setContextSegments(prev => [...prev, defaultContextSegment()])}>Add Context Block</Button>
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setContextSegments(prev => [...prev, defaultContextSegment()]);
+                            setCollapsedContextBlocks(prev => [...prev, false]);
+                        }}
+                    >
+                        Add Context Block
+                    </Button>
                 </div>
             </GlassPanel>
 
@@ -390,81 +441,109 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
                         return (
                             <div key={`setting-${settingIndex}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 10 }}>
-                                <TextInput
-                                    fullWidth
-                                    value={setting.title}
-                                    onChange={(e) => updateCustomSetting(settingIndex, { title: e.target.value })}
-                                    placeholder="Setting title"
-                                    style={{ marginBottom: 8 }}
-                                />
-                                <textarea
-                                    className="input-base"
-                                    value={setting.description}
-                                    onChange={(e) => updateCustomSetting(settingIndex, { description: e.target.value })}
-                                    rows={2}
-                                    style={{ width: '100%', resize: 'vertical', marginBottom: 8 }}
-                                />
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                    <div style={{ fontWeight: 600, color: 'var(--agenda-text)' }}>
+                                        {setting.title?.trim() || `Setting ${settingIndex + 1}`}
+                                    </div>
+                                    <Button variant="secondary" onClick={() => toggleCustomSetting(settingIndex)}>
+                                        {collapsedCustomSettings[settingIndex] ? 'Expand' : 'Collapse'}
+                                    </Button>
+                                </div>
 
-                                <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Selected Option</label>
-                                <select
-                                    className="input-base"
-                                    value={selectedOption}
-                                    onChange={(e) => setSelectedSettings(prev => ({ ...prev, [setting.title]: e.target.value }))}
-                                    style={{ marginBottom: 10 }}
-                                >
-                                    {optionEntries.map(([name]) => (
-                                        <option key={name} value={name}>{name}</option>
-                                    ))}
-                                </select>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {optionEntries.map(([optionName, segment]) => (
-                                        <div key={`${settingIndex}-${optionName}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 8 }}>
+                                {!collapsedCustomSettings[settingIndex] && (
+                                    <>
+                                        <div style={{ marginTop: 10 }}>
+                                            <label style={fieldLabelStyle}>Name</label>
                                             <TextInput
                                                 fullWidth
-                                                defaultValue={optionName}
-                                                onBlur={(e) => renameSettingOption(settingIndex, optionName, e.target.value)}
-                                                placeholder="Option name"
-                                                style={{ marginBottom: 6 }}
+                                                value={setting.title}
+                                                onChange={(e) => updateCustomSetting(settingIndex, { title: e.target.value })}
+                                                placeholder="Setting title"
+                                                style={{ marginBottom: 8 }}
                                             />
-                                            <TextInput
-                                                fullWidth
-                                                value={segment.title}
-                                                onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, title: e.target.value })}
-                                                placeholder="Context title"
-                                                style={{ marginBottom: 6 }}
-                                            />
+                                            <label style={fieldLabelStyle}>Description</label>
                                             <textarea
                                                 className="input-base"
-                                                value={typeof segment.body === 'string' ? segment.body : renderSegmentBody(segment)}
-                                                onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, body: e.target.value })}
-                                                rows={3}
-                                                style={{ width: '100%', resize: 'vertical' }}
+                                                value={setting.description}
+                                                onChange={(e) => updateCustomSetting(settingIndex, { description: e.target.value })}
+                                                rows={2}
+                                                style={{ width: '100%', resize: 'vertical', marginBottom: 8 }}
                                             />
-                                        </div>
-                                    ))}
-                                </div>
 
-                                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => {
-                                            const baseName = `Option ${optionEntries.length + 1}`;
-                                            updateSettingOption(settingIndex, baseName, {
-                                                title: baseName,
-                                                body: 'Describe context for this option.',
-                                            });
-                                        }}
-                                    >
-                                        Add Option
-                                    </Button>
-                                    <Button variant="danger" onClick={() => removeCustomSetting(settingIndex)}>Remove Setting</Button>
-                                </div>
+                                            <label style={fieldLabelStyle}>Selected Option</label>
+                                            <select
+                                                className="input-base"
+                                                value={selectedOption}
+                                                onChange={(e) => setSelectedSettings(prev => ({ ...prev, [setting.title]: e.target.value }))}
+                                                style={{ marginBottom: 10 }}
+                                            >
+                                                {optionEntries.map(([name]) => (
+                                                    <option key={name} value={name}>{name}</option>
+                                                ))}
+                                            </select>
+
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                {optionEntries.map(([optionName, segment]) => (
+                                                    <div key={`${settingIndex}-${optionName}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 8 }}>
+                                                        <label style={fieldLabelStyle}>Option Name</label>
+                                                        <TextInput
+                                                            fullWidth
+                                                            defaultValue={optionName}
+                                                            onBlur={(e) => renameSettingOption(settingIndex, optionName, e.target.value)}
+                                                            placeholder="Option name"
+                                                            style={{ marginBottom: 6 }}
+                                                        />
+                                                        <label style={fieldLabelStyle}>Context Block Name</label>
+                                                        <TextInput
+                                                            fullWidth
+                                                            value={segment.title}
+                                                            onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, title: e.target.value })}
+                                                            placeholder="Context title"
+                                                            style={{ marginBottom: 6 }}
+                                                        />
+                                                        <label style={fieldLabelStyle}>Context</label>
+                                                        <textarea
+                                                            className="input-base"
+                                                            value={typeof segment.body === 'string' ? segment.body : renderSegmentBody(segment)}
+                                                            onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, body: e.target.value })}
+                                                            rows={3}
+                                                            style={{ width: '100%', resize: 'vertical' }}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => {
+                                                    const baseName = `Option ${optionEntries.length + 1}`;
+                                                    updateSettingOption(settingIndex, baseName, {
+                                                        title: baseName,
+                                                        body: 'Describe context for this option.',
+                                                    });
+                                                }}
+                                            >
+                                                Add Option
+                                            </Button>
+                                            <Button variant="danger" onClick={() => removeCustomSetting(settingIndex)}>Remove Setting</Button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         );
                     })}
 
-                    <Button variant="secondary" onClick={() => setCustomSettings(prev => [...prev, defaultCustomSetting()])}>Add Custom Setting</Button>
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setCustomSettings(prev => [...prev, defaultCustomSetting()]);
+                            setCollapsedCustomSettings(prev => [...prev, false]);
+                        }}
+                    >
+                        Add Custom Setting
+                    </Button>
                 </div>
             </GlassPanel>
 
