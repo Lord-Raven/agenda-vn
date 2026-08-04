@@ -1651,7 +1651,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 `The game is titled "${configuration.title}".`,
             )
             .format();
-        const imageUrl = await this.makeImage({ prompt: titleImagePrompt, aspect_ratio: AspectRatio.PHOTO_HORIZONTAL, remove_background: true }, configuration.titleImageUrl || '');
+        const imageUrl = await this.makeImage({ prompt: titleImagePrompt, aspect_ratio: AspectRatio.WIDESCREEN_HORIZONTAL, remove_background: true }, configuration.titleImageUrl || '');
         return imageUrl;
     }
 

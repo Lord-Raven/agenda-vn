@@ -1,7 +1,7 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CustomSetting, SaveType, Stage } from '../Stage';
-import { GlassPanel, Title, Button, TextInput } from './UiComponents';
+import { GlassPanel, Title, Button, ColorPickerInput, TextInput } from './UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from './TooltipContext';
 import { ScreenType } from './BaseScreen';
@@ -283,28 +283,58 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
                         {/* Settings Form */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            {/* Player Name */}
-                            <div>
-                                <label 
-                                    htmlFor="player-name"
-                                    style={{
-                                        display: 'block',
-                                        color: '#b9d2e3',
-                                        fontSize: '14px',
-                                        fontWeight: 'bold',
-                                        marginBottom: '8px',
-                                    }}
-                                >
-                                    Player Name
-                                </label>
-                                <TextInput
-                                    id="player-name"
-                                    fullWidth
-                                    value={settings.playerName}
-                                    onChange={(e) => handleInputChange('playerName', e.target.value)}
-                                    placeholder="Enter your name"
-                                    style={{ fontSize: '16px' }}
-                                />
+                            {/* Player Name + Color */}
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    gap: '12px',
+                                    alignItems: 'flex-end',
+                                    flexWrap: 'wrap',
+                                }}
+                            >
+                                <div style={{ flex: '1 1 280px', minWidth: '220px' }}>
+                                    <label 
+                                        htmlFor="player-name"
+                                        style={{
+                                            display: 'block',
+                                            color: '#b9d2e3',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            marginBottom: '8px',
+                                        }}
+                                    >
+                                        Player Name
+                                    </label>
+                                    <TextInput
+                                        id="player-name"
+                                        fullWidth
+                                        value={settings.playerName}
+                                        onChange={(e) => handleInputChange('playerName', e.target.value)}
+                                        placeholder="Enter your name"
+                                        style={{ fontSize: '16px' }}
+                                    />
+                                </div>
+
+                                <div style={{ flex: '0 1 220px', minWidth: '180px' }}>
+                                    <label
+                                        style={{
+                                            display: 'block',
+                                            color: '#b9d2e3',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            marginBottom: '8px',
+                                        }}
+                                    >
+                                        Player Color
+                                    </label>
+                                    <ColorPickerInput
+                                        value={resolvedPlayerThemeColor}
+                                        onChange={handlePlayerColorChange}
+                                        placeholder="#RRGGBB"
+                                        popoverTitle="Choose player color"
+                                        inputStyle={{ fontSize: '13px' }}
+                                    />
+                                </div>
                             </div>
 
                             {/* Player Description */}
@@ -337,46 +367,78 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                 />
                             </div>
 
-                            <div>
-                                <label
-                                    htmlFor="player-color"
-                                    style={{
-                                        display: 'block',
-                                        color: '#b9d2e3',
-                                        fontSize: '14px',
-                                        fontWeight: 'bold',
-                                        marginBottom: '8px',
-                                    }}
-                                >
-                                    Player Color
-                                </label>
-                                <div
-                                    style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '88px minmax(0, 1fr)',
-                                        gap: '12px',
-                                        alignItems: 'center',
-                                    }}
-                                >
-                                    <input
-                                        id="player-color"
-                                        type="color"
-                                        value={resolvedPlayerThemeColor}
-                                        onChange={(e) => handlePlayerColorChange(e.target.value)}
-                                        aria-label="Player color"
+                            {customSettings.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <label
                                         style={{
-                                            width: '88px',
-                                            height: '56px',
-                                            borderRadius: '12px',
-                                            border: '2px solid rgba(138, 176, 204, 0.35)',
-                                            background: 'rgba(20, 28, 44, 0.82)',
-                                            padding: '6px',
-                                            cursor: 'pointer',
-                                            boxShadow: `0 0 18px ${resolvedPlayerThemeColor}22`,
+                                            display: 'block',
+                                            color: '#b9d2e3',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            marginBottom: '4px'
                                         }}
-                                    />
+                                    >
+                                        Scenario Settings
+                                    </label>
+
+                                    {customSettings.map((setting) => {
+                                        const optionNames = Object.keys(setting.options || {});
+                                        const selectedOptionName = buildSelectedCustomSettings(
+                                            [setting],
+                                            selectedCustomSettings,
+                                        )[setting.title] || '';
+                                        const selectedOption = setting.options?.[selectedOptionName];
+
+                                        return (
+                                            <div
+                                                key={setting.title}
+                                                style={{
+                                                    padding: '12px',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(28, 34, 52, 0.8)',
+                                                    border: '2px solid rgba(138, 176, 204, 0.34)',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '8px',
+                                                }}
+                                            >
+                                                <div style={{ color: '#edf2f2', fontSize: '14px', fontWeight: 700 }}>
+                                                    {setting.title}
+                                                </div>
+                                                <div style={{ color: 'rgba(185, 210, 227, 0.8)', fontSize: '13px' }}>
+                                                    {setting.description}
+                                                </div>
+
+                                                {optionNames.length > 0 ? (
+                                                    <>
+                                                        <select
+                                                            className="input-base"
+                                                            value={selectedOptionName}
+                                                            onChange={(e) => handleCustomSettingChange(setting.title, e.target.value)}
+                                                            style={{ fontSize: '13px' }}
+                                                        >
+                                                            {optionNames.map((optionName) => (
+                                                                <option key={optionName} value={optionName}>
+                                                                    {optionName}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        {selectedOption?.title && (
+                                                            <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
+                                                                {selectedOption.title}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
+                                                        No options available for this setting.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            </div>
+                            )}
 
                             {/* Generation Settings */}
                             <div>
@@ -666,79 +728,6 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                             </AnimatePresence>
                                         </div>
                                     </div>
-
-                                    {customSettings.length > 0 && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            <label
-                                                style={{
-                                                    display: 'block',
-                                                    color: '#b9d2e3',
-                                                    fontSize: '14px',
-                                                    fontWeight: 'bold',
-                                                    marginBottom: '4px'
-                                                }}
-                                            >
-                                                Scenario Settings
-                                            </label>
-
-                                            {customSettings.map((setting) => {
-                                                const optionNames = Object.keys(setting.options || {});
-                                                const selectedOptionName = buildSelectedCustomSettings(
-                                                    [setting],
-                                                    selectedCustomSettings,
-                                                )[setting.title] || '';
-                                                const selectedOption = setting.options?.[selectedOptionName];
-
-                                                return (
-                                                    <div
-                                                        key={setting.title}
-                                                        style={{
-                                                            padding: '12px',
-                                                            borderRadius: '8px',
-                                                            background: 'rgba(28, 34, 52, 0.8)',
-                                                            border: '2px solid rgba(138, 176, 204, 0.34)',
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            gap: '8px',
-                                                        }}
-                                                    >
-                                                        <div style={{ color: '#edf2f2', fontSize: '14px', fontWeight: 700 }}>
-                                                            {setting.title}
-                                                        </div>
-                                                        <div style={{ color: 'rgba(185, 210, 227, 0.8)', fontSize: '13px' }}>
-                                                            {setting.description}
-                                                        </div>
-
-                                                        {optionNames.length > 0 ? (
-                                                            <>
-                                                                <select
-                                                                    className="input-base"
-                                                                    value={selectedOptionName}
-                                                                    onChange={(e) => handleCustomSettingChange(setting.title, e.target.value)}
-                                                                    style={{ fontSize: '13px' }}
-                                                                >
-                                                                    {optionNames.map((optionName) => (
-                                                                        <option key={optionName} value={optionName}>
-                                                                            {optionName}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                                {selectedOption?.title && (
-                                                                    <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
-                                                                        {selectedOption.title}
-                                                                    </div>
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
-                                                                No options available for this setting.
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
 
                                 </div>
                             </div>
