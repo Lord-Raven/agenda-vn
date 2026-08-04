@@ -3,7 +3,18 @@ import type { CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from "
 import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { Box, Typography } from "@mui/material";
-import { ArrowBackRounded, ArrowForwardRounded, EventAvailable, EventBusy, MenuRounded, Settings, TodayRounded } from "@mui/icons-material";
+import {
+    ArrowBackRounded,
+    ArrowForwardRounded,
+    DarkModeRounded,
+    EventAvailable,
+    LightModeRounded,
+    MenuRounded,
+    NightsStayRounded,
+    Settings,
+    TodayRounded,
+    WbSunnyRounded,
+} from "@mui/icons-material";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button, GlassPanel } from "./UiComponents";
 import { useTooltip } from "./TooltipContext";
@@ -58,6 +69,43 @@ const formatMonthLabel = (date: Date) => date.toLocaleDateString("en-US", {
     year: "numeric",
     timeZone: "UTC",
 });
+
+const formatOrdinal = (value: number) => {
+    const mod100 = value % 100;
+    if (mod100 >= 11 && mod100 <= 13) {
+        return `${value}th`;
+    }
+    const mod10 = value % 10;
+    if (mod10 === 1) {
+        return `${value}st`;
+    }
+    if (mod10 === 2) {
+        return `${value}nd`;
+    }
+    if (mod10 === 3) {
+        return `${value}rd`;
+    }
+    return `${value}th`;
+};
+
+const formatActiveMonthDateLabel = (date: Date) => {
+    const monthNumber = date.getUTCMonth() + 1;
+    const year = date.getUTCFullYear();
+    return `Month ${formatOrdinal(monthNumber)}, year ${year}`;
+};
+
+const getTimeOfDayIcon = (timeOfDay: CalendarTimeOfDay) => {
+    if (timeOfDay === "morning") {
+        return WbSunnyRounded;
+    }
+    if (timeOfDay === "afternoon") {
+        return LightModeRounded;
+    }
+    if (timeOfDay === "evening") {
+        return NightsStayRounded;
+    }
+    return DarkModeRounded;
+};
 
 const formatRecurrenceSummary = (recurrence?: CalendarEventRecurrence | null) => {
     if (!recurrence) {
@@ -184,6 +232,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [activeDateKey, setActiveDateKey] = useState<string | null>(null);
+    const isViewingCurrentMonth = viewMonth.getUTCMonth() === todayDate.getUTCMonth() && viewMonth.getUTCFullYear() === todayDate.getUTCFullYear();
+    const CurrentTimeIcon = getTimeOfDayIcon(currentTimeOfDay);
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
@@ -227,18 +277,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
         setSelectedEventId(null);
     };
 
-    const skipEvent = () => {
-        const skipped = stageInstance.skipNextEvent();
-        if (skipped) {
-            setTooltip(`Skipped: ${skipped.name}`, EventBusy, 3500);
-            return;
-        }
-
-        stageInstance.rebuildUpcomingEvents(stageInstance.getSave()).then(() => {
-            setTooltip("Generated more upcoming events.", EventAvailable, 3000);
-        });
-    };
-
     return (
         <>
             <Box
@@ -258,60 +296,49 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                     backgroundRepeat: "no-repeat",
                 }}
             >
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setScreenType(ScreenType.MENU)}
-                                onMouseEnter={() => setTooltip("Back to menu", MenuRounded)}
-                                onMouseLeave={clearTooltip}
-                                style={{ padding: "10px 14px" }}
-                            >
-                                <MenuRounded fontSize="small" />
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowContentManagement(true)}
-                                onMouseEnter={() => setTooltip("Manage actors, locations, and lore", Settings)}
-                                onMouseLeave={clearTooltip}
-                                style={{ padding: "10px 14px" }}
-                            >
-                                <Settings fontSize="small" />
-                            </Button>
-                        </Box>
-
-                        <Button
-                            variant="primary"
-                            onClick={skipEvent}
-                            onMouseEnter={() => setTooltip("Skip to the next available time slot", EventBusy)}
-                            onMouseLeave={clearTooltip}
-                            style={{ padding: "10px 14px" }}
-                        >
-                            Skip Next Event
-                        </Button>
-                    </Box>
-
-                    <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
                             <Typography
                                 sx={{
-                                    color: "var(--agenda-primary)",
+                                    color: isViewingCurrentMonth ? "var(--agenda-primary)" : "var(--agenda-inactive)",
                                     fontFamily: "var(--agenda-font-flavor)",
                                     fontWeight: 700,
                                     fontSize: { xs: "2rem", md: "3rem" },
                                     letterSpacing: "0.04em",
                                     lineHeight: 1,
-                                    textShadow: "0 3px 14px rgba(0, 0, 0, 0.24)",
+                                    textShadow: isViewingCurrentMonth ? "0 3px 14px rgba(0, 0, 0, 0.24)" : "none",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 1,
                                 }}
                             >
-                                {formatMonthLabel(viewMonth)}
+                                {isViewingCurrentMonth ? formatActiveMonthDateLabel(viewMonth) : `(${formatMonthLabel(viewMonth)})`}
+                                {isViewingCurrentMonth && <CurrentTimeIcon sx={{ fontSize: { xs: "1.4rem", md: "2rem" }, opacity: 0.9 }} />}
                             </Typography>
 
                             <Typography sx={{ color: "var(--agenda-inactive)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
                                 Current Time: {formatTimeOfDay(currentTimeOfDay)}
                             </Typography>
 
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, opacity: 0.82 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, opacity: 0.82, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setScreenType(ScreenType.MENU)}
+                                    onMouseEnter={() => setTooltip("Main menu", MenuRounded)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 10px" }}
+                                >
+                                    <MenuRounded fontSize="small" />
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setShowContentManagement(true)}
+                                    onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", Settings)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 10px" }}
+                                >
+                                    <Settings fontSize="small" />
+                                </Button>
                                 <Button
                                     variant="secondary"
                                     onClick={() => changeMonth(-1)}
@@ -589,7 +616,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                         style={{
                             position: "fixed",
                             inset: 0,
-                            background: "rgba(9, 14, 24, 0.62)",
+                            background: "linear-gradient(180deg, var(--agenda-calendar-overlay-start), var(--agenda-calendar-overlay-end))",
                             backdropFilter: "blur(5px)",
                             zIndex: 1200,
                             display: "flex",
@@ -617,10 +644,10 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                         <>
                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2, flexWrap: "wrap" }}>
                                     <Box>
-                                        <Typography sx={{ color: "#edf2f2", fontWeight: 700, fontSize: { xs: "1rem", md: "1.2rem" } }}>
+                                        <Typography sx={{ color: "var(--agenda-primary)", fontWeight: 700, fontSize: { xs: "1rem", md: "1.2rem" } }}>
                                             Events on {formatDate(selectedDateKey)}
                                         </Typography>
-                                        <Typography sx={{ color: "rgba(185, 210, 227, 0.9)", fontSize: "0.88rem" }}>
+                                        <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.88rem" }}>
                                             Select an event, then confirm to begin.
                                         </Typography>
                                     </Box>
@@ -633,7 +660,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                     sx={{
                                         border: "1px solid var(--agenda-calendar-card-border)",
                                         borderRadius: "12px",
-                                        background: "rgba(14, 21, 34, 0.62)",
+                                        background: "linear-gradient(180deg, var(--agenda-calendar-card-bg), var(--agenda-glass))",
                                         padding: "12px",
                                         minHeight: 0,
                                         overflowY: "auto",
@@ -655,7 +682,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                     key={slot}
                                                     sx={{
                                                         minWidth: 0,
-                                                        borderLeft: slotIndex === 0 ? "none" : "1px solid rgba(138, 176, 204, 0.14)",
+                                                        borderLeft: slotIndex === 0 ? "none" : "1px solid var(--agenda-calendar-card-border)",
                                                         pl: slotIndex === 0 ? 0 : 1,
                                                         opacity: slotIsPast ? 0.45 : 1,
                                                     }}
@@ -699,7 +726,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                             position: "absolute",
                                                             inset: 0,
                                                             borderRadius: "10px",
-                                                            background: "linear-gradient(90deg, rgba(138, 176, 204, 0.05) 0%, rgba(138, 176, 204, 0.05) 25%, rgba(138, 176, 204, 0.02) 25%, rgba(138, 176, 204, 0.02) 50%, rgba(138, 176, 204, 0.05) 50%, rgba(138, 176, 204, 0.05) 75%, rgba(138, 176, 204, 0.02) 75%, rgba(138, 176, 204, 0.02) 100%)",
+                                                            background: "linear-gradient(90deg, var(--agenda-bg-soft) 0%, var(--agenda-bg-soft) 25%, var(--agenda-calendar-card-bg) 25%, var(--agenda-calendar-card-bg) 50%, var(--agenda-bg-soft) 50%, var(--agenda-bg-soft) 75%, var(--agenda-calendar-card-bg) 75%, var(--agenda-calendar-card-bg) 100%)",
+                                                            opacity: 0.18,
                                                             pointerEvents: "none",
                                                         },
                                                     }}
@@ -712,7 +740,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                 top: 0,
                                                                 bottom: 0,
                                                                 width: "1px",
-                                                                background: "rgba(138, 176, 204, 0.14)",
+                                                                background: "var(--agenda-calendar-card-border)",
                                                                 left: slot === "afternoon"
                                                                     ? "25%"
                                                                     : slot === "evening"
@@ -731,13 +759,13 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         style={{
                                                             appearance: "none",
                                                             border: selected
-                                                                ? `2px solid ${leadActor?.themeColor || "rgba(137, 205, 135, 0.95)"}`
-                                                                : `1px solid ${leadActor?.themeColor || "rgba(138, 176, 204, 0.5)"}`,
+                                                                ? `2px solid ${leadActor?.themeColor || "var(--agenda-active)"}`
+                                                                : `1px solid ${leadActor?.themeColor || "var(--agenda-calendar-card-border)"}`,
                                                             borderRadius: "9px",
                                                             padding: "10px",
                                                             background: selected
-                                                                ? "linear-gradient(145deg, rgba(39, 58, 60, 0.96), rgba(21, 26, 40, 0.96))"
-                                                                : `${leadActor?.themeColor || "#8ab0cc"}1f`,
+                                                                ? "linear-gradient(145deg, var(--agenda-bg-soft), var(--agenda-bg-deep))"
+                                                                : (leadActor?.themeColor ? `${leadActor.themeColor}1f` : "var(--agenda-calendar-card-bg)"),
                                                             textAlign: "left",
                                                             width: "100%",
                                                             cursor: "pointer",
@@ -748,14 +776,14 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                             minWidth: 0,
                                                         }}
                                                     >
-                                                        <Typography sx={{ color: "rgba(240, 246, 246, 0.98)", fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>
+                                                        <Typography sx={{ color: "var(--agenda-primary)", fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>
                                                             {eventItem.recurrence ? "↻ " : ""}{eventItem.name}
                                                         </Typography>
-                                                        <Typography sx={{ color: "rgba(185, 210, 227, 0.92)", fontSize: "0.72rem", mt: 0.4 }}>
+                                                        <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.72rem", mt: 0.4 }}>
                                                             {formatDurationSummary(eventItem)} · {save.atlas[eventItem.locationId]?.name || "Unknown Location"}
                                                         </Typography>
                                                         {eventItem.recurrence && (
-                                                            <Typography sx={{ color: "rgba(185, 210, 227, 0.84)", fontSize: "0.67rem", mt: 0.3 }}>
+                                                            <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.67rem", mt: 0.3, opacity: 0.86 }}>
                                                                 {formatRecurrenceSummary(eventItem.recurrence)}
                                                             </Typography>
                                                         )}
