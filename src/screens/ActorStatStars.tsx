@@ -94,23 +94,24 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
 
     if (maxStars <= 10) {
         return (
-            <div
-                role="img"
-                aria-label={`${stat.name}: ${filledStars} of ${maxStars}`}
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${maxStars}, minmax(0, 1fr))`,
-                    gap: '4px',
-                    width: '100%',
-                    maxHeight: '100%',
-                    aspectRatio: `${maxStars} / 1`,
-                    ...style,
-                }}
-            >
-                {Array.from({ length: maxStars }, (_, index) => {
-                    const starValue = index + 1;
-                    return renderStar(stat, starValue, filledStars >= starValue, updateScore);
-                })}
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', ...style }}>
+                <div
+                    role="img"
+                    aria-label={`${stat.name}: ${filledStars} of ${maxStars}`}
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${maxStars}, minmax(0, 1fr))`,
+                        gap: '4px',
+                        height: '100%',
+                        maxWidth: '100%',
+                        aspectRatio: `${maxStars} / 1`,
+                    }}
+                >
+                    {Array.from({ length: maxStars }, (_, index) => {
+                        const starValue = index + 1;
+                        return renderStar(stat, starValue, filledStars >= starValue, updateScore);
+                    })}
+                </div>
             </div>
         );
     }
@@ -122,6 +123,7 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
     });
 
     return (
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', ...style }}>
         <div
             role="img"
             aria-label={`${stat.name}: ${filledStars} of ${maxStars}`}
@@ -129,10 +131,9 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
                 display: 'grid',
                 gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))`,
                 gap: '8px',
-                width: '100%',
-                maxHeight: '100%',
+                height: '100%',
+                maxWidth: '100%',
                 aspectRatio: `${groups.length * 3} / 2`,
-                ...style,
             }}
         >
             {groups.map((group, groupIndex) => {
@@ -175,6 +176,7 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
                     </div>
                 );
             })}
+        </div>
         </div>
     );
 };
