@@ -13,6 +13,7 @@ interface LocationManagementPanelProps {
 }
 
 export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stage }) => {
+    const UNCATEGORIZED_LABEL = 'Uncategorized';
     const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
     const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
     const shouldReduceMotion = useReducedMotion();
@@ -49,12 +50,17 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         const categoryMap: Record<string, Location[]> = {};
         for (const location of locations) {
             const normalizedCategory = (location.category || '').trim();
-            const category = normalizedCategory || 'Uncategorized';
+            const category = normalizedCategory || UNCATEGORIZED_LABEL;
             if (!categoryMap[category]) {
                 categoryMap[category] = [];
             }
             categoryMap[category].push(location);
         }
+
+        if (!categoryMap[UNCATEGORIZED_LABEL]) {
+            categoryMap[UNCATEGORIZED_LABEL] = [];
+        }
+
         return Object.entries(categoryMap)
             .map(([title, entries]) => ({
                 id: title,
@@ -62,7 +68,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                 entries: entries.sort(sortByName),
             }))
             .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
-    }, [locations]);
+    }, [locations, UNCATEGORIZED_LABEL]);
 
     const selectedLocation = useMemo(() => {
         if (!selectedLocationId) {
@@ -71,7 +77,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         return locations.find((location) => location.id === selectedLocationId) || null;
     }, [locations, selectedLocationId]);
 
-    const handleCreateLocation = () => {
+    const handleCreateLocation = (category: string) => {
         const save = stage().getSave();
         const baseName = 'New Location';
         const usedNames = new Set(Object.values(save.atlas || {}).map((location) => location.name?.trim().toLowerCase()));
@@ -87,6 +93,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
             active: true,
             name: candidateName,
             description: '',
+            category: category === UNCATEGORIZED_LABEL ? '' : category,
             imageUrl: '',
             focalPoint: { x: 0.5, y: 0.5 },
             lightColor: '',
@@ -180,19 +187,16 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                 getEntryKey={(location) => location.id}
                 shouldReduceMotion={Boolean(shouldReduceMotion)}
                 emptyListMessage="No locations found in the current save."
-                sidebarTitle="Locations"
-                totalCount={locations.length}
-                containerGap="14px"
                 sectionEmptyMessage="No locations."
-                headerAction={
+                renderSectionAction={(section) => (
                     <Button
-                        onClick={handleCreateLocation}
+                        onClick={() => handleCreateLocation(section.title)}
                         variant="secondary"
                         style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '8px' }}
                     >
                         New
                     </Button>
-                }
+                )}
             />
 
             <div style={detailPaneStyle}>

@@ -12,6 +12,7 @@ interface ActorManagementPanelProps {
 }
 
 export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) => {
+    const UNCATEGORIZED_LABEL = 'Uncategorized';
     const [selectedActorId, setSelectedActorId] = useState<string | null>(null);
     const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
     const shouldReduceMotion = useReducedMotion();
@@ -49,11 +50,15 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
         const categoryMap: Record<string, Actor[]> = {};
         for (const actor of actors) {
             const normalizedCategory = (actor.category || '').trim();
-            const category = normalizedCategory || 'Uncategorized';
+            const category = normalizedCategory || UNCATEGORIZED_LABEL;
             if (!categoryMap[category]) {
                 categoryMap[category] = [];
             }
             categoryMap[category].push(actor);
+        }
+
+        if (!categoryMap[UNCATEGORIZED_LABEL]) {
+            categoryMap[UNCATEGORIZED_LABEL] = [];
         }
 
         return Object.entries(categoryMap)
@@ -63,7 +68,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                 entries: entries.sort(sortByName),
             }))
             .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
-    }, [actors]);
+            }, [actors, UNCATEGORIZED_LABEL]);
 
     const selectedActor = useMemo(() => {
         if (!selectedActorId) {
@@ -72,7 +77,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
         return actors.find((actor) => actor.id === selectedActorId) || null;
     }, [actors, selectedActorId]);
 
-    const handleCreateActor = () => {
+    const handleCreateActor = (category: string) => {
         const save = stage().getSave();
         const baseName = 'New Actor';
         const usedNames = new Set(Object.values(save.actors || {}).map((actor) => actor.name?.trim().toLowerCase()));
@@ -89,6 +94,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
             name: candidateName,
             description: '',
             profile: '',
+            category: category === UNCATEGORIZED_LABEL ? '' : category,
             outfitId: '',
             outfits: [],
             themeColor: '',
@@ -166,18 +172,16 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                 getEntryKey={(actor) => actor.id}
                 shouldReduceMotion={Boolean(shouldReduceMotion)}
                 emptyListMessage="No actors found in the current save."
-                sidebarTitle="Actors"
-                totalCount={actors.length}
-                containerGap="12px"
-                headerAction={
+                sectionEmptyMessage="No actors."
+                renderSectionAction={(section) => (
                     <Button
-                        onClick={handleCreateActor}
+                        onClick={() => handleCreateActor(section.title)}
                         variant="secondary"
                         style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '8px' }}
                     >
                         New
                     </Button>
-                }
+                )}
             />
 
             <div style={detailPaneStyle}>

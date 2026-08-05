@@ -15,14 +15,10 @@ interface CategorizedEntrySidebarProps<TEntry> {
     getEntryKey: (entry: TEntry) => string;
     shouldReduceMotion: boolean;
     emptyListMessage: string;
-    sidebarTitle?: string;
-    totalCount?: number;
-    headerAction?: ReactNode;
     renderSectionAction?: (section: CategorizedEntrySection<TEntry>) => ReactNode;
     sectionEmptyMessage?: string | ((section: CategorizedEntrySection<TEntry>) => string);
     shouldHideSection?: (section: CategorizedEntrySection<TEntry>) => boolean;
     defaultCollapsed?: boolean;
-    containerGap?: string;
 }
 
 export const CategorizedEntrySidebar = <TEntry,>({
@@ -33,14 +29,10 @@ export const CategorizedEntrySidebar = <TEntry,>({
     getEntryKey,
     shouldReduceMotion,
     emptyListMessage,
-    sidebarTitle,
-    totalCount,
-    headerAction,
     renderSectionAction,
     sectionEmptyMessage,
     shouldHideSection,
     defaultCollapsed = false,
-    containerGap = '12px',
 }: CategorizedEntrySidebarProps<TEntry>) => {
     return (
         <div
@@ -52,18 +44,9 @@ export const CategorizedEntrySidebar = <TEntry,>({
                 overflowY: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: containerGap,
+                gap: '12px',
             }}
         >
-            {sidebarTitle && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ color: 'rgba(0, 255, 136, 0.9)', fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        {sidebarTitle}{typeof totalCount === 'number' ? ` (${totalCount})` : ''}
-                    </div>
-                    {headerAction}
-                </div>
-            )}
-
             {sections.length === 0 ? (
                 <div style={{ color: 'rgba(224, 240, 255, 0.6)', fontSize: '13px', padding: '8px 0' }}>
                     {emptyListMessage}
