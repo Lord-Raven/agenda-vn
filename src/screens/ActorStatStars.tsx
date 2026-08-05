@@ -102,6 +102,8 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
                     gridTemplateColumns: `repeat(${maxStars}, minmax(0, 1fr))`,
                     gap: '4px',
                     width: '100%',
+                    maxHeight: '100%',
+                    aspectRatio: `${maxStars} / 1`,
                     ...style,
                 }}
             >
@@ -128,6 +130,8 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
                 gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))`,
                 gap: '8px',
                 width: '100%',
+                maxHeight: '100%',
+                aspectRatio: `${groups.length * 3} / 2`,
                 ...style,
             }}
         >
