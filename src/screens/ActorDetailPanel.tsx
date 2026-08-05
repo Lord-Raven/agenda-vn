@@ -981,6 +981,7 @@ ${indent}}`;
                     padding: '0',
                     width: '100%',
                     height: '100%',
+                    minHeight: 0,
                 }}
             >
                 <div
@@ -990,15 +991,19 @@ ${indent}}`;
                         maxWidth: 'none',
                         maxHeight: 'none',
                         height: '100%',
+                        minHeight: 0,
                     }}
                 >
                     <GlassPanel 
                         variant="default"
                         style={{
                             height: '100%',
+                            boxSizing: 'border-box',
+                            minHeight: 0,
                             overflow: 'auto',
                             position: 'relative',
                             padding: '20px',
+                            paddingBottom: '28px',
                         }}
                     >
                         {/* Header */}
@@ -1197,7 +1202,7 @@ ${indent}}`;
                                                             backgroundColor: 'rgba(0, 10, 25, 0.45)',
                                                         }}
                                                     >
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', height: '40px' }}>
                                                             <div style={{ color: '#e0f0ff', fontSize: '14px', fontWeight: 600 }}>
                                                                 {stat.name}
                                                             </div>

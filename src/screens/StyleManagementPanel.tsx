@@ -1,6 +1,6 @@
-import React, { FC, useMemo, useState } from 'react';
+import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, UiSettings } from '../Stage';
-import { AlphaColorPickerInput, buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
+import { AlphaColorPickerInput, buildHexColorSwatches, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
 
 interface StyleManagementPanelProps {
     stage: () => Stage;
@@ -34,6 +34,7 @@ const applyUiSettingsToRoot = (uiSettings: UiSettings) => {
 export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) => {
     const stageInstance = stage();
     const [uiSettings, setUiSettings] = useState<UiSettings>(() => ({ ...stageInstance.getUiSettings() }));
+    const hasInitializedAutoSave = useRef(false);
 
     const styleColorFields: Array<{ label: string; key: keyof UiSettings }> = [
         { label: 'Primary Text', key: 'primaryColor' },
@@ -88,11 +89,19 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
         return groupedStyleSwatches.all;
     };
 
-    const saveStyleSettings = () => {
-        stageInstance.updateUiSettings(uiSettings);
-        applyUiSettingsToRoot(uiSettings);
-        stageInstance.saveGame();
-    };
+    useEffect(() => {
+        if (!hasInitializedAutoSave.current) {
+            hasInitializedAutoSave.current = true;
+            return;
+        }
+
+        const saveTimer = window.setTimeout(() => {
+            stageInstance.updateUiSettings(uiSettings);
+            applyUiSettingsToRoot(uiSettings);
+        }, 200);
+
+        return () => window.clearTimeout(saveTimer);
+    }, [stageInstance, uiSettings]);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -212,10 +221,6 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     </div>
                 </div>
             </GlassPanel>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                <Button variant="primary" onClick={saveStyleSettings}>Save Style</Button>
-            </div>
         </div>
     );
 };
