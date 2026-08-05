@@ -35,9 +35,9 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
     uploadingButtonLabel = 'Uploading...',
     previewWidth = '160px',
     previewHeight = '120px',
-    previewBorder = '2px solid rgba(0, 255, 136, 0.3)',
+    previewBorder = '2px solid var(--agenda-line-strong)',
     previewBorderRadius = '8px',
-    previewBackgroundColor = 'rgba(0, 20, 40, 0.6)',
+    previewBackgroundColor = 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)',
     previewBackgroundPosition = '50% 50%',
     previewPlaceholder,
     accept = 'image/*',
@@ -92,7 +92,7 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '220px' }}>
                 <div>
-                    <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>{inputLabel}</label>
+                    <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{inputLabel}</label>
                     <TextInput
                         fullWidth
                         value={imageUrl}

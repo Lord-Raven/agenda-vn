@@ -313,7 +313,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                     flexDirection: "column",
                     gap: 1.5,
                     overflow: "hidden",
-                    backgroundImage: `linear-gradient(130deg, var(--agenda-calendar-overlay-start) 0%, var(--agenda-calendar-overlay-mid) 48%, var(--agenda-calendar-overlay-end) 100%), url(${configuredBackgroundImageUrl})`,
+                    backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${configuredBackgroundImageUrl})`,
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                     backgroundRepeat: "no-repeat",
@@ -323,8 +323,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
                             <Typography
                                 sx={{
-                                    color: isViewingCurrentMonth ? "var(--agenda-primary)" : "var(--agenda-inactive)",
-                                    fontFamily: "var(--agenda-font-flavor)",
+                                    color: isViewingCurrentMonth ? "var(--agenda-text-primary)" : "var(--agenda-text-muted)",
+                                    fontFamily: "var(--agenda-font-display)",
                                     fontWeight: 700,
                                     fontSize: { xs: "2rem", md: "3rem" },
                                     letterSpacing: "0.04em",
@@ -398,7 +398,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 minWidth: 0,
                                 boxSizing: "border-box",
                                 justifyItems: "stretch",
-                                border: "1px solid var(--agenda-calendar-card-border)",
+                                border: "1px solid var(--agenda-panel-border)",
                                 borderBottom: 0,
                                 borderRadius: "12px 12px 0 0",
                                 overflow: "hidden",
@@ -410,13 +410,13 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                     sx={{
                                         minWidth: 0,
                                         boxSizing: "border-box",
-                                        color: "var(--agenda-inactive)",
+                                        color: "var(--agenda-text-muted)",
                                         letterSpacing: "0.12em",
                                         textTransform: "uppercase",
                                         fontSize: "0.68rem",
                                         textAlign: "center",
                                         py: 0.85,
-                                        borderRight: "1px solid var(--agenda-calendar-card-border)",
+                                        borderRight: "1px solid var(--agenda-panel-border)",
                                         background: "linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015))",
                                         "&:last-of-type": {
                                             borderRight: 0,
@@ -439,12 +439,12 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 boxSizing: "border-box",
                                 flex: 1,
                                 minHeight: 0,
-                                border: "1px solid var(--agenda-calendar-card-border)",
+                                border: "1px solid var(--agenda-panel-border)",
                                 borderTop: 0,
                                 borderRadius: "0 0 12px 12px",
                                 overflow: "visible",
                                 isolation: "isolate",
-                                background: "var(--agenda-calendar-card-bg)",
+                                background: "var(--agenda-panel-surface)",
                             }}
                         >
                             {monthGrid.map((cellDate) => {
@@ -484,8 +484,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                 minHeight: 0,
                                                 minWidth: 0,
                                                 boxSizing: "border-box",
-                                                borderRight: "1px solid var(--agenda-calendar-card-border)",
-                                                borderBottom: "1px solid var(--agenda-calendar-card-border)",
+                                                borderRight: "1px solid var(--agenda-panel-border)",
+                                                borderBottom: "1px solid var(--agenda-panel-border)",
                                                 borderRadius: 0,
                                                 borderTop: 0,
                                                 borderLeft: 0,
@@ -511,7 +511,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         background: isCurrentMonth
                                                             ? "linear-gradient(178deg, rgba(46, 53, 77, 0.98), rgba(28, 34, 52, 0.96))"
                                                             : "rgba(18, 24, 38, 0.96)",
-                                                        border: "1px solid var(--agenda-calendar-card-border)",
+                                                        border: "1px solid var(--agenda-panel-border)",
                                                         opacity: isActiveDate ? 1 : 0,
                                                         transition: "opacity 180ms ease",
                                                         pointerEvents: "none",
@@ -525,7 +525,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                     sx={{
                                                         position: "relative",
                                                         zIndex: 1,
-                                                        color: isToday ? "var(--agenda-active)" : "var(--agenda-primary)",
+                                                        color: isToday ? "var(--agenda-highlight)" : "var(--agenda-text-primary)",
                                                         fontWeight: 700,
                                                         fontSize: { xs: "0.82rem", md: "0.92rem" },
                                                     }}
@@ -533,7 +533,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                     {cellDate.getUTCDate()}
                                                 </Typography>
                                                 {isToday && (
-                                                    <Typography sx={{ position: "relative", zIndex: 1, color: "var(--agenda-active)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                                                    <Typography sx={{ position: "relative", zIndex: 1, color: "var(--agenda-highlight)", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>
                                                         Today
                                                     </Typography>
                                                 )}
@@ -647,7 +647,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                         style={{
                             position: "fixed",
                             inset: 0,
-                            background: "linear-gradient(180deg, var(--agenda-calendar-overlay-start), var(--agenda-calendar-overlay-end))",
+                            background: "linear-gradient(180deg, var(--agenda-atmosphere-start), var(--agenda-atmosphere-end))",
                             backdropFilter: "blur(5px)",
                             zIndex: 1200,
                             display: "flex",
@@ -675,14 +675,14 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                         <>
                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2, flexWrap: "wrap" }}>
                                     <Box>
-                                        <Typography sx={{ color: "var(--agenda-primary)", fontWeight: 700, fontSize: { xs: "1rem", md: "1.2rem" } }}>
+                                        <Typography sx={{ color: "var(--agenda-text-primary)", fontWeight: 700, fontSize: { xs: "1rem", md: "1.2rem" } }}>
                                             Events on {formatDate(selectedDateKey)}
                                         </Typography>
-                                        <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.88rem" }}>
+                                        <Typography sx={{ color: "var(--agenda-text-muted)", fontSize: "0.88rem" }}>
                                             Select an event, then confirm to begin.
                                         </Typography>
                                     </Box>
-                                    <Typography sx={{ color: "var(--agenda-active)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
+                                    <Typography sx={{ color: "var(--agenda-highlight)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: "0.72rem" }}>
                                         Current Time: {formatTimeOfDay(currentTimeOfDay)}
                                     </Typography>
                                 </Box>
@@ -692,9 +692,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                         display: "flex",
                                         flexDirection: "column",
                                         flex: 1,
-                                        border: "1px solid var(--agenda-calendar-card-border)",
+                                        border: "1px solid var(--agenda-panel-border)",
                                         borderRadius: "12px",
-                                        background: "linear-gradient(180deg, var(--agenda-calendar-card-bg), var(--agenda-glass))",
+                                        background: "linear-gradient(180deg, var(--agenda-panel-surface), var(--agenda-glass))",
                                         padding: "12px",
                                         minHeight: 0,
                                         overflowY: "auto",
@@ -716,12 +716,12 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                     key={slot}
                                                     sx={{
                                                         minWidth: 0,
-                                                        borderLeft: slotIndex === 0 ? "none" : "1px solid var(--agenda-calendar-card-border)",
+                                                        borderLeft: slotIndex === 0 ? "none" : "1px solid var(--agenda-panel-border)",
                                                         pl: slotIndex === 0 ? 0 : 1,
                                                         opacity: slotIsPast ? 0.45 : 1,
                                                     }}
                                                 >
-                                                    <Typography sx={{ color: "var(--agenda-primary)", fontWeight: 700, fontSize: "0.78rem", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                                                    <Typography sx={{ color: "var(--agenda-text-primary)", fontWeight: 700, fontSize: "0.78rem", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                                                         {formatTimeOfDay(slot)}
                                                     </Typography>
                                                 </Box>
@@ -731,7 +731,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
                                     <Box sx={{ display: "flex", flexDirection: "column", gap: 1, flex: 1, minHeight: 0 }}>
                                         {orderedDateEvents.length === 0 && (
-                                            <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.8rem", fontStyle: "italic", opacity: 0.7 }}>
+                                            <Typography sx={{ color: "var(--agenda-text-muted)", fontSize: "0.8rem", fontStyle: "italic", opacity: 0.7 }}>
                                                 No events
                                             </Typography>
                                         )}
@@ -760,7 +760,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                             position: "absolute",
                                                             inset: 0,
                                                             borderRadius: "10px",
-                                                            background: "linear-gradient(90deg, var(--agenda-bg-soft) 0%, var(--agenda-bg-soft) 25%, var(--agenda-calendar-card-bg) 25%, var(--agenda-calendar-card-bg) 50%, var(--agenda-bg-soft) 50%, var(--agenda-bg-soft) 75%, var(--agenda-calendar-card-bg) 75%, var(--agenda-calendar-card-bg) 100%)",
+                                                            background: "linear-gradient(90deg, var(--agenda-surface-elevated) 0%, var(--agenda-surface-elevated) 25%, var(--agenda-panel-surface) 25%, var(--agenda-panel-surface) 50%, var(--agenda-surface-elevated) 50%, var(--agenda-surface-elevated) 75%, var(--agenda-panel-surface) 75%, var(--agenda-panel-surface) 100%)",
                                                             opacity: 0.18,
                                                             pointerEvents: "none",
                                                         },
@@ -774,11 +774,11 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         style={{
                                                             appearance: "none",
                                                             border: selected
-                                                                ? `2px solid ${leadActor?.themeColor || "var(--agenda-active)"}`
-                                                                : `1px solid ${leadActor?.themeColor || "var(--agenda-calendar-card-border)"}`,
+                                                                ? `2px solid ${leadActor?.themeColor || "var(--agenda-highlight)"}`
+                                                                : `1px solid ${leadActor?.themeColor || "var(--agenda-panel-border)"}`,
                                                             borderRadius: "9px",
                                                             padding: "10px",
-                                                            background: "linear-gradient(145deg, var(--agenda-bg-soft), var(--agenda-bg-deep))",
+                                                            background: "linear-gradient(145deg, var(--agenda-surface-elevated), var(--agenda-surface-base))",
                                                             textAlign: "left",
                                                             width: "100%",
                                                             cursor: "pointer",
@@ -789,14 +789,14 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                             minWidth: 0,
                                                         }}
                                                     >
-                                                        <Typography sx={{ color: "var(--agenda-primary)", fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>
+                                                        <Typography sx={{ color: "var(--agenda-text-primary)", fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>
                                                             {eventItem.recurrence ? "↻ " : ""}{eventItem.name}
                                                         </Typography>
-                                                        <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.72rem", mt: 0.4 }}>
+                                                        <Typography sx={{ color: "var(--agenda-text-muted)", fontSize: "0.72rem", mt: 0.4 }}>
                                                             {formatDurationSummary(eventItem)} · {save.atlas[eventItem.locationId]?.name || "Unknown Location"}
                                                         </Typography>
                                                         {eventItem.recurrence && (
-                                                            <Typography sx={{ color: "var(--agenda-inactive)", fontSize: "0.67rem", mt: 0.3, opacity: 0.86 }}>
+                                                            <Typography sx={{ color: "var(--agenda-text-muted)", fontSize: "0.67rem", mt: 0.3, opacity: 0.86 }}>
                                                                 {formatRecurrenceSummary(eventItem.recurrence)}
                                                             </Typography>
                                                         )}

@@ -216,7 +216,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'auto', minHeight: 0 }}>
                     {events.length === 0 && (
-                        <div style={{ color: 'var(--agenda-inactive)', fontStyle: 'italic' }}>
+                        <div style={{ color: 'var(--agenda-text-muted)', fontStyle: 'italic' }}>
                             No saved events.
                         </div>
                     )}
@@ -228,16 +228,16 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                             style={{
                                 textAlign: 'left',
                                 cursor: 'pointer',
-                                borderColor: selectedEventId === event.id ? 'var(--agenda-border-strong)' : 'var(--agenda-border)',
+                                borderColor: selectedEventId === event.id ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)',
                                 background: selectedEventId === event.id
                                     ? 'linear-gradient(145deg, rgba(39, 58, 60, 0.92), rgba(21, 26, 40, 0.92))'
                                     : 'linear-gradient(145deg, rgba(27, 33, 51, 0.92), rgba(21, 26, 40, 0.92))',
                             }}
                         >
                             <div style={{ fontWeight: 700, marginBottom: 4 }}>{event.name}</div>
-                            <div style={{ fontSize: '13px', color: 'var(--agenda-inactive)' }}>{event.date}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--agenda-inactive)' }}>{durationSummary(event.duration)}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--agenda-inactive)' }}>{recurrenceSummary(event.recurrence)}</div>
+                            <div style={{ fontSize: '13px', color: 'var(--agenda-text-muted)' }}>{event.date}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{durationSummary(event.duration)}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{recurrenceSummary(event.recurrence)}</div>
                         </button>
                     ))}
                 </div>
@@ -248,7 +248,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Name</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Name</label>
                         <TextInput
                             fullWidth
                             value={draft.name}
@@ -258,7 +258,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Date</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Date</label>
                         <TextInput
                             fullWidth
                             type="date"
@@ -268,7 +268,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Location</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Location</label>
                         <select
                             className="input-base"
                             value={draft.locationId}
@@ -281,11 +281,11 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>
                             Duration Slots ({durationSummary(draft.duration)})
                         </label>
                         <div style={{
-                            border: '1px solid var(--agenda-border)',
+                            border: '1px solid var(--agenda-line-subtle)',
                             borderRadius: 8,
                             padding: 10,
                             display: 'grid',
@@ -306,7 +306,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Description</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Description</label>
                         <textarea
                             className="input-base"
                             value={draft.description}
@@ -317,7 +317,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Guidance</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Guidance</label>
                         <textarea
                             className="input-base"
                             value={draft.guidance}
@@ -328,9 +328,9 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Participants</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Participants</label>
                         <div style={{
-                            border: '1px solid var(--agenda-border)',
+                            border: '1px solid var(--agenda-line-subtle)',
                             borderRadius: 8,
                             padding: 10,
                             display: 'grid',
@@ -351,7 +351,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--agenda-inactive)', marginBottom: 8 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--agenda-text-muted)', marginBottom: 8 }}>
                             <input
                                 type="checkbox"
                                 checked={recurrenceEnabled}

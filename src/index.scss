@@ -1,24 +1,23 @@
 :root {
-  --agenda-bg-deep: #1a1e30;
-  --agenda-bg-mid: #24293f;
-  --agenda-bg-soft: #2e354d;
-  --agenda-primary: #edf2f2;
-  --agenda-accent: #8ab0cc;
-  --agenda-active: #89cd87;
-  --agenda-border: rgba(138, 176, 204, 0.34);
-  --agenda-border-strong: rgba(137, 205, 135, 0.44);
+  --agenda-surface-base: #1a1e30;
+  --agenda-surface-raised: #24293f;
+  --agenda-surface-elevated: #2e354d;
+  --agenda-text-primary: #edf2f2;
+  --agenda-accent-primary: #8ab0cc;
+  --agenda-highlight: #89cd87;
+  --agenda-text-muted: #b9d2e3;
+  --agenda-line-subtle: rgba(138, 176, 204, 0.34);
+  --agenda-line-strong: rgba(137, 205, 135, 0.44);
   --agenda-glass: rgba(26, 30, 48, 0.62);
   --agenda-glass-bright: rgba(36, 41, 63, 0.78);
-  --agenda-text-primary: #edf2f2;
-  --agenda-inactive: #b9d2e3;
   --agenda-shadow: 0 14px 34px rgba(2, 8, 18, 0.48);
-  --agenda-font-flavor: "Lora", Georgia, serif;
-  --agenda-font-ui: "Geologica", sans-serif;
-  --agenda-calendar-overlay-start: rgba(10, 28, 37, 0.79);
-  --agenda-calendar-overlay-mid: rgba(21, 41, 30, 0.73);
-  --agenda-calendar-overlay-end: rgba(35, 24, 56, 0.78);
-  --agenda-calendar-card-bg: rgba(28, 34, 52, 0.92);
-  --agenda-calendar-card-border: rgba(138, 176, 204, 0.34);
+  --agenda-font-display: "Lora", Georgia, serif;
+  --agenda-font-base: "Geologica", sans-serif;
+  --agenda-atmosphere-start: rgba(10, 28, 37, 0.79);
+  --agenda-atmosphere-mid: rgba(21, 41, 30, 0.73);
+  --agenda-atmosphere-end: rgba(35, 24, 56, 0.78);
+  --agenda-panel-surface: rgba(28, 34, 52, 0.92);
+  --agenda-panel-border: rgba(138, 176, 204, 0.34);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -35,11 +34,11 @@ html, body, #root {
 
 body {
   color: var(--agenda-text-primary);
-  font-family: var(--agenda-font-ui);
+  font-family: var(--agenda-font-base);
   background:
-    radial-gradient(1200px 700px at 12% 10%, rgba(138, 176, 204, 0.2), transparent 56%),
-    radial-gradient(950px 560px at 88% 90%, rgba(137, 205, 135, 0.16), transparent 62%),
-    linear-gradient(160deg, #171b2d 0%, #1f2438 44%, #161a2a 100%);
+    radial-gradient(1200px 700px at 12% 10%, color-mix(in srgb, var(--agenda-accent-primary) 20%, transparent), transparent 56%),
+    radial-gradient(950px 560px at 88% 90%, color-mix(in srgb, var(--agenda-highlight) 16%, transparent), transparent 62%),
+    linear-gradient(160deg, color-mix(in srgb, var(--agenda-surface-base) 88%, #000) 0%, var(--agenda-surface-raised) 44%, color-mix(in srgb, var(--agenda-surface-base) 92%, #000) 100%);
 }
 
 .agenda-screen-root {
@@ -58,8 +57,8 @@ body {
   opacity: 0.36;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(138, 176, 204, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(138, 176, 204, 0.045) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--agenda-accent-primary) 18%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--agenda-accent-primary) 15%, transparent) 1px, transparent 1px);
   background-size: 64px 64px;
 }
 
@@ -69,8 +68,8 @@ body {
   pointer-events: none;
   opacity: 0.3;
   background-image:
-    linear-gradient(rgba(138, 176, 204, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(122, 123, 107, 0.12) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--agenda-accent-primary) 28%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--agenda-highlight) 22%, transparent) 1px, transparent 1px);
   mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.86), transparent 88%);
 }
 
@@ -78,39 +77,44 @@ body {
 .glass-panel-bright,
 .glass-panel-tooltip {
   position: relative;
-  border: 1px solid var(--agenda-border);
+  border: 1px solid var(--agenda-line-subtle);
   border-radius: 14px;
-  background: linear-gradient(155deg, var(--agenda-glass-bright) 0%, var(--agenda-glass) 100%);
-  box-shadow: var(--agenda-shadow), inset 0 1px 0 rgba(237, 242, 242, 0.05);
+  background:
+    linear-gradient(155deg,
+      color-mix(in srgb, var(--agenda-panel-surface) 88%, transparent) 0%,
+      color-mix(in srgb, var(--agenda-surface-base) 76%, transparent) 100%);
+  box-shadow: var(--agenda-shadow), inset 0 1px 0 color-mix(in srgb, var(--agenda-text-primary) 8%, transparent);
   backdrop-filter: blur(12px);
 }
 
 .glass-panel-bright {
-  border: 1px solid var(--agenda-border-strong);
+  border: 1px solid var(--agenda-line-strong);
   background:
-    linear-gradient(160deg, rgba(36, 41, 63, 0.86) 0%, rgba(26, 30, 48, 0.8) 100%),
-    radial-gradient(circle at 8% 14%, rgba(138, 176, 204, 0.2), transparent 60%);
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--agenda-surface-raised) 88%, transparent) 0%,
+      color-mix(in srgb, var(--agenda-surface-base) 82%, transparent) 100%),
+    radial-gradient(circle at 8% 14%, color-mix(in srgb, var(--agenda-accent-primary) 20%, transparent), transparent 60%);
 }
 
 .glass-panel-tooltip {
   border-radius: 12px;
-  border-color: rgba(138, 176, 204, 0.42);
+  border-color: color-mix(in srgb, var(--agenda-line-subtle) 84%, var(--agenda-accent-primary));
 }
 
 .text-glow-primary {
-  color: var(--agenda-primary);
-  font-family: var(--agenda-font-flavor);
+  color: var(--agenda-text-primary);
+  font-family: var(--agenda-font-display);
   letter-spacing: 0.1em;
-  text-shadow: 0 0 18px rgba(138, 176, 204, 0.34), 0 4px 10px rgba(3, 7, 15, 0.66);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--agenda-accent-primary) 34%, transparent), 0 4px 10px rgba(3, 7, 15, 0.66);
 }
 
 .text-gradient {
   color: transparent;
-  font-family: var(--agenda-font-flavor);
-  background: linear-gradient(95deg, var(--agenda-accent) 0%, var(--agenda-active) 52%, var(--agenda-primary) 100%);
+  font-family: var(--agenda-font-display);
+  background: linear-gradient(95deg, var(--agenda-accent-primary) 0%, var(--agenda-highlight) 52%, var(--agenda-text-primary) 100%);
   background-clip: text;
   -webkit-background-clip: text;
-  text-shadow: 0 0 14px rgba(138, 176, 204, 0.26);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--agenda-accent-primary) 26%, transparent);
 }
 
 .btn-primary,
@@ -119,8 +123,8 @@ body {
 .btn-danger {
   border: 1px solid transparent;
   border-radius: 10px;
-  color: var(--agenda-primary);
-  font-family: var(--agenda-font-ui);
+  color: var(--agenda-text-primary);
+  font-family: var(--agenda-font-base);
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -131,22 +135,29 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #4f6684 0%, #7da4c1 45%, #88cb86 100%);
-  border-color: rgba(185, 210, 227, 0.3);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--agenda-surface-raised) 68%, var(--agenda-accent-primary)) 0%,
+    color-mix(in srgb, var(--agenda-accent-primary) 85%, var(--agenda-surface-raised)) 45%,
+    color-mix(in srgb, var(--agenda-highlight) 90%, var(--agenda-surface-elevated)) 100%);
+  border-color: color-mix(in srgb, var(--agenda-text-primary) 30%, transparent);
 }
 
 .btn-secondary {
-  color: var(--agenda-inactive);
-  background: linear-gradient(135deg, rgba(34, 42, 63, 0.95), rgba(42, 53, 80, 0.9));
-  border-color: rgba(138, 176, 204, 0.36);
+  color: var(--agenda-text-muted);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--agenda-surface-raised) 94%, transparent),
+    color-mix(in srgb, var(--agenda-surface-elevated) 90%, transparent));
+  border-color: color-mix(in srgb, var(--agenda-accent-primary) 40%, transparent);
 }
 
 .btn-menu {
   width: 100%;
   text-align: left;
-  color: var(--agenda-primary);
-  background: linear-gradient(140deg, rgba(31, 37, 58, 0.95), rgba(24, 29, 45, 0.96));
-  border-color: rgba(138, 176, 204, 0.28);
+  color: var(--agenda-text-primary);
+  background: linear-gradient(140deg,
+    color-mix(in srgb, var(--agenda-surface-raised) 92%, transparent),
+    color-mix(in srgb, var(--agenda-surface-base) 94%, transparent));
+  border-color: color-mix(in srgb, var(--agenda-accent-primary) 30%, transparent);
   box-shadow: 0 10px 24px rgba(5, 10, 20, 0.34);
 }
 
@@ -163,17 +174,17 @@ body {
   text-transform: none;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--agenda-inactive);
+  color: var(--agenda-text-muted);
   background: transparent;
   border: 0;
-  border-bottom: 2px solid var(--agenda-border);
+  border-bottom: 2px solid var(--agenda-line-subtle);
   box-shadow: none;
   transition: color 180ms ease, border-bottom-color 220ms ease;
 }
 
 .menu-section-header.is-active {
-  color: var(--agenda-active);
-  border-bottom-color: var(--agenda-border-strong);
+  color: var(--agenda-highlight);
+  border-bottom-color: var(--agenda-line-strong);
   box-shadow: inset 0 -1px 0 rgba(137, 205, 135, 0.35);
 }
 
@@ -205,7 +216,7 @@ body {
   transform: none;
   background: transparent;
   border-color: transparent;
-  border-bottom-color: var(--agenda-border-strong);
+  border-bottom-color: var(--agenda-line-strong);
   box-shadow: none;
 }
 
@@ -237,22 +248,24 @@ body {
   width: 100%;
   box-sizing: border-box;
   border-radius: 9px;
-  border: 1px solid rgba(138, 176, 204, 0.36);
+  border: 1px solid color-mix(in srgb, var(--agenda-accent-primary) 40%, transparent);
   color: var(--agenda-text-primary);
-  background: linear-gradient(145deg, rgba(27, 33, 51, 0.92), rgba(21, 26, 40, 0.92));
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--agenda-surface-raised) 92%, transparent),
+    color-mix(in srgb, var(--agenda-surface-base) 92%, transparent));
   padding: 12px 14px;
-  font-family: var(--agenda-font-ui);
+  font-family: var(--agenda-font-base);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .input-base::placeholder {
-  color: rgba(185, 210, 227, 0.55);
+  color: color-mix(in srgb, var(--agenda-text-muted) 55%, transparent);
 }
 
 .input-base:focus {
   outline: none;
-  border-color: rgba(137, 205, 135, 0.7);
-  box-shadow: 0 0 0 3px rgba(137, 205, 135, 0.2);
+  border-color: color-mix(in srgb, var(--agenda-highlight) 70%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--agenda-highlight) 22%, transparent);
 }
 
 .number-stepper-shell {
@@ -283,17 +296,17 @@ body {
   width: 34px;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--agenda-border);
+  border-left: 1px solid var(--agenda-line-subtle);
   border-radius: 0 8px 8px 0;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--agenda-bg-soft), var(--agenda-bg-mid));
+  background: linear-gradient(180deg, var(--agenda-surface-elevated), var(--agenda-surface-raised));
 }
 
 .number-stepper-button {
   flex: 1;
   border: none;
   background: transparent;
-  color: var(--agenda-accent);
+  color: var(--agenda-accent-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -302,11 +315,11 @@ body {
 }
 
 .number-stepper-button + .number-stepper-button {
-  border-top: 1px solid var(--agenda-border);
+  border-top: 1px solid var(--agenda-line-subtle);
 }
 
 .number-stepper-button:hover {
-  color: var(--agenda-primary);
+  color: var(--agenda-text-primary);
   background: var(--agenda-glass-bright);
 }
 
@@ -315,7 +328,7 @@ body {
 }
 
 .number-stepper-button:focus-visible {
-  outline: 1px solid var(--agenda-border-strong);
+  outline: 1px solid var(--agenda-line-strong);
   outline-offset: -1px;
 }
 
@@ -326,12 +339,12 @@ select.input-base {
 select.input-base option,
 select.input-base optgroup {
   color: var(--agenda-text-primary);
-  background-color: #1f2438;
+  background-color: var(--agenda-surface-raised);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(138, 176, 204, 0.45) rgba(17, 22, 35, 0.35);
+  scrollbar-color: color-mix(in srgb, var(--agenda-accent-primary) 45%, transparent) color-mix(in srgb, var(--agenda-surface-base) 84%, transparent);
 }
 
 *::-webkit-scrollbar {
@@ -340,13 +353,15 @@ select.input-base optgroup {
 }
 
 *::-webkit-scrollbar-track {
-  background: rgba(17, 22, 35, 0.45);
+  background: color-mix(in srgb, var(--agenda-surface-base) 88%, transparent);
 }
 
 *::-webkit-scrollbar-thumb {
   border-radius: 9px;
-  border: 2px solid rgba(17, 22, 35, 0.45);
-  background: linear-gradient(180deg, rgba(138, 176, 204, 0.75), rgba(95, 127, 155, 0.9));
+  border: 2px solid color-mix(in srgb, var(--agenda-surface-base) 88%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--agenda-accent-primary) 78%, var(--agenda-surface-raised)),
+    color-mix(in srgb, var(--agenda-accent-primary) 56%, var(--agenda-surface-base)));
 }
 
 @keyframes agendaFadeRise {

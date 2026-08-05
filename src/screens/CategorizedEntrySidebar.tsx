@@ -39,8 +39,8 @@ export const CategorizedEntrySidebar = <TEntry,>({
     return (
         <div
             style={{
-                background: 'rgba(0, 20, 40, 0.45)',
-                border: '1px solid rgba(0, 255, 136, 0.25)',
+                background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
+                border: '1px solid var(--agenda-line-subtle)',
                 borderRadius: '12px',
                 padding: '14px',
                 overflowY: 'auto',
@@ -50,7 +50,7 @@ export const CategorizedEntrySidebar = <TEntry,>({
             }}
         >
             {sections.length === 0 ? (
-                <div style={{ color: 'rgba(224, 240, 255, 0.6)', fontSize: '13px', padding: '8px 0' }}>
+                <div style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', padding: '8px 0' }}>
                     {emptyListMessage}
                 </div>
             ) : (
@@ -85,13 +85,13 @@ export const CategorizedEntrySidebar = <TEntry,>({
                                         background: 'transparent',
                                         border: 'none',
                                         padding: 0,
-                                        color: 'rgba(224, 240, 255, 0.9)',
+                                        color: 'var(--agenda-text-primary)',
                                         fontSize: '13px',
                                         fontWeight: 700,
                                         textTransform: 'uppercase',
                                         letterSpacing: '0.08em',
                                         cursor: 'pointer',
-                                        borderBottom: '1px solid rgba(0, 255, 136, 0.25)',
+                                        borderBottom: '1px solid var(--agenda-line-subtle)',
                                         paddingBottom: '6px',
                                     }}
                                 >
@@ -135,7 +135,7 @@ export const CategorizedEntrySidebar = <TEntry,>({
                                         style={{ overflow: 'visible', marginBottom: '10px' }}
                                     >
                                         {section.entries.length === 0 ? (
-                                            <div style={{ color: 'rgba(224, 240, 255, 0.6)', fontSize: '13px', fontStyle: 'italic' }}>
+                                            <div style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', fontStyle: 'italic' }}>
                                                 {typeof sectionEmptyMessage === 'function'
                                                     ? sectionEmptyMessage(section)
                                                     : sectionEmptyMessage || 'No entries.'}

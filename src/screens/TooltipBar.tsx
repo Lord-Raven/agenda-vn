@@ -118,7 +118,7 @@ export const TooltipBar: FC<TooltipBarProps> = ({
                         {Icon && (
                             <Icon
                                 sx={{
-                                    color: 'var(--agenda-accent)',
+                                    color: 'var(--agenda-accent-primary)',
                                     fontSize: '28px',
                                     filter: 'drop-shadow(0 0 8px rgba(138, 176, 204, 0.45))',
                                     flexShrink: 0,
@@ -128,7 +128,7 @@ export const TooltipBar: FC<TooltipBarProps> = ({
                         <Typography
                             variant="body1"
                             sx={{
-                                color: 'var(--agenda-primary)',
+                                color: 'var(--agenda-text-primary)',
                                 fontSize: '16px',
                                 fontWeight: 600,
                                 textShadow: '0 0 10px rgba(138, 176, 204, 0.35)',

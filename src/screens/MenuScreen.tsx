@@ -4,7 +4,7 @@ import { ScreenType } from "./BaseScreen";
 import { FiberNew, Folder, PlayArrow, Save, SaveAlt, Settings } from "@mui/icons-material";
 import { SettingsScreen } from "./SettingsScreen";
 import { BlurredBackground } from "@lord-raven/novel-visualizer";
-import { Button, GridOverlay } from "./UiComponents";
+import { Button } from "./UiComponents";
 import { motion, AnimatePresence } from "framer-motion";
 import { Box } from "@mui/material";
 import { useTooltip } from "./TooltipContext";
@@ -167,9 +167,6 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                     position: 'relative',
                 }}
             >
-                {/* Background grid effect */}
-                <GridOverlay />
-
                 {/* Title above menu panel */}
                 <motion.div
                     initial={{ opacity: 0 }}
@@ -229,8 +226,8 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                             style={{
                                 margin: 0,
                                 textAlign: 'center',
-                                color: 'var(--agenda-primary)',
-                                fontFamily: 'var(--agenda-font-flavor)',
+                                color: 'var(--agenda-text-primary)',
+                                fontFamily: 'var(--agenda-font-display)',
                                 fontSize: 'clamp(2.4rem, 8vw, 4.6rem)',
                                 fontWeight: 700,
                                 letterSpacing: '0.08em',

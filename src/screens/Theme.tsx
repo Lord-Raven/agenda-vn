@@ -8,27 +8,27 @@ import { createTheme } from '@mui/material/styles';
 // Shared palette for all screen classes.
 export const colors = {
   primary: {
-    main: '#8ab0cc',
-    light: '#b9d2e3',
-    dark: '#5f7f9b',
-    contrastText: '#edf2f2',
+    main: 'var(--agenda-accent-primary)',
+    light: 'var(--agenda-text-muted)',
+    dark: 'var(--agenda-surface-raised)',
+    contrastText: 'var(--agenda-text-primary)',
   },
   secondary: {
-    main: '#89cd87',
-    light: '#b5dfb3',
-    dark: '#5f9360',
-    contrastText: '#1a1e30',
+    main: 'var(--agenda-highlight)',
+    light: 'color-mix(in srgb, var(--agenda-highlight) 65%, white)',
+    dark: 'color-mix(in srgb, var(--agenda-highlight) 62%, var(--agenda-surface-base))',
+    contrastText: 'var(--agenda-surface-base)',
   },
   background: {
-    default: '#1a1e30',
-    paper: '#25293f',
-    glass: 'rgba(138, 176, 204, 0.08)',
-    glassLight: 'rgba(137, 205, 135, 0.14)',
+    default: 'var(--agenda-surface-base)',
+    paper: 'var(--agenda-surface-raised)',
+    glass: 'color-mix(in srgb, var(--agenda-accent-primary) 14%, transparent)',
+    glassLight: 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)',
   },
   text: {
-    primary: '#edf2f2',
-    secondary: '#b9d2e3',
-    disabled: 'rgba(237, 242, 242, 0.42)',
+    primary: 'var(--agenda-text-primary)',
+    secondary: 'var(--agenda-text-muted)',
+    disabled: 'color-mix(in srgb, var(--agenda-text-primary) 42%, transparent)',
   },
 };
 
@@ -44,35 +44,35 @@ export const theme = createTheme({
     text: colors.text,
   },
   typography: {
-    fontFamily: '"Geologica", sans-serif',
+    fontFamily: 'var(--agenda-font-base)',
     h1: {
-      fontFamily: '"Lora", Georgia, serif',
+      fontFamily: 'var(--agenda-font-display)',
       fontSize: '2.5rem',
       fontWeight: 700,
       letterSpacing: '0.12em',
       textTransform: 'uppercase',
-      textShadow: '0 0 24px rgba(138, 176, 204, 0.26)',
+      textShadow: '0 0 24px color-mix(in srgb, var(--agenda-accent-primary) 26%, transparent)',
     },
     h2: {
-      fontFamily: '"Lora", Georgia, serif',
+      fontFamily: 'var(--agenda-font-display)',
       fontSize: '2rem',
       fontWeight: 700,
       letterSpacing: '0.08em',
-      textShadow: '0 0 18px rgba(137, 205, 135, 0.2)',
+      textShadow: '0 0 18px color-mix(in srgb, var(--agenda-highlight) 20%, transparent)',
     },
     h3: {
-      fontFamily: '"Lora", Georgia, serif',
+      fontFamily: 'var(--agenda-font-display)',
       fontSize: '1.75rem',
       fontWeight: 600,
       letterSpacing: '0.05em',
     },
     h4: {
-      fontFamily: '"Lora", Georgia, serif',
+      fontFamily: 'var(--agenda-font-display)',
       fontSize: '1.5rem',
       fontWeight: 600,
     },
     h5: {
-      fontFamily: '"Lora", Georgia, serif',
+      fontFamily: 'var(--agenda-font-display)',
       fontSize: '1.25rem',
       fontWeight: 500,
     },
@@ -81,7 +81,7 @@ export const theme = createTheme({
       lineHeight: 1.6,
     },
     button: {
-      fontFamily: '"Geologica", sans-serif',
+      fontFamily: 'var(--agenda-font-base)',
       textTransform: 'uppercase',
       fontWeight: 700,
       letterSpacing: '0.08em',
@@ -122,19 +122,19 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: '8px',
-          fontFamily: '"Geologica", sans-serif',
+          fontFamily: 'var(--agenda-font-base)',
           padding: '10px 24px',
           transition: 'all 0.3s ease',
-          boxShadow: '0 0 14px rgba(138, 176, 204, 0.24)',
+          boxShadow: '0 0 14px color-mix(in srgb, var(--agenda-accent-primary) 24%, transparent)',
           '&:hover': {
-            boxShadow: '0 0 24px rgba(137, 205, 135, 0.3)',
+            boxShadow: '0 0 24px color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
             transform: 'translateY(-2px)',
           },
         },
         contained: {
-          background: 'linear-gradient(135deg, #5f7f9b 0%, #8ab0cc 45%, #89cd87 100%)',
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--agenda-surface-raised) 70%, var(--agenda-accent-primary)) 0%, var(--agenda-accent-primary) 45%, var(--agenda-highlight) 100%)',
           '&:hover': {
-            background: 'linear-gradient(135deg, #6c90ae 0%, #9ac0dc 45%, #9ad897 100%)',
+            background: 'linear-gradient(135deg, color-mix(in srgb, var(--agenda-surface-raised) 60%, var(--agenda-accent-primary)) 0%, color-mix(in srgb, var(--agenda-accent-primary) 84%, white) 45%, color-mix(in srgb, var(--agenda-highlight) 86%, white) 100%)',
           },
         },
         outlined: {
@@ -156,7 +156,7 @@ export const theme = createTheme({
           backgroundColor: colors.background.paper,
           border: '2px solid',
           borderImageSlice: 1,
-          borderImageSource: 'linear-gradient(135deg, #8ab0cc, #89cd87)',
+          borderImageSource: 'linear-gradient(135deg, var(--agenda-accent-primary), var(--agenda-highlight))',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
         },
       },
@@ -164,14 +164,14 @@ export const theme = createTheme({
     MuiTextField: {
       styleOverrides: {
         root: {
-          fontFamily: '"Geologica", sans-serif',
+          fontFamily: 'var(--agenda-font-base)',
           '& .MuiOutlinedInput-root': {
             '& fieldset': {
-              borderColor: 'rgba(138, 176, 204, 0.4)',
+              borderColor: 'color-mix(in srgb, var(--agenda-accent-primary) 40%, transparent)',
               borderWidth: '2px',
             },
             '&:hover fieldset': {
-              borderColor: 'rgba(138, 176, 204, 0.62)',
+              borderColor: 'color-mix(in srgb, var(--agenda-accent-primary) 62%, transparent)',
             },
             '&.Mui-focused fieldset': {
               borderColor: colors.secondary.main,
@@ -191,12 +191,12 @@ export const theme = createTheme({
         root: {
           height: 10,
           borderRadius: 5,
-          backgroundColor: 'rgba(122, 123, 107, 0.35)',
+          backgroundColor: 'color-mix(in srgb, var(--agenda-surface-elevated) 70%, transparent)',
         },
         bar: {
           borderRadius: 5,
-          background: 'linear-gradient(90deg, #5f7f9b 0%, #8ab0cc 45%, #89cd87 100%)',
-          boxShadow: '0 0 10px rgba(138, 176, 204, 0.45)',
+          background: 'linear-gradient(90deg, color-mix(in srgb, var(--agenda-surface-raised) 65%, var(--agenda-accent-primary)) 0%, var(--agenda-accent-primary) 45%, var(--agenda-highlight) 100%)',
+          boxShadow: '0 0 10px color-mix(in srgb, var(--agenda-accent-primary) 45%, transparent)',
         },
       },
     },
@@ -206,10 +206,10 @@ export const theme = createTheme({
           backgroundColor: colors.background.glass,
           border: `1px solid ${colors.primary.main}`,
           color: colors.text.primary,
-          fontFamily: '"Geologica", sans-serif',
+          fontFamily: 'var(--agenda-font-base)',
           fontWeight: 600,
           '&:hover': {
-            backgroundColor: 'rgba(138, 176, 204, 0.16)',
+            backgroundColor: 'color-mix(in srgb, var(--agenda-accent-primary) 16%, transparent)',
           },
         },
       },

@@ -97,7 +97,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     style={{
                                         background: 'transparent',
                                         border: 'none',
-                                        color: 'rgba(0, 255, 136, 0.7)',
+                                        color: 'var(--agenda-highlight)',
                                         cursor: 'pointer',
                                         fontSize: '24px',
                                         padding: '5px',
@@ -115,7 +115,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 display: 'flex',
                                 gap: '10px',
                                 marginBottom: '20px',
-                                borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                                borderBottom: '2px solid var(--agenda-line-strong)',
                                 paddingBottom: '10px',
                             }}>
                                 <Button

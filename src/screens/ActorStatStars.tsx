@@ -36,7 +36,7 @@ const starShellStyle = (interactive: boolean): React.CSSProperties => ({
     margin: 0,
     border: 0,
     background: 'transparent',
-    color: 'var(--agenda-inactive, rgba(154, 198, 192, 0.38))',
+    color: 'var(--agenda-text-muted)',
     cursor: interactive ? 'pointer' : 'default',
     lineHeight: 0,
     overflow: 'visible',
@@ -55,8 +55,8 @@ const starFillStyle: React.CSSProperties = {
     inset: 0,
     width: '100%',
     height: '100%',
-    color: 'var(--agenda-active, #00ff88)',
-    filter: 'drop-shadow(0 0 2px rgba(0, 255, 136, 0.35))',
+    color: 'var(--agenda-highlight)',
+    filter: 'drop-shadow(0 0 2px color-mix(in srgb, var(--agenda-highlight) 35%, transparent))',
 };
 
 const renderStar = (

@@ -8,6 +8,7 @@ import {
     mergeGeneratedUiSettings,
     renderContextSegment,
     UiSettings,
+    UI_STYLE_FIELD_LABELS,
     UI_SETTINGS_GENERATION_FIELDS,
 } from '../content/Style';
 import { parseStructuredResponse } from '../utils/StructuredResponse.js';
@@ -30,52 +31,52 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
     const hasInitializedAutoSave = useRef(false);
 
     const styleColorFields: Array<{ label: string; key: keyof UiSettings }> = [
-        { label: 'Primary Text', key: 'primaryColor' },
-        { label: 'Secondary Text', key: 'inactiveColor' },
-        { label: 'Active Text', key: 'activeColor' },
-        { label: 'Accent Text', key: 'accentColor' },
-        { label: 'Background Deep', key: 'bgDeepColor' },
-        { label: 'Background Mid', key: 'bgMidColor' },
-        { label: 'Background Soft', key: 'bgSoftColor' },
+        { label: UI_STYLE_FIELD_LABELS.textPrimaryColor, key: 'textPrimaryColor' },
+        { label: UI_STYLE_FIELD_LABELS.textMutedColor, key: 'textMutedColor' },
+        { label: UI_STYLE_FIELD_LABELS.highlightColor, key: 'highlightColor' },
+        { label: UI_STYLE_FIELD_LABELS.accentColor, key: 'accentColor' },
+        { label: UI_STYLE_FIELD_LABELS.surfaceBaseColor, key: 'surfaceBaseColor' },
+        { label: UI_STYLE_FIELD_LABELS.surfaceRaisedColor, key: 'surfaceRaisedColor' },
+        { label: UI_STYLE_FIELD_LABELS.surfaceElevatedColor, key: 'surfaceElevatedColor' },
     ];
 
     const groupedStyleSwatches = useMemo(() => ({
         text: buildHexColorSwatches([
-            uiSettings.primaryColor,
-            uiSettings.inactiveColor,
-            uiSettings.activeColor,
+            uiSettings.textPrimaryColor,
+            uiSettings.textMutedColor,
+            uiSettings.highlightColor,
             uiSettings.accentColor,
         ]),
         background: buildHexColorSwatches([
-            uiSettings.bgDeepColor,
-            uiSettings.bgMidColor,
-            uiSettings.bgSoftColor,
+            uiSettings.surfaceBaseColor,
+            uiSettings.surfaceRaisedColor,
+            uiSettings.surfaceElevatedColor,
         ]),
         all: buildHexColorSwatches([
-            uiSettings.primaryColor,
-            uiSettings.inactiveColor,
-            uiSettings.activeColor,
+            uiSettings.textPrimaryColor,
+            uiSettings.textMutedColor,
+            uiSettings.highlightColor,
             uiSettings.accentColor,
-            uiSettings.bgDeepColor,
-            uiSettings.bgMidColor,
-            uiSettings.bgSoftColor,
+            uiSettings.surfaceBaseColor,
+            uiSettings.surfaceRaisedColor,
+            uiSettings.surfaceElevatedColor,
         ]),
     }), [
-        uiSettings.activeColor,
+        uiSettings.highlightColor,
         uiSettings.accentColor,
-        uiSettings.bgDeepColor,
-        uiSettings.bgMidColor,
-        uiSettings.bgSoftColor,
-        uiSettings.inactiveColor,
-        uiSettings.primaryColor,
+        uiSettings.surfaceBaseColor,
+        uiSettings.surfaceRaisedColor,
+        uiSettings.surfaceElevatedColor,
+        uiSettings.textMutedColor,
+        uiSettings.textPrimaryColor,
     ]);
 
     const getSwatchesForStyleKey = (key: keyof UiSettings): string[] => {
-        if (key === 'primaryColor' || key === 'inactiveColor' || key === 'activeColor' || key === 'accentColor') {
+        if (key === 'textPrimaryColor' || key === 'textMutedColor' || key === 'highlightColor' || key === 'accentColor') {
             return groupedStyleSwatches.text;
         }
 
-        if (key === 'bgDeepColor' || key === 'bgMidColor' || key === 'bgSoftColor') {
+        if (key === 'surfaceBaseColor' || key === 'surfaceRaisedColor' || key === 'surfaceElevatedColor') {
             return groupedStyleSwatches.background;
         }
 
@@ -200,28 +201,28 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>UI Font Family</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.interfaceFontFamily}</label>
                         <TextInput
                             fullWidth
-                            value={uiSettings.uiFontFamily}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, uiFontFamily: e.target.value }))}
+                            value={uiSettings.interfaceFontFamily}
+                            onChange={(e) => setUiSettings(prev => ({ ...prev, interfaceFontFamily: e.target.value }))}
                             placeholder='"Geologica", sans-serif'
                         />
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Flavor Font Family</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.displayFontFamily}</label>
                         <TextInput
                             fullWidth
-                            value={uiSettings.flavorFontFamily}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, flavorFontFamily: e.target.value }))}
+                            value={uiSettings.displayFontFamily}
+                            onChange={(e) => setUiSettings(prev => ({ ...prev, displayFontFamily: e.target.value }))}
                             placeholder='"Lora", Georgia, serif'
                         />
                     </div>
 
                     {styleColorFields.map(({ label, key }) => (
                         <div key={key}>
-                            <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>{label}</label>
+                            <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{label}</label>
                             <ColorPickerInput
                                 value={uiSettings[key] as string}
                                 onChange={(value) => setUiSettings(prev => ({ ...prev, [key]: value }))}
@@ -233,10 +234,10 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     ))}
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Border Color</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.lineSubtleColor}</label>
                         <AlphaColorPickerInput
-                            value={uiSettings.borderColor}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, borderColor: value }))}
+                            value={uiSettings.lineSubtleColor}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, lineSubtleColor: value }))}
                             popoverTitle="Choose Border Color"
                             swatches={groupedStyleSwatches.all}
                             inputStyle={{ width: '100%' }}
@@ -244,10 +245,10 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Border Strong Color</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.lineStrongColor}</label>
                         <AlphaColorPickerInput
-                            value={uiSettings.borderStrongColor}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, borderStrongColor: value }))}
+                            value={uiSettings.lineStrongColor}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, lineStrongColor: value }))}
                             popoverTitle="Choose Border Strong Color"
                             swatches={groupedStyleSwatches.all}
                             inputStyle={{ width: '100%' }}
@@ -257,53 +258,53 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             </GlassPanel>
 
             <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Calendar Styling</Title>
+                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Overlay & Panel Styling</Title>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay Start</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.atmosphereStartColor}</label>
                         <AlphaColorPickerInput
-                            value={uiSettings.calendarOverlayStart}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarOverlayStart: value }))}
+                            value={uiSettings.atmosphereStartColor}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, atmosphereStartColor: value }))}
                             popoverTitle="Choose Overlay Start"
                             swatches={groupedStyleSwatches.all}
                             inputStyle={{ width: '100%' }}
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay Mid</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.atmosphereMidColor}</label>
                         <AlphaColorPickerInput
-                            value={uiSettings.calendarOverlayMid}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarOverlayMid: value }))}
+                            value={uiSettings.atmosphereMidColor}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, atmosphereMidColor: value }))}
                             popoverTitle="Choose Overlay Mid"
                             swatches={groupedStyleSwatches.all}
                             inputStyle={{ width: '100%' }}
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Overlay End</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.atmosphereEndColor}</label>
                         <AlphaColorPickerInput
-                            value={uiSettings.calendarOverlayEnd}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarOverlayEnd: value }))}
+                            value={uiSettings.atmosphereEndColor}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, atmosphereEndColor: value }))}
                             popoverTitle="Choose Overlay End"
                             swatches={groupedStyleSwatches.all}
                             inputStyle={{ width: '100%' }}
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Card Background</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.panelSurfaceColor}</label>
                         <AlphaColorPickerInput
-                            value={uiSettings.calendarCardBackground}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarCardBackground: value }))}
+                            value={uiSettings.panelSurfaceColor}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, panelSurfaceColor: value }))}
                             popoverTitle="Choose Card Background"
                             swatches={groupedStyleSwatches.all}
                             inputStyle={{ width: '100%' }}
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Card Border</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.panelBorderColor}</label>
                         <AlphaColorPickerInput
-                            value={uiSettings.calendarCardBorder}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, calendarCardBorder: value }))}
+                            value={uiSettings.panelBorderColor}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, panelBorderColor: value }))}
                             popoverTitle="Choose Card Border"
                             swatches={groupedStyleSwatches.all}
                             inputStyle={{ width: '100%' }}
@@ -318,28 +319,28 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                 slotProps={{
                     paper: {
                         style: {
-                            backgroundColor: 'rgba(0, 20, 40, 0.95)',
+                            backgroundColor: 'var(--agenda-surface-base)',
                             backdropFilter: 'blur(10px)',
-                            border: '2px solid rgba(0, 255, 136, 0.3)',
+                            border: '2px solid var(--agenda-line-strong)',
                             borderRadius: '8px',
-                            color: '#e0f0ff',
+                            color: 'var(--agenda-text-primary)',
                             minWidth: '400px',
                         },
                     },
                 }}
             >
                 <DialogTitle style={{
-                    color: '#00ff88',
+                    color: 'var(--agenda-highlight)',
                     fontSize: '18px',
                     fontWeight: 'bold',
-                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                    borderBottom: '2px solid var(--agenda-line-strong)',
                     paddingBottom: '10px',
                 }}>
                     {confirmDialog.title}
                 </DialogTitle>
                 <DialogContent style={{ paddingTop: '20px' }}>
                     <div style={{
-                        color: '#e0f0ff',
+                        color: 'var(--agenda-text-primary)',
                         fontSize: '14px',
                         lineHeight: '1.6',
                     }}>

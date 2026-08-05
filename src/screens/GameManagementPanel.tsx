@@ -120,7 +120,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
     const fieldLabelStyle: React.CSSProperties = {
         display: 'block',
-        color: 'var(--agenda-inactive)',
+        color: 'var(--agenda-text-muted)',
         marginBottom: 0,
         fontSize: '13px',
         lineHeight: 1.1,
@@ -140,7 +140,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     };
 
     const compactChipLabelStyle: React.CSSProperties = {
-        color: 'var(--agenda-inactive)',
+        color: 'var(--agenda-text-muted)',
         fontSize: '12px',
         marginBottom: 4,
     };
@@ -522,7 +522,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Game Title</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Game Title</label>
                         <TextInput
                             fullWidth
                             value={title}
@@ -531,7 +531,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Start Date</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Start Date</label>
                         <TextInput
                             fullWidth
                             type="date"
@@ -541,7 +541,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Title Image Prompt</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Title Image Prompt</label>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'start' }}>
                             <TextInput
                                 fullWidth
@@ -569,7 +569,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             isUploading={isUploadingTitleImage}
                             inputLabel="Title Image URL"
                             uploadButtonLabel="Upload Title Image"
-                            previewBorder="3px solid var(--agenda-border-strong)"
+                            previewBorder="3px solid var(--agenda-line-strong)"
                             previewBackgroundPosition="50% 45%"
                             previewWidth="220px"
                             previewHeight="124px"
@@ -579,7 +579,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-inactive)', marginBottom: 6 }}>Background Image Prompt</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Background Image Prompt</label>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'start' }}>
                             <TextInput
                                 fullWidth
@@ -607,7 +607,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             isUploading={isUploadingBackgroundImage}
                             inputLabel="Background Image URL"
                             uploadButtonLabel="Upload Background Image"
-                            previewBorder="3px solid var(--agenda-border-strong)"
+                            previewBorder="3px solid var(--agenda-line-strong)"
                             previewBackgroundPosition="50% 45%"
                             previewWidth="220px"
                             previewHeight="124px"
@@ -615,12 +615,12 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
                         />
                         {!backgroundImageUrl && (
-                            <div style={{ color: 'var(--agenda-inactive)', fontSize: '12px', marginTop: 6 }}>
+                            <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 6 }}>
                                 Falls back to the existing default background image until you set one.
                             </div>
                         )}
                         {backgroundImageUrl && backgroundImageUrl.trim() === defaultBackgroundImageUrl && (
-                            <div style={{ color: 'var(--agenda-inactive)', fontSize: '12px', marginTop: 6 }}>
+                            <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 6 }}>
                                 This matches the current built-in background image.
                             </div>
                         )}
@@ -632,9 +632,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Global Context Blocks</Title>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {contextSegments.map((segment, index) => (
-                        <div key={`context-${index}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 10 }}>
+                        <div key={`context-${index}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                <div style={{ fontWeight: 600, color: 'var(--agenda-text)' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
                                     {segment.title?.trim() || `Context Block ${index + 1}`}
                                 </div>
                                 <Button variant="secondary" onClick={() => toggleContextBlock(index)}>
@@ -692,9 +692,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         const selectedOption = validSelections[setting.title] || optionEntries[0]?.[0] || '';
 
                         return (
-                            <div key={`setting-${settingIndex}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 10 }}>
+                            <div key={`setting-${settingIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                    <div style={{ fontWeight: 600, color: 'var(--agenda-text)' }}>
+                                    <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
                                         {setting.title?.trim() || `Setting ${settingIndex + 1}`}
                                     </div>
                                     <Button variant="secondary" onClick={() => toggleCustomSetting(settingIndex)}>
@@ -740,7 +740,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                 {optionEntries.map(([optionName, segment]) => (
-                                                    <div key={`${settingIndex}-${optionName}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 8 }}>
+                                                    <div key={`${settingIndex}-${optionName}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
                                                         <div style={inlineFieldStyle}>
                                                             <label style={fieldLabelStyle}>Option Name</label>
                                                             <TextInput
@@ -811,9 +811,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Actor Stats</Title>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {actorStats.map((stat, statIndex) => (
-                        <div key={`actor-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-border)', borderRadius: 8, padding: 10 }}>
+                        <div key={`actor-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                <div style={{ fontWeight: 600, color: 'var(--agenda-text)' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
                                     {stat.name?.trim() || `Actor Stat ${statIndex + 1}`}
                                 </div>
                                 <Button variant="secondary" onClick={() => toggleActorStat(statIndex)}>
@@ -943,7 +943,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                     </Button>
                 </div>
 
-                <div style={{ color: 'var(--agenda-inactive)', fontSize: '12px', marginBottom: '8px' }}>
+                <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginBottom: '8px' }}>
                     Includes active actors and locations, plus current settings, styles, lorebook, and calendar event series.
                 </div>
 

@@ -367,14 +367,16 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                             <motion.div
                                 whileHover={{ scale: 1.01 }}
                                 style={{
-                                    background: isSelected ? 'rgba(0, 255, 136, 0.2)' : 'rgba(0, 30, 60, 0.5)',
-                                    border: `1px solid ${isSelected ? 'rgba(0, 255, 136, 0.6)' : 'rgba(0, 255, 136, 0.22)'}`,
+                                    background: isSelected
+                                        ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)'
+                                        : 'color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)',
+                                    border: `1px solid ${isSelected ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)'}`,
                                     borderRadius: '8px',
                                     padding: '8px 10px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
-                                    color: '#e0f0ff',
+                                    color: 'var(--agenda-text-primary)',
                                     opacity: entry.enabled ? 1 : (isSelected ? 0.75 : 0.55),
                                 }}
                             >
@@ -391,7 +393,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         justifyContent: 'center',
                                         background: 'transparent',
                                         border: 'none',
-                                        color: entry.enabled ? 'rgba(0, 255, 136, 0.95)' : 'rgba(224, 240, 255, 0.55)',
+                                        color: entry.enabled ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)',
                                         cursor: 'pointer',
                                         padding: 0,
                                         flexShrink: 0,
@@ -409,7 +411,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         background: 'transparent',
                                         border: 'none',
                                         cursor: 'pointer',
-                                        color: '#e0f0ff',
+                                        color: 'var(--agenda-text-primary)',
                                         padding: 0,
                                         flex: 1,
                                         alignSelf: 'stretch',
@@ -434,8 +436,8 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
                             <div
                                 style={{
-                                    background: 'rgba(0, 20, 40, 0.45)',
-                                    border: '1px solid rgba(0, 255, 136, 0.25)',
+                                    background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
+                                    border: '1px solid var(--agenda-line-subtle)',
                                     borderRadius: '12px',
                                     padding: '18px',
                                     overflow: 'hidden',
@@ -447,7 +449,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                 {!selectedLore ? (
                                     <div
                                         style={{
-                                            color: 'rgba(224, 240, 255, 0.7)',
+                                            color: 'var(--agenda-text-muted)',
                                             fontSize: '15px',
                                             textAlign: 'center',
                                             padding: '30px',
@@ -460,9 +462,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         {selectedLoreMatchesExistingActor && (
                                             <div
                                                 style={{
-                                                    color: 'rgba(224, 240, 255, 0.95)',
-                                                    background: 'rgba(0, 255, 136, 0.12)',
-                                                    border: '1px solid rgba(0, 255, 136, 0.35)',
+                                                    color: 'var(--agenda-text-primary)',
+                                                    background: 'color-mix(in srgb, var(--agenda-highlight) 14%, transparent)',
+                                                    border: '1px solid var(--agenda-line-strong)',
                                                     borderRadius: '10px',
                                                     padding: '10px 12px',
                                                     fontSize: '13px',
@@ -476,9 +478,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         {selectedLoreMatchesExistingLocation && (
                                             <div
                                                 style={{
-                                                    color: 'rgba(224, 240, 255, 0.95)',
-                                                    background: 'rgba(90, 163, 216, 0.14)',
-                                                    border: '1px solid rgba(90, 163, 216, 0.4)',
+                                                    color: 'var(--agenda-text-primary)',
+                                                    background: 'color-mix(in srgb, var(--agenda-accent-primary) 14%, transparent)',
+                                                    border: '1px solid color-mix(in srgb, var(--agenda-accent-primary) 42%, transparent)',
                                                     borderRadius: '10px',
                                                     padding: '10px 12px',
                                                     fontSize: '13px',
@@ -490,7 +492,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         )}
 
                                         <div style={{ display: 'grid', gap: '6px' }}>
-                                            <label style={{ color: '#cfe6ff', fontSize: '13px' }}>Title</label>
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Title</label>
                                             <TextInput
                                                 value={selectedLore.title}
                                                 onChange={(event) => updateSelectedLore({ title: event.target.value })}
@@ -499,7 +501,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         </div>
 
                                         <div style={{ display: 'grid', gap: '6px' }}>
-                                            <label style={{ color: '#cfe6ff', fontSize: '13px' }}>Category</label>
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Category</label>
                                             <select
                                                 value={selectedLore.type}
                                                 onChange={(event) => updateSelectedLore({ type: event.target.value as LoreCategory })}
@@ -520,7 +522,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                             }}
                                         >
                                             <div style={{ display: 'grid', gap: '6px' }}>
-                                                <label style={{ color: '#cfe6ff', fontSize: '13px' }}>Order</label>
+                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Order</label>
                                                 <NumberStepperInput
                                                     value={selectedLore.insertionOrder}
                                                     onChange={(value) => updateSelectedLore({ insertionOrder: value })}
@@ -528,7 +530,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                 />
                                             </div>
                                             <div style={{ display: 'grid', gap: '6px' }}>
-                                                <label style={{ color: '#cfe6ff', fontSize: '13px' }}>Priority</label>
+                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Priority</label>
                                                 <NumberStepperInput
                                                     value={selectedLore.priority}
                                                     onChange={(value) => updateSelectedLore({ priority: value })}
@@ -536,7 +538,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                 />
                                             </div>
                                             <div style={{ display: 'grid', gap: '6px' }}>
-                                                <label style={{ color: '#cfe6ff', fontSize: '13px' }}>Probability</label>
+                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Probability</label>
                                                 <NumberStepperInput
                                                     value={selectedLore.probability}
                                                     onChange={(value) => updateSelectedLore({ probability: value })}
@@ -544,7 +546,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                 />
                                             </div>
                                             <div style={{ display: 'grid', gap: '6px' }}>
-                                                <label style={{ color: '#cfe6ff', fontSize: '13px' }}>Scan Depth</label>
+                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Scan Depth</label>
                                                 <NumberStepperInput
                                                     value={selectedLore.scanDepth}
                                                     onChange={(value) => updateSelectedLore({ scanDepth: value })}
@@ -562,8 +564,8 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                     gap: '12px',
                                                 }}
                                             >
-                                                <label style={{ color: '#cfe6ff', fontSize: '13px' }}>Triggers</label>
-                                                <label style={{ color: '#cfe6ff', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Triggers</label>
+                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedLore.constant}
@@ -579,8 +581,8 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                     gap: '8px',
                                                     padding: '8px',
                                                     borderRadius: '10px',
-                                                    border: '1px solid rgba(0, 255, 136, 0.25)',
-                                                    background: 'rgba(0, 30, 60, 0.25)',
+                                                    border: '1px solid var(--agenda-line-subtle)',
+                                                    background: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)',
                                                     minHeight: '44px',
                                                     alignItems: 'center',
                                                     opacity: selectedLore.constant ? 0.5 : 1,
@@ -686,7 +688,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         </div>
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minHeight: 0 }}>
-                                            <label style={{ color: '#cfe6ff', fontSize: '13px' }}>Content</label>
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Content</label>
                                             <textarea
                                                 value={selectedLore.content}
                                                 onChange={(event) => updateSelectedLoreContent(event.target.value)}

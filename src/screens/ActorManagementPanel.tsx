@@ -26,8 +26,8 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
     };
 
     const detailPaneStyle: React.CSSProperties = {
-        background: 'rgba(0, 20, 40, 0.45)',
-        border: '1px solid rgba(0, 255, 136, 0.25)',
+        background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
+        border: '1px solid var(--agenda-line-subtle)',
         borderRadius: '12px',
         overflow: 'hidden',
         display: 'flex',
@@ -119,11 +119,13 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                 style={{
                     width: '100%',
                     textAlign: 'left',
-                    background: isSelected ? 'rgba(0, 255, 136, 0.2)' : 'rgba(0, 30, 60, 0.5)',
-                    border: `1px solid ${isSelected ? 'rgba(0, 255, 136, 0.6)' : 'rgba(0, 255, 136, 0.22)'}`,
+                    background: isSelected
+                        ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)'
+                        : 'color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)',
+                    border: `1px solid ${isSelected ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)'}`,
                     borderRadius: '8px',
                     padding: '10px',
-                    color: '#e0f0ff',
+                    color: 'var(--agenda-text-primary)',
                     cursor: 'pointer',
                     display: 'grid',
                     gridTemplateColumns: '52px 1fr',
@@ -136,8 +138,8 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                         width: '52px',
                         height: '52px',
                         borderRadius: '50%',
-                        backgroundColor: 'rgba(0, 20, 40, 0.8)',
-                        border: `2px solid ${actor.themeColor || 'rgba(0, 255, 136, 0.45)'}`,
+                        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 86%, transparent)',
+                        border: `2px solid ${actor.themeColor || 'var(--agenda-line-strong)'}`,
                         backgroundImage: avatarUrl ? `url(${avatarUrl})` : 'none',
                         backgroundSize: 'cover',
                         backgroundPosition: 'top center',
@@ -146,10 +148,10 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                         justifyContent: 'center',
                     }}
                 >
-                    {!avatarUrl && <Person style={{ fontSize: '24px', color: 'rgba(0, 255, 136, 0.35)' }} />}
+                    {!avatarUrl && <Person style={{ fontSize: '24px', color: 'var(--agenda-accent-primary)' }} />}
                 </div>
                 <div>
-                    <div style={{ color: actor.themeColor || '#00ff88', fontSize: '15px', fontWeight: 700 }}>
+                    <div style={{ color: actor.themeColor || 'var(--agenda-highlight)', fontSize: '15px', fontWeight: 700 }}>
                         {actor.name || '(Unnamed Actor)'}
                     </div>
                 </div>
@@ -182,7 +184,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                 {!selectedActor ? (
                     <div
                         style={{
-                            color: 'rgba(224, 240, 255, 0.7)',
+                            color: 'var(--agenda-text-muted)',
                             fontSize: '15px',
                             textAlign: 'center',
                             padding: '30px',

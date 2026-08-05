@@ -27,8 +27,8 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
     };
 
     const detailPaneStyle: React.CSSProperties = {
-        background: 'rgba(0, 20, 40, 0.45)',
-        border: '1px solid rgba(0, 255, 136, 0.25)',
+        background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
+        border: '1px solid var(--agenda-line-subtle)',
         borderRadius: '12px',
         overflow: 'hidden',
         display: 'flex',
@@ -135,11 +135,13 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                 style={{
                     width: '100%',
                     textAlign: 'left',
-                    background: isSelected ? 'rgba(0, 255, 136, 0.2)' : 'rgba(0, 30, 60, 0.5)',
-                    border: `1px solid ${isSelected ? 'rgba(0, 255, 136, 0.6)' : 'rgba(0, 255, 136, 0.22)'}`,
+                    background: isSelected
+                        ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)'
+                        : 'color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)',
+                    border: `1px solid ${isSelected ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)'}`,
                     borderRadius: '8px',
                     padding: '10px',
-                    color: '#e0f0ff',
+                    color: 'var(--agenda-text-primary)',
                     cursor: 'pointer',
                     display: 'grid',
                     gridTemplateColumns: '64px 1fr',
@@ -152,8 +154,8 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                         width: '64px',
                         height: '48px',
                         borderRadius: '6px',
-                        border: `2px solid ${location.themeColor || 'rgba(0, 255, 136, 0.35)'}`,
-                        backgroundColor: 'rgba(0, 20, 40, 0.8)',
+                        border: `2px solid ${location.themeColor || 'var(--agenda-line-strong)'}`,
+                        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 86%, transparent)',
                         backgroundImage: location.imageUrl ? `url(${location.imageUrl})` : 'none',
                         backgroundSize: 'cover',
                         backgroundPosition: `${(location.focalPoint?.x ?? 0.5) * 100}% ${(location.focalPoint?.y ?? 0.5) * 100}%`,
@@ -163,9 +165,9 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                         overflow: 'hidden',
                     }}
                 >
-                    {!location.imageUrl && <Place style={{ fontSize: '20px', color: 'rgba(0, 255, 136, 0.35)' }} />}
+                    {!location.imageUrl && <Place style={{ fontSize: '20px', color: 'var(--agenda-accent-primary)' }} />}
                 </div>
-                <div style={{ color: location.themeColor || '#00ff88', fontSize: '14px', fontWeight: 700 }}>
+                <div style={{ color: location.themeColor || 'var(--agenda-highlight)', fontSize: '14px', fontWeight: 700 }}>
                     {location.name || '(Unnamed Location)'}
                 </div>
             </motion.button>
@@ -197,7 +199,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                 {!selectedLocation ? (
                     <div
                         style={{
-                            color: 'rgba(224, 240, 255, 0.7)',
+                            color: 'var(--agenda-text-muted)',
                             fontSize: '15px',
                             textAlign: 'center',
                             padding: '30px',

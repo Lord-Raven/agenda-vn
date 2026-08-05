@@ -2,7 +2,7 @@ import { FC, useEffect, useRef, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { ScreenType } from './BaseScreen';
 import { Stage } from '../Stage';
-import { GridOverlay, GlassPanel, Title } from './UiComponents';
+import { GlassPanel, Title } from './UiComponents';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEFAULT_ATLAS_LOCATIONS } from '../content/Location';
 
@@ -138,8 +138,6 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                     pointerEvents: 'none',
                 }}
             />
-            <GridOverlay size={56} />
-
             <motion.div
                 className="agenda-entrance"
                 initial={{ opacity: 0, y: 18 }}
@@ -164,9 +162,9 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                         </Title>
                         <Typography
                             sx={{
-                                fontFamily: 'var(--agenda-font-flavor)',
+                                fontFamily: 'var(--agenda-font-display)',
                                 fontSize: '0.85rem',
-                                color: 'var(--agenda-inactive)',
+                                color: 'var(--agenda-text-muted)',
                                 opacity: 0.8,
                                 flexShrink: 0,
                             }}
@@ -190,9 +188,9 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                                 sx={{
                                     textAlign: 'center',
                                     fontSize: '0.65rem',
-                                    fontFamily: 'var(--agenda-font-ui)',
+                                    fontFamily: 'var(--agenda-font-base)',
                                     letterSpacing: '0.08em',
-                                    color: 'var(--agenda-inactive)',
+                                    color: 'var(--agenda-text-muted)',
                                     pb: '2px',
                                     opacity: 0.7,
                                 }}
@@ -229,10 +227,10 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                                     <Typography
                                         sx={{
                                             fontSize: 'clamp(0.5rem, 1.5vw, 0.7rem)',
-                                            fontFamily: 'var(--agenda-font-flavor)',
+                                            fontFamily: 'var(--agenda-font-display)',
                                             color: isMarked
                                                 ? 'rgba(185, 143, 110, 0.55)'
-                                                : 'var(--agenda-inactive)',
+                                                : 'var(--agenda-text-muted)',
                                             opacity: isMarked ? 0.6 : 0.5,
                                             userSelect: 'none',
                                             lineHeight: 1,

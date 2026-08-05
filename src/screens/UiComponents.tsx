@@ -88,25 +88,6 @@ export const Button: FC<ButtonProps> = ({
 };
 
 /* ===============================================
-   BACKGROUND COMPONENTS
-   =============================================== */
-
-interface GridOverlayProps {
-	size?: number;
-}
-
-export const GridOverlay: FC<GridOverlayProps> = ({ size = 60 }) => {
-	return (
-		<div 
-			className="grid-overlay"
-			style={{
-				backgroundSize: `${size}px ${size}px`
-			}}
-		/>
-	);
-};
-
-/* ===============================================
 	PROGRESS INDICATORS
    =============================================== */
 
@@ -139,8 +120,8 @@ export const TurnIndicator: FC<TurnIndicatorProps> = ({ currentTurn, totalTurns 
 					>
 						<HourglassIcon
 							sx={{
-								color: isSpent ? 'rgba(122, 123, 107, 0.55)' : 'var(--agenda-accent)',
-								filter: isSpent ? 'none' : 'drop-shadow(0 0 8px rgba(138, 176, 204, 0.45))',
+								color: isSpent ? 'var(--agenda-text-muted)' : 'var(--agenda-accent-primary)',
+								filter: isSpent ? 'none' : 'drop-shadow(0 0 8px color-mix(in srgb, var(--agenda-accent-primary) 45%, transparent))',
 								fontSize: '28px',
 							}}
 						/>
@@ -385,7 +366,7 @@ const rgbToHex = (rgb: { r: number; g: number; b: number }): string => (
 const formatRgbaColor = (hex: string, alpha: number): string => {
 	const rgb = hexToRgb(hex);
 	if (!rgb) {
-		return `rgba(138, 176, 204, ${clamp(alpha, 0, 1).toFixed(2)})`;
+		return `color-mix(in srgb, var(--agenda-accent-primary) 100%, transparent ${Math.round((1 - clamp(alpha, 0, 1)) * 100)}%)`;
 	}
 
 	const resolvedAlpha = clamp(Number.parseFloat(alpha.toString()), 0, 1);
@@ -479,7 +460,7 @@ export const ColorPickerInput: FC<ColorPickerInputProps> = ({
 						width: '50px',
 						height: '38px',
 						backgroundColor: previewColor,
-						border: '2px solid rgba(0, 255, 136, 0.3)',
+						border: '2px solid var(--agenda-line-strong)',
 						borderRadius: '5px',
 						cursor: 'pointer',
 						padding: 0,
@@ -497,10 +478,10 @@ export const ColorPickerInput: FC<ColorPickerInputProps> = ({
 					paper: {
 						style: {
 							marginTop: '8px',
-							backgroundColor: 'rgba(0, 20, 40, 0.95)',
-							border: '2px solid rgba(0, 255, 136, 0.3)',
+								backgroundColor: 'var(--agenda-surface-base)',
+								border: '2px solid var(--agenda-line-strong)',
 							borderRadius: '8px',
-							color: '#e0f0ff',
+								color: 'var(--agenda-text-primary)',
 							minWidth: '260px',
 							padding: '12px',
 						},
@@ -508,7 +489,7 @@ export const ColorPickerInput: FC<ColorPickerInputProps> = ({
 				}}
 			>
 				<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-					<div style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+					<div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>
 						{popoverTitle}
 					</div>
 					<div
@@ -531,10 +512,10 @@ export const ColorPickerInput: FC<ColorPickerInputProps> = ({
 										width: '100%',
 										aspectRatio: '1',
 										borderRadius: '6px',
-										border: isSelected ? '2px solid #ffffff' : '2px solid rgba(255, 255, 255, 0.25)',
+										border: isSelected ? '2px solid var(--agenda-text-primary)' : '2px solid color-mix(in srgb, var(--agenda-text-primary) 28%, transparent)',
 										backgroundColor: color,
 										cursor: 'pointer',
-										boxShadow: isSelected ? '0 0 0 1px rgba(0, 255, 136, 0.7)' : 'none',
+										boxShadow: isSelected ? '0 0 0 1px var(--agenda-line-strong)' : 'none',
 									}}
 								/>
 							);
@@ -555,7 +536,7 @@ export const ColorPickerInput: FC<ColorPickerInputProps> = ({
 								padding: 0,
 							}}
 						/>
-						<span style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+						<span style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>
 							Custom color
 						</span>
 					</div>
@@ -621,7 +602,7 @@ export const AlphaColorPickerInput: FC<AlphaColorPickerInputProps> = ({
 						width: '50px',
 						height: '38px',
 						backgroundColor: previewColor,
-						border: '2px solid rgba(0, 255, 136, 0.3)',
+						border: '2px solid var(--agenda-line-strong)',
 						borderRadius: '5px',
 						cursor: 'pointer',
 						padding: 0,
@@ -639,10 +620,10 @@ export const AlphaColorPickerInput: FC<AlphaColorPickerInputProps> = ({
 					paper: {
 						style: {
 							marginTop: '8px',
-							backgroundColor: 'rgba(0, 20, 40, 0.95)',
-							border: '2px solid rgba(0, 255, 136, 0.3)',
+								backgroundColor: 'var(--agenda-surface-base)',
+								border: '2px solid var(--agenda-line-strong)',
 							borderRadius: '8px',
-							color: '#e0f0ff',
+								color: 'var(--agenda-text-primary)',
 							minWidth: '280px',
 							padding: '12px',
 						},
@@ -650,7 +631,7 @@ export const AlphaColorPickerInput: FC<AlphaColorPickerInputProps> = ({
 				}}
 			>
 				<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-					<div style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+					<div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>
 						{popoverTitle}
 					</div>
 					<div
@@ -673,10 +654,10 @@ export const AlphaColorPickerInput: FC<AlphaColorPickerInputProps> = ({
 										width: '100%',
 										aspectRatio: '1',
 										borderRadius: '6px',
-										border: isSelected ? '2px solid #ffffff' : '2px solid rgba(255, 255, 255, 0.25)',
+										border: isSelected ? '2px solid var(--agenda-text-primary)' : '2px solid color-mix(in srgb, var(--agenda-text-primary) 28%, transparent)',
 										backgroundColor: color,
 										cursor: 'pointer',
-										boxShadow: isSelected ? '0 0 0 1px rgba(0, 255, 136, 0.7)' : 'none',
+										boxShadow: isSelected ? '0 0 0 1px var(--agenda-line-strong)' : 'none',
 									}}
 								/>
 							);
@@ -697,12 +678,12 @@ export const AlphaColorPickerInput: FC<AlphaColorPickerInputProps> = ({
 								padding: 0,
 							}}
 						/>
-						<span style={{ fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+						<span style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>
 							Custom color
 						</span>
 					</div>
 					<div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-						<div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'rgba(224, 240, 255, 0.8)' }}>
+						<div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--agenda-text-muted)' }}>
 							<span>Alpha</span>
 							<span>{Math.round(currentAlpha * 100)}%</span>
 						</div>
@@ -713,7 +694,7 @@ export const AlphaColorPickerInput: FC<AlphaColorPickerInputProps> = ({
 							step={0.01}
 							value={currentAlpha}
 							onChange={(e) => updateColor(currentHexColor, Number.parseFloat(e.target.value))}
-							style={{ width: '100%', accentColor: 'var(--agenda-active)' }}
+							style={{ width: '100%', accentColor: 'var(--agenda-highlight)' }}
 						/>
 					</div>
 				</div>
@@ -785,7 +766,7 @@ export const MenuItem: FC<MenuItemProps> = ({
 					display: 'flex',
 					justifyContent: 'space-between',
 					alignItems: 'center',
-					background: isExpanded ? 'rgba(138, 176, 204, 0.16)' : 'transparent',
+					background: isExpanded ? 'color-mix(in srgb, var(--agenda-accent-primary) 16%, transparent)' : 'transparent',
 				}}
 			>
 				<span>{title}</span>
@@ -810,8 +791,8 @@ export const MenuItem: FC<MenuItemProps> = ({
 				}}
 				style={{ 
 					overflow: 'hidden',
-					background: 'rgba(24, 31, 48, 0.86)',
-					border: isExpanded ? '2px solid rgba(138, 176, 204, 0.35)' : 'none',
+					background: 'color-mix(in srgb, var(--agenda-surface-base) 86%, transparent)',
+					border: isExpanded ? '2px solid var(--agenda-line-subtle)' : 'none',
 					borderTop: 'none',
 					borderRadius: '0 0 8px 8px',
 				}}

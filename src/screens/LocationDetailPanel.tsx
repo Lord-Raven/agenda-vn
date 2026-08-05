@@ -254,18 +254,18 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
 
     const labelStyle: React.CSSProperties = {
         display: 'block',
-        color: '#00ff88',
+        color: 'var(--agenda-highlight)',
         fontSize: '14px',
         fontWeight: 'bold',
         marginBottom: '8px',
     };
 
     const sectionHeadingStyle: React.CSSProperties = {
-        color: '#00ff88',
+        color: 'var(--agenda-highlight)',
         fontSize: '18px',
         fontWeight: 'bold',
         marginBottom: '15px',
-        borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+        borderBottom: '2px solid var(--agenda-line-strong)',
         paddingBottom: '5px',
     };
 
@@ -274,10 +274,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         minHeight: '100px',
         padding: '12px',
         fontSize: '14px',
-        backgroundColor: 'rgba(0, 20, 40, 0.6)',
-        border: '2px solid rgba(0, 255, 136, 0.3)',
+        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)',
+        border: '2px solid var(--agenda-line-strong)',
         borderRadius: '5px',
-        color: '#e0f0ff',
+        color: 'var(--agenda-text-primary)',
         fontFamily: 'inherit',
         resize: 'vertical',
     };
@@ -291,14 +291,14 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
 
     const sliderStyle: React.CSSProperties = {
         width: '100%',
-        accentColor: '#00ff88',
+        accentColor: 'var(--agenda-highlight)',
         cursor: 'pointer',
     };
 
     const sliderValueStyle: React.CSSProperties = {
         minWidth: '56px',
         textAlign: 'right',
-        color: '#e0f0ff',
+        color: 'var(--agenda-text-primary)',
         fontSize: '13px',
         fontVariantNumeric: 'tabular-nums',
         opacity: 0.9,
@@ -528,9 +528,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                     onImageUrlChange={(value) => handleInputChange('imageUrl', value)}
                                     onUploadFile={handleLocationImageUpload}
                                     isUploading={isUploadingImage}
-                                    previewBorder={`3px solid ${editedLocation.themeColor || 'rgba(0, 255, 136, 0.3)'}`}
+                                    previewBorder={`3px solid ${editedLocation.themeColor || 'var(--agenda-line-strong)'}`}
                                     previewBackgroundPosition={`${editedLocation.focalX * 100}% ${editedLocation.focalY * 100}%`}
-                                    previewPlaceholder={<Place style={{ fontSize: '48px', color: 'rgba(0, 255, 136, 0.3)' }} />}
+                                    previewPlaceholder={<Place style={{ fontSize: '48px', color: 'var(--agenda-accent-primary)' }} />}
                                     onInvalidFile={() => stage().showPriorityMessage('Please select a valid image file.')}
                                 />
                             </section>
@@ -597,28 +597,28 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                 slotProps={{
                     paper: {
                         style: {
-                            backgroundColor: 'rgba(0, 20, 40, 0.95)',
+                            backgroundColor: 'var(--agenda-surface-base)',
                             backdropFilter: 'blur(10px)',
-                            border: '2px solid rgba(0, 255, 136, 0.3)',
+                            border: '2px solid var(--agenda-line-strong)',
                             borderRadius: '8px',
-                            color: '#e0f0ff',
+                            color: 'var(--agenda-text-primary)',
                             minWidth: '400px',
                         },
                     },
                 }}
             >
                 <DialogTitle style={{
-                    color: '#00ff88',
+                    color: 'var(--agenda-highlight)',
                     fontSize: '18px',
                     fontWeight: 'bold',
-                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                    borderBottom: '2px solid var(--agenda-line-strong)',
                     paddingBottom: '10px',
                 }}>
                     {confirmDialog.title}
                 </DialogTitle>
                 <DialogContent style={{ paddingTop: '20px' }}>
                     <div style={{
-                        color: '#e0f0ff',
+                        color: 'var(--agenda-text-primary)',
                         fontSize: '14px',
                         lineHeight: '1.6',
                     }}>

@@ -79,7 +79,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
     return (
         <BlurredBackground
             imageUrl={CALENDAR_BACKGROUND_IMAGE}
-            overlay="linear-gradient(130deg, var(--agenda-calendar-overlay-start) 0%, var(--agenda-calendar-overlay-mid) 48%, var(--agenda-calendar-overlay-end) 100%)"
+            overlay="linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%)"
         >
             <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
                 <Box
