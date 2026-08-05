@@ -1,5 +1,5 @@
 import React, { FC, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Person } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
@@ -12,6 +12,8 @@ interface ActorManagementPanelProps {
 
 export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) => {
     const [selectedActorId, setSelectedActorId] = useState<string | null>(null);
+    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+    const shouldReduceMotion = useReducedMotion();
 
     const shellStyle: React.CSSProperties = {
         display: 'grid',
@@ -52,6 +54,22 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
             .sort(sortByName);
     }, [stage]);
 
+    const actorsByCategory = useMemo(() => {
+        const categoryMap: Record<string, Actor[]> = {};
+        for (const actor of actors) {
+            const normalizedCategory = (actor.category || '').trim();
+            const category = normalizedCategory || 'Uncategorized';
+            if (!categoryMap[category]) {
+                categoryMap[category] = [];
+            }
+            categoryMap[category].push(actor);
+        }
+
+        return Object.entries(categoryMap)
+            .map(([title, entries]) => ({ title, entries: entries.sort(sortByName) }))
+            .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
+    }, [actors]);
+
     const selectedActor = useMemo(() => {
         if (!selectedActorId) {
             return null;
@@ -88,6 +106,56 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
         setSelectedActorId(actor.id);
     };
 
+    const renderActorButton = (actor: Actor) => {
+        const isSelected = actor.id === selectedActorId;
+        const avatarUrl = getEmotionImage(actor, 'neutral') || getEmotionImage(actor, 'base');
+        return (
+            <motion.button
+                key={actor.id}
+                whileHover={{ scale: 1.01 }}
+                type="button"
+                onClick={() => setSelectedActorId(actor.id)}
+                style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    background: isSelected ? 'rgba(0, 255, 136, 0.2)' : 'rgba(0, 30, 60, 0.5)',
+                    border: `1px solid ${isSelected ? 'rgba(0, 255, 136, 0.6)' : 'rgba(0, 255, 136, 0.22)'}`,
+                    borderRadius: '8px',
+                    padding: '10px',
+                    color: '#e0f0ff',
+                    cursor: 'pointer',
+                    display: 'grid',
+                    gridTemplateColumns: '52px 1fr',
+                    gap: '10px',
+                    alignItems: 'center',
+                }}
+            >
+                <div
+                    style={{
+                        width: '52px',
+                        height: '52px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(0, 20, 40, 0.8)',
+                        border: `2px solid ${actor.themeColor || 'rgba(0, 255, 136, 0.45)'}`,
+                        backgroundImage: avatarUrl ? `url(${avatarUrl})` : 'none',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'top center',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                >
+                    {!avatarUrl && <Person style={{ fontSize: '24px', color: 'rgba(0, 255, 136, 0.35)' }} />}
+                </div>
+                <div>
+                    <div style={{ color: actor.themeColor || '#00ff88', fontSize: '15px', fontWeight: 700 }}>
+                        {actor.name || '(Unnamed Actor)'}
+                    </div>
+                </div>
+            </motion.button>
+        );
+    };
+
     return (
         <div style={shellStyle}>
             <div style={sidebarStyle}>
@@ -109,57 +177,70 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                         No actors found in the current save.
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gap: '10px' }}>
-                        {actors.map((actor) => {
-                            const isSelected = actor.id === selectedActorId;
-                            const avatarUrl = getEmotionImage(actor, 'neutral') || getEmotionImage(actor, 'base');
+                    <>
+                        {actorsByCategory.map((section) => {
+                            const isCollapsed = collapsedCategories[section.title] ?? false;
                             return (
-                                <motion.button
-                                    key={actor.id}
-                                    whileHover={{ scale: 1.01 }}
-                                    type="button"
-                                    onClick={() => setSelectedActorId(actor.id)}
-                                    style={{
-                                        width: '100%',
-                                        textAlign: 'left',
-                                        background: isSelected ? 'rgba(0, 255, 136, 0.2)' : 'rgba(0, 30, 60, 0.5)',
-                                        border: `1px solid ${isSelected ? 'rgba(0, 255, 136, 0.6)' : 'rgba(0, 255, 136, 0.22)'}`,
-                                        borderRadius: '8px',
-                                        padding: '10px',
-                                        color: '#e0f0ff',
-                                        cursor: 'pointer',
-                                        display: 'grid',
-                                        gridTemplateColumns: '52px 1fr',
-                                        gap: '10px',
-                                        alignItems: 'center',
-                                    }}
-                                >
-                                    <div
+                                <div key={section.title}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCollapsedCategories((current) => ({
+                                                ...current,
+                                                [section.title]: !(current[section.title] ?? false),
+                                            }));
+                                        }}
+                                        aria-expanded={!isCollapsed}
                                         style={{
-                                            width: '52px',
-                                            height: '52px',
-                                            borderRadius: '50%',
-                                            backgroundColor: 'rgba(0, 20, 40, 0.8)',
-                                            border: `2px solid ${actor.themeColor || 'rgba(0, 255, 136, 0.45)'}`,
-                                            backgroundImage: avatarUrl ? `url(${avatarUrl})` : 'none',
-                                            backgroundSize: 'cover',
-                                            backgroundPosition: 'top center',
+                                            width: '100%',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            justifyContent: 'center',
+                                            justifyContent: 'space-between',
+                                            marginBottom: '8px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            padding: 0,
+                                            color: 'rgba(224, 240, 255, 0.9)',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.08em',
+                                            cursor: 'pointer',
+                                            borderBottom: '1px solid rgba(0, 255, 136, 0.25)',
+                                            paddingBottom: '6px',
                                         }}
                                     >
-                                        {!avatarUrl && <Person style={{ fontSize: '24px', color: 'rgba(0, 255, 136, 0.35)' }} />}
-                                    </div>
-                                    <div>
-                                        <div style={{ color: actor.themeColor || '#00ff88', fontSize: '15px', fontWeight: 700 }}>
-                                            {actor.name || '(Unnamed Actor)'}
-                                        </div>
-                                    </div>
-                                </motion.button>
+                                        <span>{section.title} ({section.entries.length})</span>
+                                        <motion.span
+                                            aria-hidden="true"
+                                            animate={{ rotate: isCollapsed ? 0 : 90 }}
+                                            transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.18, ease: 'easeOut' }}
+                                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                        >
+                                            ▸
+                                        </motion.span>
+                                    </button>
+
+                                    <AnimatePresence initial={false}>
+                                        {!isCollapsed && (
+                                            <motion.div
+                                                key={`${section.title}-actors`}
+                                                initial={shouldReduceMotion ? false : { height: 0, opacity: 0, y: -6 }}
+                                                animate={shouldReduceMotion ? { height: 'auto', opacity: 1 } : { height: 'auto', opacity: 1, y: 0 }}
+                                                exit={shouldReduceMotion ? { height: 0, opacity: 0 } : { height: 0, opacity: 0, y: -6 }}
+                                                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
+                                                style={{ overflow: 'hidden', marginBottom: '10px' }}
+                                            >
+                                                <div style={{ display: 'grid', gap: '10px' }}>
+                                                    {section.entries.map((actor) => renderActorButton(actor))}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
                             );
                         })}
-                    </div>
+                    </>
                 )}
             </div>
 

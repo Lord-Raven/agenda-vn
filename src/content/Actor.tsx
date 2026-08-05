@@ -38,6 +38,7 @@ export class Actor {
     name: string = ''; // Display name
     description: string = ''; // Core physical description—not outfit-oriented
     profile: string = ''; // Personality profile description of character
+    category: string = ''; // A category for filtering or organization in the UI. Could be a role ("good guys", "baddies") or could be a type of character ("human", "elf"); it is for organizational and not gameplay purposes.
     outfitId: string = ''; // The ID of the current outfit for this actor; if empty, use the first outfit index
     outfits: Outfit[] = []; // Sets of outfits representing transformations for this actor; each outfit has a full set of emotions
     themeColor: string = ''; // Theme color (hex code)

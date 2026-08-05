@@ -7,6 +7,7 @@ import { Actor, generateBaseActorImage, generateEmotionImage, generateOutfitEmot
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
+import { ActorStatStars } from './ActorStatStars';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -36,7 +37,12 @@ const resolveActorStatRange = (stat: ActorStat): { min: number; max: number; ste
     }
 
     if (stat.displayType === 'stars') {
-        return { min: 1, max: 5, step: 1, hasRange: true };
+        return {
+            min: 0,
+            max: Number.isFinite(stat.max) ? Math.max(1, Math.round(Number(stat.max))) : 5,
+            step: 1,
+            hasRange: true,
+        };
     }
 
     if (stat.displayType === 'letter grade') {
@@ -114,6 +120,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
     // Local state for editable fields
     const [editedActor, setEditedActor] = useState<{
         name: string;
+        category: string;
         description: string;
         profile: string;
         lore: string;
@@ -122,6 +129,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
         themeFontFamily: string;
     }>({
         name: actor.name,
+        category: actor.category ?? '',
         description: actor.description || '',
         profile: actor.profile || '',
         lore: linkedLoreEntry?.content || '',
@@ -129,6 +137,34 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
         themeColor: actor.themeColor,
         themeFontFamily: actor.themeFontFamily,
     });
+
+    const categoryInputListId = `actor-category-options-${actor.id}`;
+    const categorySuggestions = useMemo(() => {
+        const seenCategories = new Set<string>();
+        let hasUncategorized = false;
+
+        for (const candidate of Object.values(stage().getSave().actors || {})) {
+            if (candidate.id === actor.id) {
+                continue;
+            }
+
+            const normalizedCategory = (candidate.category || '').trim();
+            if (!normalizedCategory) {
+                hasUncategorized = true;
+                continue;
+            }
+
+            if (!seenCategories.has(normalizedCategory)) {
+                seenCategories.add(normalizedCategory);
+            }
+        }
+
+        const values = Array.from(seenCategories).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        return {
+            hasUncategorized,
+            values,
+        };
+    }, [actor.id, stage]);
     const [editedOutfits, setEditedOutfits] = useState<Outfit[]>(() => getClonedOutfits());
     const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: number }>(() =>
         createInitialActorStatMap(actor, actorStats),
@@ -199,6 +235,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
             }));
 
         actor.name = nextEditedActor.name;
+        actor.category = nextEditedActor.category.trim();
         actor.description = nextEditedActor.description;
         actor.profile = nextEditedActor.profile;
         if (linkedLoreEntry) {
@@ -906,6 +943,35 @@ ${indent}}`;
                                     </div>
 
                                     <div>
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                color: '#00ff88',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Category
+                                        </label>
+                                        <TextInput
+                                            fullWidth
+                                            value={editedActor.category}
+                                            onChange={(e) => handleInputChange('category', e.target.value)}
+                                            placeholder="Choose or type a category (leave blank for Uncategorized)"
+                                            list={categoryInputListId}
+                                        />
+                                        <datalist id={categoryInputListId}>
+                                            {categorySuggestions.hasUncategorized && (
+                                                <option value="">Uncategorized</option>
+                                            )}
+                                            {categorySuggestions.values.map((category) => (
+                                                <option key={category} value={category} />
+                                            ))}
+                                        </datalist>
+                                    </div>
+
+                                    <div>
                                         <label 
                                             style={{
                                                 display: 'block',
@@ -996,7 +1062,6 @@ ${indent}}`;
                                                     ? value
                                                     : clampActorStatValue(Number(stat.default) || 0, stat);
                                                 const statRange = resolveActorStatRange(stat);
-                                                const starStep = (statRange.max - statRange.min) / 4;
                                                 const letterGradeOptions = buildLetterGradeOptions(stat);
                                                 const nearestGrade = letterGradeOptions.reduce((closest, option) => {
                                                     const optionDelta = Math.abs(option.value - displayValue);
@@ -1033,30 +1098,11 @@ ${indent}}`;
                                                         )}
 
                                                         {stat.displayType === 'stars' && (
-                                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                                                {[1, 2, 3, 4, 5].map((star) => {
-                                                                    const mappedValue = Number((statRange.min + (star - 1) * starStep).toFixed(2));
-                                                                    const active = displayValue >= mappedValue - 0.001;
-                                                                    return (
-                                                                        <button
-                                                                            key={`${stat.name}-star-${star}`}
-                                                                            type="button"
-                                                                            onClick={() => handleActorStatValueChange(stat, mappedValue)}
-                                                                            style={{
-                                                                                border: '1px solid rgba(0, 255, 136, 0.35)',
-                                                                                borderRadius: '6px',
-                                                                                backgroundColor: active ? 'rgba(0, 255, 136, 0.22)' : 'rgba(0, 20, 40, 0.45)',
-                                                                                color: active ? '#00ff88' : '#9ac6c0',
-                                                                                padding: '4px 8px',
-                                                                                cursor: 'pointer',
-                                                                                fontSize: '13px',
-                                                                            }}
-                                                                        >
-                                                                            {'★'.repeat(star)}
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
+                                                            <ActorStatStars
+                                                                stat={stat}
+                                                                value={displayValue}
+                                                                updateScore={(nextValue) => handleActorStatValueChange(stat, nextValue)}
+                                                            />
                                                         )}
 
                                                         {stat.displayType === 'letter grade' && (
@@ -1121,18 +1167,6 @@ ${indent}}`;
                                                                 placeholder="0"
                                                             />
                                                         </div>
-
-                                                        {(typeof stat.min === 'number' || typeof stat.max === 'number') && (
-                                                            <div style={{ color: 'rgba(154, 198, 192, 0.85)', fontSize: '12px' }}>
-                                                                Range: {typeof stat.min === 'number' ? stat.min : '-inf'} to {typeof stat.max === 'number' ? stat.max : '+inf'}
-                                                            </div>
-                                                        )}
-
-                                                        {!!stat.guidance?.trim() && (
-                                                            <div style={{ color: 'rgba(154, 198, 192, 0.85)', fontSize: '12px' }}>
-                                                                Guidance: {stat.guidance}
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 );
                                             })}

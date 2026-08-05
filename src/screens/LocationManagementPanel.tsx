@@ -1,5 +1,5 @@
 import React, { FC, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Place } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { Location } from '../content/Location';
@@ -13,6 +13,8 @@ interface LocationManagementPanelProps {
 
 export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stage }) => {
     const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+    const shouldReduceMotion = useReducedMotion();
 
     const shellStyle: React.CSSProperties = {
         display: 'grid',
@@ -54,7 +56,8 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
     const locationsByCategory = useMemo(() => {
         const categoryMap: Record<string, Location[]> = {};
         for (const location of locations) {
-            const category = location.category || 'Uncategorized';
+            const normalizedCategory = (location.category || '').trim();
+            const category = normalizedCategory || 'Uncategorized';
             if (!categoryMap[category]) {
                 categoryMap[category] = [];
             }
@@ -188,33 +191,74 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                     </div>
                 ) : (
                     <>
-                        {locationsByCategory.map((section) => (
-                            <div key={section.title}>
-                                <div
-                                    style={{
-                                        color: 'rgba(224, 240, 255, 0.9)',
-                                        fontSize: '13px',
-                                        fontWeight: 700,
-                                        marginBottom: '8px',
-                                        borderBottom: '1px solid rgba(0, 255, 136, 0.25)',
-                                        paddingBottom: '6px',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.08em',
-                                    }}
-                                >
-                                    {section.title} ({section.entries.length})
+                        {locationsByCategory.map((section) => {
+                            const isCollapsed = collapsedCategories[section.title] ?? false;
+                            return (
+                                <div key={section.title}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCollapsedCategories((current) => ({
+                                                ...current,
+                                                [section.title]: !(current[section.title] ?? false),
+                                            }));
+                                        }}
+                                        aria-expanded={!isCollapsed}
+                                        style={{
+                                            width: '100%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            marginBottom: '8px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            padding: 0,
+                                            color: 'rgba(224, 240, 255, 0.9)',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.08em',
+                                            cursor: 'pointer',
+                                            borderBottom: '1px solid rgba(0, 255, 136, 0.25)',
+                                            paddingBottom: '6px',
+                                        }}
+                                    >
+                                        <span>{section.title} ({section.entries.length})</span>
+                                        <motion.span
+                                            aria-hidden="true"
+                                            animate={{ rotate: isCollapsed ? 0 : 90 }}
+                                            transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.18, ease: 'easeOut' }}
+                                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                        >
+                                            ▸
+                                        </motion.span>
+                                    </button>
+
+                                    <AnimatePresence initial={false}>
+                                        {!isCollapsed && (
+                                            <motion.div
+                                                key={`${section.title}-locations`}
+                                                initial={shouldReduceMotion ? false : { height: 0, opacity: 0, y: -6 }}
+                                                animate={shouldReduceMotion ? { height: 'auto', opacity: 1 } : { height: 'auto', opacity: 1, y: 0 }}
+                                                exit={shouldReduceMotion ? { height: 0, opacity: 0 } : { height: 0, opacity: 0, y: -6 }}
+                                                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
+                                                style={{ overflow: 'hidden', marginBottom: '10px' }}
+                                            >
+                                                {section.entries.length === 0 ? (
+                                                    <div style={{ color: 'rgba(224, 240, 255, 0.6)', fontSize: '13px', fontStyle: 'italic' }}>
+                                                        No locations.
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'grid', gap: '10px' }}>
+                                                        {section.entries.map((location) => renderLocationButton(location))}
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
-                                {section.entries.length === 0 ? (
-                                    <div style={{ color: 'rgba(224, 240, 255, 0.6)', fontSize: '13px', fontStyle: 'italic' }}>
-                                        No locations.
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'grid', gap: '10px' }}>
-                                        {section.entries.map((location) => renderLocationButton(location))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                            );
+                        })}
                     </>
                 )}
             </div>
