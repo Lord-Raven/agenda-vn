@@ -123,7 +123,7 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
     });
 
     return (
-        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', ...style }}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-start', ...style }}>
         <div
             role="img"
             aria-label={`${stat.name}: ${filledStars} of ${maxStars}`}
