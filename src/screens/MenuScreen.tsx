@@ -202,7 +202,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                     objectFit: 'contain',
                                     margin: '0 auto',
                                     opacity: 1,
-                                    filter: 'blur(5px) drop-shadow(0 10px 28px rgba(0, 0, 0, 0.32))',
+                                    filter: 'blur(1px) drop-shadow(0 10px 28px rgba(0, 0, 0, 0.32))',
                                 }}
                             />
                             <img
