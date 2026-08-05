@@ -1,4 +1,4 @@
-import React, { FC, useMemo, useState } from 'react';
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { ActorStat, ContextSegment, CustomSetting, Stage } from '../Stage';
 import { Button, GlassPanel, TextInput, Title } from './UiComponents';
@@ -113,6 +113,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [selectedSettings, setSelectedSettings] = useState<{ [key: string]: string }>(() => ({
         ...(save.agendaConfig?.selectedSettings || {}),
     }));
+    const autoSaveTimeoutRef = useRef<number | null>(null);
+    const didMountRef = useRef(false);
+    const saveGameConfigurationRef = useRef<() => void>(() => {});
 
     const fieldLabelStyle: React.CSSProperties = {
         display: 'block',
@@ -156,7 +159,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         return nextSelections;
     }, [customSettings, selectedSettings]);
 
-    const saveGameConfiguration = () => {
+    const saveGameConfiguration = useCallback(() => {
         stageInstance.updateConfiguration({
             context: contextSegments,
             settings: customSettings,
@@ -208,14 +211,47 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         });
 
         stageInstance.saveGame();
-    };
+    }, [actorStats, backgroundImagePrompt, backgroundImageUrl, contextSegments, customSettings, save, selectedSettings, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validSelections]);
+
+    useEffect(() => {
+        saveGameConfigurationRef.current = saveGameConfiguration;
+    }, [saveGameConfiguration]);
+
+    useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
+
+        if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+        }
+
+        autoSaveTimeoutRef.current = window.setTimeout(() => {
+            saveGameConfigurationRef.current();
+        }, 300);
+
+        return () => {
+            if (autoSaveTimeoutRef.current) {
+                clearTimeout(autoSaveTimeoutRef.current);
+            }
+        };
+    }, [saveGameConfiguration]);
+
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimeoutRef.current) {
+                saveGameConfigurationRef.current();
+            }
+        };
+    }, []);
 
     const handleTitleImageUpload = async (file: File) => {
         setIsUploadingTitleImage(true);
         try {
             const uploadedUrl = await stageInstance.uploadFile('game-title-image.png', file);
             setTitleImageUrl(uploadedUrl);
-            stageInstance.showPriorityMessage('Title image uploaded. Save to keep this in configuration.');
+            stageInstance.showPriorityMessage('Title image uploaded and will be saved automatically.');
         } catch (error) {
             console.error('Failed to upload title image:', error);
             stageInstance.showPriorityMessage('Failed to upload title image. Check console for details.');
@@ -240,7 +276,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             const generatedUrl = await stageInstance.generateTitleImage();
             if (generatedUrl?.trim()) {
                 setTitleImageUrl(generatedUrl);
-                stageInstance.showPriorityMessage('Generated a new title image. Save to keep this in configuration.');
+                stageInstance.showPriorityMessage('Generated a new title image and will save it automatically.');
             } else {
                 stageInstance.showPriorityMessage('No title image was generated. Try adjusting the prompt.');
             }
@@ -257,7 +293,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         try {
             const uploadedUrl = await stageInstance.uploadFile('game-background-image.png', file);
             setBackgroundImageUrl(uploadedUrl);
-            stageInstance.showPriorityMessage('Background image uploaded. Save to keep this in configuration.');
+            stageInstance.showPriorityMessage('Background image uploaded and will be saved automatically.');
         } catch (error) {
             console.error('Failed to upload background image:', error);
             stageInstance.showPriorityMessage('Failed to upload background image. Check console for details.');
@@ -281,7 +317,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             const generatedUrl = await stageInstance.generateBackgroundImage();
             if (generatedUrl?.trim()) {
                 setBackgroundImageUrl(generatedUrl);
-                stageInstance.showPriorityMessage('Generated a new background image. Save to keep this in configuration.');
+                stageInstance.showPriorityMessage('Generated a new background image and will save it automatically.');
             } else {
                 stageInstance.showPriorityMessage('No background image was generated. Try adjusting the prompt.');
             }
@@ -810,10 +846,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                     </Button>
                 </div>
             </GlassPanel>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                <Button variant="primary" onClick={saveGameConfiguration}>Save Game Settings</Button>
-            </div>
         </div>
     );
 };

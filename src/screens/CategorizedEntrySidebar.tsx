@@ -44,7 +44,6 @@ export const CategorizedEntrySidebar = <TEntry,>({
                 borderRadius: '12px',
                 padding: '14px',
                 overflowY: 'auto',
-                overflowX: 'visible',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px',
@@ -133,7 +132,7 @@ export const CategorizedEntrySidebar = <TEntry,>({
                                         animate={shouldReduceMotion ? { height: 'auto', opacity: 1 } : { height: 'auto', opacity: 1, y: 0 }}
                                         exit={shouldReduceMotion ? { height: 0, opacity: 0 } : { height: 0, opacity: 0, y: -6 }}
                                         transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
-                                        style={{ overflow: 'hidden', marginBottom: '10px' }}
+                                        style={{ overflow: 'visible', marginBottom: '10px' }}
                                     >
                                         {section.entries.length === 0 ? (
                                             <div style={{ color: 'rgba(224, 240, 255, 0.6)', fontSize: '13px', fontStyle: 'italic' }}>
