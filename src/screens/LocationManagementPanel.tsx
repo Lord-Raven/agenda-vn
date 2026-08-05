@@ -1,11 +1,12 @@
 import React, { FC, useMemo, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Place } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { Location } from '../content/Location';
 import { Button } from './UiComponents';
 import { LocationDetailPanel } from './LocationDetailPanel';
 import { createLoreEntry } from '../content/Lore';
+import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
 
 interface LocationManagementPanelProps {
     stage: () => Stage;
@@ -22,17 +23,6 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         gap: '20px',
         flex: 1,
         minHeight: 0,
-    };
-
-    const sidebarStyle: React.CSSProperties = {
-        background: 'rgba(0, 20, 40, 0.45)',
-        border: '1px solid rgba(0, 255, 136, 0.25)',
-        borderRadius: '12px',
-        padding: '14px',
-        overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '14px',
     };
 
     const detailPaneStyle: React.CSSProperties = {
@@ -55,7 +45,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
     }, [stage]);
 
     // Create a map of locations by their category property. locationsByCategory[category] = array of locations in that category.
-    const locationsByCategory = useMemo(() => {
+    const locationsByCategory = useMemo<CategorizedEntrySection<Location>[]>(() => {
         const categoryMap: Record<string, Location[]> = {};
         for (const location of locations) {
             const normalizedCategory = (location.category || '').trim();
@@ -66,7 +56,11 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
             categoryMap[category].push(location);
         }
         return Object.entries(categoryMap)
-            .map(([title, entries]) => ({ title, entries: entries.sort(sortByName) }))
+            .map(([title, entries]) => ({
+                id: title,
+                title,
+                entries: entries.sort(sortByName),
+            }))
             .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
     }, [locations]);
 
@@ -128,7 +122,6 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         const isSelected = location.id === selectedLocationId;
         return (
             <motion.button
-                key={location.id}
                 whileHover={{ scale: 1.01 }}
                 type="button"
                 onClick={() => setSelectedLocationId(location.id)}
@@ -174,11 +167,24 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
 
     return (
         <div style={shellStyle}>
-            <div style={sidebarStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ color: 'rgba(0, 255, 136, 0.9)', fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        Locations ({locations.length})
-                    </div>
+            <CategorizedEntrySidebar
+                sections={locationsByCategory}
+                collapsedSections={collapsedCategories}
+                onToggleSection={(sectionId) => {
+                    setCollapsedCategories((current) => ({
+                        ...current,
+                        [sectionId]: !(current[sectionId] ?? false),
+                    }));
+                }}
+                renderEntry={(location) => renderLocationButton(location)}
+                getEntryKey={(location) => location.id}
+                shouldReduceMotion={Boolean(shouldReduceMotion)}
+                emptyListMessage="No locations found in the current save."
+                sidebarTitle="Locations"
+                totalCount={locations.length}
+                containerGap="14px"
+                sectionEmptyMessage="No locations."
+                headerAction={
                     <Button
                         onClick={handleCreateLocation}
                         variant="secondary"
@@ -186,85 +192,8 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                     >
                         New
                     </Button>
-                </div>
-
-                {locations.length === 0 ? (
-                    <div style={{ color: 'rgba(224, 240, 255, 0.6)', fontSize: '13px', padding: '8px 0' }}>
-                        No locations found in the current save.
-                    </div>
-                ) : (
-                    <>
-                        {locationsByCategory.map((section) => {
-                            const isCollapsed = collapsedCategories[section.title] ?? false;
-                            return (
-                                <div key={section.title}>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setCollapsedCategories((current) => ({
-                                                ...current,
-                                                [section.title]: !(current[section.title] ?? false),
-                                            }));
-                                        }}
-                                        aria-expanded={!isCollapsed}
-                                        style={{
-                                            width: '100%',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            marginBottom: '8px',
-                                            background: 'transparent',
-                                            border: 'none',
-                                            padding: 0,
-                                            color: 'rgba(224, 240, 255, 0.9)',
-                                            fontSize: '13px',
-                                            fontWeight: 700,
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.08em',
-                                            cursor: 'pointer',
-                                            borderBottom: '1px solid rgba(0, 255, 136, 0.25)',
-                                            paddingBottom: '6px',
-                                        }}
-                                    >
-                                        <span>{section.title} ({section.entries.length})</span>
-                                        <motion.span
-                                            aria-hidden="true"
-                                            animate={{ rotate: isCollapsed ? 0 : 90 }}
-                                            transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.18, ease: 'easeOut' }}
-                                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                        >
-                                            ▸
-                                        </motion.span>
-                                    </button>
-
-                                    <AnimatePresence initial={false}>
-                                        {!isCollapsed && (
-                                            <motion.div
-                                                key={`${section.title}-locations`}
-                                                initial={shouldReduceMotion ? false : { height: 0, opacity: 0, y: -6 }}
-                                                animate={shouldReduceMotion ? { height: 'auto', opacity: 1 } : { height: 'auto', opacity: 1, y: 0 }}
-                                                exit={shouldReduceMotion ? { height: 0, opacity: 0 } : { height: 0, opacity: 0, y: -6 }}
-                                                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
-                                                style={{ overflow: 'hidden', marginBottom: '10px' }}
-                                            >
-                                                {section.entries.length === 0 ? (
-                                                    <div style={{ color: 'rgba(224, 240, 255, 0.6)', fontSize: '13px', fontStyle: 'italic' }}>
-                                                        No locations.
-                                                    </div>
-                                                ) : (
-                                                    <div style={{ display: 'grid', gap: '10px' }}>
-                                                        {section.entries.map((location) => renderLocationButton(location))}
-                                                    </div>
-                                                )}
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            );
-                        })}
-                    </>
-                )}
-            </div>
+                }
+            />
 
             <div style={detailPaneStyle}>
                 {!selectedLocation ? (
