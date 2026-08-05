@@ -5,9 +5,9 @@ import { Actor, findBestNameMatch, loadSupportedActor } from "./content/Actor";
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, Skit, SkitType } from "./content/Skit";
-import { createDefaultAtlas, getLinkedLocationLore, Location } from "./content/Location";
+import { createDefaultAtlas, Location } from "./content/Location";
 import { BaseScreen } from "./screens/BaseScreen";
-import { fetchLorebook, Lore, updateTypeMapping } from "./content/Lore";
+import { Lore } from "./content/Lore";
 import { DEFAULT_PLAYER_THEME_COLOR } from "./screens/SettingsScreen";
 import {buildPrompt} from "./utils/PromptBuilder.js";
 import {
@@ -180,9 +180,13 @@ export type GameConfiguration = {
     
     actors: Actor[], // All defined actors for a new game
     locations: Location[], // All defined locations for a new game
+    lorebook: Lore[], // Lore entries to seed into new games
+    calendarEvents: CalendarEvent[], // Calendar event series definitions to seed into new games
     context: ContextSegment[], // All defined context segments (applies to current and new games)
     settings: CustomSetting[], // All defined custom settings (applies to current and new games)
+    selectedSettings: {[key: string]: string}, // Default selected options for custom settings in new games
     actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
+    uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
     titleImageUrl: string, // URL of a title image for the game
     titleImagePrompt: string, // Prompt for generating a title image for the game
@@ -213,6 +217,45 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     displayType: stat.displayType,
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
+});
+
+const cloneUiSettings = (settings?: Partial<UiSettings>): UiSettings => ({
+    ...DEFAULT_UI_SETTINGS,
+    ...(settings || {}),
+});
+
+const cloneActor = (actor: Actor): Actor => new Actor({
+    ...actor,
+    outfits: (actor.outfits || []).map(outfit => ({
+        ...outfit,
+        prompts: { ...(outfit.prompts || {}) },
+        emotionPack: { ...(outfit.emotionPack || {}) },
+    })),
+    statMap: actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {},
+});
+
+const cloneLocation = (location: Location): Location => new Location({
+    ...location,
+    focalPoint: location.focalPoint ? { ...location.focalPoint } : undefined,
+});
+
+const cloneLore = (entry: Lore): Lore => ({
+    ...entry,
+    triggers: [...(entry.triggers || [])],
+});
+
+const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({
+    ...event,
+    duration: [...(event.duration || ALL_DAY_DURATION)],
+    actorIds: [...(event.actorIds || event.participantActorIds || [])],
+    participantActorIds: [...(event.participantActorIds || event.actorIds || [])],
+    recurrence: event.recurrence
+        ? {
+            frequency: event.recurrence.frequency,
+            interval: Number(event.recurrence.interval) || 1,
+            untilDate: event.recurrence.untilDate,
+        }
+        : undefined,
 });
 
 type ExpeditionChoice = {
@@ -256,14 +299,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.primaryUser = Object.values(users)[0];
         this.primaryCharacter = Object.values(characters)[0];
 
+        // config may be a JSON representation of a configuration; if so, we can use it to populate the default configuration for new games.
+        const loadedConfiguration = config ? JSON.parse(config.configuration) : {};
+        const defaultConfiguration = {...this.createDefaultNewGameConfiguration(), ...loadedConfiguration};
+
+
         // Populate default saves with SAVE_SLOT_COUNT undefines:
         this.saveData = chatState != null
             ? chatState
             : {
                 saves: Array(this.SAVE_SLOT_COUNT).fill(undefined),
-                configuration: this.createDefaultNewGameConfiguration(),
+                configuration: defaultConfiguration,
                 lastSaveSlot: 0,
             };
+        
+        
         this.ensureChatState();
 
     }
@@ -272,9 +322,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return {
             actors: [],
             locations: [],
+            lorebook: [],
+            calendarEvents: [],
             context: [],
             settings: [],
+            selectedSettings: {},
             actorStats: [],
+            uiSettings: cloneUiSettings(DEFAULT_UI_SETTINGS),
             title: 'Agenda VN',
             titleImageUrl: '',
             titleImagePrompt: 'Generate a title image for a visual novel game called "Agenda VN".',
@@ -297,23 +351,37 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const defaultConfiguration = this.createDefaultNewGameConfiguration();
         const legacyContext = activeSave?.agendaConfig?.context || [];
         const legacySettings = activeSave?.agendaConfig?.settings || [];
+        const legacySelectedSettings = activeSave?.agendaConfig?.selectedSettings || {};
         const legacyActorStats = activeSave?.agendaConfig?.actorStats || [];
+        const legacyLorebook = activeSave?.lorebook || [];
+        const legacyUiSettings = activeSave?.uiSettings || {};
 
         if (!this.saveData.configuration) {
             this.saveData.configuration = {
                 ...defaultConfiguration,
+                actors: [],
+                locations: [],
+                lorebook: legacyLorebook.map(cloneLore),
+                calendarEvents: [],
                 context: legacyContext.map(cloneContextSegment),
                 settings: legacySettings.map(cloneCustomSetting),
+                selectedSettings: { ...legacySelectedSettings },
+                actorStats: legacyActorStats.map(cloneActorStat),
+                uiSettings: cloneUiSettings(legacyUiSettings),
             };
             return;
         }
 
         this.saveData.configuration = {
-            actors: this.saveData.configuration.actors || defaultConfiguration.actors,
-            locations: this.saveData.configuration.locations || defaultConfiguration.locations,
+            actors: (this.saveData.configuration.actors || defaultConfiguration.actors).map(cloneActor),
+            locations: (this.saveData.configuration.locations || defaultConfiguration.locations).map(cloneLocation),
+            lorebook: (this.saveData.configuration.lorebook || legacyLorebook || defaultConfiguration.lorebook).map(cloneLore),
+            calendarEvents: (this.saveData.configuration.calendarEvents || defaultConfiguration.calendarEvents).map(cloneCalendarEvent),
             context: (this.saveData.configuration.context || legacyContext).map(cloneContextSegment),
             settings: (this.saveData.configuration.settings || legacySettings).map(cloneCustomSetting),
+            selectedSettings: { ...(this.saveData.configuration.selectedSettings || legacySelectedSettings || defaultConfiguration.selectedSettings) },
             actorStats: (this.saveData.configuration.actorStats || legacyActorStats).map(cloneActorStat),
+            uiSettings: cloneUiSettings(this.saveData.configuration.uiSettings || legacyUiSettings || defaultConfiguration.uiSettings),
             startingDate: this.saveData.configuration.startingDate || defaultConfiguration.startingDate,
             title: this.saveData.configuration.title || defaultConfiguration.title,
             titleImageUrl: this.saveData.configuration.titleImageUrl || defaultConfiguration.titleImageUrl,
@@ -339,11 +407,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             titleImagePrompt: updates.titleImagePrompt ?? current.titleImagePrompt ?? '',
             backgroundImageUrl: updates.backgroundImageUrl ?? current.backgroundImageUrl ?? '',
             backgroundImagePrompt: updates.backgroundImagePrompt ?? current.backgroundImagePrompt ?? '',
-            actors: (updates.actors ?? current.actors ?? []).map(actor => ({...actor})),
-            locations: (updates.locations ?? current.locations ?? []).map(location => ({...location})),
+            actors: (updates.actors ?? current.actors ?? []).map(cloneActor),
+            locations: (updates.locations ?? current.locations ?? []).map(cloneLocation),
+            lorebook: (updates.lorebook ?? current.lorebook ?? []).map(cloneLore),
+            calendarEvents: (updates.calendarEvents ?? current.calendarEvents ?? []).map(cloneCalendarEvent),
             context: (updates.context ?? current.context ?? []).map(cloneContextSegment),
             settings: (updates.settings ?? current.settings ?? []).map(cloneCustomSetting),
+            selectedSettings: { ...(updates.selectedSettings ?? current.selectedSettings ?? {}) },
             actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneActorStat),
+            uiSettings: cloneUiSettings(updates.uiSettings ?? current.uiSettings ?? DEFAULT_UI_SETTINGS),
             startingDate: updates.startingDate ?? current.startingDate,
         };
 
@@ -395,10 +467,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     generateFreshSave(playerData: {name: string, personality: string, themeColor?: string}): SaveType {
-        const startingDate = this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10);
+        const configuration = this.getConfiguration();
+        const startingDate = configuration.startingDate || new Date().toISOString().slice(0, 10);
 
-        return {playerId: this.primaryUser.anonymizedId,
-            actors: {
+        const actors: {[key: string]: Actor} = {
                 [this.primaryUser.anonymizedId]: {
                     id: this.primaryUser.anonymizedId,
                     active: true,
@@ -413,27 +485,61 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     themeFontFamily: '',
                     voiceId: ''
                 },
-            },
-            atlas: createDefaultAtlas(),
+            };
+
+        (configuration.actors || [])
+            .filter(actor => actor?.active !== false)
+            .forEach((configuredActor) => {
+                const seededActor = cloneActor(configuredActor);
+                if (seededActor.id !== this.primaryUser.anonymizedId) {
+                    actors[seededActor.id] = seededActor;
+                }
+            });
+
+        const atlas: {[key: string]: Location} = createDefaultAtlas();
+        (configuration.locations || [])
+            .filter(location => location?.active !== false)
+            .forEach((configuredLocation) => {
+                const seededLocation = cloneLocation(configuredLocation);
+                atlas[seededLocation.id] = seededLocation;
+            });
+
+        const draftSaveContext = {
+            playerId: this.primaryUser.anonymizedId,
+            actors,
+            atlas,
+            inventory: [],
+            timeline: [],
+            timestamp: Date.now(),
+        } as SaveType;
+
+        const seededEvents = (configuration.calendarEvents || []).flatMap(event =>
+            this.expandRecurringEvent(this.normalizeCalendarEventForSave(cloneCalendarEvent(event), draftSaveContext)),
+        );
+
+        return {playerId: this.primaryUser.anonymizedId,
+            actors,
+            atlas,
             inventory: [],
             timeline: [],
             timestamp: Date.now(),
             currentDate: startingDate,
             currentTimeOfDay: 'morning',
-            upcomingEvents: [],
+            upcomingEvents: seededEvents,
+            lorebook: (configuration.lorebook || []).map(cloneLore),
             agendaConfig: {
-                title: this.getConfiguration().title || 'Agenda VN',
-                titleImageUrl: this.getConfiguration().titleImageUrl || '',
-                titleImagePrompt: this.getConfiguration().titleImagePrompt || '',
-                backgroundImageUrl: this.getConfiguration().backgroundImageUrl || '',
-                backgroundImagePrompt: this.getConfiguration().backgroundImagePrompt || '',
+                title: configuration.title || 'Agenda VN',
+                titleImageUrl: configuration.titleImageUrl || '',
+                titleImagePrompt: configuration.titleImagePrompt || '',
+                backgroundImageUrl: configuration.backgroundImageUrl || '',
+                backgroundImagePrompt: configuration.backgroundImagePrompt || '',
                 startingDate,
-                context: [],
-                settings: [],
-                selectedSettings: {},
-                actorStats: this.getConfiguration().actorStats.map(cloneActorStat),
+                context: configuration.context.map(cloneContextSegment),
+                settings: configuration.settings.map(cloneCustomSetting),
+                selectedSettings: { ...(configuration.selectedSettings || {}) },
+                actorStats: configuration.actorStats.map(cloneActorStat),
             },
-            uiSettings: {...DEFAULT_UI_SETTINGS},
+            uiSettings: cloneUiSettings(configuration.uiSettings || DEFAULT_UI_SETTINGS),
         };
     }
 
@@ -460,16 +566,34 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 startingDate: persistedConfiguration.startingDate || new Date().toISOString().slice(0, 10),
                 context: persistedConfiguration.context.map(cloneContextSegment),
                 settings: persistedConfiguration.settings.map(cloneCustomSetting),
-                selectedSettings: Object.fromEntries(
-                    persistedConfiguration.settings.map(setting => {
-                        const optionName = Object.keys(setting.options || {})[0];
-                        return [setting.title, optionName || ''];
-                    }),
-                ),
+                selectedSettings: {
+                    ...Object.fromEntries(
+                        persistedConfiguration.settings.map(setting => {
+                            const optionName = Object.keys(setting.options || {})[0];
+                            return [setting.title, optionName || ''];
+                        }),
+                    ),
+                    ...(persistedConfiguration.selectedSettings || {}),
+                },
                 actorStats: persistedConfiguration.actorStats.map(cloneActorStat),
             };
         } else if (!newSave.agendaConfig.actorStats) {
             newSave.agendaConfig.actorStats = persistedConfiguration.actorStats.map(cloneActorStat);
+        }
+
+        if (!newSave.lorebook || newSave.lorebook.length === 0) {
+            newSave.lorebook = persistedConfiguration.lorebook.map(cloneLore);
+        }
+
+        if (!newSave.upcomingEvents || newSave.upcomingEvents.length === 0) {
+            const seededEvents = persistedConfiguration.calendarEvents.flatMap(event =>
+                this.expandRecurringEvent(this.normalizeCalendarEventForSave(cloneCalendarEvent(event), newSave)),
+            );
+            newSave.upcomingEvents = seededEvents;
+        }
+
+        if (!newSave.uiSettings) {
+            newSave.uiSettings = cloneUiSettings(persistedConfiguration.uiSettings || DEFAULT_UI_SETTINGS);
         }
 
         this.syncActorStats(newSave);

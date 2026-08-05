@@ -113,6 +113,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [selectedSettings, setSelectedSettings] = useState<{ [key: string]: string }>(() => ({
         ...(save.agendaConfig?.selectedSettings || {}),
     }));
+    const [isCopyingConfigurationJson, setIsCopyingConfigurationJson] = useState(false);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
     const saveGameConfigurationRef = useRef<() => void>(() => {});
@@ -159,11 +160,92 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         return nextSelections;
     }, [customSettings, selectedSettings]);
 
+    const activeActors = useMemo(() => {
+        return Object.values(save.actors || {})
+            .filter(actor => actor.id !== save.playerId)
+            .filter(actor => actor.active !== false)
+            .map(actor => JSON.parse(JSON.stringify(actor)));
+    }, [save.actors, save.playerId]);
+
+    const activeLocations = useMemo(() => {
+        return Object.values(save.atlas || {})
+            .filter(location => location.active !== false)
+            .map(location => JSON.parse(JSON.stringify(location)));
+    }, [save.atlas]);
+
+    const managedCalendarEvents = useMemo(() => {
+        return stageInstance.getManagedCalendarEvents().map(event => JSON.parse(JSON.stringify(event)));
+    }, [stageInstance, save.upcomingEvents, save.currentDate, save.currentTimeOfDay]);
+
+    const portableGameConfiguration = useMemo(() => {
+        return {
+            title,
+            titleImageUrl,
+            titleImagePrompt,
+            backgroundImageUrl,
+            backgroundImagePrompt,
+            startingDate,
+            context: contextSegments.map(cloneSegment),
+            settings: customSettings.map(cloneSetting),
+            selectedSettings: { ...validSelections },
+            actorStats: actorStats.map(cloneActorStat),
+            actors: activeActors,
+            locations: activeLocations,
+            lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
+            calendarEvents: managedCalendarEvents,
+            uiSettings: JSON.parse(JSON.stringify(stageInstance.getUiSettings())),
+        };
+    }, [
+        activeActors,
+        activeLocations,
+        actorStats,
+        backgroundImagePrompt,
+        backgroundImageUrl,
+        contextSegments,
+        customSettings,
+        managedCalendarEvents,
+        save.lorebook,
+        stageInstance,
+        startingDate,
+        title,
+        titleImagePrompt,
+        titleImageUrl,
+        validSelections,
+    ]);
+
+    const portableGameConfigurationJson = useMemo(
+        () => JSON.stringify(portableGameConfiguration, null, 2),
+        [portableGameConfiguration],
+    );
+
+    const copyConfigurationJson = useCallback(async () => {
+        if (isCopyingConfigurationJson) {
+            return;
+        }
+
+        setIsCopyingConfigurationJson(true);
+        try {
+            await navigator.clipboard.writeText(portableGameConfigurationJson);
+            stageInstance.showPriorityMessage('Copied GameConfiguration JSON to clipboard.');
+        } catch (error) {
+            console.error('Failed to copy GameConfiguration JSON:', error);
+            stageInstance.showPriorityMessage('Failed to copy GameConfiguration JSON. Check console for details.');
+        } finally {
+            setIsCopyingConfigurationJson(false);
+        }
+    }, [isCopyingConfigurationJson, portableGameConfigurationJson, stageInstance]);
+
     const saveGameConfiguration = useCallback(() => {
         stageInstance.updateConfiguration({
+            actors: activeActors,
+            locations: activeLocations,
+            lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
+            calendarEvents: managedCalendarEvents,
             context: contextSegments,
             settings: customSettings,
+            selectedSettings: validSelections,
             actorStats,
+            uiSettings: stageInstance.getUiSettings(),
             title,
             titleImageUrl,
             titleImagePrompt: titleImagePrompt,
@@ -211,7 +293,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         });
 
         stageInstance.saveGame();
-    }, [actorStats, backgroundImagePrompt, backgroundImageUrl, contextSegments, customSettings, save, selectedSettings, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validSelections]);
+    }, [activeActors, activeLocations, actorStats, backgroundImagePrompt, backgroundImageUrl, contextSegments, customSettings, managedCalendarEvents, save, selectedSettings, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validSelections]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;
@@ -488,7 +570,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             inputLabel="Title Image URL"
                             uploadButtonLabel="Upload Title Image"
                             previewBorder="3px solid var(--agenda-border-strong)"
-                            previewBackgroundPosition="50% 40%"
+                            previewBackgroundPosition="50% 45%"
+                            previewWidth="220px"
+                            previewHeight="124px"
                             previewPlaceholder={<ImageIcon style={{ fontSize: '46px', color: 'rgba(138, 176, 204, 0.35)' }} />}
                             onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
                         />
@@ -845,6 +929,31 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         Add Actor Stat
                     </Button>
                 </div>
+            </GlassPanel>
+
+            <GlassPanel variant="default" style={{ padding: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
+                    <Title variant="glow" style={{ fontSize: '20px', margin: 0 }}>GameConfiguration JSON Export</Title>
+                    <Button
+                        variant="secondary"
+                        onClick={copyConfigurationJson}
+                        disabled={isCopyingConfigurationJson}
+                    >
+                        {isCopyingConfigurationJson ? 'Copying...' : 'Copy JSON'}
+                    </Button>
+                </div>
+
+                <div style={{ color: 'var(--agenda-inactive)', fontSize: '12px', marginBottom: '8px' }}>
+                    Includes active actors and locations, plus current settings, styles, lorebook, and calendar event series.
+                </div>
+
+                <textarea
+                    className="input-base"
+                    readOnly
+                    value={portableGameConfigurationJson}
+                    rows={20}
+                    style={{ width: '100%', resize: 'vertical', fontFamily: 'monospace', fontSize: '12px' }}
+                />
             </GlassPanel>
         </div>
     );
