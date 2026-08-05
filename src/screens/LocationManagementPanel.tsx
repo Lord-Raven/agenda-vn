@@ -188,15 +188,9 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                 shouldReduceMotion={Boolean(shouldReduceMotion)}
                 emptyListMessage="No locations found in the current save."
                 sectionEmptyMessage="No locations."
-                renderSectionAction={(section) => (
-                    <Button
-                        onClick={() => handleCreateLocation(section.title)}
-                        variant="secondary"
-                        style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '8px' }}
-                    >
-                        New
-                    </Button>
-                )}
+                renderSectionAction={(section) => {
+                    handleCreateLocation(section.title);
+                }}
             />
 
             <div style={detailPaneStyle}>

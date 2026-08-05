@@ -1,5 +1,7 @@
 import React, { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Button } from './UiComponents';
+import { Add } from '@mui/icons-material';
 
 export interface CategorizedEntrySection<TEntry> {
     id: string;
@@ -15,7 +17,7 @@ interface CategorizedEntrySidebarProps<TEntry> {
     getEntryKey: (entry: TEntry) => string;
     shouldReduceMotion: boolean;
     emptyListMessage: string;
-    renderSectionAction?: (section: CategorizedEntrySection<TEntry>) => ReactNode;
+    renderSectionAction?: (section: CategorizedEntrySection<TEntry>) => void;
     sectionEmptyMessage?: string | ((section: CategorizedEntrySection<TEntry>) => string);
     shouldHideSection?: (section: CategorizedEntrySection<TEntry>) => boolean;
     defaultCollapsed?: boolean;
@@ -103,7 +105,23 @@ export const CategorizedEntrySidebar = <TEntry,>({
                                         ▸
                                     </motion.span>
                                 </button>
-                                {renderSectionAction?.(section)}
+                                {renderSectionAction && (
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => renderSectionAction(section)}
+                                        style={{
+                                            padding: '4px 10px',
+                                            fontSize: '12px',
+                                            borderRadius: '8px',
+                                            alignSelf: 'auto',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                        }}
+                                    >
+                                        <Add style={{ fontSize: '16px' }} /> New
+                                    </Button>
+                                )}
                             </div>
 
                             <AnimatePresence initial={false}>

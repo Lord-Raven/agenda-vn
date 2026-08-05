@@ -173,15 +173,9 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                 shouldReduceMotion={Boolean(shouldReduceMotion)}
                 emptyListMessage="No actors found in the current save."
                 sectionEmptyMessage="No actors."
-                renderSectionAction={(section) => (
-                    <Button
-                        onClick={() => handleCreateActor(section.title)}
-                        variant="secondary"
-                        style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '8px' }}
-                    >
-                        New
-                    </Button>
-                )}
+                renderSectionAction={(section) => {
+                    handleCreateActor(section.title);
+                }}
             />
 
             <div style={detailPaneStyle}>

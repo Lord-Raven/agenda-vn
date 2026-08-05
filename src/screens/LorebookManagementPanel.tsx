@@ -427,23 +427,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                     defaultCollapsed
                     sectionEmptyMessage="No entries"
                     shouldHideSection={(section) => !CORE_CATEGORY_SET.has(section.id) && section.entries.length === 0}
-                    renderSectionAction={(section) => (
-                        <Button
-                            variant="secondary"
-                            onClick={() => createNewLoreEntry(section.id as LoreCategory)}
-                            style={{
-                                padding: '4px 10px',
-                                fontSize: '12px',
-                                borderRadius: '8px',
-                                alignSelf: 'auto',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                            }}
-                        >
-                            <Add style={{ fontSize: '16px' }} /> New
-                        </Button>
-                    )}
+                    renderSectionAction={(section) => {
+                        createNewLoreEntry(section.id as LoreCategory);
+                    }}
                 />
 
                             <div
