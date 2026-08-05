@@ -51,6 +51,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
         const save = stage().getSave();
         return Object.values(save.actors || {})
             .filter((actor) => actor.id !== save.playerId)
+            .filter((actor) => actor.active !== false)
             .sort(sortByName);
     }, [stage]);
 
@@ -90,6 +91,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
         }
 
         const actor = new Actor({
+            active: true,
             name: candidateName,
             description: '',
             profile: '',
@@ -261,6 +263,11 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                         key={selectedActor.id}
                         actor={selectedActor}
                         stage={stage}
+                        onDeactivate={(actorId) => {
+                            if (selectedActorId === actorId) {
+                                setSelectedActorId(null);
+                            }
+                        }}
                     />
                 )}
             </div>

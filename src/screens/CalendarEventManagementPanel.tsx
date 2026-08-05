@@ -66,11 +66,14 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
     const actors = useMemo(
         () => Object.values(save.actors || {})
             .filter(actor => actor.id !== save.playerId)
+            .filter(actor => actor.active !== false)
             .sort((a, b) => a.name.localeCompare(b.name)),
         [save.actors, save.playerId],
     );
     const locations = useMemo(
-        () => Object.values(save.atlas || {}).sort((a, b) => a.name.localeCompare(b.name)),
+        () => Object.values(save.atlas || {})
+            .filter(location => location.active !== false)
+            .sort((a, b) => a.name.localeCompare(b.name)),
         [save.atlas],
     );
 

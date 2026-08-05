@@ -49,7 +49,9 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), undefined, { sensitivity: 'base' });
 
     const locations = useMemo(() => {
-        return Object.values(stage().getSave().atlas || {}).sort(sortByName);
+        return Object.values(stage().getSave().atlas || {})
+            .filter((location) => location.active !== false)
+            .sort(sortByName);
     }, [stage]);
 
     // Create a map of locations by their category property. locationsByCategory[category] = array of locations in that category.
@@ -88,6 +90,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         }
 
         const location = new Location({
+            active: true,
             name: candidateName,
             description: '',
             imageUrl: '',
@@ -280,6 +283,11 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                         key={selectedLocation.id}
                         location={selectedLocation}
                         stage={stage}
+                        onDeactivate={(locationId) => {
+                            if (selectedLocationId === locationId) {
+                                setSelectedLocationId(null);
+                            }
+                        }}
                     />
                 )}
             </div>

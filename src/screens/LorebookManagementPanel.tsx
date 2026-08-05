@@ -110,6 +110,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
         const playerId = stage().getSave().playerId;
         const extraCategories = Object.values(stage().getSave().actors || {})
             .filter(actor => actor.id !== playerId)
+            .filter(actor => actor.active !== false)
             .map((actor) => actor.name.trim())
             .sort((a, b) => a.localeCompare(b));
 
@@ -150,7 +151,11 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             return false;
         }
 
-        return !!findBestNameMatch(normalizedTitle, Object.values(stage().getSave().actors) || [], ['name']);
+        return !!findBestNameMatch(
+            normalizedTitle,
+            (Object.values(stage().getSave().actors) || []).filter((actor) => actor.active !== false),
+            ['name'],
+        );
     }, [selectedLore]);
 
     const selectedLoreMatchesExistingLocation = useMemo(() => {
@@ -158,7 +163,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             return false;
         }
 
-        return Object.values(stage().getSave().atlas || {}).some((location) => {
+        return Object.values(stage().getSave().atlas || {})
+            .filter((location) => location.active !== false)
+            .some((location) => {
             const linkedLore = getLinkedLocationLore(location.name, stage());
             return linkedLore?.id === selectedLore.id;
         });
@@ -254,6 +261,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
         if (selectedLore.type === 'character') {
             const linkedActor = Object.values(stage().getSave().actors || {}).find((actor) => {
+                if (actor.active === false) {
+                    return false;
+                }
                 const linkedLore = getLinkedActorLore(actor.name, stage());
                 return linkedLore?.id === selectedLore.id;
             });
@@ -267,6 +277,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
         if (selectedLore.type === 'location') {
             const linkedLocation = Object.values(stage().getSave().atlas || {}).find((location) => {
+                if (location.active === false) {
+                    return false;
+                }
                 const linkedLore = getLinkedLocationLore(location.name, stage());
                 return linkedLore?.id === selectedLore.id;
             });

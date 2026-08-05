@@ -401,6 +401,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actors: {
                 [this.primaryUser.anonymizedId]: {
                     id: this.primaryUser.anonymizedId,
+                    active: true,
                     name: playerData.name,
                     description: '',
                     profile: playerData.personality,
@@ -601,10 +602,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const save = this.getSave();
         this.ensureCalendarState(save);
 
-        const locations = Object.values(save.atlas || {});
+        const locations = Object.values(save.atlas || {}).filter(location => location.active !== false);
         const fallbackLocation = locations[0];
         const actorIds = Object.values(save.actors || {})
             .filter(actor => actor.id !== save.playerId)
+            .filter(actor => actor.active !== false)
             .slice(0, 1)
             .map(actor => actor.id);
         const date = this.addDays(save.currentDate || this.getStartingDate(save), 1);
@@ -909,7 +911,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType): CalendarEvent {
-        const allLocations = Object.values(save.atlas || {});
+        const allLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
         const fallbackLocationId = allLocations[0]?.id || '';
         const locationId = allLocations.some(location => location.id === event.locationId)
             ? event.locationId
@@ -919,6 +921,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const actorIds = Array.from(new Set(
             (event.actorIds || event.participantActorIds || [])
                 .filter(actorId => Boolean(save.actors?.[actorId]))
+                .filter(actorId => save.actors?.[actorId]?.active !== false)
                 .map(actorId => `${actorId}`),
         ));
         const locationName = save.atlas[locationId]?.name || 'an unknown location';
@@ -1057,7 +1060,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const eventDate = `${source.date ?? source.Date ?? save.currentDate ?? this.getStartingDate(save)}`.trim();
         const resolvedDate = eventDate || this.addDays(save.currentDate || this.getStartingDate(save), 1);
         const locationText = `${source.location ?? source.Location ?? ''}`.trim();
-        const locations = Object.values(save.atlas || {});
+        const locations = Object.values(save.atlas || {}).filter(location => location.active !== false);
         const matchedLocation = findBestNameMatch(locationText, locations, ['id', 'name']) || locations[0];
         if (!matchedLocation) {
             return null;
@@ -1070,7 +1073,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             ?? source.Character
             ?? source.character,
         );
-        const availableActors = Object.values(save.actors || {});
+        const availableActors = Object.values(save.actors || {}).filter(actor => actor.active !== false);
         const actorIds = actorCandidates
             .map(name => findBestNameMatch(name, availableActors, ['id', 'name'])?.id)
             .filter((id): id is string => Boolean(id));
@@ -1219,7 +1222,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const playerId = save.playerId;
         const availableActors = Object.values(save.actors || {}).filter(actor =>
             actor.id !== playerId && actor.name.toLowerCase() !== 'cassiel',
-        );
+        ).filter(actor => actor.active !== false);
 
         const generatedEvents: CalendarEvent[] = [];
         const upcomingEvents = (save.upcomingEvents || []).filter(event => this.isFutureEvent(event));
@@ -1229,7 +1232,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             : (save.currentDate || new Date().toISOString().slice(0, 10));
 
         for (let i = 0; i < count; i += 1) {
-            const location = this.pickRandom(Object.values(save.atlas || {}));
+            const location = this.pickRandom(Object.values(save.atlas || {}).filter(candidate => candidate.active !== false));
             if (!location) {
                 break;
             }

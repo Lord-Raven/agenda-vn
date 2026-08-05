@@ -35,6 +35,7 @@ export type Outfit = {
 
 export class Actor {
     id: string = ''; // UUID
+    active: boolean = true; // Soft-delete flag. Inactive actors are hidden from management UIs.
     name: string = ''; // Display name
     description: string = ''; // Core physical description—not outfit-oriented
     profile: string = ''; // Personality profile description of character
@@ -52,6 +53,7 @@ export class Actor {
     static fromSave(savedActor: any): Actor {
         const actor = Object.create(Actor.prototype);
         Object.assign(actor, savedActor);
+        actor.active = savedActor?.active !== false;
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
         return actor;
     }
@@ -61,6 +63,7 @@ export class Actor {
         if (!this.id) {
             this.id = generateUuid();
         }
+        this.active = this.active !== false;
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
     }
 }

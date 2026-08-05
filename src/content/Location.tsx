@@ -1,6 +1,13 @@
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { findBestNameMatch } from './Actor';
+import { buildPrompt } from '../utils/PromptBuilder.js';
+import {
+	buildStructuredExampleResponse,
+	buildStructuredResponseFormat,
+	parseStructuredResponse,
+	StructuredFieldDefinition,
+} from '../utils/StructuredResponse.js';
 
 
 // Customize this list to define which locations are restored when the map is cleared.
@@ -44,8 +51,116 @@ export function updateLocationDescription(locationId: string, description: strin
 	location.description = description;
 }
 
+function renderContextSegment(segment: any): string {
+	if (typeof segment.body === 'string') {
+		return segment.body;
+	}
+	if (Array.isArray(segment.body)) {
+		return segment.body.map((child: any) => `${child.title}:\n${renderContextSegment(child)}`).join('\n\n');
+	}
+	return '';
+}
+
+const LOCATION_DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
+	{ key: 'name', label: 'NAME', description: 'The location name.' },
+	{ key: 'category', label: 'CATEGORY', description: 'A concise organizational category for this location.' },
+	{ key: 'description', label: 'DESCRIPTION', description: 'A vivid but practical description of the location for the game lorebook and UI.' },
+	{ key: 'theme_color', label: 'THEME COLOR', description: 'A hex color that suits this location UI theme, like #8ab0cc.' },
+	{ key: 'light_color', label: 'LIGHT COLOR', description: 'A hex lighting tint for the location, like #ffffff.' },
+];
+
+export async function distillLocation(location: Location, definition: any, stage: Stage): Promise<Location | null> {
+	console.log('Distilling location:', definition?.name || location.name);
+	console.log(definition);
+
+	const generationKey = `distilling_location/${location.id}`;
+	const existingGeneration = stage.generationPromises[generationKey];
+	if (existingGeneration) {
+		return existingGeneration as Promise<Location | null>;
+	}
+
+	const buildWorldContext = (builder: any) => {
+		(stage.getConfiguration().context || []).forEach(segment => {
+			builder.addBlock(segment.title, renderContextSegment(segment));
+		});
+	};
+
+	const locationDetails = [
+		`Name: ${String(definition?.name || location.name || '').trim()}`,
+		`Category: ${String(definition?.category || location.category || '').trim() || 'Uncategorized'}`,
+		`Description: ${String(definition?.description || getLocationDescription(location.id, stage) || location.description || '').trim()}`,
+		`Theme Color: ${String(definition?.themeColor || location.themeColor || '').trim()}`,
+		`Light Color: ${String(definition?.lightColor || location.lightColor || '').trim()}`,
+	].join('\n');
+
+	const request = stage.generateText(
+		buildPrompt()
+			.addBlock(
+				'Instructions',
+				`This is a preparatory request for structured game content. ` +
+				`The world and its rules are described below. ` +
+				`Use the existing location details to produce a polished set of location fields for this game. ` +
+				`Keep the location grounded in the same setting, and output valid hex colors for theme and light colors.`
+			)
+			.addBlock('World Context', buildWorldContext)
+			.addBlock('Location Details', locationDetails)
+			.addBlock('Response Format', buildStructuredResponseFormat(LOCATION_DISTILLATION_FIELDS, { includeEndTag: true }))
+			.addBlock(
+				'Example Response',
+				buildStructuredExampleResponse(
+					LOCATION_DISTILLATION_FIELDS,
+					{
+						name: 'Amber Drop Cafe',
+						category: 'Cafe',
+						description: 'A narrow late-night cafe with amber pendant lights, scratched brass trim, and rain-streaked front windows that make every conversation feel private.',
+						theme_color: '#b98f6e',
+						light_color: '#ffd7b0',
+					},
+					{ includeEndTag: true },
+				),
+			)
+			.format(),
+		40,
+		220,
+	).then((generatedResponse: string) => {
+		console.log('Generated location distillation:');
+		console.log(generatedResponse);
+
+		const parsedData = parseStructuredResponse(generatedResponse, LOCATION_DISTILLATION_FIELDS);
+		const existingLore = getLinkedLocationLore(location.name, stage);
+		const nextName = (parsedData['name'] || location.name || '').trim() || location.name;
+		const nextCategory = (parsedData['category'] || location.category || '').trim();
+		const nextDescription = (parsedData['description'] || getLocationDescription(location.id, stage) || location.description || '').trim();
+		const nextThemeColor = /^#([0-9A-F]{6}|[0-9A-F]{8})$/i.test(parsedData['theme_color'] || '')
+			? parsedData['theme_color']
+			: location.themeColor;
+		const nextLightColor = /^#([0-9A-F]{6}|[0-9A-F]{8})$/i.test(parsedData['light_color'] || '')
+			? parsedData['light_color']
+			: location.lightColor;
+
+		location.name = nextName;
+		location.category = nextCategory;
+		location.description = nextDescription;
+		location.themeColor = nextThemeColor;
+		location.lightColor = nextLightColor;
+
+		if (existingLore) {
+			existingLore.title = nextName;
+			existingLore.content = nextDescription;
+		}
+
+		return location;
+	}).finally(() => {
+		delete stage.generationPromises[generationKey];
+	});
+
+	stage.generationPromises[generationKey] = request;
+	return request;
+}
+
 export class Location {
     id: string = '';
+	active: boolean = true; // Soft-delete flag. Inactive locations are hidden from management UIs.
     name: string = '';
     description: string = '';
 	category: string = ''; // A category for filtering or organization in the UI. Could be a region ("house", "city") or could be a type of location ("dungeons", "shops"); it is for organizational and not gameplay purposes.
@@ -60,6 +175,7 @@ export class Location {
         if (!this.id) {
             this.id = generateUuid();
         }
+		this.active = this.active !== false;
         if (!this.themeColor) {
             // Pick from the core game theme palette in index.scss.
             const colors = ['#8ab0cc', '#89cd87', '#7a7b6b', '#b98f6e', '#2e354d'];

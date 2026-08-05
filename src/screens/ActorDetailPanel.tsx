@@ -12,6 +12,7 @@ import { ActorStatStars } from './ActorStatStars';
 interface ActorDetailPanelProps {
     actor: Actor;
     stage: () => Stage;
+    onDeactivate?: (actorId: string) => void;
 }
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
@@ -78,7 +79,7 @@ const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [ke
     return nextMap;
 };
 
-export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) => {
+export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDeactivate }) => {
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
     const linkedLoreEntry = getLinkedActorLore(actor.name, stage());
@@ -145,6 +146,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
 
         for (const candidate of Object.values(stage().getSave().actors || {})) {
             if (candidate.id === actor.id) {
+                continue;
+            }
+            if (candidate.active === false) {
                 continue;
             }
 
@@ -415,6 +419,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
     const actorThemeColorSwatches = useMemo(() => {
         const otherActorThemeColors = Object.values(stage().getSave().actors || {})
             .filter((candidate) => candidate.id !== actor.id)
+            .filter((candidate) => candidate.active !== false)
             .map((candidate) => candidate.themeColor);
 
         return buildHexColorSwatches([
@@ -600,6 +605,20 @@ ${indent}}`;
         } finally {
             setIsGeneratingActorDetails(false);
         }
+    };
+
+    const handleDeactivateActor = () => {
+        const linkedLore = getLinkedActorLore(actor.name, stage());
+        actor.active = false;
+
+        if (linkedLore) {
+            const save = stage().getSave();
+            save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
+        }
+
+        stage().saveGame();
+        stage().showPriorityMessage(`${actor.name || 'Actor'} is now inactive and hidden from management.`);
+        onDeactivate?.(actor.id);
     };
 
     const handleRegenerateEmotion = async (emotion: Emotion, promptDraft: string) => {
@@ -1244,25 +1263,6 @@ ${indent}}`;
                                                                 style={{ width: '100%' }}
                                                             />
                                                         )}
-
-                                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 120px) minmax(0, 1fr)', gap: '8px', alignItems: 'center' }}>
-                                                            <div style={{ color: 'rgba(0, 255, 136, 0.75)', fontSize: '12px' }}>
-                                                                Numeric value
-                                                            </div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={Number(displayValue.toFixed(2)).toString()}
-                                                                onChange={(e) => {
-                                                                    const next = Number(e.target.value);
-                                                                    if (!Number.isFinite(next)) {
-                                                                        return;
-                                                                    }
-                                                                    handleActorStatValueChange(stat, next);
-                                                                }}
-                                                                placeholder="0"
-                                                            />
-                                                        </div>
                                                     </div>
                                                 );
                                             })}
@@ -1786,7 +1786,29 @@ ${indent}}`;
                                 </div>
                             </section>
 
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                                <Button
+                                    onClick={() => {
+                                        setConfirmDialog({
+                                            open: true,
+                                            title: `Delete Actor: ${editedActor.name || actor.name}`,
+                                            message: 'This will mark this actor as inactive (soft delete), hide it from management lists, and delete its linked lorebook entry. Existing references remain intact in past content. Continue?',
+                                            actions: [
+                                                {
+                                                    label: 'Delete Actor',
+                                                    onClick: () => {
+                                                        setConfirmDialog((prev) => ({ ...prev, open: false }));
+                                                        handleDeactivateActor();
+                                                    },
+                                                    variant: 'primary',
+                                                },
+                                            ],
+                                        });
+                                    }}
+                                    variant="secondary"
+                                >
+                                    Delete
+                                </Button>
                                 <Button
                                     onClick={() => {
                                         if (isGeneratingActorDetails) {

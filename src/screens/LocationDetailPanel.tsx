@@ -1,7 +1,8 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import { Stage } from '../Stage';
-import { getLocationDescription, Location, updateLocationDescription } from '../content/Location';
+import { distillLocation, getLocationDescription, getLinkedLocationLore, Location, updateLocationDescription } from '../content/Location';
 import { Image as ImageIcon, Place } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
@@ -9,9 +10,10 @@ import { ImageUrlUploadField } from './ImageUrlUploadField';
 interface LocationDetailPanelProps {
     location: Location;
     stage: () => Stage;
+    onDeactivate?: (locationId: string) => void;
 }
 
-export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage }) => {
+export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onDeactivate }) => {
     const [editedLocation, setEditedLocation] = useState<{
         name: string;
         category: string;
@@ -41,6 +43,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             if (candidate.id === location.id) {
                 continue;
             }
+            if (candidate.active === false) {
+                continue;
+            }
 
             const normalizedCategory = (candidate.category || '').trim();
             if (!normalizedCategory) {
@@ -62,6 +67,13 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     }, [location.id, stage]);
 
     const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [isGeneratingLocationDetails, setIsGeneratingLocationDetails] = useState(false);
+    const [confirmDialog, setConfirmDialog] = useState<{
+        open: boolean;
+        title: string;
+        message: string;
+        actions?: Array<{ label: string; onClick: () => void; variant?: 'primary' | 'secondary' }>;
+    }>({ open: false, title: '', message: '' });
     const editedLocationRef = useRef(editedLocation);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
@@ -84,6 +96,19 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
 
         stage().saveGame();
+    };
+
+    const syncEditedLocationFromSource = () => {
+        setEditedLocation({
+            name: location.name,
+            category: location.category ?? '',
+            description: getLocationDescription(location.id, stage()),
+            themeColor: location.themeColor,
+            lightColor: location.lightColor,
+            imageUrl: location.imageUrl,
+            focalX: location.focalPoint?.x ?? 0.5,
+            focalY: location.focalPoint?.y ?? 0.5,
+        });
     };
 
     useEffect(() => {
@@ -136,6 +161,86 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         } finally {
             setIsUploadingImage(false);
         }
+    };
+
+    const handleGenerateLocationDetails = async () => {
+        if (isGeneratingLocationDetails) {
+            return;
+        }
+
+        const nextLocation = editedLocationRef.current;
+        persistLocation(nextLocation);
+
+        const linkedLore = getLinkedLocationLore(location.name, stage());
+        const previousState = {
+            name: location.name,
+            category: location.category,
+            description: location.description,
+            themeColor: location.themeColor,
+            lightColor: location.lightColor,
+            imageUrl: location.imageUrl,
+            focalPoint: location.focalPoint ? { ...location.focalPoint } : { x: 0.5, y: 0.5 },
+            linkedLore: linkedLore
+                ? {
+                    title: linkedLore.title,
+                    content: linkedLore.content,
+                }
+                : null,
+        };
+
+        setIsGeneratingLocationDetails(true);
+
+        try {
+            const distilledLocation = await distillLocation(location, {
+                name: nextLocation.name,
+                category: nextLocation.category,
+                description: nextLocation.description,
+                themeColor: nextLocation.themeColor,
+                lightColor: nextLocation.lightColor,
+            }, stage());
+
+            if (!distilledLocation) {
+                throw new Error('Location distillation returned no location.');
+            }
+
+            syncEditedLocationFromSource();
+            stage().saveGame();
+            stage().showPriorityMessage(`Generated new details for ${location.name}.`);
+        } catch (error) {
+            location.name = previousState.name;
+            location.category = previousState.category;
+            location.description = previousState.description;
+            location.themeColor = previousState.themeColor;
+            location.lightColor = previousState.lightColor;
+            location.imageUrl = previousState.imageUrl;
+            location.focalPoint = previousState.focalPoint;
+
+            const restoredLore = getLinkedLocationLore(previousState.name, stage());
+            if (restoredLore && previousState.linkedLore) {
+                restoredLore.title = previousState.linkedLore.title;
+                restoredLore.content = previousState.linkedLore.content;
+            }
+
+            syncEditedLocationFromSource();
+            console.error('Failed to generate location details:', error);
+            stage().showPriorityMessage('Failed to generate location details. Check console for details.');
+        } finally {
+            setIsGeneratingLocationDetails(false);
+        }
+    };
+
+    const handleDeactivateLocation = () => {
+        const linkedLore = getLinkedLocationLore(location.name, stage());
+        location.active = false;
+
+        if (linkedLore) {
+            const save = stage().getSave();
+            save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
+        }
+
+        stage().saveGame();
+        stage().showPriorityMessage(`${location.name || 'Location'} is now inactive and hidden from management.`);
+        onDeactivate?.(location.id);
     };
 
     const clampedCoord = (value: string): number => {
@@ -198,14 +303,15 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
 
     const locationThemeColorSwatches = useMemo(() => {
         const locations = Object.values(stage().getSave().atlas || {});
+        const activeLocations = locations.filter((candidate) => candidate.active !== false);
         const targetCategory = (editedLocation.category || '').trim().toLowerCase();
 
-        const sameCategoryThemeColors = locations
+        const sameCategoryThemeColors = activeLocations
             .filter((candidate) => candidate.id !== location.id)
             .filter((candidate) => (candidate.category || '').trim().toLowerCase() === targetCategory)
             .map((candidate) => candidate.themeColor);
 
-        const otherThemeColors = locations
+        const otherThemeColors = activeLocations
             .filter((candidate) => candidate.id !== location.id)
             .filter((candidate) => (candidate.category || '').trim().toLowerCase() !== targetCategory)
             .map((candidate) => candidate.themeColor);
@@ -219,14 +325,15 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
 
     const locationLightColorSwatches = useMemo(() => {
         const locations = Object.values(stage().getSave().atlas || {});
+        const activeLocations = locations.filter((candidate) => candidate.active !== false);
         const targetCategory = (editedLocation.category || '').trim().toLowerCase();
 
-        const sameCategoryLightColors = locations
+        const sameCategoryLightColors = activeLocations
             .filter((candidate) => candidate.id !== location.id)
             .filter((candidate) => (candidate.category || '').trim().toLowerCase() === targetCategory)
             .map((candidate) => candidate.lightColor);
 
-        const otherLightColors = locations
+        const otherLightColors = activeLocations
             .filter((candidate) => candidate.id !== location.id)
             .filter((candidate) => (candidate.category || '').trim().toLowerCase() !== targetCategory)
             .map((candidate) => candidate.lightColor);
@@ -423,10 +530,114 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                 />
                             </section>
 
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                                <Button
+                                    onClick={() => {
+                                        setConfirmDialog({
+                                            open: true,
+                                            title: `Delete Location: ${editedLocation.name || location.name}`,
+                                            message: 'This will mark this location as inactive (soft delete), hide it from management lists, and delete its linked lorebook entry. Existing references remain intact in past content. Continue?',
+                                            actions: [
+                                                {
+                                                    label: 'Delete Location',
+                                                    onClick: () => {
+                                                        setConfirmDialog((prev) => ({ ...prev, open: false }));
+                                                        handleDeactivateLocation();
+                                                    },
+                                                    variant: 'primary',
+                                                },
+                                            ],
+                                        });
+                                    }}
+                                    variant="secondary"
+                                >
+                                    Delete
+                                </Button>
+                                <Button
+                                    onClick={() => {
+                                        if (isGeneratingLocationDetails) {
+                                            return;
+                                        }
+
+                                        setConfirmDialog({
+                                            open: true,
+                                            title: 'Generate Location Details',
+                                            message: 'Warning: this will replace existing details for this location.',
+                                            actions: [
+                                                {
+                                                    label: isGeneratingLocationDetails ? 'Generating...' : 'Generate',
+                                                    onClick: async () => {
+                                                        setConfirmDialog((prev) => ({ ...prev, open: false }));
+                                                        await handleGenerateLocationDetails();
+                                                    },
+                                                    variant: 'primary',
+                                                },
+                                            ],
+                                        });
+                                    }}
+                                    disabled={isGeneratingLocationDetails}
+                                >
+                                    {isGeneratingLocationDetails ? 'Generating...' : 'Generate'}
+                                </Button>
+                            </div>
+
                         </div>
                     </GlassPanel>
                 </div>
             </motion.div>
+
+            <Dialog
+                open={confirmDialog.open}
+                onClose={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+                slotProps={{
+                    paper: {
+                        style: {
+                            backgroundColor: 'rgba(0, 20, 40, 0.95)',
+                            backdropFilter: 'blur(10px)',
+                            border: '2px solid rgba(0, 255, 136, 0.3)',
+                            borderRadius: '8px',
+                            color: '#e0f0ff',
+                            minWidth: '400px',
+                        },
+                    },
+                }}
+            >
+                <DialogTitle style={{
+                    color: '#00ff88',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                    paddingBottom: '10px',
+                }}>
+                    {confirmDialog.title}
+                </DialogTitle>
+                <DialogContent style={{ paddingTop: '20px' }}>
+                    <div style={{
+                        color: '#e0f0ff',
+                        fontSize: '14px',
+                        lineHeight: '1.6',
+                    }}>
+                        {confirmDialog.message}
+                    </div>
+                </DialogContent>
+                <DialogActions style={{ padding: '15px 20px', display: 'flex', gap: '10px' }}>
+                    <Button
+                        onClick={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+                        variant="secondary"
+                    >
+                        Cancel
+                    </Button>
+                    {confirmDialog.actions?.map((action, index) => (
+                        <Button
+                            key={index}
+                            onClick={action.onClick}
+                            variant={action.variant || 'primary'}
+                        >
+                            {action.label}
+                        </Button>
+                    ))}
+                </DialogActions>
+            </Dialog>
         </AnimatePresence>
     );
 };
