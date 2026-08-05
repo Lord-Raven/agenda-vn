@@ -181,21 +181,46 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                     }}
                 >
                     {configuredTitleImageUrl ? (
-                        <motion.img
+                        <motion.div
                             initial={{ opacity: 0, y: -14 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.35, duration: 0.45, ease: 'easeOut' }}
-                            src={configuredTitleImageUrl}
-                            alt={configuredTitle}
                             style={{
-                                display: 'block',
+                                position: 'relative',
                                 width: '100%',
                                 maxHeight: 'min(300px, 30vh)',
-                                objectFit: 'contain',
-                                margin: '0 auto',
-                                filter: 'drop-shadow(0 10px 28px rgba(0, 0, 0, 0.32))',
                             }}
-                        />
+                        >
+                            <img
+                                src={configuredTitleImageUrl}
+                                alt=""
+                                aria-hidden="true"
+                                style={{
+                                    display: 'block',
+                                    width: '100%',
+                                    maxHeight: 'min(300px, 30vh)',
+                                    objectFit: 'contain',
+                                    margin: '0 auto',
+                                    opacity: 1,
+                                    filter: 'blur(5px) drop-shadow(0 10px 28px rgba(0, 0, 0, 0.32))',
+                                }}
+                            />
+                            <img
+                                src={configuredTitleImageUrl}
+                                alt={configuredTitle}
+                                style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    display: 'block',
+                                    width: '100%',
+                                    maxHeight: 'min(300px, 30vh)',
+                                    objectFit: 'contain',
+                                    margin: '0 auto',
+                                    opacity: 0.7,
+                                    filter: 'drop-shadow(0 10px 28px rgba(0, 0, 0, 0.32))',
+                                }}
+                            />
+                        </motion.div>
                     ) : (
                         <motion.h1
                             initial={{ opacity: 0, y: -14 }}
