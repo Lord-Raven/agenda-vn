@@ -83,6 +83,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
     const linkedLoreEntry = getLinkedActorLore(actor.name, stage());
+    const isProfileBackedByLore = !!linkedLoreEntry;
     const actorStats = useMemo(() => {
         const configured = stage().getSave().agendaConfig?.actorStats || [];
         const uniqueStatMap: { [name: string]: ActorStat } = {};
@@ -242,9 +243,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.name = nextEditedActor.name;
         actor.category = nextEditedActor.category.trim();
         actor.description = nextEditedActor.description;
-        actor.profile = nextEditedActor.profile;
-        if (linkedLoreEntry) {
+        if (isProfileBackedByLore) {
             updateActorLore(actor.id, nextEditedActor.lore, stage());
+        } else {
+            actor.profile = nextEditedActor.profile;
         }
         actor.voiceId = nextEditedActor.voiceId;
         actor.themeColor = nextEditedActor.themeColor;
@@ -549,8 +551,7 @@ ${indent}}`;
             name: nextEditedActor.name.trim() || actor.name,
             personality: [
                 nextEditedActor.description,
-                nextEditedActor.profile,
-                nextEditedActor.lore,
+                isProfileBackedByLore ? nextEditedActor.lore : nextEditedActor.profile,
                 nextEditedOutfits.map((outfit) => `${outfit.name}: ${outfit.description}`)
                     .filter((entry) => entry.replace(/^[^:]*:/, '').trim().length > 0)
                     .join('\n'),
@@ -1133,11 +1134,11 @@ ${indent}}`;
                                                 marginBottom: '8px',
                                             }}
                                         >
-                                            Personality Profile
+                                            Personality Profile{isProfileBackedByLore ? ' (From Lorebook)' : ''}
                                         </label>
                                         <textarea
-                                            value={editedActor.profile}
-                                            onChange={(e) => handleInputChange('profile', e.target.value)}
+                                            value={isProfileBackedByLore ? editedActor.lore : editedActor.profile}
+                                            onChange={(e) => handleInputChange(isProfileBackedByLore ? 'lore' : 'profile', e.target.value)}
                                             placeholder="Key personality traits and behaviors"
                                             style={{
                                                 width: '100%',
@@ -1270,39 +1271,6 @@ ${indent}}`;
                                                     </div>
                                                 );
                                             })}
-                                        </div>
-                                    )}
-
-                                    {linkedLoreEntry && (
-                                        <div>
-                                            <label
-                                                style={{
-                                                    display: 'block',
-                                                    color: '#00ff88',
-                                                    fontSize: '14px',
-                                                    fontWeight: 'bold',
-                                                    marginBottom: '8px',
-                                                }}
-                                            >
-                                                Linked Lore Entry
-                                            </label>
-                                            <textarea
-                                                value={editedActor.lore}
-                                                onChange={(e) => handleInputChange('lore', e.target.value)}
-                                                placeholder="Lorebook content linked to this actor"
-                                                style={{
-                                                    width: '100%',
-                                                    minHeight: '120px',
-                                                    padding: '12px',
-                                                    fontSize: '14px',
-                                                    backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                    border: '2px solid rgba(0, 255, 136, 0.3)',
-                                                    borderRadius: '5px',
-                                                    color: '#e0f0ff',
-                                                    fontFamily: 'inherit',
-                                                    resize: 'vertical',
-                                                }}
-                                            />
                                         </div>
                                     )}
                                 </div>

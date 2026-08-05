@@ -14,6 +14,9 @@ interface LocationDetailPanelProps {
 }
 
 export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onDeactivate }) => {
+    const linkedLoreEntry = getLinkedLocationLore(location.name, stage());
+    const isDescriptionBackedByLore = !!linkedLoreEntry;
+
     const [editedLocation, setEditedLocation] = useState<{
         name: string;
         category: string;
@@ -435,7 +438,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                         </datalist>
                                     </div>
                                     <div>
-                                        <label style={labelStyle}>Description</label>
+                                        <label style={labelStyle}>
+                                            Description{isDescriptionBackedByLore ? ' (From Lorebook)' : ''}
+                                        </label>
                                         <textarea
                                             value={editedLocation.description}
                                             onChange={(e) => handleInputChange('description', e.target.value)}
