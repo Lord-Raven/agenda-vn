@@ -153,7 +153,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     return (
         <BlurredBackground
             imageUrl={configuredBackgroundImageUrl}
-            overlay="linear-gradient(142deg, rgba(19, 24, 39, 0.78) 0%, rgba(37, 45, 66, 0.76) 52%, rgba(31, 47, 43, 0.72) 100%)"
+            overlay="linear-gradient(142deg, var(--agenda-atmoshere-start) 0%, var(--agenda-atmoshere-mid) 52%, var(--agenda-atmoshere-end) 100%)"
         >
             <Box 
                 sx={{
