@@ -1201,9 +1201,58 @@ ${indent}}`;
                                                             <div style={{ color: '#e0f0ff', fontSize: '14px', fontWeight: 600 }}>
                                                                 {stat.name}
                                                             </div>
-                                                            <div style={{ color: 'rgba(0, 255, 136, 0.75)', fontSize: '12px', textTransform: 'uppercase' }}>
-                                                                {stat.displayType}
-                                                            </div>
+
+                                                            {stat.displayType === 'stars' && (
+                                                                <ActorStatStars
+                                                                    stat={stat}
+                                                                    value={displayValue}
+                                                                    updateScore={(nextValue) => handleActorStatValueChange(stat, nextValue)}
+                                                                />
+                                                            )}
+
+                                                            {stat.displayType === 'letter grade' && (
+                                                                <div>
+                                                                    <select
+                                                                        value={nearestGrade.label}
+                                                                        onChange={(e) => {
+                                                                            const selectedOption = letterGradeOptions.find((option) => option.label === e.target.value);
+                                                                            if (!selectedOption) {
+                                                                                return;
+                                                                            }
+                                                                            handleActorStatValueChange(stat, selectedOption.value);
+                                                                        }}
+                                                                        style={{
+                                                                            width: '100%',
+                                                                            padding: '10px',
+                                                                            fontSize: '14px',
+                                                                            backgroundColor: 'rgba(0, 20, 40, 0.6)',
+                                                                            border: '2px solid rgba(0, 255, 136, 0.3)',
+                                                                            borderRadius: '5px',
+                                                                            color: '#e0f0ff',
+                                                                            fontFamily: 'inherit',
+                                                                            cursor: 'pointer',
+                                                                        }}
+                                                                    >
+                                                                        {letterGradeOptions.map((option) => (
+                                                                            <option key={`${stat.name}-grade-${option.label}`} value={option.label}>
+                                                                                {option.label}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            )}
+
+                                                            {stat.displayType === 'percentage' || (stat.displayType === 'number' && statRange.hasRange) && (
+                                                                <input
+                                                                    type="range"
+                                                                    min={statRange.min}
+                                                                    max={statRange.max}
+                                                                    step={statRange.step}
+                                                                    value={Math.min(statRange.max, Math.max(statRange.min, displayValue))}
+                                                                    onChange={(e) => handleActorStatValueChange(stat, Number(e.target.value))}
+                                                                    style={{ width: '100%' }}
+                                                                />
+                                                            )}
                                                         </div>
 
                                                         {!!stat.description?.trim() && (
@@ -1212,57 +1261,7 @@ ${indent}}`;
                                                             </div>
                                                         )}
 
-                                                        {stat.displayType === 'stars' && (
-                                                            <ActorStatStars
-                                                                stat={stat}
-                                                                value={displayValue}
-                                                                updateScore={(nextValue) => handleActorStatValueChange(stat, nextValue)}
-                                                            />
-                                                        )}
-
-                                                        {stat.displayType === 'letter grade' && (
-                                                            <div>
-                                                                <select
-                                                                    value={nearestGrade.label}
-                                                                    onChange={(e) => {
-                                                                        const selectedOption = letterGradeOptions.find((option) => option.label === e.target.value);
-                                                                        if (!selectedOption) {
-                                                                            return;
-                                                                        }
-                                                                        handleActorStatValueChange(stat, selectedOption.value);
-                                                                    }}
-                                                                    style={{
-                                                                        width: '100%',
-                                                                        padding: '10px',
-                                                                        fontSize: '14px',
-                                                                        backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                                        border: '2px solid rgba(0, 255, 136, 0.3)',
-                                                                        borderRadius: '5px',
-                                                                        color: '#e0f0ff',
-                                                                        fontFamily: 'inherit',
-                                                                        cursor: 'pointer',
-                                                                    }}
-                                                                >
-                                                                    {letterGradeOptions.map((option) => (
-                                                                        <option key={`${stat.name}-grade-${option.label}`} value={option.label}>
-                                                                            {option.label}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-                                                        )}
-
-                                                        {(statRange.hasRange || stat.displayType === 'percentage') && (
-                                                            <input
-                                                                type="range"
-                                                                min={statRange.min}
-                                                                max={statRange.max}
-                                                                step={statRange.step}
-                                                                value={Math.min(statRange.max, Math.max(statRange.min, displayValue))}
-                                                                onChange={(e) => handleActorStatValueChange(stat, Number(e.target.value))}
-                                                                style={{ width: '100%' }}
-                                                            />
-                                                        )}
+                                                        
                                                     </div>
                                                 );
                                             })}

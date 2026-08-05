@@ -44,6 +44,7 @@ export const CategorizedEntrySidebar = <TEntry,>({
                 borderRadius: '12px',
                 padding: '14px',
                 overflowY: 'auto',
+                overflowX: 'visible',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px',

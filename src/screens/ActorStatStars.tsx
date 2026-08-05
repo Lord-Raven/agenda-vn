@@ -63,7 +63,6 @@ const renderStar = (
     stat: ActorStat,
     starValue: number,
     filled: boolean,
-    interactive: boolean,
     updateScore?: (value: number) => void,
 ) => {
     const label = `${stat.name} ${starValue} of ${resolveStarCount(stat)}`;
@@ -72,11 +71,11 @@ const renderStar = (
         <button
             key={`${stat.name}-star-${starValue}`}
             type="button"
-            disabled={!interactive}
-            onClick={interactive ? () => updateScore?.(starValue) : undefined}
+            disabled={!updateScore}
+            onClick={updateScore ? () => updateScore?.(starValue) : undefined}
             aria-label={label}
             title={label}
-            style={starShellStyle(interactive)}
+            style={starShellStyle(!!updateScore)}
         >
             <StarBorder style={starBorderStyle} />
             {filled && <Star style={starFillStyle} />}
@@ -88,12 +87,10 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
     stat,
     value,
     updateScore,
-    readOnly = false,
     style,
 }) => {
     const maxStars = resolveStarCount(stat);
     const filledStars = getFilledStarCount(value, maxStars);
-    const interactive = !!updateScore && !readOnly;
 
     if (maxStars <= 10) {
         return (
@@ -110,7 +107,7 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
             >
                 {Array.from({ length: maxStars }, (_, index) => {
                     const starValue = index + 1;
-                    return renderStar(stat, starValue, filledStars >= starValue, interactive, updateScore);
+                    return renderStar(stat, starValue, filledStars >= starValue, updateScore);
                 })}
             </div>
         );
@@ -155,7 +152,7 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
                                 gap: '3px',
                             }}
                         >
-                            {topStars.map((starValue) => renderStar(stat, starValue, filledStars >= starValue, interactive, updateScore))}
+                            {topStars.map((starValue) => renderStar(stat, starValue, filledStars >= starValue, updateScore))}
                         </div>
 
                         {bottomStars.length > 0 && (
@@ -168,7 +165,7 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
                                     margin: '-2px auto 0',
                                 }}
                             >
-                                {bottomStars.map((starValue) => renderStar(stat, starValue, filledStars >= starValue, interactive, updateScore))}
+                                {bottomStars.map((starValue) => renderStar(stat, starValue, filledStars >= starValue, updateScore))}
                             </div>
                         )}
                     </div>
