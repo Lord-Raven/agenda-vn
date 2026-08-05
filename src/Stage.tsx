@@ -40,7 +40,6 @@ export type SaveType = {
     disableImpersonation?: boolean;
     language?: string;
     lorebook?: Lore[];
-    expeditionChoices?: ExpeditionChoice[];
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
     upcomingEvents?: CalendarEvent[];
@@ -258,14 +257,6 @@ const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({
         : undefined,
 });
 
-type ExpeditionChoice = {
-    id: string;
-    locationId: string;
-    description: string;
-    name: string;
-    partnerActorIds: string[];
-}
-
 type TimelineEntry = {
     calendarEventId?: string;
     date?: string;
@@ -273,7 +264,6 @@ type TimelineEntry = {
 }
 
 export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateType, ConfigType> {
-
 
     readonly SAVE_SLOT_COUNT = 10;
     readonly INITIAL_ACTORS = 5;
@@ -300,7 +290,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.primaryCharacter = Object.values(characters)[0];
 
         // config may be a JSON representation of a configuration; if so, we can use it to populate the default configuration for new games.
-        const loadedConfiguration = config ? JSON.parse(config.configuration) : {};
+        const loadedConfiguration = config && config.configuration ? JSON.parse(config.configuration) : {};
         const defaultConfiguration = {...this.createDefaultNewGameConfiguration(), ...loadedConfiguration};
 
 

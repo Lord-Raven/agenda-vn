@@ -314,7 +314,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
         console.log('Generating skit guidance...');
         let attempts = 3;
         const availableActors = Object.values(stage.getSave().actors)
-            .filter(actor => actor.id !== stage.getSave().playerId && !(stage.getSave().expeditionChoices || []).some(choice => choice.partnerActorIds.includes(actor.id)));
+            .filter(actor => actor.id !== stage.getSave().playerId && actor.active);
         while (attempts > 0) {
             const response = await stage.generateText(
                 buildPrompt()
