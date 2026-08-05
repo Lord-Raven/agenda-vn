@@ -9,6 +9,7 @@ import { theme } from './Theme';
 import { CalendarScreen } from './CalendarScreen';
 import { SkitScreen } from './SkitScreen';
 import { LoadingScreen } from './LoadingScreen';
+import { applyUiSettingsToRoot } from '../content/Style';
 
 /*
  * Base screen management; the Stage class will display this, and this will track the current screen being displayed.
@@ -51,25 +52,7 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
 
     // Apply save-configured theme variables globally.
     React.useEffect(() => {
-        const uiSettings = stage().getUiSettings();
-        const rootStyle = document.documentElement.style;
-
-        rootStyle.setProperty('--agenda-accent', uiSettings.accentColor);
-        rootStyle.setProperty('--agenda-active', uiSettings.activeColor);
-        rootStyle.setProperty('--agenda-primary', uiSettings.primaryColor);
-        rootStyle.setProperty('--agenda-inactive', uiSettings.inactiveColor);
-        rootStyle.setProperty('--agenda-bg-deep', uiSettings.bgDeepColor);
-        rootStyle.setProperty('--agenda-bg-mid', uiSettings.bgMidColor);
-        rootStyle.setProperty('--agenda-bg-soft', uiSettings.bgSoftColor);
-        rootStyle.setProperty('--agenda-border', uiSettings.borderColor);
-        rootStyle.setProperty('--agenda-border-strong', uiSettings.borderStrongColor);
-        rootStyle.setProperty('--agenda-font-ui', uiSettings.uiFontFamily);
-        rootStyle.setProperty('--agenda-font-flavor', uiSettings.flavorFontFamily);
-        rootStyle.setProperty('--agenda-calendar-overlay-start', uiSettings.calendarOverlayStart);
-        rootStyle.setProperty('--agenda-calendar-overlay-mid', uiSettings.calendarOverlayMid);
-        rootStyle.setProperty('--agenda-calendar-overlay-end', uiSettings.calendarOverlayEnd);
-        rootStyle.setProperty('--agenda-calendar-card-bg', uiSettings.calendarCardBackground);
-        rootStyle.setProperty('--agenda-calendar-card-border', uiSettings.calendarCardBorder);
+        applyUiSettingsToRoot(stage().getUiSettings());
     }, [stage, screenType]);
 
     return (

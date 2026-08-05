@@ -6,6 +6,7 @@ import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEvent
 import { Item } from "./content/Item";
 import { generateContext, Skit, SkitType } from "./content/Skit";
 import { createDefaultAtlas, Location } from "./content/Location";
+import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
 import { Lore } from "./content/Lore";
 import { DEFAULT_PLAYER_THEME_COLOR } from "./screens/SettingsScreen";
@@ -58,44 +59,6 @@ export type SaveType = {
     uiSettings?: UiSettings;
     betaMode?: boolean;
 }
-
-export type UiSettings = {
-    uiFontFamily: string;
-    flavorFontFamily: string;
-    primaryColor: string; // Used for default UI text color. was "fog"
-    activeColor: string; // Used to indicate active/selected elements in the UI, such as buttons, tabs, and highlights. was "verdant"
-    inactiveColor: string; // Used for unselected elements in the UI, such as inactive buttons, tabs, and text. was "textSecondary"
-    accentColor: string; // Used for MUI icons and some secondary headers or other elements that require differentiation. was "mist"
-    bgDeepColor: string;
-    bgMidColor: string;
-    bgSoftColor: string;
-    borderColor: string;
-    borderStrongColor: string;
-    calendarOverlayStart: string;
-    calendarOverlayMid: string;
-    calendarOverlayEnd: string;
-    calendarCardBackground: string;
-    calendarCardBorder: string;
-}
-
-const DEFAULT_UI_SETTINGS: UiSettings = {
-    uiFontFamily: '"Geologica", sans-serif',
-    flavorFontFamily: '"Lora", Georgia, serif',
-    accentColor: '#8ab0cc',
-    activeColor: '#89cd87',
-    primaryColor: '#edf2f2',
-    inactiveColor: '#b9d2e3',
-    bgDeepColor: '#1a1e30',
-    bgMidColor: '#24293f',
-    bgSoftColor: '#2e354d',
-    borderColor: 'rgba(138, 176, 204, 0.34)',
-    borderStrongColor: 'rgba(137, 205, 135, 0.44)',
-    calendarOverlayStart: 'rgba(10, 28, 37, 0.79)',
-    calendarOverlayMid: 'rgba(21, 41, 30, 0.73)',
-    calendarOverlayEnd: 'rgba(35, 24, 56, 0.78)',
-    calendarCardBackground: 'rgba(28, 34, 52, 0.92)',
-    calendarCardBorder: 'rgba(138, 176, 204, 0.34)',
-};
 
 const LORE_UPDATE_RESPONSE_FIELDS: StructuredFieldDefinition[] = [
     {
@@ -216,11 +179,6 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     displayType: stat.displayType,
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
-});
-
-const cloneUiSettings = (settings?: Partial<UiSettings>): UiSettings => ({
-    ...DEFAULT_UI_SETTINGS,
-    ...(settings || {}),
 });
 
 const cloneActor = (actor: Actor): Actor => new Actor({
