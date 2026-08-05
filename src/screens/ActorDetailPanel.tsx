@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { ActorStat, Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore } from '../content/Actor';
+import { Actor, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
@@ -179,6 +179,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
 
     const [regeneratingImages, setRegeneratingImages] = useState<Set<string>>(new Set());
     const [isFillingMissingEmotions, setIsFillingMissingEmotions] = useState(false);
+    const [isGeneratingActorDetails, setIsGeneratingActorDetails] = useState(false);
     const [, forceUpdate] = useState({});
     const imageUploadInputRef = useRef<HTMLInputElement>(null);
     const [imageDialog, setImageDialog] = useState<{
@@ -336,6 +337,29 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage }) =>
 
     const syncEditedOutfitsFromActor = () => {
         setEditedOutfits(cloneOutfits(actor.outfits));
+    };
+
+    const syncEditedFieldsFromActor = () => {
+        const latestLinkedLoreEntry = getLinkedActorLore(actor.name, stage());
+        setEditedActor({
+            name: actor.name,
+            category: actor.category ?? '',
+            description: actor.description || '',
+            profile: actor.profile || '',
+            lore: latestLinkedLoreEntry?.content || '',
+            voiceId: actor.voiceId,
+            themeColor: actor.themeColor,
+            themeFontFamily: actor.themeFontFamily,
+        });
+        setEditedStatMap(createInitialActorStatMap(actor, actorStats));
+        const nextOutfits = cloneOutfits(actor.outfits);
+        setEditedOutfits(nextOutfits);
+        setSelectedOutfitId(() => {
+            if (actor.outfitId && nextOutfits.some((outfit) => outfit.id === actor.outfitId)) {
+                return actor.outfitId;
+            }
+            return nextOutfits[0]?.id || '';
+        });
     };
 
     const replaceOutfits = (nextOutfits: Outfit[]) => {
@@ -504,6 +528,78 @@ ${indent}}`;
 
     const handleGenerateOutfitsExport = () => {
         setOutfitsObjectExport(formatAsJavascriptObject(buildOutfitsExport()));
+    };
+
+    const handleGenerateActorDetails = async () => {
+        if (isGeneratingActorDetails) {
+            return;
+        }
+
+        const nextEditedActor = editedActorRef.current;
+        const nextEditedOutfits = editedOutfitsRef.current;
+        const nextEditedStatMap = editedStatMapRef.current;
+        persistActor(nextEditedActor, nextEditedOutfits, nextEditedStatMap);
+
+        const generationDefinition = {
+            name: nextEditedActor.name.trim() || actor.name,
+            personality: [
+                nextEditedActor.description,
+                nextEditedActor.profile,
+                nextEditedActor.lore,
+                nextEditedOutfits.map((outfit) => `${outfit.name}: ${outfit.description}`)
+                    .filter((entry) => entry.replace(/^[^:]*:/, '').trim().length > 0)
+                    .join('\n'),
+            ].filter((value) => value?.trim()).join('\n\n'),
+            voice_id: nextEditedActor.voiceId,
+        };
+
+        setIsGeneratingActorDetails(true);
+
+        const previousGeneratedState = {
+            description: actor.description,
+            profile: actor.profile,
+            voiceId: actor.voiceId,
+            themeColor: actor.themeColor,
+            themeFontFamily: actor.themeFontFamily,
+            outfitId: actor.outfitId,
+            outfits: cloneOutfits(actor.outfits),
+            statMap: { ...(actor.statMap || {}) },
+        };
+
+        try {
+            actor.description = '';
+            actor.profile = '';
+            actor.voiceId = '';
+            actor.themeColor = '';
+            actor.themeFontFamily = '';
+            actor.outfitId = '';
+            actor.outfits = [];
+            actor.statMap = {};
+
+            const distilledActor = await distillActor(actor, generationDefinition, stage());
+            if (!distilledActor) {
+                throw new Error('Actor distillation returned no actor.');
+            }
+
+            syncEditedFieldsFromActor();
+            stage().saveGame();
+            forceUpdate({});
+            stage().showPriorityMessage(`Generated new details for ${actor.name}.`);
+        } catch (error) {
+            actor.description = previousGeneratedState.description;
+            actor.profile = previousGeneratedState.profile;
+            actor.voiceId = previousGeneratedState.voiceId;
+            actor.themeColor = previousGeneratedState.themeColor;
+            actor.themeFontFamily = previousGeneratedState.themeFontFamily;
+            actor.outfitId = previousGeneratedState.outfitId;
+            actor.outfits = previousGeneratedState.outfits;
+            actor.statMap = previousGeneratedState.statMap;
+            syncEditedFieldsFromActor();
+            console.error('Failed to generate actor details:', error);
+            stage().showPriorityMessage('Failed to generate actor details. Check console for details.');
+        } finally {
+            setIsGeneratingActorDetails(false);
+        }
     };
 
     const handleRegenerateEmotion = async (emotion: Emotion, promptDraft: string) => {
@@ -1689,6 +1785,35 @@ ${indent}}`;
                                     </div>
                                 </div>
                             </section>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                                <Button
+                                    onClick={() => {
+                                        if (isGeneratingActorDetails) {
+                                            return;
+                                        }
+
+                                        setConfirmDialog({
+                                            open: true,
+                                            title: 'Generate Actor Details',
+                                            message: 'Warning: this will replace existing details for this actor.',
+                                            actions: [
+                                                {
+                                                    label: isGeneratingActorDetails ? 'Generating...' : 'Generate',
+                                                    onClick: async () => {
+                                                        setConfirmDialog((prev) => ({ ...prev, open: false }));
+                                                        await handleGenerateActorDetails();
+                                                    },
+                                                    variant: 'primary',
+                                                },
+                                            ],
+                                        });
+                                    }}
+                                    disabled={isGeneratingActorDetails}
+                                >
+                                    {isGeneratingActorDetails ? 'Generating...' : 'Generate'}
+                                </Button>
+                            </div>
                         </div>
                     </GlassPanel>
                 </div>
