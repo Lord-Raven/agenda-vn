@@ -1031,11 +1031,11 @@ ${indent}}`;
                             {/* Basic Info Section */}
                             <section>
                                 <h2 style={{ 
-                                    color: '#00ff88', 
+                                    color: 'var(--agenda-highlight)', 
                                     fontSize: '18px', 
                                     fontWeight: 'bold',
                                     marginBottom: '15px',
-                                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                                    borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                     paddingBottom: '5px'
                                 }}>
                                     Basic Information
@@ -1047,7 +1047,7 @@ ${indent}}`;
                                         <label 
                                             style={{
                                                 display: 'block',
-                                                color: '#00ff88',
+                                                color: 'var(--agenda-highlight)',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 marginBottom: '8px',
@@ -1067,7 +1067,7 @@ ${indent}}`;
                                         <label
                                             style={{
                                                 display: 'block',
-                                                color: '#00ff88',
+                                                color: 'var(--agenda-highlight)',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 marginBottom: '8px',
@@ -1096,7 +1096,7 @@ ${indent}}`;
                                         <label 
                                             style={{
                                                 display: 'block',
-                                                color: '#00ff88',
+                                                color: 'var(--agenda-highlight)',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 marginBottom: '8px',
@@ -1109,6 +1109,9 @@ ${indent}}`;
                                             onChange={(e) => handleInputChange('description', e.target.value)}
                                             placeholder="Core physical appearance, separate from clothing or outfit details"
                                             style={{
+                                                width: '100%',
+                                                minHeight: '100px',
+                                                borderRadius: '5px',
                                                 resize: 'vertical',
                                             }}
                                         />
@@ -1119,7 +1122,7 @@ ${indent}}`;
                                         <label 
                                             style={{
                                                 display: 'block',
-                                                color: '#00ff88',
+                                                color: 'var(--agenda-highlight)',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 marginBottom: '8px',
@@ -1132,6 +1135,9 @@ ${indent}}`;
                                             onChange={(e) => handleInputChange(isProfileBackedByLore ? 'lore' : 'profile', e.target.value)}
                                             placeholder="Key personality traits and behaviors"
                                             style={{
+                                                width: '100%',
+                                                minHeight: '100px',
+                                                borderRadius: '5px',
                                                 resize: 'vertical',
                                             }}
                                         />
@@ -1142,15 +1148,15 @@ ${indent}}`;
                                             display: 'flex',
                                             flexDirection: 'column',
                                             gap: '12px',
-                                            backgroundColor: 'rgba(0, 20, 40, 0.35)',
-                                            border: '1px solid rgba(0, 255, 136, 0.2)',
+                                            backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)',
+                                            border: '1px solid color-mix(in srgb, var(--agenda-highlight) 20%, transparent)',
                                             borderRadius: '8px',
                                             padding: '12px',
                                         }}>
                                             <label
                                                 style={{
                                                     display: 'block',
-                                                    color: '#00ff88',
+                                                    color: 'var(--agenda-highlight)',
                                                     fontSize: '14px',
                                                     fontWeight: 'bold',
                                                     marginBottom: '2px',
@@ -1179,14 +1185,14 @@ ${indent}}`;
                                                             display: 'flex',
                                                             flexDirection: 'column',
                                                             gap: '8px',
-                                                            border: '1px solid rgba(0, 255, 136, 0.18)',
+                                                            border: '1px solid color-mix(in srgb, var(--agenda-highlight) 18%, transparent)',
                                                             borderRadius: '6px',
                                                             padding: '10px',
-                                                            backgroundColor: 'rgba(0, 10, 25, 0.45)',
+                                                            backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)',
                                                         }}
                                                     >
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', height: '40px' }}>
-                                                            <div style={{ color: '#e0f0ff', fontSize: '14px', fontWeight: 600 }}>
+                                                            <div style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 600 }}>
                                                                 {stat.name}
                                                             </div>
 
@@ -1213,10 +1219,10 @@ ${indent}}`;
                                                                             width: '100%',
                                                                             padding: '10px',
                                                                             fontSize: '14px',
-                                                                            backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                                            border: '2px solid rgba(0, 255, 136, 0.3)',
+                                                                            backgroundColor: 'var(--agenda-glass-bright)',
+                                                                            border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                                             borderRadius: '5px',
-                                                                            color: '#e0f0ff',
+                                                                            color: 'var(--agenda-text-primary)',
                                                                             fontFamily: 'inherit',
                                                                             cursor: 'pointer',
                                                                         }}
@@ -1244,7 +1250,7 @@ ${indent}}`;
                                                         </div>
 
                                                         {!!stat.description?.trim() && (
-                                                            <div style={{ color: 'rgba(224, 240, 255, 0.75)', fontSize: '12px' }}>
+                                                            <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 75%, transparent)', fontSize: '12px' }}>
                                                                 {stat.description}
                                                             </div>
                                                         )}
@@ -1261,11 +1267,11 @@ ${indent}}`;
                             {/* Theme & Voice Section */}
                             <section>
                                 <h2 style={{ 
-                                    color: '#00ff88', 
+                                    color: 'var(--agenda-highlight)', 
                                     fontSize: '18px', 
                                     fontWeight: 'bold',
                                     marginBottom: '15px',
-                                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                                    borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                     paddingBottom: '5px'
                                 }}>
                                     Theme & Voice
@@ -1277,7 +1283,7 @@ ${indent}}`;
                                         <label 
                                             style={{
                                                 display: 'block',
-                                                color: '#00ff88',
+                                                color: 'var(--agenda-highlight)',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 marginBottom: '8px',
@@ -1292,10 +1298,10 @@ ${indent}}`;
                                                 width: '100%',
                                                 padding: '12px',
                                                 fontSize: '14px',
-                                                backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                border: '2px solid rgba(0, 255, 136, 0.3)',
+                                                backgroundColor: 'var(--agenda-glass-bright)',
+                                                border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                 borderRadius: '5px',
-                                                color: '#e0f0ff',
+                                                color: 'var(--agenda-text-primary)',
                                                 fontFamily: 'inherit',
                                                 cursor: 'pointer',
                                             }}
@@ -1313,7 +1319,7 @@ ${indent}}`;
                                         <label 
                                             style={{
                                                 display: 'block',
-                                                color: '#00ff88',
+                                                color: 'var(--agenda-highlight)',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 marginBottom: '8px',
@@ -1336,7 +1342,7 @@ ${indent}}`;
                                         <label 
                                             style={{
                                                 display: 'block',
-                                                color: '#00ff88',
+                                                color: 'var(--agenda-highlight)',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 marginBottom: '8px',
@@ -1357,11 +1363,11 @@ ${indent}}`;
                             {/* Outfit Section */}
                             <section>
                                 <h2 style={{
-                                    color: '#00ff88',
+                                    color: 'var(--agenda-highlight)',
                                     fontSize: '18px',
                                     fontWeight: 'bold',
                                     marginBottom: '15px',
-                                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                                    borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                     paddingBottom: '5px'
                                 }}>
                                     Outfit
@@ -1373,7 +1379,7 @@ ${indent}}`;
                                             <label
                                                 style={{
                                                     display: 'block',
-                                                    color: '#00ff88',
+                                                    color: 'var(--agenda-highlight)',
                                                     fontSize: '14px',
                                                     fontWeight: 'bold',
                                                     marginBottom: '8px',
@@ -1388,10 +1394,10 @@ ${indent}}`;
                                                     width: '100%',
                                                     padding: '12px',
                                                     fontSize: '14px',
-                                                    backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                    border: '2px solid rgba(0, 255, 136, 0.3)',
+                                                    backgroundColor: 'var(--agenda-glass-bright)',
+                                                    border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                     borderRadius: '5px',
-                                                    color: '#e0f0ff',
+                                                    color: 'var(--agenda-text-primary)',
                                                     fontFamily: 'inherit',
                                                     cursor: 'pointer',
                                                 }}
@@ -1408,7 +1414,7 @@ ${indent}}`;
                                             <label
                                                 style={{
                                                     display: 'block',
-                                                    color: '#00ff88',
+                                                    color: 'var(--agenda-highlight)',
                                                     fontSize: '14px',
                                                     fontWeight: 'bold',
                                                     marginBottom: '8px',
@@ -1442,7 +1448,7 @@ ${indent}}`;
                                         <label
                                             style={{
                                                 display: 'block',
-                                                color: '#00ff88',
+                                                color: 'var(--agenda-highlight)',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 marginBottom: '8px',
@@ -1459,10 +1465,10 @@ ${indent}}`;
                                                 minHeight: '100px',
                                                 padding: '12px',
                                                 fontSize: '14px',
-                                                backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                border: '2px solid rgba(0, 255, 136, 0.3)',
+                                                backgroundColor: 'var(--agenda-glass-bright)',
+                                                border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                 borderRadius: '5px',
-                                                color: '#e0f0ff',
+                                                color: 'var(--agenda-text-primary)',
                                                 fontFamily: 'inherit',
                                                 resize: 'vertical',
                                             }}
@@ -1474,7 +1480,7 @@ ${indent}}`;
                                             <label
                                                 style={{
                                                     display: 'block',
-                                                    color: '#00ff88',
+                                                    color: 'var(--agenda-highlight)',
                                                     fontSize: '14px',
                                                     fontWeight: 'bold',
                                                     marginBottom: '8px',
@@ -1496,10 +1502,10 @@ ${indent}}`;
                                                     minHeight: '160px',
                                                     padding: '12px',
                                                     fontSize: '13px',
-                                                    backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                    border: '2px solid rgba(0, 255, 136, 0.3)',
+                                                    backgroundColor: 'var(--agenda-glass-bright)',
+                                                    border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                     borderRadius: '5px',
-                                                    color: '#e0f0ff',
+                                                    color: 'var(--agenda-text-primary)',
                                                     fontFamily: 'monospace',
                                                     resize: 'vertical',
                                                 }}
@@ -1512,11 +1518,11 @@ ${indent}}`;
                             {/* Emotion Images Section */}
                             <section>
                                 <h2 style={{ 
-                                    color: '#00ff88', 
+                                    color: 'var(--agenda-highlight)', 
                                     fontSize: '18px', 
                                     fontWeight: 'bold',
                                     marginBottom: '15px',
-                                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                                    borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                     paddingBottom: '5px',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -1559,8 +1565,8 @@ ${indent}}`;
                                             style={{
                                                 width: '120px',
                                                 height: '120px',
-                                                backgroundColor: getSelectedOutfitImageUrl('base') ? 'transparent' : 'rgba(0, 20, 40, 0.6)',
-                                                border: `2px solid ${getSelectedOutfitImageUrl('base') ? 'rgba(255, 136, 0, 0.5)' : 'rgba(0, 255, 136, 0.2)'}`,
+                                                backgroundColor: getSelectedOutfitImageUrl('base') ? 'transparent' : 'var(--agenda-glass-bright)',
+                                                border: `2px solid ${getSelectedOutfitImageUrl('base') ? 'color-mix(in srgb, var(--agenda-accent-primary) 56%, transparent)' : 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)'}`,
                                                 borderRadius: '8px',
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -1584,7 +1590,7 @@ ${indent}}`;
                                             )}
                                             {!getSelectedOutfitImageUrl('base') && (
                                                 <div style={{
-                                                    color: 'rgba(0, 255, 136, 0.3)',
+                                                    color: 'color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                     fontSize: '12px',
                                                     textAlign: 'center',
                                                     padding: '10px'
@@ -1599,11 +1605,11 @@ ${indent}}`;
                                                     left: 0,
                                                     right: 0,
                                                     bottom: 0,
-                                                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                                    backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 72%, #000)',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    color: '#00ff88',
+                                                    color: 'var(--agenda-highlight)',
                                                     fontSize: '12px',
                                                 }}>
                                                     Generating...
@@ -1613,7 +1619,7 @@ ${indent}}`;
                                         <Chip style={{
                                             fontSize: '11px',
                                             textTransform: 'capitalize',
-                                            backgroundColor: 'rgba(255, 136, 0, 0.2)',
+                                            backgroundColor: 'color-mix(in srgb, var(--agenda-accent-primary) 24%, transparent)',
                                         }}>
                                             Base
                                         </Chip>
@@ -1643,8 +1649,8 @@ ${indent}}`;
                                                     style={{
                                                         width: '120px',
                                                         height: '120px',
-                                                        backgroundColor: hasImage ? 'transparent' : 'rgba(0, 20, 40, 0.6)',
-                                                        border: `2px solid ${hasImage ? 'rgba(0, 255, 136, 0.5)' : 'rgba(0, 255, 136, 0.2)'}`,
+                                                        backgroundColor: hasImage ? 'transparent' : 'var(--agenda-glass-bright)',
+                                                        border: `2px solid ${hasImage ? 'color-mix(in srgb, var(--agenda-highlight) 50%, transparent)' : 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)'}`,
                                                         borderRadius: '8px',
                                                         display: 'flex',
                                                         alignItems: 'center',
@@ -1668,7 +1674,7 @@ ${indent}}`;
                                                     )}
                                                     {!hasImage && (
                                                         <div style={{
-                                                            color: 'rgba(0, 255, 136, 0.3)',
+                                                            color: 'color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                             fontSize: '12px',
                                                             textAlign: 'center',
                                                             padding: '10px'
@@ -1683,11 +1689,11 @@ ${indent}}`;
                                                             left: 0,
                                                             right: 0,
                                                             bottom: 0,
-                                                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                                            backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 72%, #000)',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
-                                                            color: '#00ff88',
+                                                            color: 'var(--agenda-highlight)',
                                                             fontSize: '12px',
                                                         }}>
                                                             Generating...
@@ -1697,7 +1703,7 @@ ${indent}}`;
                                                 <Chip style={{
                                                     fontSize: '11px',
                                                     textTransform: 'capitalize',
-                                                    backgroundColor: hasImage ? 'rgba(0, 255, 136, 0.2)' : 'rgba(0, 20, 40, 0.6)',
+                                                    backgroundColor: hasImage ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)' : 'var(--agenda-glass-bright)',
                                                 }}>
                                                     {emotion}
                                                 </Chip>
@@ -1710,11 +1716,11 @@ ${indent}}`;
                             {/* Read-only Info Section */}
                             <section>
                                 <h2 style={{ 
-                                    color: '#00ff88', 
+                                    color: 'var(--agenda-highlight)', 
                                     fontSize: '18px', 
                                     fontWeight: 'bold',
                                     marginBottom: '15px',
-                                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                                    borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                     paddingBottom: '5px'
                                 }}>
                                     Additional Information
@@ -1724,16 +1730,16 @@ ${indent}}`;
                                     display: 'grid', 
                                     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
                                     gap: '15px',
-                                    backgroundColor: 'rgba(0, 20, 40, 0.4)',
+                                    backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 60%, transparent)',
                                     padding: '15px',
                                     borderRadius: '5px',
-                                    border: '1px solid rgba(0, 255, 136, 0.2)',
+                                    border: '1px solid color-mix(in srgb, var(--agenda-highlight) 20%, transparent)',
                                 }}>
                                     <div>
-                                        <div style={{ color: 'rgba(0, 255, 136, 0.7)', fontSize: '12px', marginBottom: '4px' }}>
+                                        <div style={{ color: 'color-mix(in srgb, var(--agenda-highlight) 70%, transparent)', fontSize: '12px', marginBottom: '4px' }}>
                                             Actor ID
                                         </div>
-                                        <div style={{ color: '#e0f0ff', fontSize: '14px', fontFamily: 'monospace' }}>
+                                        <div style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontFamily: 'monospace' }}>
                                             {actor.id}
                                         </div>
                                     </div>
@@ -1802,11 +1808,11 @@ ${indent}}`;
                 slotProps={{
                     paper: {
                         style: {
-                            backgroundColor: 'rgba(0, 20, 40, 0.95)',
+                            backgroundColor: 'color-mix(in srgb, var(--agenda-surface-raised) 94%, var(--agenda-surface-base))',
                             backdropFilter: 'blur(10px)',
-                            border: '2px solid rgba(0, 255, 136, 0.3)',
+                            border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                             borderRadius: '8px',
-                            color: '#e0f0ff',
+                            color: 'var(--agenda-text-primary)',
                             minWidth: '700px',
                             maxWidth: '900px',
                         }
@@ -1814,10 +1820,10 @@ ${indent}}`;
                 }}
             >
                 <DialogTitle style={{
-                    color: '#00ff88',
+                    color: 'var(--agenda-highlight)',
                     fontSize: '18px',
                     fontWeight: 'bold',
-                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                    borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                     paddingBottom: '10px',
                     textTransform: 'capitalize',
                 }}>
@@ -1869,8 +1875,8 @@ ${indent}}`;
                                     width: '100%',
                                     minHeight: '360px',
                                     height: '100%',
-                                    backgroundColor: currentImageUrl ? 'transparent' : 'rgba(0, 20, 40, 0.6)',
-                                    border: `2px dashed ${isImageDropActive ? 'rgba(0, 255, 136, 0.8)' : 'rgba(0, 255, 136, 0.35)'}`,
+                                    backgroundColor: currentImageUrl ? 'transparent' : 'var(--agenda-glass-bright)',
+                                    border: `2px dashed ${isImageDropActive ? 'color-mix(in srgb, var(--agenda-highlight) 80%, transparent)' : 'color-mix(in srgb, var(--agenda-highlight) 35%, transparent)'}`,
                                     borderRadius: '8px',
                                     backgroundImage: currentImageUrl ? `url(${currentImageUrl})` : 'none',
                                     backgroundSize: 'contain',
@@ -1900,9 +1906,9 @@ ${indent}}`;
                                                 width: '38px',
                                                 height: '38px',
                                                 borderRadius: '999px',
-                                                border: '1px solid rgba(0, 255, 136, 0.45)',
-                                                backgroundColor: 'rgba(0, 10, 20, 0.78)',
-                                                color: '#00ff88',
+                                                border: '1px solid color-mix(in srgb, var(--agenda-highlight) 45%, transparent)',
+                                                backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 78%, #000)',
+                                                color: 'var(--agenda-highlight)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -1927,9 +1933,9 @@ ${indent}}`;
                                                 width: '38px',
                                                 height: '38px',
                                                 borderRadius: '999px',
-                                                border: '1px solid rgba(0, 255, 136, 0.45)',
-                                                backgroundColor: 'rgba(0, 10, 20, 0.78)',
-                                                color: '#00ff88',
+                                                border: '1px solid color-mix(in srgb, var(--agenda-highlight) 45%, transparent)',
+                                                backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 78%, #000)',
+                                                color: 'var(--agenda-highlight)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -1951,9 +1957,9 @@ ${indent}}`;
                                         transform: 'translateX(-50%)',
                                         padding: '4px 10px',
                                         borderRadius: '999px',
-                                        border: '1px solid rgba(0, 255, 136, 0.35)',
-                                        backgroundColor: 'rgba(0, 10, 20, 0.78)',
-                                        color: '#00ff88',
+                                        border: '1px solid color-mix(in srgb, var(--agenda-highlight) 35%, transparent)',
+                                        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 78%, #000)',
+                                        color: 'var(--agenda-highlight)',
                                         fontSize: '12px',
                                         letterSpacing: '0.4px',
                                         zIndex: 3,
@@ -1964,7 +1970,7 @@ ${indent}}`;
 
                                 {!currentImageUrl && (
                                     <div style={{
-                                        color: 'rgba(0, 255, 136, 0.5)',
+                                        color: 'color-mix(in srgb, var(--agenda-highlight) 50%, transparent)',
                                         fontSize: '14px',
                                         textAlign: 'center',
                                         padding: '16px',
@@ -1983,11 +1989,11 @@ ${indent}}`;
                                         left: 0,
                                         right: 0,
                                         bottom: 0,
-                                        backgroundColor: 'rgba(0, 255, 136, 0.2)',
+                                        backgroundColor: 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: '#00ff88',
+                                        color: 'var(--agenda-highlight)',
                                         fontSize: '16px',
                                         fontWeight: 'bold',
                                     }}>
@@ -2002,11 +2008,11 @@ ${indent}}`;
                                         left: 0,
                                         right: 0,
                                         bottom: 0,
-                                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 72%, #000)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: '#00ff88',
+                                        color: 'var(--agenda-highlight)',
                                         fontSize: '14px',
                                         fontWeight: 'bold',
                                     }}>
@@ -2021,11 +2027,11 @@ ${indent}}`;
                                         left: 0,
                                         right: 0,
                                         bottom: 0,
-                                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 72%, #000)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: '#00ff88',
+                                        color: 'var(--agenda-highlight)',
                                         fontSize: '14px',
                                         fontWeight: 'bold',
                                     }}>
@@ -2037,7 +2043,7 @@ ${indent}}`;
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: '360px' }}>
                             <div style={{
-                                color: '#e0f0ff',
+                                color: 'var(--agenda-text-primary)',
                                 fontSize: '14px',
                                 lineHeight: 1.6,
                             }}>
@@ -2048,7 +2054,7 @@ ${indent}}`;
                                     <label
                                         style={{
                                             display: 'block',
-                                            color: '#00ff88',
+                                            color: 'var(--agenda-highlight)',
                                             fontSize: '13px',
                                             fontWeight: 'bold',
                                             marginBottom: '8px',
@@ -2064,10 +2070,10 @@ ${indent}}`;
                                             boxSizing: 'border-box',
                                             padding: '12px',
                                             fontSize: '14px',
-                                            backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                            border: '2px solid rgba(0, 255, 136, 0.3)',
+                                            backgroundColor: 'var(--agenda-glass-bright)',
+                                            border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                             borderRadius: '5px',
-                                            color: '#e0f0ff',
+                                            color: 'var(--agenda-text-primary)',
                                             fontFamily: 'inherit',
                                             cursor: 'pointer',
                                         }}
@@ -2085,7 +2091,7 @@ ${indent}}`;
                                     <label
                                         style={{
                                             display: 'block',
-                                            color: '#00ff88',
+                                            color: 'var(--agenda-highlight)',
                                             fontSize: '13px',
                                             fontWeight: 'bold',
                                             marginBottom: '8px',
@@ -2103,10 +2109,10 @@ ${indent}}`;
                                             minHeight: '120px',
                                             padding: '12px',
                                             fontSize: '13px',
-                                            backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                            border: '2px solid rgba(0, 255, 136, 0.3)',
+                                            backgroundColor: 'var(--agenda-glass-bright)',
+                                            border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                             borderRadius: '5px',
-                                            color: '#e0f0ff',
+                                            color: 'var(--agenda-text-primary)',
                                             fontFamily: 'inherit',
                                             resize: 'vertical',
                                             lineHeight: 1.5,
@@ -2155,28 +2161,28 @@ ${indent}}`;
                 slotProps={{
                     paper: {
                         style: {
-                            backgroundColor: 'rgba(0, 20, 40, 0.95)',
+                            backgroundColor: 'color-mix(in srgb, var(--agenda-surface-raised) 94%, var(--agenda-surface-base))',
                             backdropFilter: 'blur(10px)',
-                            border: '2px solid rgba(0, 255, 136, 0.3)',
+                            border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                             borderRadius: '8px',
-                            color: '#e0f0ff',
+                            color: 'var(--agenda-text-primary)',
                             minWidth: '400px',
                         }
                     }
                 }}
             >
                 <DialogTitle style={{
-                    color: '#00ff88',
+                    color: 'var(--agenda-highlight)',
                     fontSize: '18px',
                     fontWeight: 'bold',
-                    borderBottom: '2px solid rgba(0, 255, 136, 0.3)',
+                    borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                     paddingBottom: '10px',
                 }}>
                     {confirmDialog.title}
                 </DialogTitle>
                 <DialogContent style={{ paddingTop: '20px' }}>
                     <div style={{
-                        color: '#e0f0ff',
+                        color: 'var(--agenda-text-primary)',
                         fontSize: '14px',
                         lineHeight: '1.6',
                     }}>
