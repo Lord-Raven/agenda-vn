@@ -152,23 +152,6 @@ function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage
         : '(None so far)';
 }
 
-function flattenContextSegments(segments: Array<{ title: string; body: string | any[] }> = [], depth = 0): string {
-    const prefix = '  '.repeat(Math.max(depth, 0));
-    return segments.map(segment => {
-        const titleLine = `${prefix}${segment.title}:`;
-        if (typeof segment.body === 'string') {
-            return `${titleLine}\n${prefix}${segment.body}`;
-        }
-
-        if (Array.isArray(segment.body)) {
-            const nested = flattenContextSegments(segment.body as Array<{ title: string; body: string | any[] }>, depth + 1);
-            return `${titleLine}\n${nested}`;
-        }
-
-        return titleLine;
-    }).join('\n');
-}
-
 export function buildPremise(playerName: string, worldContext = ''): string {
     // Fallback generic premise if no configuration context available
     if (!worldContext) {
@@ -194,19 +177,32 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         .filter((lore) => lore.enabled && lore.constant && passedProbabilityLoreIds.has(lore.id))
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
     const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
-    const selectedSettingContext = (agendaConfig?.settings || []).map(setting => {
-        const selectedOptionName = agendaConfig?.selectedSettings?.[setting.title] || '';
-        if (!selectedOptionName) {
+    const selectedSettingContext = (agendaConfig?.playerStats || []).map((stat) => {
+        const statName = (stat.name || '').trim();
+        if (!statName) {
             return '';
         }
 
-        const selectedSegment = setting.options?.[selectedOptionName];
-        if (!selectedSegment) {
+        const value = agendaConfig?.playerStatValues?.[statName] ?? stat.default;
+        const valueText = typeof value === 'number' ? String(value) : String(value || '');
+        if (!valueText) {
             return '';
         }
 
-        const renderedSegment = flattenContextSegments([selectedSegment]);
-        return `${setting.title}: ${selectedOptionName}\n${renderedSegment}`;
+        if (stat.displayType === 'option') {
+            const selectedOption = (stat.options || []).find((option) => option.name === valueText);
+            const optionDescription = selectedOption?.description?.trim() || '';
+            return [
+                `${statName}: ${valueText}`,
+                stat.description?.trim(),
+                optionDescription,
+            ].filter(Boolean).join('\n');
+        }
+
+        return [
+            `${statName}: ${valueText}`,
+            stat.description?.trim(),
+        ].filter(Boolean).join('\n');
     }).filter(Boolean).join('\n\n');
 
     // For lorebook context, we go through lorebook entries and add them 
@@ -258,7 +254,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
     return (builder: PromptBuilder) => builder.addBlock(`Premise`, buildPremise(playerName, agendaContext))
         .addBlock(`Agenda Context`, agendaContext || 'None.')
-        .addBlock(`Selected Custom Settings`, selectedSettingContext || 'None.')
+        .addBlock(`Selected Player Settings`, selectedSettingContext || 'None.')
         .addBlock(`Lore Entries`, (builder) => {
             // Add each lore entry as a separate block, with the title and content.
             triggeredLore.forEach(lore => {

@@ -6,7 +6,6 @@ import {
     applyUiSettingsToRoot,
     buildUiSettingsGenerationPrompt,
     mergeGeneratedUiSettings,
-    renderContextSegment,
     UiSettings,
     UI_STYLE_FIELD_LABELS,
     UI_SETTINGS_GENERATION_FIELDS,
@@ -112,18 +111,31 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             const activeLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
             const contextText = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [])) || 'None provided.';
 
-            const selectedSettingContext = (configuration.settings || []).map((setting) => {
-                const selectedOptionName = configuration.selectedSettings?.[setting.title] || '';
-                if (!selectedOptionName) {
+            const selectedSettingContext = (configuration.playerStats || []).map((stat) => {
+                const statName = (stat.name || '').trim();
+                if (!statName) {
                     return '';
                 }
 
-                const selectedSegment = setting.options?.[selectedOptionName];
-                if (!selectedSegment) {
-                    return `${setting.title}: ${selectedOptionName}`;
+                const selectedValue = save.agendaConfig?.playerStatValues?.[statName] ?? stat.default;
+                const valueText = typeof selectedValue === 'number' ? String(selectedValue) : String(selectedValue || '');
+                if (!valueText) {
+                    return '';
                 }
 
-                return `${setting.title}: ${selectedOptionName}\n${renderContextSegment(selectedSegment)}`;
+                if (stat.displayType === 'option') {
+                    const selectedOption = (stat.options || []).find(option => option.name === valueText);
+                    return [
+                        `${statName}: ${valueText}`,
+                        stat.description?.trim(),
+                        selectedOption?.description?.trim() || '',
+                    ].filter(Boolean).join('\n');
+                }
+
+                return [
+                    `${statName}: ${valueText}`,
+                    stat.description?.trim(),
+                ].filter(Boolean).join('\n');
             }).filter(Boolean).join('\n\n') || 'None selected.';
 
             const actorContext = activeActors.slice(0, 12).map((actor) =>

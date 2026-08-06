@@ -1,6 +1,6 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CustomSetting, SaveType, Stage } from '../Stage';
+import { ActorStat, SaveType, Stage } from '../Stage';
 import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from './UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from './TooltipContext';
@@ -32,34 +32,73 @@ interface SettingsData {
     language: string;
 }
 
-const resolveActiveCustomSettings = (stageInstance: Stage): CustomSetting[] => {
-    const saveSettings = stageInstance.getSave()?.agendaConfig?.settings || [];
-    if (saveSettings.length > 0) {
-        return saveSettings;
+const resolveActivePlayerStats = (stageInstance: Stage): ActorStat[] => {
+    const saveStats = stageInstance.getSave()?.agendaConfig?.playerStats || [];
+    if (saveStats.length > 0) {
+        return saveStats;
     }
 
-    return stageInstance.getConfiguration()?.settings || [];
+    return stageInstance.getConfiguration()?.playerStats || [];
 };
 
-const buildSelectedCustomSettings = (
-    settings: CustomSetting[],
-    preferredSelections: { [key: string]: string },
-): { [key: string]: string } => {
-    const nextSelectedSettings: { [key: string]: string } = {};
+const resolveStatDefaultValue = (stat: ActorStat): number | string => {
+    if (stat.displayType === 'option') {
+        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
+        if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
+            return stat.default;
+        }
+        return optionNames[0] || '';
+    }
 
-    settings.forEach((setting) => {
-        const optionNames = Object.keys(setting.options || {});
-        if (optionNames.length === 0) {
+    if (stat.displayType === 'text') {
+        return typeof stat.default === 'string' ? stat.default : '';
+    }
+
+    return Number.isFinite(stat.default) ? Number(stat.default) : 0;
+};
+
+const normalizePlayerStatValue = (value: unknown, stat: ActorStat): number | string => {
+    if (stat.displayType === 'option') {
+        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
+        if (typeof value === 'string' && optionNames.includes(value)) {
+            return value;
+        }
+        return resolveStatDefaultValue(stat);
+    }
+
+    if (stat.displayType === 'text') {
+        if (typeof value === 'string') {
+            return value;
+        }
+        return resolveStatDefaultValue(stat);
+    }
+
+    let resolved = Number.isFinite(value) ? Number(value) : Number(resolveStatDefaultValue(stat)) || 0;
+    if (typeof stat.min === 'number') {
+        resolved = Math.max(stat.min, resolved);
+    }
+    if (typeof stat.max === 'number') {
+        resolved = Math.min(stat.max, resolved);
+    }
+    return resolved;
+};
+
+const buildPlayerStatValues = (
+    stats: ActorStat[],
+    preferredValues: { [key: string]: number | string },
+): { [key: string]: number | string } => {
+    const nextValues: { [key: string]: number | string } = {};
+
+    stats.forEach((stat) => {
+        const statName = (stat.name || '').trim();
+        if (!statName) {
             return;
         }
 
-        const preferred = preferredSelections[setting.title];
-        nextSelectedSettings[setting.title] = preferred && optionNames.includes(preferred)
-            ? preferred
-            : optionNames[0];
+        nextValues[statName] = normalizePlayerStatValue(preferredValues[statName], stat);
     });
 
-    return nextSelectedSettings;
+    return nextValues;
 };
 
 const ensureAgendaConfig = (saveData: SaveType, stageInstance: Stage) => {
@@ -75,8 +114,8 @@ const ensureAgendaConfig = (saveData: SaveType, stageInstance: Stage) => {
         backgroundImageUrl: configuration.backgroundImageUrl || '',
         backgroundImagePrompt: configuration.backgroundImagePrompt || '',
         startingDate: configuration.startingDate,
-        settings: configuration.settings || [],
-        selectedSettings: {},
+        playerStats: configuration.playerStats || [],
+        playerStatValues: { ...(configuration.playerStatValues || {}) },
         actorStats: configuration.actorStats || [],
     };
 };
@@ -106,10 +145,10 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         language: stageInstance.getSave()?.language || 'English',
     });
 
-    const [customSettings] = useState<CustomSetting[]>(() => resolveActiveCustomSettings(stageInstance));
-    const [selectedCustomSettings, setSelectedCustomSettings] = useState<{ [key: string]: string }>(() => {
-        const saveSelectedSettings = stageInstance.getSave()?.agendaConfig?.selectedSettings || {};
-        return buildSelectedCustomSettings(resolveActiveCustomSettings(stageInstance), saveSelectedSettings);
+    const [playerStats] = useState<ActorStat[]>(() => resolveActivePlayerStats(stageInstance));
+    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: number | string }>(() => {
+        const savePlayerStatValues = stageInstance.getSave()?.agendaConfig?.playerStatValues || {};
+        return buildPlayerStatValues(resolveActivePlayerStats(stageInstance), savePlayerStatValues);
     });
 
     const [languageSuggestions, setLanguageSuggestions] = useState<string[]>([]);
@@ -119,7 +158,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     const handleSave = () => {
         console.log('Saving settings:', settings);
         const playerThemeColor = resolvePlayerThemeColor(settings.playerColor);
-        const resolvedSelectedCustomSettings = buildSelectedCustomSettings(customSettings, selectedCustomSettings);
+        const resolvedPlayerStatValues = buildPlayerStatValues(playerStats, playerStatValues);
         
         if (isNewGame) {
             console.log('Starting new game with settings');
@@ -137,7 +176,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
             const newSave = stageInstance.getSave();
             ensureAgendaConfig(newSave, stageInstance);
-            newSave.agendaConfig!.selectedSettings = resolvedSelectedCustomSettings;
+            newSave.agendaConfig!.playerStatValues = resolvedPlayerStatValues;
             setScreenType(ScreenType.LOADING);
         } else {
             console.log('Updating settings');
@@ -148,7 +187,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             saveData.betaMode = settings.betaMode;
             saveData.language = settings.language;
             ensureAgendaConfig(saveData, stageInstance);
-            saveData.agendaConfig!.selectedSettings = resolvedSelectedCustomSettings;
+            saveData.agendaConfig!.playerStatValues = resolvedPlayerStatValues;
 
             const player = stageInstance.getPlayerActor();
             player.name = settings.playerName;
@@ -195,10 +234,16 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         setShowLanguageSuggestions(false);
     };
 
-    const handleCustomSettingChange = (settingTitle: string, optionName: string) => {
-        setSelectedCustomSettings(prev => ({
+    const handlePlayerStatValueChange = (stat: ActorStat, nextValue: string | number) => {
+        const statName = (stat.name || '').trim();
+        if (!statName) {
+            return;
+        }
+
+        const normalized = normalizePlayerStatValue(nextValue, stat);
+        setPlayerStatValues(prev => ({
             ...prev,
-            [settingTitle]: optionName,
+            [statName]: normalized,
         }));
     };
 
@@ -367,7 +412,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                 />
                             </div>
 
-                            {customSettings.length > 0 && (
+                            {playerStats.filter((stat) => stat.exposed).length > 0 && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     <label
                                         style={{
@@ -378,20 +423,20 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                             marginBottom: '4px'
                                         }}
                                     >
-                                        Scenario Settings
+                                        Player Settings
                                     </label>
 
-                                    {customSettings.map((setting) => {
-                                        const optionNames = Object.keys(setting.options || {});
-                                        const selectedOptionName = buildSelectedCustomSettings(
-                                            [setting],
-                                            selectedCustomSettings,
-                                        )[setting.title] || '';
-                                        const selectedOption = setting.options?.[selectedOptionName];
+                                    {playerStats
+                                        .filter((stat) => stat.exposed)
+                                        .map((stat) => {
+                                        const statName = (stat.name || '').trim();
+                                        const selectedValue = normalizePlayerStatValue(playerStatValues[statName], stat);
+                                        const optionEntries = stat.options || [];
+                                        const isNumericDisplay = ['number', 'percentage', 'stars', 'letter grade'].includes(stat.displayType);
 
                                         return (
                                             <div
-                                                key={setting.title}
+                                                key={statName}
                                                 style={{
                                                     padding: '12px',
                                                     borderRadius: '8px',
@@ -403,36 +448,57 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 }}
                                             >
                                                 <div style={{ color: '#edf2f2', fontSize: '14px', fontWeight: 700 }}>
-                                                    {setting.title}
+                                                    {statName}
                                                 </div>
                                                 <div style={{ color: 'rgba(185, 210, 227, 0.8)', fontSize: '13px' }}>
-                                                    {setting.description}
+                                                    {stat.description}
                                                 </div>
 
-                                                {optionNames.length > 0 ? (
+                                                {stat.displayType === 'option' && optionEntries.length > 0 && (
+                                                    <select
+                                                        className="input-base"
+                                                        value={typeof selectedValue === 'string' ? selectedValue : ''}
+                                                        onChange={(e) => handlePlayerStatValueChange(stat, e.target.value)}
+                                                        style={{ fontSize: '13px' }}
+                                                    >
+                                                        {optionEntries.map((option, optionIndex) => (
+                                                            <option key={`${statName}-option-${optionIndex}`} value={option.name}>
+                                                                {option.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                )}
+
+                                                {stat.displayType === 'option' && optionEntries.length === 0 && (
+                                                    <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
+                                                        No options configured for this setting.
+                                                    </div>
+                                                )}
+
+                                                {stat.displayType === 'text' && (
+                                                    <TextArea
+                                                        value={typeof selectedValue === 'string' ? selectedValue : ''}
+                                                        onChange={(e) => handlePlayerStatValueChange(stat, e.target.value)}
+                                                        rows={2}
+                                                        style={{ width: '100%', resize: 'vertical', fontSize: '13px' }}
+                                                    />
+                                                )}
+
+                                                {isNumericDisplay && (
                                                     <>
-                                                        <select
-                                                            className="input-base"
-                                                            value={selectedOptionName}
-                                                            onChange={(e) => handleCustomSettingChange(setting.title, e.target.value)}
+                                                        <TextInput
+                                                            fullWidth
+                                                            type="number"
+                                                            value={String(selectedValue)}
+                                                            onChange={(e) => handlePlayerStatValueChange(stat, Number(e.target.value) || 0)}
                                                             style={{ fontSize: '13px' }}
-                                                        >
-                                                            {optionNames.map((optionName) => (
-                                                                <option key={optionName} value={optionName}>
-                                                                    {optionName}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        {selectedOption?.title && (
+                                                        />
+                                                        {(typeof stat.min === 'number' || typeof stat.max === 'number') && (
                                                             <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
-                                                                {selectedOption.title}
+                                                                Range: {typeof stat.min === 'number' ? stat.min : '-inf'} to {typeof stat.max === 'number' ? stat.max : '+inf'}
                                                             </div>
                                                         )}
                                                     </>
-                                                ) : (
-                                                    <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
-                                                        No options available for this setting.
-                                                    </div>
                                                 )}
                                             </div>
                                         );

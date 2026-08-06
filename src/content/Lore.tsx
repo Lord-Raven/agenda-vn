@@ -17,6 +17,15 @@ export function updateTypeMapping(lore: Lore[]): void {
 
 export const MAX_ENTRIES = 30; // Maximum number of lore entries to add to context; if there are more, we'll prioritize based on priority and probability.
 
+// Unused as-yet.
+export type LoreTrigger = {
+    id: string;
+    // 'keyword' is a trigger that is a specific word or phrase
+    // 'variable' is a trigger that can be replaced with a variable value (e.g., a character name).
+    type: 'keyword' | 'variable';
+    value: string;
+};
+
 export type Lore = {
     id: string;
     type: LoreType;

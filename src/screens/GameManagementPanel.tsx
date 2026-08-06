@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
-import { ActorStat, CustomSetting, Stage } from '../Stage';
+import { ActorStat, ActorStatDisplayType, Stage } from '../Stage';
 import { Button, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
 
@@ -8,40 +8,80 @@ interface GameManagementPanelProps {
     stage: () => Stage;
 }
 
-const cloneSettingSegment = (segment: { title: string; body: string | any[] }): { title: string; body: string | any[] } => ({
-    title: segment.title,
-    body: typeof segment.body === 'string'
-        ? segment.body
-        : (segment.body || []).map((child: any) => cloneSettingSegment(child)),
-});
+const NUMERIC_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'stars', 'letter grade'];
 
-const cloneSetting = (setting: CustomSetting): CustomSetting => ({
-    title: setting.title,
-    description: setting.description,
-    options: Object.fromEntries(
-        Object.entries(setting.options || {}).map(([key, value]) => [key, cloneSettingSegment(value)]),
-    ),
-});
+const isNumericDisplayType = (displayType: ActorStatDisplayType): boolean => NUMERIC_DISPLAY_TYPES.includes(displayType);
 
 const cloneActorStat = (stat: ActorStat): ActorStat => ({
     name: stat.name,
     description: stat.description,
     guidance: stat.guidance,
-    default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
+    default: typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : 0,
     displayType: stat.displayType,
+    options: (stat.options || []).map((option) => ({
+        name: option.name,
+        description: option.description,
+    })),
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
+    exposed: stat.exposed === true,
 });
 
-const defaultCustomSetting = (): CustomSetting => ({
-    title: 'New Setting',
-    description: 'Describe what this setting affects.',
-    options: {
-        Default: {
-            title: 'Default',
-            body: 'Describe the default selected option context.',
+const resolveStatDefaultValue = (stat: ActorStat): number | string => {
+    if (stat.displayType === 'option') {
+        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
+        if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
+            return stat.default;
+        }
+        return optionNames[0] || '';
+    }
+
+    if (stat.displayType === 'text') {
+        return typeof stat.default === 'string' ? stat.default : '';
+    }
+
+    return Number.isFinite(stat.default) ? Number(stat.default) : 0;
+};
+
+const normalizeStatValue = (value: unknown, stat: ActorStat): number | string => {
+    if (stat.displayType === 'option') {
+        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
+        if (typeof value === 'string' && optionNames.includes(value)) {
+            return value;
+        }
+        return resolveStatDefaultValue(stat);
+    }
+
+    if (stat.displayType === 'text') {
+        if (typeof value === 'string') {
+            return value;
+        }
+        return resolveStatDefaultValue(stat);
+    }
+
+    let resolved = Number.isFinite(value) ? Number(value) : Number(resolveStatDefaultValue(stat)) || 0;
+    if (typeof stat.min === 'number') {
+        resolved = Math.max(stat.min, resolved);
+    }
+    if (typeof stat.max === 'number') {
+        resolved = Math.min(stat.max, resolved);
+    }
+    return resolved;
+};
+
+const defaultPlayerStat = (): ActorStat => ({
+    name: 'New Setting',
+    description: 'Describe what this player setting controls.',
+    guidance: 'How this setting should influence generated narrative and behavior.',
+    default: 'Default',
+    displayType: 'option',
+    options: [
+        {
+            name: 'Default',
+            description: 'Default option behavior for this setting.',
         },
-    },
+    ],
+    exposed: true,
 });
 
 const defaultActorStat = (): ActorStat => ({
@@ -52,6 +92,8 @@ const defaultActorStat = (): ActorStat => ({
     displayType: 'percentage',
     min: 0,
     max: 100,
+    options: [],
+    exposed: false,
 });
 
 const clampStatValue = (value: number, stat: ActorStat): number => {
@@ -63,14 +105,6 @@ const clampStatValue = (value: number, stat: ActorStat): number => {
         resolved = Math.min(stat.max, resolved);
     }
     return resolved;
-};
-
-const renderSettingSegmentBody = (segment: { title: string; body: string | any[] }): string => {
-    if (typeof segment.body === 'string') {
-        return segment.body;
-    }
-
-    return (segment.body || []).map((child: any) => `${child.title}: ${renderSettingSegmentBody(child)}`).join('\n');
 };
 
 export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => {
@@ -89,11 +123,11 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [isUploadingBackgroundImage, setIsUploadingBackgroundImage] = useState(false);
     const [isGeneratingBackgroundImage, setIsGeneratingBackgroundImage] = useState(false);
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
-    const [customSettings, setCustomSettings] = useState<CustomSetting[]>(() =>
-        (configuration.settings || []).map(cloneSetting),
+    const [playerStats, setPlayerStats] = useState<ActorStat[]>(() =>
+        (configuration.playerStats || save.agendaConfig?.playerStats || []).map(cloneActorStat),
     );
-    const [collapsedCustomSettings, setCollapsedCustomSettings] = useState<boolean[]>(() =>
-        (configuration.settings || []).map(() => true),
+    const [collapsedPlayerStats, setCollapsedPlayerStats] = useState<boolean[]>(() =>
+        (configuration.playerStats || save.agendaConfig?.playerStats || []).map(() => true),
     );
     const [collapsedActorStats, setCollapsedActorStats] = useState<boolean[]>(() =>
         (configuration.actorStats || save.agendaConfig?.actorStats || []).map(() => true),
@@ -101,8 +135,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [actorStats, setActorStats] = useState<ActorStat[]>(() =>
         (configuration.actorStats || save.agendaConfig?.actorStats || []).map(cloneActorStat),
     );
-    const [selectedSettings, setSelectedSettings] = useState<{ [key: string]: string }>(() => ({
-        ...(save.agendaConfig?.selectedSettings || {}),
+    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: number | string }>(() => ({
+        ...(save.agendaConfig?.playerStatValues || configuration.playerStatValues || {}),
     }));
     const [isCopyingConfigurationJson, setIsCopyingConfigurationJson] = useState(false);
     const autoSaveTimeoutRef = useRef<number | null>(null);
@@ -136,20 +170,20 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         marginBottom: 4,
     };
 
-    const validSelections = useMemo(() => {
-        const nextSelections: { [key: string]: string } = {};
-        customSettings.forEach(setting => {
-            const optionNames = Object.keys(setting.options || {});
-            if (optionNames.length === 0) {
+    const validPlayerStatValues = useMemo(() => {
+        const nextValues: { [key: string]: number | string } = {};
+
+        playerStats.forEach((stat) => {
+            const statName = (stat.name || '').trim();
+            if (!statName) {
                 return;
             }
 
-            const current = selectedSettings[setting.title];
-            nextSelections[setting.title] = current && optionNames.includes(current) ? current : optionNames[0];
+            nextValues[statName] = normalizeStatValue(playerStatValues[statName], stat);
         });
 
-        return nextSelections;
-    }, [customSettings, selectedSettings]);
+        return nextValues;
+    }, [playerStatValues, playerStats]);
 
     const activeActors = useMemo(() => {
         return Object.values(save.actors || {})
@@ -176,9 +210,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             backgroundImageUrl,
             backgroundImagePrompt,
             startingDate,
-            settings: customSettings.map(cloneSetting),
-            selectedSettings: { ...validSelections },
             actorStats: actorStats.map(cloneActorStat),
+            playerStats: playerStats.map(cloneActorStat),
+            playerStatValues: { ...validPlayerStatValues },
             actors: activeActors,
             locations: activeLocations,
             lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
@@ -191,15 +225,15 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         actorStats,
         backgroundImagePrompt,
         backgroundImageUrl,
-        customSettings,
         managedCalendarEvents,
+        playerStats,
+        validPlayerStatValues,
         save.lorebook,
         stageInstance,
         startingDate,
         title,
         titleImagePrompt,
         titleImageUrl,
-        validSelections,
     ]);
 
     const portableGameConfigurationJson = useMemo(
@@ -230,9 +264,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             locations: activeLocations,
             lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
             calendarEvents: managedCalendarEvents,
-            settings: customSettings,
-            selectedSettings: validSelections,
             actorStats,
+            playerStats,
+            playerStatValues: validPlayerStatValues,
             uiSettings: stageInstance.getUiSettings(),
             title,
             titleImageUrl,
@@ -249,19 +283,24 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             titleImagePrompt: titleImagePrompt,
             backgroundImageUrl: backgroundImageUrl,
             backgroundImagePrompt: backgroundImagePrompt,
-            settings: customSettings.map(cloneSetting),
-            selectedSettings: validSelections,
             actorStats: actorStats.map(cloneActorStat),
+            playerStats: playerStats.map(cloneActorStat),
+            playerStatValues: { ...validPlayerStatValues },
             startingDate: startingDate,
         };
 
-        const statNames = new Set(actorStats.map(stat => stat.name.trim()).filter(Boolean));
+        const statNames = new Set(
+            actorStats
+                .filter(stat => isNumericDisplayType(stat.displayType))
+                .map(stat => stat.name.trim())
+                .filter(Boolean),
+        );
         Object.values(currentSave.actors || {}).forEach(actor => {
             if (!actor.statMap || typeof actor.statMap !== 'object') {
                 actor.statMap = {};
             }
 
-            actorStats.forEach(stat => {
+            actorStats.filter(stat => isNumericDisplayType(stat.displayType)).forEach(stat => {
                 const statName = stat.name.trim();
                 if (!statName) {
                     return;
@@ -280,7 +319,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         });
 
         stageInstance.saveGame();
-    }, [activeActors, activeLocations, actorStats, backgroundImagePrompt, backgroundImageUrl, customSettings, managedCalendarEvents, save, selectedSettings, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validSelections]);
+    }, [activeActors, activeLocations, actorStats, backgroundImagePrompt, backgroundImageUrl, managedCalendarEvents, playerStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validPlayerStatValues]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;
@@ -398,21 +437,106 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         }
     };
 
-    const updateCustomSetting = (index: number, patch: Partial<CustomSetting>) => {
-        setCustomSettings(prev => prev.map((setting, idx) => (
-            idx === index ? { ...setting, ...patch } : setting
+    const updatePlayerStat = (index: number, patch: Partial<ActorStat>) => {
+        setPlayerStats(prev => prev.map((stat, idx) => (
+            idx === index ? { ...stat, ...patch } : stat
         )));
     };
 
-    const removeCustomSetting = (index: number) => {
-        setCustomSettings(prev => prev.filter((_, idx) => idx !== index));
-        setCollapsedCustomSettings(prev => prev.filter((_, idx) => idx !== index));
+    const setPlayerStatName = (index: number, rawName: string) => {
+        const nextName = rawName;
+        const previousName = (playerStats[index]?.name || '').trim();
+
+        updatePlayerStat(index, { name: nextName });
+
+        const trimmedNextName = nextName.trim();
+        if (!previousName || !trimmedNextName || previousName === trimmedNextName) {
+            return;
+        }
+
+        setPlayerStatValues((prev) => {
+            const nextValues = { ...prev };
+            const existingValue = nextValues[previousName];
+            delete nextValues[previousName];
+            if (existingValue !== undefined) {
+                nextValues[trimmedNextName] = existingValue;
+            }
+            return nextValues;
+        });
     };
 
-    const toggleCustomSetting = (index: number) => {
-        setCollapsedCustomSettings(prev => prev.map((isCollapsed, idx) => (
+    const removePlayerStat = (index: number) => {
+        const removedName = (playerStats[index]?.name || '').trim();
+
+        setPlayerStats(prev => prev.filter((_, idx) => idx !== index));
+        setCollapsedPlayerStats(prev => prev.filter((_, idx) => idx !== index));
+
+        if (removedName) {
+            setPlayerStatValues((prev) => {
+                const nextValues = { ...prev };
+                delete nextValues[removedName];
+                return nextValues;
+            });
+        }
+    };
+
+    const togglePlayerStat = (index: number) => {
+        setCollapsedPlayerStats(prev => prev.map((isCollapsed, idx) => (
             idx === index ? !isCollapsed : isCollapsed
         )));
+    };
+
+    const updatePlayerStatOption = (statIndex: number, optionIndex: number, patch: { name?: string; description?: string }) => {
+        setPlayerStats(prev => prev.map((stat, idx) => {
+            if (idx !== statIndex) {
+                return stat;
+            }
+
+            const currentOptions = [...(stat.options || [])];
+            const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), ...patch };
+            currentOptions[optionIndex] = nextOption;
+            return { ...stat, options: currentOptions };
+        }));
+    };
+
+    const removePlayerStatOption = (statIndex: number, optionIndex: number) => {
+        setPlayerStats(prev => prev.map((stat, idx) => {
+            if (idx !== statIndex) {
+                return stat;
+            }
+
+            const options = (stat.options || []).filter((_, idx2) => idx2 !== optionIndex);
+            const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
+                ? stat.default
+                : (options[0]?.name || '');
+
+            return {
+                ...stat,
+                options,
+                default: defaultValue,
+            };
+        }));
+    };
+
+    const addPlayerStatOption = (statIndex: number) => {
+        setPlayerStats(prev => prev.map((stat, idx) => {
+            if (idx !== statIndex) {
+                return stat;
+            }
+
+            const options = [...(stat.options || [])];
+            const nextLabel = `Option ${options.length + 1}`;
+            options.push({
+                name: nextLabel,
+                description: '',
+            });
+
+            return {
+                ...stat,
+                options,
+                default: typeof stat.default === 'string' && stat.default.trim() ? stat.default : nextLabel,
+            };
+        }));
     };
 
     const updateActorStat = (index: number, patch: Partial<ActorStat>) => {
@@ -432,57 +556,36 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         )));
     };
 
-    const updateSettingOption = (settingIndex: number, optionName: string, segment: { title: string; body: string | any[] }) => {
-        setCustomSettings(prev => prev.map((setting, idx) => {
-            if (idx !== settingIndex) {
-                return setting;
-            }
-
+    const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
+        if (stat.displayType === 'option') {
+            const options = (stat.options || []).filter(option => option.name.trim());
+            const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
+                ? stat.default
+                : (options[0]?.name || '');
             return {
-                ...setting,
-                options: {
-                    ...(setting.options || {}),
-                    [optionName]: segment,
-                },
+                ...stat,
+                options,
+                default: defaultValue,
+                min: undefined,
+                max: undefined,
             };
-        }));
-    };
-
-    const renameSettingOption = (settingIndex: number, oldName: string, newName: string) => {
-        const nextName = newName.trim();
-        if (!nextName || oldName === nextName) {
-            return;
         }
 
-        setCustomSettings(prev => prev.map((setting, idx) => {
-            if (idx !== settingIndex) {
-                return setting;
-            }
-
-            const options = { ...(setting.options || {}) };
-            const value = options[oldName];
-            delete options[oldName];
-            if (value) {
-                options[nextName] = value;
-            }
-
+        if (stat.displayType === 'text') {
             return {
-                ...setting,
-                options,
+                ...stat,
+                default: typeof stat.default === 'string' ? stat.default : '',
+                options: [],
+                min: undefined,
+                max: undefined,
             };
-        }));
+        }
 
-        setSelectedSettings(prev => {
-            const current = prev[customSettings[settingIndex]?.title || ''];
-            if (current !== oldName) {
-                return prev;
-            }
-
-            return {
-                ...prev,
-                [customSettings[settingIndex]?.title || '']: nextName,
-            };
-        });
+        return {
+            ...stat,
+            default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
+            options: [],
+        };
     };
 
     return (
@@ -599,107 +702,191 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             </GlassPanel>
 
             <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Custom Settings</Title>
+                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Player Stats</Title>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {customSettings.map((setting, settingIndex) => {
-                        const optionEntries = Object.entries(setting.options || {});
-                        const selectedOption = validSelections[setting.title] || optionEntries[0]?.[0] || '';
+                    {playerStats.map((stat, statIndex) => {
+                        const optionEntries = stat.options || [];
+                        const normalizedStat = normalizePlayerStatShape(stat);
 
                         return (
-                            <div key={`setting-${settingIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
+                            <div key={`player-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                                     <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
-                                        {setting.title?.trim() || `Setting ${settingIndex + 1}`}
+                                        {stat.name?.trim() || `Player Stat ${statIndex + 1}`}
                                     </div>
-                                    <Button variant="secondary" onClick={() => toggleCustomSetting(settingIndex)}>
-                                        {collapsedCustomSettings[settingIndex] ? 'Expand' : 'Collapse'}
+                                    <Button variant="secondary" onClick={() => togglePlayerStat(statIndex)}>
+                                        {collapsedPlayerStats[statIndex] ? 'Expand' : 'Collapse'}
                                     </Button>
                                 </div>
 
-                                {!collapsedCustomSettings[settingIndex] && (
+                                {!collapsedPlayerStats[statIndex] && (
                                     <>
                                         <div style={{ marginTop: 10 }}>
                                             <div style={inlineFieldStyle}>
                                                 <label style={fieldLabelStyle}>Name</label>
                                                 <TextInput
                                                     fullWidth
-                                                    value={setting.title}
-                                                    onChange={(e) => updateCustomSetting(settingIndex, { title: e.target.value })}
-                                                    placeholder="Setting title"
+                                                    value={stat.name}
+                                                    onChange={(e) => setPlayerStatName(statIndex, e.target.value)}
+                                                    placeholder="Setting name"
                                                 />
                                             </div>
+
                                             <div style={inlineFieldTopStyle}>
                                                 <label style={fieldLabelStyle}>Description</label>
                                                 <TextArea
-                                                    value={setting.description}
-                                                    onChange={(e) => updateCustomSetting(settingIndex, { description: e.target.value })}
+                                                    value={stat.description}
+                                                    onChange={(e) => updatePlayerStat(statIndex, { description: e.target.value })}
+                                                    rows={2}
+                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                />
+                                            </div>
+
+                                            <div style={inlineFieldTopStyle}>
+                                                <label style={fieldLabelStyle}>Guidance</label>
+                                                <TextArea
+                                                    value={stat.guidance}
+                                                    onChange={(e) => updatePlayerStat(statIndex, { guidance: e.target.value })}
                                                     rows={2}
                                                     style={{ width: '100%', resize: 'vertical' }}
                                                 />
                                             </div>
 
                                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Default</label>
+                                                <label style={fieldLabelStyle}>Display</label>
                                                 <select
                                                     className="input-base"
-                                                    value={selectedOption}
-                                                    onChange={(e) => setSelectedSettings(prev => ({ ...prev, [setting.title]: e.target.value }))}
+                                                    value={stat.displayType}
+                                                    onChange={(e) => {
+                                                        const nextDisplayType = e.target.value as ActorStat['displayType'];
+                                                        updatePlayerStat(statIndex, normalizePlayerStatShape({
+                                                            ...stat,
+                                                            displayType: nextDisplayType,
+                                                        }));
+                                                    }}
                                                 >
-                                                    {optionEntries.map(([name]) => (
-                                                        <option key={name} value={name}>{name}</option>
-                                                    ))}
+                                                    <option value="option">option</option>
+                                                    <option value="number">number</option>
+                                                    <option value="percentage">percentage</option>
+                                                    <option value="stars">stars</option>
+                                                    <option value="letter grade">letter grade</option>
+                                                    <option value="text">text</option>
                                                 </select>
                                             </div>
 
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                {optionEntries.map(([optionName, segment]) => (
-                                                    <div key={`${settingIndex}-${optionName}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
-                                                        <div style={inlineFieldStyle}>
-                                                            <label style={fieldLabelStyle}>Option Name</label>
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Editable In Settings</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.exposed === true}
+                                                        onChange={(e) => updatePlayerStat(statIndex, { exposed: e.target.checked })}
+                                                    />
+                                                    Exposed
+                                                </label>
+                                            </div>
+
+                                            {normalizedStat.displayType === 'option' && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
+                                                    <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
+                                                        <label style={fieldLabelStyle}>Default Option</label>
+                                                        <select
+                                                            className="input-base"
+                                                            value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
+                                                            onChange={(e) => updatePlayerStat(statIndex, { default: e.target.value })}
+                                                        >
+                                                            {optionEntries.map((option, idx) => (
+                                                                <option key={`${statIndex}-default-option-${idx}`} value={option.name}>
+                                                                    {option.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {optionEntries.map((option, optionIndex) => (
+                                                        <div key={`${statIndex}-option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
+                                                            <div style={inlineFieldStyle}>
+                                                                <label style={fieldLabelStyle}>Option Name</label>
+                                                                <TextInput
+                                                                    fullWidth
+                                                                    value={option.name}
+                                                                    onChange={(e) => updatePlayerStatOption(statIndex, optionIndex, { name: e.target.value })}
+                                                                    placeholder="Option name"
+                                                                />
+                                                            </div>
+                                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                                                <label style={fieldLabelStyle}>Option Description</label>
+                                                                <TextArea
+                                                                    value={option.description}
+                                                                    onChange={(e) => updatePlayerStatOption(statIndex, optionIndex, { description: e.target.value })}
+                                                                    rows={2}
+                                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                                />
+                                                            </div>
+                                                            <div style={{ marginTop: 8 }}>
+                                                                <Button variant="danger" onClick={() => removePlayerStatOption(statIndex, optionIndex)}>
+                                                                    Remove Option
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    <Button variant="secondary" onClick={() => addPlayerStatOption(statIndex)}>
+                                                        Add Option
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {(normalizedStat.displayType === 'text') && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Value</label>
+                                                    <TextArea
+                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
+                                                        onChange={(e) => updatePlayerStat(statIndex, { default: e.target.value })}
+                                                        rows={2}
+                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {isNumericDisplayType(normalizedStat.displayType) && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                                    <label style={fieldLabelStyle}>Properties</label>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                                                        <div>
+                                                            <div style={compactChipLabelStyle}>Default</div>
                                                             <TextInput
                                                                 fullWidth
-                                                                defaultValue={optionName}
-                                                                onBlur={(e) => renameSettingOption(settingIndex, optionName, e.target.value)}
-                                                                placeholder="Option name"
+                                                                type="number"
+                                                                value={String(Number.isFinite(normalizedStat.default) ? Number(normalizedStat.default) : 0)}
+                                                                onChange={(e) => updatePlayerStat(statIndex, { default: Number(e.target.value) || 0 })}
                                                             />
                                                         </div>
-                                                        <div style={inlineFieldStyle}>
-                                                            <label style={fieldLabelStyle}>Context Name</label>
+                                                        <div>
+                                                            <div style={compactChipLabelStyle}>Min</div>
                                                             <TextInput
                                                                 fullWidth
-                                                                value={segment.title}
-                                                                onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, title: e.target.value })}
-                                                                placeholder="Context title"
+                                                                type="number"
+                                                                value={typeof normalizedStat.min === 'number' ? String(normalizedStat.min) : ''}
+                                                                onChange={(e) => updatePlayerStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
                                                             />
                                                         </div>
-                                                        <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                            <label style={fieldLabelStyle}>Context</label>
-                                                            <TextArea
-                                                                value={typeof segment.body === 'string' ? segment.body : renderSettingSegmentBody(segment)}
-                                                                onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, body: e.target.value })}
-                                                                rows={3}
-                                                                style={{ width: '100%', resize: 'vertical' }}
+                                                        <div>
+                                                            <div style={compactChipLabelStyle}>Max</div>
+                                                            <TextInput
+                                                                fullWidth
+                                                                type="number"
+                                                                value={typeof normalizedStat.max === 'number' ? String(normalizedStat.max) : ''}
+                                                                onChange={(e) => updatePlayerStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
                                                             />
                                                         </div>
                                                     </div>
-                                                ))}
-                                            </div>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                                            <Button
-                                                variant="secondary"
-                                                onClick={() => {
-                                                    const baseName = `Option ${optionEntries.length + 1}`;
-                                                    updateSettingOption(settingIndex, baseName, {
-                                                        title: baseName,
-                                                        body: 'Describe context for this option.',
-                                                    });
-                                                }}
-                                            >
-                                                Add Option
-                                            </Button>
-                                            <Button variant="danger" onClick={() => removeCustomSetting(settingIndex)}>Remove Setting</Button>
+                                        <div style={{ marginTop: 10 }}>
+                                            <Button variant="danger" onClick={() => removePlayerStat(statIndex)}>Remove Player Stat</Button>
                                         </div>
                                     </>
                                 )}
@@ -710,11 +897,11 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                     <Button
                         variant="secondary"
                         onClick={() => {
-                            setCustomSettings(prev => [...prev, defaultCustomSetting()]);
-                            setCollapsedCustomSettings(prev => [...prev, false]);
+                            setPlayerStats(prev => [...prev, defaultPlayerStat()]);
+                            setCollapsedPlayerStats(prev => [...prev, false]);
                         }}
                     >
-                        Add Custom Setting
+                        Add Player Stat
                     </Button>
                 </div>
             </GlassPanel>

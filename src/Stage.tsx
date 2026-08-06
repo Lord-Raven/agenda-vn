@@ -50,8 +50,8 @@ export type SaveType = {
         titleImagePrompt?: string;
         backgroundImageUrl?: string;
         backgroundImagePrompt?: string;
-        settings: CustomSetting[];
-        selectedSettings: {[key: string]: string};
+        playerStats?: ActorStat[];
+        playerStatValues?: {[key: string]: number | string};
         actorStats?: ActorStat[];
         startingDate?: string;
     };
@@ -110,30 +110,24 @@ const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
 
 const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
 
+export type ActorStatDisplayType = 'number' | 'percentage' | 'stars' | 'letter grade' | 'option' | 'text';
 
-
-// Represents a piece of context to be included in generative requests. Has a title and text body/array of sub-segments
-export type ContextSegment = {
-    title: string;
-    body: string|ContextSegment[];
-}
+export type ActorStatOption = {
+    name: string;
+    description: string;
+};
 
 // Represents a custom stat that applies to all actors in the game.
 export type ActorStat = {
     name: string; // Display name of the stat
     description: string; // User-facing description of what the stat represents
     guidance: string; // Guidance for how the stat should be used in generative requests
-    default: number; // Default value of the stat
-    displayType: 'number' | 'percentage' | 'stars' | 'letter grade'; // How the stat should be displayed in the UI
+    default: number | string; // Default value of the stat
+    displayType: ActorStatDisplayType; // How the stat should be displayed in the UI
+    options?: ActorStatOption[]; // Supported option values for option-based stats
     min?: number; // Minimum value of the stat (optional)
     max?: number; // Maximum value of the stat (optional)
-}
-
-// Represents a setting drop-down that can build added to the game.
-export type CustomSetting = {
-    title: string; // Name of the setting
-    description: string; // Description of what it does
-    options: {[key: string]: ContextSegment} // Map of option name to a ContextSegment that it will cause to be used.
+    exposed: boolean; // Whether the stat should be exposed to the player in the SettingsScreen
 }
 
 // Represents a configuration that is used to initialize new games, but can also influence existing games.
@@ -143,9 +137,9 @@ export type GameConfiguration = {
     locations: Location[], // All defined locations for a new game
     lorebook: Lore[], // Lore entries to seed into new games
     calendarEvents: CalendarEvent[], // Calendar event series definitions to seed into new games
-    settings: CustomSetting[], // All defined custom settings (applies to current and new games)
-    selectedSettings: {[key: string]: string}, // Default selected options for custom settings in new games
     actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
+    playerStats: ActorStat[], // Stats that apply to the player only
+    playerStatValues: {[key: string]: number | string}, // Selected/default values for player stats
     uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
     titleImageUrl: string, // URL of a title image for the game
@@ -156,27 +150,19 @@ export type GameConfiguration = {
 
 }
 
-const cloneContextSegment = (segment: ContextSegment): ContextSegment => ({
-    title: segment.title,
-    body: typeof segment.body === 'string' ? segment.body : (segment.body || []).map(cloneContextSegment),
-});
-
-const cloneCustomSetting = (setting: CustomSetting): CustomSetting => ({
-    title: setting.title,
-    description: setting.description,
-    options: Object.fromEntries(
-        Object.entries(setting.options || {}).map(([key, value]) => [key, cloneContextSegment(value)]),
-    ),
-});
-
 const cloneActorStat = (stat: ActorStat): ActorStat => ({
     name: stat.name,
     description: stat.description,
     guidance: stat.guidance,
-    default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
+    default: typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : 0,
     displayType: stat.displayType,
+    options: (stat.options || []).map((option) => ({
+        name: option.name,
+        description: option.description,
+    })),
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
+    exposed: stat.exposed === true,
 });
 
 const cloneActor = (actor: Actor): Actor => new Actor({
@@ -213,53 +199,53 @@ const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({
         : undefined,
 });
 
-const renderContextSegment = (segment: ContextSegment): string => {
-    if (typeof segment.body === 'string') {
-        return segment.body;
+
+const NUMERIC_STAT_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'stars', 'letter grade'];
+
+const isNumericActorStat = (stat: ActorStat): boolean => NUMERIC_STAT_DISPLAY_TYPES.includes(stat.displayType);
+
+const resolveActorStatDefault = (stat: ActorStat): number | string => {
+    if (stat.displayType === 'option') {
+        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
+        if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
+            return stat.default;
+        }
+        return optionNames[0] || '';
     }
 
-    if (Array.isArray(segment.body)) {
-        return segment.body.map((child) => `${child.title}:\n${renderContextSegment(child)}`).join('\n\n');
+    if (stat.displayType === 'text') {
+        return typeof stat.default === 'string' ? stat.default : '';
     }
 
-    return '';
+    return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const mergeLegacyContextIntoLorebook = (lorebook: Lore[], legacyContext: ContextSegment[]): Lore[] => {
-    const mergedLore = lorebook.map(cloneLore);
-
-    legacyContext.forEach((segment, index) => {
-        const title = (segment.title || '').trim() || `World Context ${index + 1}`;
-        const content = renderContextSegment(segment).trim();
-        if (!content) {
-            return;
+const normalizeActorStatValue = (value: unknown, stat: ActorStat): number | string => {
+    if (stat.displayType === 'option') {
+        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
+        const fallback = resolveActorStatDefault(stat);
+        if (typeof value === 'string' && optionNames.includes(value)) {
+            return value;
         }
+        return typeof fallback === 'string' ? fallback : '';
+    }
 
-        const exists = mergedLore.some((entry) =>
-            entry.constant &&
-            entry.enabled &&
-            entry.title.trim().toLowerCase() === title.toLowerCase() &&
-            entry.content.trim() === content,
-        );
-        if (exists) {
-            return;
+    if (stat.displayType === 'text') {
+        if (typeof value === 'string') {
+            return value;
         }
+        const fallback = resolveActorStatDefault(stat);
+        return typeof fallback === 'string' ? fallback : '';
+    }
 
-        mergedLore.push(createLoreEntry({
-            type: 'other',
-            title,
-            content,
-            triggers: [],
-            enabled: true,
-            constant: true,
-            scanDepth: 10,
-            insertionOrder: index,
-            priority: 50,
-            probability: 100,
-        }));
-    });
-
-    return mergedLore;
+    let resolved = Number.isFinite(value) ? Number(value) : Number(resolveActorStatDefault(stat)) || 0;
+    if (typeof stat.min === 'number') {
+        resolved = Math.max(stat.min, resolved);
+    }
+    if (typeof stat.max === 'number') {
+        resolved = Math.min(stat.max, resolved);
+    }
+    return resolved;
 };
 
 type TimelineEntry = {
@@ -319,9 +305,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locations: [],
             lorebook: [],
             calendarEvents: [],
-            settings: [],
-            selectedSettings: {},
             actorStats: [],
+            playerStats: [],
+            playerStatValues: {},
             uiSettings: cloneUiSettings(DEFAULT_UI_SETTINGS),
             title: 'Agenda VN',
             titleImageUrl: '',
@@ -341,26 +327,20 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             this.saveData.lastSaveSlot = 0;
         }
 
-        const activeSave = this.saveData.saves[this.saveData.lastSaveSlot];
         const defaultConfiguration = this.createDefaultNewGameConfiguration();
-        const legacyContext = ((activeSave?.agendaConfig as any)?.context || []) as ContextSegment[];
-        const legacySettings = activeSave?.agendaConfig?.settings || [];
-        const legacySelectedSettings = activeSave?.agendaConfig?.selectedSettings || {};
-        const legacyActorStats = activeSave?.agendaConfig?.actorStats || [];
-        const legacyLorebook = mergeLegacyContextIntoLorebook(activeSave?.lorebook || [], legacyContext);
-        const legacyUiSettings = activeSave?.uiSettings || {};
+        const activeSave = this.saveData.saves[this.saveData.lastSaveSlot];
 
         if (!this.saveData.configuration) {
             this.saveData.configuration = {
                 ...defaultConfiguration,
                 actors: [],
                 locations: [],
-                lorebook: legacyLorebook.map(cloneLore),
+                lorebook: (activeSave?.lorebook || []).map(cloneLore),
                 calendarEvents: [],
-                settings: legacySettings.map(cloneCustomSetting),
-                selectedSettings: { ...legacySelectedSettings },
-                actorStats: legacyActorStats.map(cloneActorStat),
-                uiSettings: cloneUiSettings(legacyUiSettings),
+                actorStats: (activeSave?.agendaConfig?.actorStats || []).map(cloneActorStat),
+                playerStats: (activeSave?.agendaConfig?.playerStats || []).map(cloneActorStat),
+                playerStatValues: { ...(activeSave?.agendaConfig?.playerStatValues || {}) },
+                uiSettings: cloneUiSettings(activeSave?.uiSettings || {}),
             };
             return;
         }
@@ -368,15 +348,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.saveData.configuration = {
             actors: (this.saveData.configuration.actors || defaultConfiguration.actors).map(cloneActor),
             locations: (this.saveData.configuration.locations || defaultConfiguration.locations).map(cloneLocation),
-            lorebook: mergeLegacyContextIntoLorebook(
-                (this.saveData.configuration.lorebook || legacyLorebook || defaultConfiguration.lorebook).map(cloneLore),
-                legacyContext,
-            ),
+            lorebook: (this.saveData.configuration.lorebook || defaultConfiguration.lorebook).map(cloneLore),
             calendarEvents: (this.saveData.configuration.calendarEvents || defaultConfiguration.calendarEvents).map(cloneCalendarEvent),
-            settings: (this.saveData.configuration.settings || legacySettings).map(cloneCustomSetting),
-            selectedSettings: { ...(this.saveData.configuration.selectedSettings || legacySelectedSettings || defaultConfiguration.selectedSettings) },
-            actorStats: (this.saveData.configuration.actorStats || legacyActorStats).map(cloneActorStat),
-            uiSettings: cloneUiSettings(this.saveData.configuration.uiSettings || legacyUiSettings || defaultConfiguration.uiSettings),
+            actorStats: (this.saveData.configuration.actorStats || defaultConfiguration.actorStats).map(cloneActorStat),
+            playerStats: (this.saveData.configuration.playerStats || defaultConfiguration.playerStats).map(cloneActorStat),
+            playerStatValues: { ...(this.saveData.configuration.playerStatValues || defaultConfiguration.playerStatValues) },
+            uiSettings: cloneUiSettings(this.saveData.configuration.uiSettings || defaultConfiguration.uiSettings),
             startingDate: this.saveData.configuration.startingDate || defaultConfiguration.startingDate,
             title: this.saveData.configuration.title || defaultConfiguration.title,
             titleImageUrl: this.saveData.configuration.titleImageUrl || defaultConfiguration.titleImageUrl,
@@ -406,9 +383,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locations: (updates.locations ?? current.locations ?? []).map(cloneLocation),
             lorebook: (updates.lorebook ?? current.lorebook ?? []).map(cloneLore),
             calendarEvents: (updates.calendarEvents ?? current.calendarEvents ?? []).map(cloneCalendarEvent),
-            settings: (updates.settings ?? current.settings ?? []).map(cloneCustomSetting),
-            selectedSettings: { ...(updates.selectedSettings ?? current.selectedSettings ?? {}) },
             actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneActorStat),
+            playerStats: (updates.playerStats ?? current.playerStats ?? []).map(cloneActorStat),
+            playerStatValues: { ...(updates.playerStatValues ?? current.playerStatValues ?? {}) },
             uiSettings: cloneUiSettings(updates.uiSettings ?? current.uiSettings ?? DEFAULT_UI_SETTINGS),
             startingDate: updates.startingDate ?? current.startingDate,
         };
@@ -422,14 +399,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     titleImagePrompt: "Generate a title image for a visual novel game called 'Agenda VN'.",
                     backgroundImageUrl: "",
                     backgroundImagePrompt: "Generate a background image for the menu and calendar screens of a visual novel game called 'Agenda VN'.",
-                    settings: [],
-                    selectedSettings: {},
                     actorStats: [],
+                    playerStats: [],
+                    playerStatValues: {},
                     startingDate: new Date().toISOString().slice(0, 10),
                 };
             }
             currentSave.agendaConfig.actorStats = this.saveData.configuration.actorStats.map(cloneActorStat);
+            currentSave.agendaConfig.playerStats = this.saveData.configuration.playerStats.map(cloneActorStat);
+            currentSave.agendaConfig.playerStatValues = { ...(this.saveData.configuration.playerStatValues || {}) };
             this.syncActorStats(currentSave);
+            this.syncPlayerStats(currentSave);
         }
 
         this.saveGame();
@@ -527,9 +507,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 backgroundImageUrl: configuration.backgroundImageUrl || '',
                 backgroundImagePrompt: configuration.backgroundImagePrompt || '',
                 startingDate,
-                settings: configuration.settings.map(cloneCustomSetting),
-                selectedSettings: { ...(configuration.selectedSettings || {}) },
                 actorStats: configuration.actorStats.map(cloneActorStat),
+                playerStats: configuration.playerStats.map(cloneActorStat),
+                playerStatValues: { ...(configuration.playerStatValues || {}) },
             },
             uiSettings: cloneUiSettings(configuration.uiSettings || DEFAULT_UI_SETTINGS),
         };
@@ -556,20 +536,20 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 backgroundImageUrl: persistedConfiguration.backgroundImageUrl || '',
                 backgroundImagePrompt: persistedConfiguration.backgroundImagePrompt || '',
                 startingDate: persistedConfiguration.startingDate || new Date().toISOString().slice(0, 10),
-                settings: persistedConfiguration.settings.map(cloneCustomSetting),
-                selectedSettings: {
-                    ...Object.fromEntries(
-                        persistedConfiguration.settings.map(setting => {
-                            const optionName = Object.keys(setting.options || {})[0];
-                            return [setting.title, optionName || ''];
-                        }),
-                    ),
-                    ...(persistedConfiguration.selectedSettings || {}),
-                },
                 actorStats: persistedConfiguration.actorStats.map(cloneActorStat),
+                playerStats: persistedConfiguration.playerStats.map(cloneActorStat),
+                playerStatValues: { ...(persistedConfiguration.playerStatValues || {}) },
             };
         } else if (!newSave.agendaConfig.actorStats) {
             newSave.agendaConfig.actorStats = persistedConfiguration.actorStats.map(cloneActorStat);
+        }
+
+        if (!newSave.agendaConfig.playerStats) {
+            newSave.agendaConfig.playerStats = persistedConfiguration.playerStats.map(cloneActorStat);
+        }
+
+        if (!newSave.agendaConfig.playerStatValues) {
+            newSave.agendaConfig.playerStatValues = { ...(persistedConfiguration.playerStatValues || {}) };
         }
 
         if (!newSave.lorebook || newSave.lorebook.length === 0) {
@@ -588,6 +568,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         this.syncActorStats(newSave);
+    this.syncPlayerStats(newSave);
 
         if (!newSave.currentDate && persistedConfiguration.startingDate) {
             newSave.currentDate = persistedConfiguration.startingDate;
@@ -1276,9 +1257,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 backgroundImageUrl: this.getConfiguration().backgroundImageUrl || '',
                 backgroundImagePrompt: this.getConfiguration().backgroundImagePrompt || '',
                 startingDate: this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10),
-                settings: [],
-                selectedSettings: {},
                 actorStats: [],
+                playerStats: [],
+                playerStatValues: {},
             };
         }
 
@@ -1286,7 +1267,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             save.agendaConfig.actorStats = this.getConfiguration().actorStats.map(cloneActorStat);
         }
 
+        if (!save.agendaConfig.playerStats) {
+            save.agendaConfig.playerStats = this.getConfiguration().playerStats.map(cloneActorStat);
+        }
+
+        if (!save.agendaConfig.playerStatValues) {
+            save.agendaConfig.playerStatValues = { ...(this.getConfiguration().playerStatValues || {}) };
+        }
+
         this.syncActorStats(save);
+        this.syncPlayerStats(save);
 
         if (!save.uiSettings) {
             save.uiSettings = {...DEFAULT_UI_SETTINGS};
@@ -1295,20 +1285,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
     }
 
-    private normalizeActorStatValue(value: number, stat: ActorStat): number {
-        let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
-        if (typeof stat.min === 'number') {
-            resolved = Math.max(stat.min, resolved);
-        }
-        if (typeof stat.max === 'number') {
-            resolved = Math.min(stat.max, resolved);
-        }
-        return resolved;
-    }
-
     private syncActorStats(save: SaveType) {
-        const configuredStats = (save.agendaConfig?.actorStats || []).filter(stat => stat?.name?.trim());
-        const statNames = new Set(configuredStats.map(stat => stat.name));
+        const configuredStats = (save.agendaConfig?.actorStats || [])
+            .filter(stat => stat?.name?.trim())
+            .filter(isNumericActorStat);
+        const statNames = new Set(configuredStats.map(stat => stat.name.trim()));
 
         Object.values(save.actors || {}).forEach(actor => {
             if (!actor.statMap || typeof actor.statMap !== 'object') {
@@ -1316,10 +1297,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
 
             configuredStats.forEach(stat => {
-                const existingValue = actor.statMap[stat.name];
-                const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
-                const value = Number.isFinite(existingValue) ? Number(existingValue) : fallback;
-                actor.statMap[stat.name] = this.normalizeActorStatValue(value, stat);
+                const statName = stat.name.trim();
+                const existingValue = actor.statMap[statName];
+                const normalized = normalizeActorStatValue(existingValue, stat);
+                actor.statMap[statName] = Number.isFinite(normalized) ? Number(normalized) : 0;
             });
 
             Object.keys(actor.statMap).forEach(statName => {
@@ -1328,6 +1309,25 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 }
             });
         });
+    }
+
+    private syncPlayerStats(save: SaveType) {
+        if (!save.agendaConfig) {
+            return;
+        }
+
+        const configuredStats = (save.agendaConfig.playerStats || []).filter(stat => stat?.name?.trim());
+        const currentValues = save.agendaConfig.playerStatValues && typeof save.agendaConfig.playerStatValues === 'object'
+            ? save.agendaConfig.playerStatValues
+            : {};
+
+        const normalizedValues: { [key: string]: number | string } = {};
+        configuredStats.forEach((stat) => {
+            const statName = stat.name.trim();
+            normalizedValues[statName] = normalizeActorStatValue(currentValues[statName], stat);
+        });
+
+        save.agendaConfig.playerStatValues = normalizedValues;
     }
 
     private createCalendarEvents(save: SaveType, count: number): CalendarEvent[] {
@@ -1529,10 +1529,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                             const existingValue = Number(actor.statMap[targetStatName]);
                             const currentValue = Number.isFinite(existingValue)
                                 ? existingValue
-                                : (resolvedStat ? this.normalizeActorStatValue(Number(resolvedStat.default) || 0, resolvedStat) : 0);
+                                : (resolvedStat
+                                    ? Number(normalizeActorStatValue(Number(resolvedStat.default) || 0, resolvedStat))
+                                    : 0);
                             const nextValue = currentValue + changeValue;
                             actor.statMap[targetStatName] = resolvedStat
-                                ? this.normalizeActorStatValue(nextValue, resolvedStat)
+                                ? Number(normalizeActorStatValue(nextValue, resolvedStat))
                                 : nextValue;
                         }
                         this.saveGame();
@@ -1629,29 +1631,40 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private buildActiveSettingContextSummary(save: SaveType): string {
         const agendaConfig = save.agendaConfig;
-        if (!agendaConfig?.settings?.length) {
-            return 'No custom setting context is active.';
+        if (!agendaConfig?.playerStats?.length) {
+            return 'No player stat context is active.';
         }
 
         const lines: string[] = [];
-        for (const setting of agendaConfig.settings) {
-            const optionName = agendaConfig.selectedSettings?.[setting.title] || Object.keys(setting.options || {})[0] || '';
-            if (!optionName) {
+        for (const stat of agendaConfig.playerStats) {
+            const statName = (stat.name || '').trim();
+            if (!statName) {
                 continue;
             }
 
-            const context = setting.options?.[optionName];
-            if (!context) {
+            const value = normalizeActorStatValue(agendaConfig.playerStatValues?.[statName], stat);
+            const valueText = typeof value === 'number' ? String(value) : value;
+
+            if (stat.displayType === 'option') {
+                const selectedOption = (stat.options || []).find(option => option.name === valueText);
+                const optionDescription = selectedOption?.description?.trim() || '';
+                const line = [
+                    `${statName}: ${valueText}`,
+                    stat.description?.trim(),
+                    optionDescription,
+                ].filter(Boolean).join('\n');
+                lines.push(line);
                 continue;
             }
 
-            const contextBody = typeof context.body === 'string'
-                ? context.body
-                : (context.body || []).map(segment => `${segment.title}: ${typeof segment.body === 'string' ? segment.body : ''}`).join('\n');
-            lines.push(`${setting.title}: ${optionName}\n${context.title}: ${contextBody}`.trim());
+            const line = [
+                `${statName}: ${valueText}`,
+                stat.description?.trim(),
+            ].filter(Boolean).join('\n');
+            lines.push(line);
         }
 
-        return lines.length > 0 ? lines.join('\n\n') : 'No custom setting context is active.';
+        return lines.length > 0 ? lines.join('\n\n') : 'No player stat context is active.';
     }
 
     private buildActorSeedPrompt(save: SaveType, existingActorNames: string[]): string {

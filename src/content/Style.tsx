@@ -89,18 +89,6 @@ export const cloneUiSettings = (settings?: Partial<UiSettings>): UiSettings => (
     ...(settings || {}),
 });
 
-export const renderContextSegment = (segment: any): string => {
-    if (typeof segment?.body === 'string') {
-        return segment.body;
-    }
-    if (Array.isArray(segment?.body)) {
-        return segment.body
-            .map((child: any) => `${child.title}:\n${renderContextSegment(child)}`)
-            .join('\n\n');
-    }
-    return '';
-};
-
 export const applyUiSettingsToRoot = (uiSettings: UiSettings) => {
     const rootStyle = document.documentElement.style;
     rootStyle.setProperty('--agenda-accent-primary', uiSettings.accentColor);
@@ -169,7 +157,7 @@ export const buildUiSettingsGenerationPrompt = (input: UiStyleGenerationInput): 
         )
         .addBlock('Game Title', input.gameTitle || 'Agenda VN')
         .addBlock('World Context', input.worldContext || 'None provided.')
-        .addBlock('Selected Settings Context', input.selectedSettingsContext || 'None selected.')
+        .addBlock('Player Settings Context', input.selectedSettingsContext || 'None selected.')
         .addBlock('Active Characters', input.actorContext || 'None.')
         .addBlock('Active Locations', input.locationContext || 'None.')
         .addBlock('Field Usage Guide', buildStyleUsageGuide())
