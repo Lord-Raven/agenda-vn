@@ -58,8 +58,8 @@ export const UI_SETTINGS_GENERATION_FIELDS: StructuredFieldDefinition[] = [
     { key: 'atmosphere_start_color', label: 'ATMOSPHERE START COLOR', description: 'Gradient overlay start color for full-screen atmosphere.' },
     { key: 'atmosphere_mid_color', label: 'ATMOSPHERE MID COLOR', description: 'Gradient overlay midpoint color for depth transitions.' },
     { key: 'atmosphere_end_color', label: 'ATMOSPHERE END COLOR', description: 'Gradient overlay end color for mood and finish.' },
-    { key: 'panel_surface_color', label: 'PANEL SURFACE COLOR', description: 'Background color for shared cards and panel surfaces.' },
-    { key: 'panel_border_color', label: 'PANEL BORDER COLOR', description: 'Border color for shared cards and panel surfaces.' },
+    { key: 'panel_surface_color', label: 'PANEL SURFACE COLOR', description: 'Background color for shared card and panel surfaces.' },
+    { key: 'panel_border_color', label: 'PANEL BORDER COLOR', description: 'Border color for shared card and panel surfaces.' },
 ];
 
 export const UI_STYLE_FIELD_LABELS: Record<keyof UiSettings, string> = {
