@@ -11,6 +11,7 @@ import {
     UI_STYLE_FIELD_LABELS,
     UI_SETTINGS_GENERATION_FIELDS,
 } from '../content/Style';
+import { formatLoreEntriesAsContext, selectConstantLoreEntries } from '../content/Lore';
 import { parseStructuredResponse } from '../utils/StructuredResponse.js';
 import { AlphaColorPickerInput, buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
 
@@ -109,9 +110,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             const save = stageInstance.getSave();
             const activeActors = Object.values(save.actors || {}).filter(actor => actor.active !== false && actor.id !== save.playerId);
             const activeLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
-            const contextText = (configuration.context || [])
-                .map((segment) => `${segment.title}:\n${renderContextSegment(segment)}`)
-                .join('\n\n') || 'None provided.';
+            const contextText = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [])) || 'None provided.';
 
             const selectedSettingContext = (configuration.settings || []).map((setting) => {
                 const selectedOptionName = configuration.selectedSettings?.[setting.title] || '';

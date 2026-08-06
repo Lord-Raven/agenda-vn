@@ -2,7 +2,7 @@ import { v4 as generateUuid } from 'uuid';
 import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emotion';
 import { Stage } from '../Stage';
 import { AspectRatio } from '@chub-ai/stages-ts';
-import { createLoreEntry } from './Lore';
+import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import {buildPrompt} from "../utils/PromptBuilder.js";
 import {
     buildStructuredExampleResponse,
@@ -11,17 +11,6 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ActorStat } from "../Stage";
-
-
-function renderContextSegment(segment: any): string {
-    if (typeof segment.body === 'string') {
-        return segment.body;
-    }
-    if (Array.isArray(segment.body)) {
-        return segment.body.map((child: any) => `${child.title}:\n${renderContextSegment(child)}`).join('\n\n');
-    }
-    return '';
-}
 
 
 // An outfit represents a set of clothing or physical transformation that can be applied to a specific actor; each outfit comes with a full set of emotions
@@ -231,18 +220,14 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     }));
 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
-    const buildWorldContext = (builder: any) => {
-        (stage.getConfiguration().context || []).forEach(segment => {
-            builder.addBlock(segment.title, renderContextSegment(segment));
-        });
-    };
+    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [])) || 'None provided.';
     
     const generationRequest = stage.generateText(buildPrompt()
             .addBlock('Instructions',
                 `This is preparatory request for structured and formatted game content. ` +
                 `The world and its rules are described below. ` +
                 `The character details below describe a character of this world (${actor.name}) to convert into a set of defined fields for this game.`)
-            .addBlock('World Context', buildWorldContext)
+            .addBlock('World Context', worldContext)
             .addBlock('Character Details', definition.personality)
             .addBlock('Custom Actor Stats', actorStatContext)
             .addBlock('Stat Guidance',

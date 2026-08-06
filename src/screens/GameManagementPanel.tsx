@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
-import { ActorStat, ContextSegment, CustomSetting, Stage } from '../Stage';
+import { ActorStat, CustomSetting, Stage } from '../Stage';
 import { Button, GlassPanel, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
 
@@ -8,16 +8,18 @@ interface GameManagementPanelProps {
     stage: () => Stage;
 }
 
-const cloneSegment = (segment: ContextSegment): ContextSegment => ({
+const cloneSettingSegment = (segment: { title: string; body: string | any[] }): { title: string; body: string | any[] } => ({
     title: segment.title,
-    body: typeof segment.body === 'string' ? segment.body : (segment.body || []).map(cloneSegment),
+    body: typeof segment.body === 'string'
+        ? segment.body
+        : (segment.body || []).map((child: any) => cloneSettingSegment(child)),
 });
 
 const cloneSetting = (setting: CustomSetting): CustomSetting => ({
     title: setting.title,
     description: setting.description,
     options: Object.fromEntries(
-        Object.entries(setting.options || {}).map(([key, value]) => [key, cloneSegment(value)]),
+        Object.entries(setting.options || {}).map(([key, value]) => [key, cloneSettingSegment(value)]),
     ),
 });
 
@@ -29,11 +31,6 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     displayType: stat.displayType,
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
-});
-
-const defaultContextSegment = (): ContextSegment => ({
-    title: 'New Context Block',
-    body: 'Describe this context block.',
 });
 
 const defaultCustomSetting = (): CustomSetting => ({
@@ -68,12 +65,12 @@ const clampStatValue = (value: number, stat: ActorStat): number => {
     return resolved;
 };
 
-const renderSegmentBody = (segment: ContextSegment): string => {
+const renderSettingSegmentBody = (segment: { title: string; body: string | any[] }): string => {
     if (typeof segment.body === 'string') {
         return segment.body;
     }
 
-    return (segment.body || []).map(child => `${child.title}: ${renderSegmentBody(child)}`).join('\n');
+    return (segment.body || []).map((child: any) => `${child.title}: ${renderSettingSegmentBody(child)}`).join('\n');
 };
 
 export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => {
@@ -92,14 +89,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [isUploadingBackgroundImage, setIsUploadingBackgroundImage] = useState(false);
     const [isGeneratingBackgroundImage, setIsGeneratingBackgroundImage] = useState(false);
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
-    const [contextSegments, setContextSegments] = useState<ContextSegment[]>(() =>
-        (configuration.context || []).map(cloneSegment),
-    );
     const [customSettings, setCustomSettings] = useState<CustomSetting[]>(() =>
         (configuration.settings || []).map(cloneSetting),
-    );
-    const [collapsedContextBlocks, setCollapsedContextBlocks] = useState<boolean[]>(() =>
-        (configuration.context || []).map(() => true),
     );
     const [collapsedCustomSettings, setCollapsedCustomSettings] = useState<boolean[]>(() =>
         (configuration.settings || []).map(() => true),
@@ -185,7 +176,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             backgroundImageUrl,
             backgroundImagePrompt,
             startingDate,
-            context: contextSegments.map(cloneSegment),
             settings: customSettings.map(cloneSetting),
             selectedSettings: { ...validSelections },
             actorStats: actorStats.map(cloneActorStat),
@@ -201,7 +191,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         actorStats,
         backgroundImagePrompt,
         backgroundImageUrl,
-        contextSegments,
         customSettings,
         managedCalendarEvents,
         save.lorebook,
@@ -241,7 +230,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             locations: activeLocations,
             lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
             calendarEvents: managedCalendarEvents,
-            context: contextSegments,
             settings: customSettings,
             selectedSettings: validSelections,
             actorStats,
@@ -261,7 +249,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             titleImagePrompt: titleImagePrompt,
             backgroundImageUrl: backgroundImageUrl,
             backgroundImagePrompt: backgroundImagePrompt,
-            context: contextSegments.map(cloneSegment),
             settings: customSettings.map(cloneSetting),
             selectedSettings: validSelections,
             actorStats: actorStats.map(cloneActorStat),
@@ -293,7 +280,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         });
 
         stageInstance.saveGame();
-    }, [activeActors, activeLocations, actorStats, backgroundImagePrompt, backgroundImageUrl, contextSegments, customSettings, managedCalendarEvents, save, selectedSettings, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validSelections]);
+    }, [activeActors, activeLocations, actorStats, backgroundImagePrompt, backgroundImageUrl, customSettings, managedCalendarEvents, save, selectedSettings, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validSelections]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;
@@ -411,17 +398,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         }
     };
 
-    const updateContextSegment = (index: number, patch: Partial<ContextSegment>) => {
-        setContextSegments(prev => prev.map((segment, idx) => (
-            idx === index ? { ...segment, ...patch } : segment
-        )));
-    };
-
-    const removeContextSegment = (index: number) => {
-        setContextSegments(prev => prev.filter((_, idx) => idx !== index));
-        setCollapsedContextBlocks(prev => prev.filter((_, idx) => idx !== index));
-    };
-
     const updateCustomSetting = (index: number, patch: Partial<CustomSetting>) => {
         setCustomSettings(prev => prev.map((setting, idx) => (
             idx === index ? { ...setting, ...patch } : setting
@@ -431,12 +407,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const removeCustomSetting = (index: number) => {
         setCustomSettings(prev => prev.filter((_, idx) => idx !== index));
         setCollapsedCustomSettings(prev => prev.filter((_, idx) => idx !== index));
-    };
-
-    const toggleContextBlock = (index: number) => {
-        setCollapsedContextBlocks(prev => prev.map((isCollapsed, idx) => (
-            idx === index ? !isCollapsed : isCollapsed
-        )));
     };
 
     const toggleCustomSetting = (index: number) => {
@@ -462,7 +432,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         )));
     };
 
-    const updateSettingOption = (settingIndex: number, optionName: string, segment: ContextSegment) => {
+    const updateSettingOption = (settingIndex: number, optionName: string, segment: { title: string; body: string | any[] }) => {
         setCustomSettings(prev => prev.map((setting, idx) => {
             if (idx !== settingIndex) {
                 return setting;
@@ -629,62 +599,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             </GlassPanel>
 
             <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Global Context Blocks</Title>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {contextSegments.map((segment, index) => (
-                        <div key={`context-${index}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
-                                    {segment.title?.trim() || `Context Block ${index + 1}`}
-                                </div>
-                                <Button variant="secondary" onClick={() => toggleContextBlock(index)}>
-                                    {collapsedContextBlocks[index] ? 'Expand' : 'Collapse'}
-                                </Button>
-                            </div>
-
-                            {!collapsedContextBlocks[index] && (
-                                <>
-                                    <div style={{ marginTop: 10 }}>
-                                        <div style={inlineFieldStyle}>
-                                            <label style={fieldLabelStyle}>Name</label>
-                                            <TextInput
-                                                fullWidth
-                                                value={segment.title}
-                                                onChange={(e) => updateContextSegment(index, { title: e.target.value })}
-                                                placeholder="Context title"
-                                            />
-                                        </div>
-                                        <div style={inlineFieldTopStyle}>
-                                            <label style={fieldLabelStyle}>Context</label>
-                                            <textarea
-                                                className="input-base"
-                                                value={renderSegmentBody(segment)}
-                                                onChange={(e) => updateContextSegment(index, { body: e.target.value })}
-                                                rows={4}
-                                                style={{ width: '100%', resize: 'vertical' }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div style={{ marginTop: 8 }}>
-                                        <Button variant="danger" onClick={() => removeContextSegment(index)}>Remove Block</Button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    ))}
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            setContextSegments(prev => [...prev, defaultContextSegment()]);
-                            setCollapsedContextBlocks(prev => [...prev, false]);
-                        }}
-                    >
-                        Add Context Block
-                    </Button>
-                </div>
-            </GlassPanel>
-
-            <GlassPanel variant="default" style={{ padding: '18px' }}>
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Custom Settings</Title>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {customSettings.map((setting, settingIndex) => {
@@ -763,7 +677,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                                                             <label style={fieldLabelStyle}>Context</label>
                                                             <textarea
                                                                 className="input-base"
-                                                                value={typeof segment.body === 'string' ? segment.body : renderSegmentBody(segment)}
+                                                                value={typeof segment.body === 'string' ? segment.body : renderSettingSegmentBody(segment)}
                                                                 onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, body: e.target.value })}
                                                                 rows={3}
                                                                 style={{ width: '100%', resize: 'vertical' }}

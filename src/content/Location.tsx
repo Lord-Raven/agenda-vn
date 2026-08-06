@@ -1,6 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { findBestNameMatch } from './Actor';
+import { formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import { buildPrompt } from '../utils/PromptBuilder.js';
 import {
 	buildStructuredExampleResponse,
@@ -51,16 +52,6 @@ export function updateLocationDescription(locationId: string, description: strin
 	location.description = description;
 }
 
-function renderContextSegment(segment: any): string {
-	if (typeof segment.body === 'string') {
-		return segment.body;
-	}
-	if (Array.isArray(segment.body)) {
-		return segment.body.map((child: any) => `${child.title}:\n${renderContextSegment(child)}`).join('\n\n');
-	}
-	return '';
-}
-
 const LOCATION_DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
 	{ key: 'name', label: 'NAME', description: 'The location name.' },
 	{ key: 'category', label: 'CATEGORY', description: 'A concise organizational category for this location.' },
@@ -79,11 +70,7 @@ export async function distillLocation(location: Location, definition: any, stage
 		return existingGeneration as Promise<Location | null>;
 	}
 
-	const buildWorldContext = (builder: any) => {
-		(stage.getConfiguration().context || []).forEach(segment => {
-			builder.addBlock(segment.title, renderContextSegment(segment));
-		});
-	};
+	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [])) || 'None provided.';
 
 	const locationDetails = [
 		`Name: ${String(definition?.name || location.name || '').trim()}`,
@@ -102,7 +89,7 @@ export async function distillLocation(location: Location, definition: any, stage
 				`Use the existing location details to produce a polished set of location fields for this game. ` +
 				`Keep the location grounded in the same setting, and output valid hex colors for theme and light colors.`
 			)
-			.addBlock('World Context', buildWorldContext)
+			.addBlock('World Context', worldContext)
 			.addBlock('Location Details', locationDetails)
 			.addBlock('Response Format', buildStructuredResponseFormat(LOCATION_DISTILLATION_FIELDS, { includeEndTag: true }))
 			.addBlock(

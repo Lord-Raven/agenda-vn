@@ -31,6 +31,40 @@ export type Lore = {
     probability: number; // 1 to 100
 }
 
+const resolveLoreProbability = (entry: Lore): number => {
+    const value = Number(entry.probability);
+    if (!Number.isFinite(value)) {
+        return 100;
+    }
+
+    return Math.max(0, Math.min(100, value));
+};
+
+export const isLoreProbabilityActive = (entry: Lore): boolean => {
+    return Math.random() * 100 <= resolveLoreProbability(entry);
+};
+
+export const selectConstantLoreEntries = (lorebook: Lore[] = []): Lore[] => {
+    return lorebook
+        .filter((entry) => entry?.enabled && entry?.constant)
+        .filter((entry) => isLoreProbabilityActive(entry));
+};
+
+export const formatLoreEntriesAsContext = (entries: Lore[] = []): string => {
+    return entries
+        .map((entry) => {
+            const title = (entry.title || '').trim() || 'Lore';
+            const content = String(entry.content || '').trim();
+            if (!content) {
+                return '';
+            }
+
+            return `${title}:\n${content}`;
+        })
+        .filter(Boolean)
+        .join('\n\n');
+};
+
 export function createLoreEntry(params: Partial<Omit<Lore, 'id'>>): Lore {
     return {
         type: "other",

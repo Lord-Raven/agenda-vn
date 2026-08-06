@@ -8,7 +8,7 @@ import { generateContext, Skit, SkitType } from "./content/Skit";
 import { createDefaultAtlas, Location } from "./content/Location";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
-import { Lore } from "./content/Lore";
+import { createLoreEntry, Lore } from "./content/Lore";
 import { DEFAULT_PLAYER_THEME_COLOR } from "./screens/SettingsScreen";
 import {buildPrompt} from "./utils/PromptBuilder.js";
 import {
@@ -50,7 +50,6 @@ export type SaveType = {
         titleImagePrompt?: string;
         backgroundImageUrl?: string;
         backgroundImagePrompt?: string;
-        context: ContextSegment[];
         settings: CustomSetting[];
         selectedSettings: {[key: string]: string};
         actorStats?: ActorStat[];
@@ -144,7 +143,6 @@ export type GameConfiguration = {
     locations: Location[], // All defined locations for a new game
     lorebook: Lore[], // Lore entries to seed into new games
     calendarEvents: CalendarEvent[], // Calendar event series definitions to seed into new games
-    context: ContextSegment[], // All defined context segments (applies to current and new games)
     settings: CustomSetting[], // All defined custom settings (applies to current and new games)
     selectedSettings: {[key: string]: string}, // Default selected options for custom settings in new games
     actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
@@ -215,6 +213,55 @@ const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({
         : undefined,
 });
 
+const renderContextSegment = (segment: ContextSegment): string => {
+    if (typeof segment.body === 'string') {
+        return segment.body;
+    }
+
+    if (Array.isArray(segment.body)) {
+        return segment.body.map((child) => `${child.title}:\n${renderContextSegment(child)}`).join('\n\n');
+    }
+
+    return '';
+};
+
+const mergeLegacyContextIntoLorebook = (lorebook: Lore[], legacyContext: ContextSegment[]): Lore[] => {
+    const mergedLore = lorebook.map(cloneLore);
+
+    legacyContext.forEach((segment, index) => {
+        const title = (segment.title || '').trim() || `World Context ${index + 1}`;
+        const content = renderContextSegment(segment).trim();
+        if (!content) {
+            return;
+        }
+
+        const exists = mergedLore.some((entry) =>
+            entry.constant &&
+            entry.enabled &&
+            entry.title.trim().toLowerCase() === title.toLowerCase() &&
+            entry.content.trim() === content,
+        );
+        if (exists) {
+            return;
+        }
+
+        mergedLore.push(createLoreEntry({
+            type: 'other',
+            title,
+            content,
+            triggers: [],
+            enabled: true,
+            constant: true,
+            scanDepth: 10,
+            insertionOrder: index,
+            priority: 50,
+            probability: 100,
+        }));
+    });
+
+    return mergedLore;
+};
+
 type TimelineEntry = {
     calendarEventId?: string;
     date?: string;
@@ -272,7 +319,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locations: [],
             lorebook: [],
             calendarEvents: [],
-            context: [],
             settings: [],
             selectedSettings: {},
             actorStats: [],
@@ -297,11 +343,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const activeSave = this.saveData.saves[this.saveData.lastSaveSlot];
         const defaultConfiguration = this.createDefaultNewGameConfiguration();
-        const legacyContext = activeSave?.agendaConfig?.context || [];
+        const legacyContext = ((activeSave?.agendaConfig as any)?.context || []) as ContextSegment[];
         const legacySettings = activeSave?.agendaConfig?.settings || [];
         const legacySelectedSettings = activeSave?.agendaConfig?.selectedSettings || {};
         const legacyActorStats = activeSave?.agendaConfig?.actorStats || [];
-        const legacyLorebook = activeSave?.lorebook || [];
+        const legacyLorebook = mergeLegacyContextIntoLorebook(activeSave?.lorebook || [], legacyContext);
         const legacyUiSettings = activeSave?.uiSettings || {};
 
         if (!this.saveData.configuration) {
@@ -311,7 +357,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 locations: [],
                 lorebook: legacyLorebook.map(cloneLore),
                 calendarEvents: [],
-                context: legacyContext.map(cloneContextSegment),
                 settings: legacySettings.map(cloneCustomSetting),
                 selectedSettings: { ...legacySelectedSettings },
                 actorStats: legacyActorStats.map(cloneActorStat),
@@ -323,9 +368,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.saveData.configuration = {
             actors: (this.saveData.configuration.actors || defaultConfiguration.actors).map(cloneActor),
             locations: (this.saveData.configuration.locations || defaultConfiguration.locations).map(cloneLocation),
-            lorebook: (this.saveData.configuration.lorebook || legacyLorebook || defaultConfiguration.lorebook).map(cloneLore),
+            lorebook: mergeLegacyContextIntoLorebook(
+                (this.saveData.configuration.lorebook || legacyLorebook || defaultConfiguration.lorebook).map(cloneLore),
+                legacyContext,
+            ),
             calendarEvents: (this.saveData.configuration.calendarEvents || defaultConfiguration.calendarEvents).map(cloneCalendarEvent),
-            context: (this.saveData.configuration.context || legacyContext).map(cloneContextSegment),
             settings: (this.saveData.configuration.settings || legacySettings).map(cloneCustomSetting),
             selectedSettings: { ...(this.saveData.configuration.selectedSettings || legacySelectedSettings || defaultConfiguration.selectedSettings) },
             actorStats: (this.saveData.configuration.actorStats || legacyActorStats).map(cloneActorStat),
@@ -359,7 +406,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locations: (updates.locations ?? current.locations ?? []).map(cloneLocation),
             lorebook: (updates.lorebook ?? current.lorebook ?? []).map(cloneLore),
             calendarEvents: (updates.calendarEvents ?? current.calendarEvents ?? []).map(cloneCalendarEvent),
-            context: (updates.context ?? current.context ?? []).map(cloneContextSegment),
             settings: (updates.settings ?? current.settings ?? []).map(cloneCustomSetting),
             selectedSettings: { ...(updates.selectedSettings ?? current.selectedSettings ?? {}) },
             actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneActorStat),
@@ -376,7 +422,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     titleImagePrompt: "Generate a title image for a visual novel game called 'Agenda VN'.",
                     backgroundImageUrl: "",
                     backgroundImagePrompt: "Generate a background image for the menu and calendar screens of a visual novel game called 'Agenda VN'.",
-                    context: [],
                     settings: [],
                     selectedSettings: {},
                     actorStats: [],
@@ -482,7 +527,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 backgroundImageUrl: configuration.backgroundImageUrl || '',
                 backgroundImagePrompt: configuration.backgroundImagePrompt || '',
                 startingDate,
-                context: configuration.context.map(cloneContextSegment),
                 settings: configuration.settings.map(cloneCustomSetting),
                 selectedSettings: { ...(configuration.selectedSettings || {}) },
                 actorStats: configuration.actorStats.map(cloneActorStat),
@@ -512,7 +556,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 backgroundImageUrl: persistedConfiguration.backgroundImageUrl || '',
                 backgroundImagePrompt: persistedConfiguration.backgroundImagePrompt || '',
                 startingDate: persistedConfiguration.startingDate || new Date().toISOString().slice(0, 10),
-                context: persistedConfiguration.context.map(cloneContextSegment),
                 settings: persistedConfiguration.settings.map(cloneCustomSetting),
                 selectedSettings: {
                     ...Object.fromEntries(
@@ -1233,7 +1276,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 backgroundImageUrl: this.getConfiguration().backgroundImageUrl || '',
                 backgroundImagePrompt: this.getConfiguration().backgroundImagePrompt || '',
                 startingDate: this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10),
-                context: [],
                 settings: [],
                 selectedSettings: {},
                 actorStats: [],

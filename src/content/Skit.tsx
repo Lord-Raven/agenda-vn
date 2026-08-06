@@ -4,7 +4,7 @@ import { Outcome, OutcomeType } from "./Outcome";
 import { Stage } from "../Stage";
 import { Actor, findBestNameMatch, getActorLore } from "./Actor";
 import { getLocationDescription } from "./Location";
-import { MAX_ENTRIES } from "./Lore";
+import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
 import {
     buildStructuredExampleResponse,
@@ -13,16 +13,6 @@ import {
     parseXmlTagsToObjects,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-
-function renderContextSegment(segment: any): string {
-    if (typeof segment.body === 'string') {
-        return segment.body;
-    }
-    if (Array.isArray(segment.body)) {
-        return segment.body.map((child: any) => `${child.title}:\n${renderContextSegment(child)}`).join('\n\n');
-    }
-    return '';
-}
 
 const getDayDifference = (startDate: string, endDate: string): number => {
     const start = new Date(`${startDate}T00:00:00Z`);
@@ -179,14 +169,7 @@ function flattenContextSegments(segments: Array<{ title: string; body: string | 
     }).join('\n');
 }
 
-export function buildPremise(playerName: string, stage?: any): string {
-    // Build world context from configuration if stage is provided
-    let worldContext = '';
-    if (stage) {
-        const contextSegments = (stage.getConfiguration?.()?.context || []);
-        worldContext = contextSegments.map((segment: any) => renderContextSegment(segment)).join('\n\n');
-    }
-    
+export function buildPremise(playerName: string, worldContext = ''): string {
     // Fallback generic premise if no configuration context available
     if (!worldContext) {
         worldContext = `This is a science-fantasy game set in a unique world. The player is one of many characters navigating this world, interacting with others and embarking on expeditions to discover artifacts and remnants of the old world.`;
@@ -204,7 +187,13 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     const currentActors = skit ? getCurrentActors(skit, skit.script.length - 1).map(actorId => save.actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[] : [];
     const lorebook = save.lorebook || [];
     const agendaConfig = save.agendaConfig;
-    const agendaContext = flattenContextSegments(agendaConfig?.context || []);
+    const passedProbabilityLoreIds = new Set(
+        lorebook.filter((lore) => isLoreProbabilityActive(lore)).map((lore) => lore.id),
+    );
+    const activeConstantLore = lorebook
+        .filter((lore) => lore.enabled && lore.constant && passedProbabilityLoreIds.has(lore.id))
+        .sort((a, b) => a.insertionOrder - b.insertionOrder);
+    const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
     const selectedSettingContext = (agendaConfig?.settings || []).map(setting => {
         const selectedOptionName = agendaConfig?.selectedSettings?.[setting.title] || '';
         if (!selectedOptionName) {
@@ -245,8 +234,8 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             });
     }).sort((a, b) => a.insertionOrder - b.insertionOrder);
 
-    // Run probabilities on triggeredLore, and remove entries that don't pass. For each record, look at the entry's prorobability (100 by default) and run a calculation to determine whether to keep it in the context or not. This adds an element of variability and surprise to the lore that can be included in the context, while still prioritizing important lore with higher probability and insertion order.
-    triggeredLore = triggeredLore.filter(lore => Math.random() * 100 <= lore.probability);
+    // Run probabilities on triggered lore with one shared probability roll-set so constant lore stays consistent across all context blocks.
+    triggeredLore = triggeredLore.filter((lore) => passedProbabilityLoreIds.has(lore.id));
 
     // Remove (if present) lore entry for the current location (which is referenced in detail below):
     if (location) {
@@ -267,7 +256,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Finally, order the triggeredLore list by insertion order, so that earlier lore entries appear first in the context.
     triggeredLore = triggeredLore.sort((a, b) => a.insertionOrder - b.insertionOrder);
 
-    return (builder: PromptBuilder) => builder.addBlock(`Premise`, buildPremise(playerName, stage))
+    return (builder: PromptBuilder) => builder.addBlock(`Premise`, buildPremise(playerName, agendaContext))
         .addBlock(`Agenda Context`, agendaContext || 'None.')
         .addBlock(`Selected Custom Settings`, selectedSettingContext || 'None.')
         .addBlock(`Lore Entries`, (builder) => {
