@@ -273,6 +273,30 @@ export const TextInput: FC<TextInputProps> = ({
 	);
 };
 
+interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+	fullWidth?: boolean;
+	style?: React.CSSProperties;
+	className?: string;
+}
+
+export const TextArea: FC<TextAreaProps> = ({
+	fullWidth = false,
+	className = '',
+	style,
+	...props
+}) => {
+	return (
+		<textarea
+			className={`input-base ${className}`}
+			style={{
+				width: fullWidth ? '100%' : 'auto',
+				...style
+			}}
+			{...props}
+		/>
+	);
+};
+
 interface ColorPickerInputProps {
 	value: string;
 	onChange: (value: string) => void;

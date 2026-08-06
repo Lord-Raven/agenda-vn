@@ -6,7 +6,7 @@ import { v4 as generateUuid } from 'uuid';
 import { Actor, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
+import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ActorStatStars } from './ActorStatStars';
 
 interface ActorDetailPanelProps {
@@ -1104,20 +1104,11 @@ ${indent}}`;
                                         >
                                             Physical Description
                                         </label>
-                                        <textarea
+                                        <TextArea
                                             value={editedActor.description}
                                             onChange={(e) => handleInputChange('description', e.target.value)}
                                             placeholder="Core physical appearance, separate from clothing or outfit details"
                                             style={{
-                                                width: '100%',
-                                                minHeight: '100px',
-                                                padding: '12px',
-                                                fontSize: '14px',
-                                                backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                border: '2px solid rgba(0, 255, 136, 0.3)',
-                                                borderRadius: '5px',
-                                                color: '#e0f0ff',
-                                                fontFamily: 'inherit',
                                                 resize: 'vertical',
                                             }}
                                         />
@@ -1136,20 +1127,11 @@ ${indent}}`;
                                         >
                                             Personality Profile{isProfileBackedByLore ? ' (From Lorebook)' : ''}
                                         </label>
-                                        <textarea
+                                        <TextArea
                                             value={isProfileBackedByLore ? editedActor.lore : editedActor.profile}
                                             onChange={(e) => handleInputChange(isProfileBackedByLore ? 'lore' : 'profile', e.target.value)}
                                             placeholder="Key personality traits and behaviors"
                                             style={{
-                                                width: '100%',
-                                                minHeight: '100px',
-                                                padding: '12px',
-                                                fontSize: '14px',
-                                                backgroundColor: 'rgba(0, 20, 40, 0.6)',
-                                                border: '2px solid rgba(0, 255, 136, 0.3)',
-                                                borderRadius: '5px',
-                                                color: '#e0f0ff',
-                                                fontFamily: 'inherit',
                                                 resize: 'vertical',
                                             }}
                                         />
@@ -1468,7 +1450,7 @@ ${indent}}`;
                                         >
                                             Outfit Description
                                         </label>
-                                        <textarea
+                                        <TextArea
                                             value={selectedOutfit?.description || ''}
                                             onChange={(e) => handleOutfitChange('description', e.target.value)}
                                             placeholder="Physical appearance, attire, and distinguishing features for this outfit"
@@ -1505,7 +1487,7 @@ ${indent}}`;
                                                     Generate Object
                                                 </Button>
                                             </div>
-                                            <textarea
+                                            <TextArea
                                                 value={outfitsObjectExport}
                                                 readOnly
                                                 placeholder="Generate object output to export this actor's outfits"
@@ -2111,7 +2093,7 @@ ${indent}}`;
                                     >
                                         Emotion Prompt
                                     </label>
-                                    <textarea
+                                    <TextArea
                                         value={emotionPromptDraft}
                                         onChange={(e) => handleEmotionPromptDraftChange(e.target.value)}
                                         placeholder="Describe the character's expression, gesture, or pose for this emotion; leave blank to have a prompt generated for you."

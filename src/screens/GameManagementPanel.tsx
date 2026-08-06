@@ -1,7 +1,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { ActorStat, CustomSetting, Stage } from '../Stage';
-import { Button, GlassPanel, TextInput, Title } from './UiComponents';
+import { Button, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
 
 interface GameManagementPanelProps {
@@ -630,8 +630,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                                             </div>
                                             <div style={inlineFieldTopStyle}>
                                                 <label style={fieldLabelStyle}>Description</label>
-                                                <textarea
-                                                    className="input-base"
+                                                <TextArea
                                                     value={setting.description}
                                                     onChange={(e) => updateCustomSetting(settingIndex, { description: e.target.value })}
                                                     rows={2}
@@ -675,8 +674,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                                                         </div>
                                                         <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                                             <label style={fieldLabelStyle}>Context</label>
-                                                            <textarea
-                                                                className="input-base"
+                                                            <TextArea
                                                                 value={typeof segment.body === 'string' ? segment.body : renderSettingSegmentBody(segment)}
                                                                 onChange={(e) => updateSettingOption(settingIndex, optionName, { ...segment, body: e.target.value })}
                                                                 rows={3}
@@ -750,8 +748,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
                                         <div style={inlineFieldTopStyle}>
                                             <label style={fieldLabelStyle}>Description</label>
-                                            <textarea
-                                                className="input-base"
+                                            <TextArea
                                                 value={stat.description}
                                                 onChange={(e) => updateActorStat(statIndex, { description: e.target.value })}
                                                 rows={2}
@@ -762,8 +759,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
                                         <div style={inlineFieldTopStyle}>
                                             <label style={fieldLabelStyle}>Guidance</label>
-                                            <textarea
-                                                className="input-base"
+                                            <TextArea
                                                 value={stat.guidance}
                                                 onChange={(e) => updateActorStat(statIndex, { guidance: e.target.value })}
                                                 rows={2}
@@ -861,8 +857,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                     Includes active actors and locations, plus current settings, styles, lorebook, and calendar event series.
                 </div>
 
-                <textarea
-                    className="input-base"
+                <TextArea
                     readOnly
                     value={portableGameConfigurationJson}
                     rows={20}

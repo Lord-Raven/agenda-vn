@@ -4,7 +4,7 @@ import { Add, Close, KeyboardArrowDownRounded, KeyboardArrowUpRounded, Visibilit
 import { Chip } from '@mui/material';
 import { Stage } from '../Stage';
 import { createLoreEntry, Lore } from '../content/Lore';
-import { Button, ConfirmDialog, GlassPanel, TextInput, Title } from './UiComponents';
+import { Button, ConfirmDialog, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { findBestNameMatch, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { getLinkedLocationLore, updateLocationDescription } from '../content/Location';
 import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
@@ -689,10 +689,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minHeight: 0 }}>
                                             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Content</label>
-                                            <textarea
+                                            <TextArea
                                                 value={selectedLore.content}
                                                 onChange={(event) => updateSelectedLoreContent(event.target.value)}
-                                                className="input-base"
                                                 style={{ width: '100%', flex: 1, minHeight: 0, resize: 'none', overflowY: 'auto' }}
                                             />
                                         </div>

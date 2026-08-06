@@ -1,7 +1,7 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CustomSetting, SaveType, Stage } from '../Stage';
-import { GlassPanel, Title, Button, ColorPickerInput, TextInput } from './UiComponents';
+import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from './UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from './TooltipContext';
 import { ScreenType } from './BaseScreen';
@@ -352,9 +352,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                 >
                                     Player Description
                                 </label>
-                                <textarea
+                                <TextArea
                                     id="player-description"
-                                    className="input-base"
                                     value={settings.playerDescription}
                                     onChange={(e) => handleInputChange('playerDescription', e.target.value)}
                                     placeholder="Describe your character..."

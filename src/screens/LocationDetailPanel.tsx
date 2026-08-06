@@ -4,7 +4,7 @@ import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material
 import { Stage } from '../Stage';
 import { distillLocation, getLocationDescription, getLinkedLocationLore, Location, updateLocationDescription } from '../content/Location';
 import { Image as ImageIcon, Place } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
+import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
 
 interface LocationDetailPanelProps {
@@ -441,7 +441,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                         <label style={labelStyle}>
                                             Description{isDescriptionBackedByLore ? ' (From Lorebook)' : ''}
                                         </label>
-                                        <textarea
+                                        <TextArea
                                             value={editedLocation.description}
                                             onChange={(e) => handleInputChange('description', e.target.value)}
                                             placeholder="A description of this location"

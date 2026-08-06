@@ -1,7 +1,7 @@
 import React, { FC, useMemo, useState } from 'react';
 import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
-import { Button, GlassPanel, TextInput, Title } from './UiComponents';
+import { Button, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 
 interface CalendarEventManagementPanelProps {
     stage: () => Stage;
@@ -307,8 +307,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                     <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Description</label>
-                        <textarea
-                            className="input-base"
+                        <TextArea
                             value={draft.description}
                             onChange={(e) => updateDraft({ description: e.target.value })}
                             rows={3}
@@ -318,8 +317,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                     <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Guidance</label>
-                        <textarea
-                            className="input-base"
+                        <TextArea
                             value={draft.guidance}
                             onChange={(e) => updateDraft({ guidance: e.target.value })}
                             rows={3}
