@@ -33,6 +33,7 @@ export const colors = {
 };
 
 export const theme = createTheme({
+  cssVariables: true,
   palette: {
     mode: 'dark',
     primary: colors.primary,
