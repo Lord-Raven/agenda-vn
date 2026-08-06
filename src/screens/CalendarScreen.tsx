@@ -329,7 +329,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                     fontSize: { xs: "2rem", md: "3rem" },
                                     letterSpacing: "0.04em",
                                     lineHeight: 1,
-                                    textShadow: isViewingCurrentMonth ? "0 3px 14px rgba(0, 0, 0, 0.24)" : "none",
+                                    textShadow: isViewingCurrentMonth
+                                        ? "0 3px 14px color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)"
+                                        : "none",
                                     display: "inline-flex",
                                     alignItems: "center",
                                     gap: 1,
@@ -417,7 +419,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                         textAlign: "center",
                                         py: 0.85,
                                         borderRight: "1px solid var(--agenda-panel-border)",
-                                        background: "linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015))",
+                                        background: "linear-gradient(180deg, color-mix(in srgb, var(--agenda-text-primary) 6%, transparent), color-mix(in srgb, var(--agenda-text-primary) 1.5%, transparent))",
                                         "&:last-of-type": {
                                             borderRight: 0,
                                         },
@@ -490,11 +492,11 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                 borderTop: 0,
                                                 borderLeft: 0,
                                                 background: isCurrentMonth
-                                                    ? "linear-gradient(178deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.005))"
-                                                    : "rgba(0, 0, 0, 0.2)",
+                                                    ? "linear-gradient(178deg, color-mix(in srgb, var(--agenda-text-primary) 3%, transparent), color-mix(in srgb, var(--agenda-text-primary) 0.5%, transparent))"
+                                                    : "color-mix(in srgb, var(--agenda-surface-base) 80%, transparent)",
                                                 opacity: isCurrentMonth ? 1 : 0.5,
                                                 boxShadow: isToday
-                                                    ? "inset 0 0 0 2px rgba(137, 205, 135, 0.42)"
+                                                    ? "inset 0 0 0 2px color-mix(in srgb, var(--agenda-highlight) 42%, transparent)"
                                                     : "none",
                                                 display: "flex",
                                                 flexDirection: "column",
@@ -509,8 +511,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         position: "absolute",
                                                         inset: isActiveDate ? "-1px" : "0px",
                                                         background: isCurrentMonth
-                                                            ? "linear-gradient(178deg, rgba(46, 53, 77, 0.98), rgba(28, 34, 52, 0.96))"
-                                                            : "rgba(18, 24, 38, 0.96)",
+                                                            ? "linear-gradient(178deg, color-mix(in srgb, var(--agenda-surface-elevated) 98%, transparent), color-mix(in srgb, var(--agenda-surface-base) 96%, transparent))"
+                                                            : "color-mix(in srgb, var(--agenda-surface-base) 96%, transparent)",
                                                         border: "1px solid var(--agenda-panel-border)",
                                                         opacity: isActiveDate ? 1 : 0,
                                                         transition: "opacity 180ms ease",
@@ -561,8 +563,10 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                     position: "relative",
                                                                     display: "flex",
                                                                     alignItems: "center",
-                                                                    backgroundColor: `${leadActor?.themeColor || "#8ab0cc"}22`,
-                                                                    border: `1px solid ${leadActor?.themeColor || "rgba(138, 176, 204, 0.48)"}`,
+                                                                        backgroundColor: leadActor?.themeColor
+                                                                            ? `${leadActor.themeColor}22`
+                                                                            : "color-mix(in srgb, var(--agenda-accent-primary) 14%, transparent)",
+                                                                        border: `1px solid ${leadActor?.themeColor || "var(--agenda-accent-primary)"}`,
                                                                     borderRadius: "7px",
                                                                     padding: "4px 8px",
                                                                     minHeight: "30px",
@@ -589,12 +593,12 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                                 height: 20,
                                                                                 marginLeft: index === 0 ? 0 : -0.9,
                                                                                 borderRadius: "50%",
-                                                                                border: "1px solid rgba(237, 242, 242, 0.44)",
+                                                                                border: "1px solid var(--agenda-line-subtle)",
                                                                                 backgroundImage: `url(${getEmotionImage(actor, "neutral", stageInstance, actor.outfitId) || getEmotionImage(actor, "base", stageInstance, actor.outfitId)})`,
                                                                                 backgroundSize: "cover",
                                                                                 backgroundPosition: "top center",
-                                                                                backgroundColor: "rgba(12, 18, 28, 0.88)",
-                                                                                boxShadow: "0 1px 4px rgba(0, 0, 0, 0.35)",
+                                                                                backgroundColor: "color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)",
+                                                                                boxShadow: "0 1px 4px color-mix(in srgb, var(--agenda-surface-base) 70%, transparent)",
                                                                             }}
                                                                         />
                                                                     ))}
@@ -604,7 +608,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                     sx={{
                                                                         position: "relative",
                                                                         zIndex: 2,
-                                                                        color: "rgba(240, 246, 246, 0.98)",
+                                                                        color: "var(--agenda-text-primary)",
                                                                         fontSize: "0.72rem",
                                                                         fontWeight: 700,
                                                                         letterSpacing: "0.01em",
@@ -614,8 +618,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                         paddingRight: "48px",
                                                                         width: "100%",
                                                                         fontFamily: leadActor?.themeFontFamily || "inherit",
-                                                                        textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
-                                                                        WebkitTextStroke: `0.6px ${leadActor?.themeColor || "rgba(12, 18, 28, 0.95)"}`,
+                                                                        textShadow: "0 1px 2px color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)",
+                                                                        WebkitTextStroke: `0.6px ${leadActor?.themeColor || "var(--agenda-surface-base)"}`,
                                                                     }}
                                                                 >
                                                                     {eventItem.recurrence ? "↻ " : ""}{eventItem.name} · {formatDurationSummary(eventItem)}

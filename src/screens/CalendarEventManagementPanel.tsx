@@ -1,13 +1,20 @@
 import React, { FC, useMemo, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
 import { Button, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
+import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
 
 interface CalendarEventManagementPanelProps {
     stage: () => Stage;
 }
 
 const TIME_OF_DAY_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
+const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+});
 
 const formatTimeOfDay = (timeOfDay: CalendarTimeOfDay) => `${timeOfDay[0].toUpperCase()}${timeOfDay.slice(1)}`;
 
@@ -59,9 +66,37 @@ const recurrenceSummary = (recurrence?: CalendarEventRecurrence): string => {
     return `Every ${interval} ${unit} until ${recurrence.untilDate}`;
 };
 
+const monthYearForEvent = (dateKey: string): { id: string; label: string; sortKey: number } => {
+    const parsed = new Date(`${dateKey}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+        return {
+            id: 'unknown-date',
+            label: 'Unknown Date',
+            sortKey: Number.MAX_SAFE_INTEGER,
+        };
+    }
+
+    const year = parsed.getUTCFullYear();
+    const month = parsed.getUTCMonth();
+    return {
+        id: `${year}-${String(month + 1).padStart(2, '0')}`,
+        label: MONTH_YEAR_FORMATTER.format(parsed),
+        sortKey: year * 100 + month,
+    };
+};
+
+const eventSortKey = (event: CalendarEvent): number => {
+    const parsed = new Date(`${event.date}T00:00:00Z`);
+    const day = Number.isNaN(parsed.getTime()) ? Number.MAX_SAFE_INTEGER : parsed.getTime();
+    const firstSlot = normalizeDuration(event.duration)[0];
+    const slotOrder = TIME_OF_DAY_ORDER.indexOf(firstSlot);
+    return (day * 10) + (slotOrder < 0 ? TIME_OF_DAY_ORDER.length : slotOrder);
+};
+
 export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps> = ({ stage }) => {
     const stageInstance = stage();
     const save = stageInstance.getSave();
+    const shouldReduceMotion = useReducedMotion();
 
     const actors = useMemo(
         () => Object.values(save.actors || {})
@@ -83,6 +118,45 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
     const [selectedEventId, setSelectedEventId] = useState<string | null>(() => events[0]?.id || null);
     const [draft, setDraft] = useState<CalendarEvent>(() => cloneEvent(events[0] || stageInstance.createCalendarEventDraft()));
     const [isNewDraft, setIsNewDraft] = useState<boolean>(() => events.length === 0);
+    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+
+    const eventSections = useMemo<CategorizedEntrySection<CalendarEvent>[]>(() => {
+        const grouped = new Map<string, { id: string; title: string; sortKey: number; entries: CalendarEvent[] }>();
+
+        for (const event of events) {
+            const group = monthYearForEvent(event.date);
+            const existing = grouped.get(group.id);
+            if (existing) {
+                existing.entries.push(event);
+                continue;
+            }
+
+            grouped.set(group.id, {
+                id: group.id,
+                title: group.label,
+                sortKey: group.sortKey,
+                entries: [event],
+            });
+        }
+
+        return Array.from(grouped.values())
+            .map((section) => ({
+                id: section.id,
+                title: section.title,
+                entries: section.entries.sort((left, right) => {
+                    const byDateAndTime = eventSortKey(left) - eventSortKey(right);
+                    if (byDateAndTime !== 0) {
+                        return byDateAndTime;
+                    }
+                    return left.name.localeCompare(right.name);
+                }),
+            }))
+            .sort((left, right) => {
+                const leftSort = monthYearForEvent(left.entries[0]?.date || '').sortKey;
+                const rightSort = monthYearForEvent(right.entries[0]?.date || '').sortKey;
+                return leftSort - rightSort;
+            });
+    }, [events]);
 
     const refreshEvents = (nextSelectedId?: string) => {
         const refreshed = stageInstance.getManagedCalendarEvents().map(cloneEvent);
@@ -214,32 +288,41 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     <Button variant="secondary" onClick={() => refreshEvents()}>Refresh</Button>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'auto', minHeight: 0 }}>
-                    {events.length === 0 && (
-                        <div style={{ color: 'var(--agenda-text-muted)', fontStyle: 'italic' }}>
-                            No saved events.
-                        </div>
-                    )}
-                    {events.map(event => (
-                        <button
-                            key={event.id}
-                            className="input-base"
-                            onClick={() => selectEvent(event.id)}
-                            style={{
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                borderColor: selectedEventId === event.id ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)',
-                                background: selectedEventId === event.id
-                                    ? 'linear-gradient(145deg, rgba(39, 58, 60, 0.92), rgba(21, 26, 40, 0.92))'
-                                    : 'linear-gradient(145deg, rgba(27, 33, 51, 0.92), rgba(21, 26, 40, 0.92))',
-                            }}
-                        >
-                            <div style={{ fontWeight: 700, marginBottom: 4 }}>{event.name}</div>
-                            <div style={{ fontSize: '13px', color: 'var(--agenda-text-muted)' }}>{event.date}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{durationSummary(event.duration)}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{recurrenceSummary(event.recurrence)}</div>
-                        </button>
-                    ))}
+                <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                    <CategorizedEntrySidebar
+                        sections={eventSections}
+                        collapsedSections={collapsedSections}
+                        onToggleSection={(sectionId) => {
+                            setCollapsedSections((current) => ({
+                                ...current,
+                                [sectionId]: !(current[sectionId] ?? false),
+                            }));
+                        }}
+                        renderEntry={(event) => (
+                            <button
+                                key={event.id}
+                                className="input-base"
+                                onClick={() => selectEvent(event.id)}
+                                style={{
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    borderColor: selectedEventId === event.id ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)',
+                                    background: selectedEventId === event.id
+                                        ? 'linear-gradient(145deg, rgba(39, 58, 60, 0.92), rgba(21, 26, 40, 0.92))'
+                                        : 'linear-gradient(145deg, rgba(27, 33, 51, 0.92), rgba(21, 26, 40, 0.92))',
+                                }}
+                            >
+                                <div style={{ fontWeight: 700, marginBottom: 4 }}>{event.name}</div>
+                                <div style={{ fontSize: '13px', color: 'var(--agenda-text-muted)' }}>{event.date}</div>
+                                <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{durationSummary(event.duration)}</div>
+                                <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{recurrenceSummary(event.recurrence)}</div>
+                            </button>
+                        )}
+                        getEntryKey={(event) => event.id}
+                        shouldReduceMotion={Boolean(shouldReduceMotion)}
+                        emptyListMessage="No saved events."
+                        sectionEmptyMessage="No events in this month."
+                    />
                 </div>
             </GlassPanel>
 
