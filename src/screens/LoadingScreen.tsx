@@ -4,7 +4,7 @@ import { ScreenType } from './BaseScreen';
 import { Stage } from '../Stage';
 import { GlassPanel, Title } from './UiComponents';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DEFAULT_ATLAS_LOCATIONS } from '../content/Location';
+import { DEFAULT_ATLAS_LOCATIONS, getLocationImageUrl } from '../content/Location';
 
 /*
  * Loading screen that displays while content is being loaded.
@@ -40,7 +40,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
     const bgQueueIndexRef = useRef(0);
     const [bgUrl, setBgUrl] = useState<string>(() => {
         const urls = shuffleArray(
-            DEFAULT_ATLAS_LOCATIONS.map(l => l.imageUrl).filter(Boolean)
+            DEFAULT_ATLAS_LOCATIONS.map((location) => getLocationImageUrl(location)).filter(Boolean)
         );
         bgQueueRef.current = urls;
         bgQueueIndexRef.current = 0;

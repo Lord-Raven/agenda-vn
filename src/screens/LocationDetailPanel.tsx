@@ -2,7 +2,21 @@ import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import { Stage } from '../Stage';
-import { distillLocation, getLocationDescription, getLinkedLocationLore, Location, updateLocationDescription, upsertLocationLoreEntry } from '../content/Location';
+import { CalendarTimeOfDay } from '../content/CalendarEvent';
+import {
+    distillLocation,
+    generateBaseLocationImage,
+    generateLocationImageForTimeOfDay,
+    generateLocationTimeOfDayPrompt,
+    getLocationDescription,
+    getLocationTimeOfDayPrompt,
+    getLinkedLocationLore,
+    Location,
+    LOCATION_TIME_OF_DAY_LABELS,
+    LOCATION_TIME_OF_DAY_ORDER,
+    updateLocationDescription,
+    upsertLocationLoreEntry,
+} from '../content/Location';
 import { Image as ImageIcon, Place } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
@@ -24,6 +38,8 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         themeColor: string;
         lightColor: string;
         imageUrl: string;
+        timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>>;
+        timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>>;
         focalX: number;
         focalY: number;
     }>({
@@ -33,6 +49,8 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         themeColor: location.themeColor,
         lightColor: location.lightColor,
         imageUrl: location.imageUrl,
+        timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
+        timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
         focalX: location.focalPoint?.x ?? 0.5,
         focalY: location.focalPoint?.y ?? 0.5,
     });
@@ -70,7 +88,19 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     }, [location.id, stage]);
 
     const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [isUploadingTimeOfDayImages, setIsUploadingTimeOfDayImages] = useState<Record<CalendarTimeOfDay, boolean>>({
+        morning: false,
+        afternoon: false,
+        evening: false,
+        night: false,
+    });
     const [isGeneratingLocationDetails, setIsGeneratingLocationDetails] = useState(false);
+    const [isGeneratingTimeOfDayImages, setIsGeneratingTimeOfDayImages] = useState<Record<CalendarTimeOfDay, boolean>>({
+        morning: false,
+        afternoon: false,
+        evening: false,
+        night: false,
+    });
     const [confirmDialog, setConfirmDialog] = useState<{
         open: boolean;
         title: string;
@@ -101,6 +131,8 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.themeColor = nextLocation.themeColor;
         location.lightColor = nextLocation.lightColor;
         location.imageUrl = nextLocation.imageUrl;
+        location.timeOfDayImagePrompts = { ...(nextLocation.timeOfDayImagePrompts || {}) };
+        location.timeOfDayImageUrls = { ...(nextLocation.timeOfDayImageUrls || {}) };
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
     };
 
@@ -112,6 +144,8 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             themeColor: location.themeColor,
             lightColor: location.lightColor,
             imageUrl: location.imageUrl,
+            timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
+            timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
             focalX: location.focalPoint?.x ?? 0.5,
             focalY: location.focalPoint?.y ?? 0.5,
         });
@@ -168,6 +202,76 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         }
     };
 
+    const handleTimeOfDayImageUpload = async (timeOfDay: CalendarTimeOfDay, file: File) => {
+        setIsUploadingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: true }));
+        try {
+            const uploadedUrl = await stage().uploadFile(`location-${location.id}-${timeOfDay}.png`, file);
+            setEditedLocation((current) => {
+                const nextTimeOfDayImageUrls = { ...(current.timeOfDayImageUrls || {}), [timeOfDay]: uploadedUrl };
+                location.timeOfDayImageUrls = nextTimeOfDayImageUrls;
+                return { ...current, timeOfDayImageUrls: nextTimeOfDayImageUrls };
+            });
+        } catch (error) {
+            console.error(`Failed to upload ${timeOfDay} location image:`, error);
+            stage().showPriorityMessage(`Failed to upload ${timeOfDay} location image. Check console for details.`);
+        } finally {
+            setIsUploadingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: false }));
+        }
+    };
+
+    const handleTimeOfDayPromptChange = (timeOfDay: CalendarTimeOfDay, value: string) => {
+        setEditedLocation((current) => {
+            const nextTimeOfDayImagePrompts = { ...(current.timeOfDayImagePrompts || {}), [timeOfDay]: value };
+            location.timeOfDayImagePrompts = nextTimeOfDayImagePrompts;
+            return { ...current, timeOfDayImagePrompts: nextTimeOfDayImagePrompts };
+        });
+    };
+
+    const handleGenerateTimeOfDayPrompt = async (timeOfDay: CalendarTimeOfDay) => {
+        setIsGeneratingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: true }));
+        try {
+            const prompt = await generateLocationTimeOfDayPrompt(location, timeOfDay, stage(), true);
+            if (!prompt) {
+                throw new Error(`Failed to generate ${timeOfDay} prompt.`);
+            }
+
+            syncEditedLocationFromSource();
+            stage().showPriorityMessage(`Generated ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay].toLowerCase()} prompt for ${location.name || 'location'}.`);
+        } catch (error) {
+            console.error(`Failed to generate ${timeOfDay} prompt:`, error);
+            stage().showPriorityMessage(`Failed to generate ${timeOfDay} prompt. Check console for details.`);
+        } finally {
+            setIsGeneratingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: false }));
+        }
+    };
+
+    const handleGenerateTimeOfDayImage = async (timeOfDay: CalendarTimeOfDay) => {
+        if (isGeneratingTimeOfDayImages[timeOfDay]) {
+            return;
+        }
+
+        setIsGeneratingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: true }));
+        try {
+            if (!location.imageUrl) {
+                await generateBaseLocationImage(location, stage());
+                syncEditedLocationFromSource();
+            }
+
+            const generatedImageUrl = await generateLocationImageForTimeOfDay(location, timeOfDay, stage(), true);
+            if (!generatedImageUrl) {
+                throw new Error(`Failed to generate ${timeOfDay} location image.`);
+            }
+
+            syncEditedLocationFromSource();
+            stage().showPriorityMessage(`Generated ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay].toLowerCase()} image for ${location.name || 'location'}.`);
+        } catch (error) {
+            console.error(`Failed to generate ${timeOfDay} location image:`, error);
+            stage().showPriorityMessage(`Failed to generate ${timeOfDay} location image. Check console for details.`);
+        } finally {
+            setIsGeneratingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: false }));
+        }
+    };
+
     const handleGenerateLocationDetails = async () => {
         if (isGeneratingLocationDetails) {
             return;
@@ -184,6 +288,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             themeColor: location.themeColor,
             lightColor: location.lightColor,
             imageUrl: location.imageUrl,
+            timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
             focalPoint: location.focalPoint ? { ...location.focalPoint } : { x: 0.5, y: 0.5 },
             linkedLore: linkedLore
                 ? {
@@ -217,6 +322,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             location.themeColor = previousState.themeColor;
             location.lightColor = previousState.lightColor;
             location.imageUrl = previousState.imageUrl;
+            location.timeOfDayImageUrls = { ...(previousState.timeOfDayImageUrls || {}) };
             location.focalPoint = previousState.focalPoint;
 
             const restoredLore = getLinkedLocationLore(previousState.name, stage());
@@ -521,8 +627,11 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             <section>
                                 <h2 style={{ ...sectionHeadingStyle, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <ImageIcon />
-                                    Location Image
+                                    Base Location Image
                                 </h2>
+                                <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
+                                    This is the fallback image used when no time-of-day variant is available.
+                                </p>
                                 <ImageUrlUploadField
                                     imageUrl={editedLocation.imageUrl}
                                     onImageUrlChange={(value) => handleInputChange('imageUrl', value)}
@@ -533,6 +642,87 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                     previewPlaceholder={<Place style={{ fontSize: '48px', color: 'var(--agenda-accent-primary)' }} />}
                                     onInvalidFile={() => stage().showPriorityMessage('Please select a valid image file.')}
                                 />
+                            </section>
+
+                            <section>
+                                <h2 style={{ ...sectionHeadingStyle, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <ImageIcon />
+                                    Time of Day Variants
+                                </h2>
+                                <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
+                                    Each variant can be uploaded directly or generated from the base location image.
+                                </p>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                                    {LOCATION_TIME_OF_DAY_ORDER.map((timeOfDay) => {
+                                        const variantImageUrl = editedLocation.timeOfDayImageUrls?.[timeOfDay] || '';
+                                        const variantPromptValue = editedLocation.timeOfDayImagePrompts?.[timeOfDay] ?? getLocationTimeOfDayPrompt(location, timeOfDay);
+                                        const isUploadingVariant = isUploadingTimeOfDayImages[timeOfDay];
+                                        const isGeneratingVariant = isGeneratingTimeOfDayImages[timeOfDay];
+
+                                        return (
+                                            <div
+                                                key={timeOfDay}
+                                                style={{
+                                                    padding: '14px',
+                                                    borderRadius: '10px',
+                                                    border: `1px solid color-mix(in srgb, ${editedLocation.themeColor || 'var(--agenda-line-strong)'} 42%, var(--agenda-line-subtle))`,
+                                                    background: 'color-mix(in srgb, var(--agenda-surface-base) 86%, transparent)',
+                                                }}
+                                            >
+                                                <div style={{ marginBottom: '10px', color: 'var(--agenda-highlight)', fontWeight: 700, letterSpacing: '0.04em' }}>
+                                                    {LOCATION_TIME_OF_DAY_LABELS[timeOfDay]}
+                                                </div>
+                                                <div style={{ marginBottom: '12px' }}>
+                                                    <label style={labelStyle}>Prompt</label>
+                                                    <TextArea
+                                                        value={variantPromptValue || ''}
+                                                        onChange={(e) => handleTimeOfDayPromptChange(timeOfDay, e.target.value)}
+                                                        placeholder={`Describe how the scene should change for ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay].toLowerCase()}`}
+                                                        style={{
+                                                            ...textareaStyle,
+                                                            minHeight: '88px',
+                                                        }}
+                                                    />
+                                                </div>
+                                                <ImageUrlUploadField
+                                                    imageUrl={variantImageUrl}
+                                                    onImageUrlChange={(value) => {
+                                                        setEditedLocation((current) => {
+                                                            const nextTimeOfDayImageUrls = { ...(current.timeOfDayImageUrls || {}), [timeOfDay]: value };
+                                                            location.timeOfDayImageUrls = nextTimeOfDayImageUrls;
+                                                            return { ...current, timeOfDayImageUrls: nextTimeOfDayImageUrls };
+                                                        });
+                                                    }}
+                                                    onUploadFile={(file) => handleTimeOfDayImageUpload(timeOfDay, file)}
+                                                    isUploading={isUploadingVariant}
+                                                    inputLabel={`${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} Image URL`}
+                                                    uploadButtonLabel={`Upload ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} Image`}
+                                                    uploadingButtonLabel={`Uploading ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]}...`}
+                                                    previewWidth="140px"
+                                                    previewHeight="105px"
+                                                    previewBorder={`2px solid ${editedLocation.themeColor || 'var(--agenda-line-strong)'}`}
+                                                    previewBackgroundPosition={`${editedLocation.focalX * 100}% ${editedLocation.focalY * 100}%`}
+                                                    previewPlaceholder={<Place style={{ fontSize: '36px', color: 'var(--agenda-accent-primary)' }} />}
+                                                    onInvalidFile={() => stage().showPriorityMessage('Please select a valid image file.')}
+                                                />
+                                                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+                                                    <Button
+                                                        onClick={() => handleGenerateTimeOfDayPrompt(timeOfDay)}
+                                                        disabled={isGeneratingVariant}
+                                                    >
+                                                        {isGeneratingVariant ? 'Generating...' : `Generate ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} Prompt`}
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() => handleGenerateTimeOfDayImage(timeOfDay)}
+                                                        disabled={isGeneratingVariant}
+                                                    >
+                                                        {isGeneratingVariant ? 'Generating...' : `Generate ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]}`}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </section>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>

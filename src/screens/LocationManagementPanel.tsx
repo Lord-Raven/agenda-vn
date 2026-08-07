@@ -2,7 +2,7 @@ import React, { FC, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Place } from '@mui/icons-material';
 import { Stage } from '../Stage';
-import { Location } from '../content/Location';
+import { getLocationImageUrl, Location } from '../content/Location';
 import { Button } from './UiComponents';
 import { LocationDetailPanel } from './LocationDetailPanel';
 import { createLoreEntry } from '../content/Lore';
@@ -155,7 +155,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                         borderRadius: '6px',
                         border: `2px solid ${location.themeColor || 'var(--agenda-line-strong)'}`,
                         backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 86%, transparent)',
-                        backgroundImage: location.imageUrl ? `url(${location.imageUrl})` : 'none',
+                        backgroundImage: getLocationImageUrl(location, stage()) ? `url(${getLocationImageUrl(location, stage())})` : 'none',
                         backgroundSize: 'cover',
                         backgroundPosition: `${(location.focalPoint?.x ?? 0.5) * 100}% ${(location.focalPoint?.y ?? 0.5) * 100}%`,
                         display: 'flex',
@@ -164,7 +164,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                         overflow: 'hidden',
                     }}
                 >
-                    {!location.imageUrl && <Place style={{ fontSize: '20px', color: 'var(--agenda-accent-primary)' }} />}
+                    {!getLocationImageUrl(location, stage()) && <Place style={{ fontSize: '20px', color: 'var(--agenda-accent-primary)' }} />}
                 </div>
                 <div style={{ color: location.themeColor || 'var(--agenda-highlight)', fontSize: '14px', fontWeight: 700 }}>
                     {location.name || '(Unnamed Location)'}
