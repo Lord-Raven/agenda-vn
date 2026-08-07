@@ -19,6 +19,18 @@ export const colors = {
     dark: 'color-mix(in srgb, var(--agenda-highlight) 62%, var(--agenda-surface-base))',
     contrastText: 'var(--agenda-surface-base)',
   },
+  warning: {
+    main: 'var(--agenda-warning)',
+    light: 'color-mix(in srgb, var(--agenda-warning) 72%, var(--agenda-text-primary))',
+    dark: 'color-mix(in srgb, var(--agenda-warning) 62%, var(--agenda-surface-base))',
+    contrastText: 'var(--agenda-surface-base)',
+  },
+  danger: {
+    main: 'var(--agenda-danger-text)',
+    light: 'color-mix(in srgb, var(--agenda-danger-text) 80%, var(--agenda-text-primary))',
+    dark: 'color-mix(in srgb, var(--agenda-danger-text) 66%, var(--agenda-surface-base))',
+    contrastText: 'var(--agenda-text-primary)',
+  },
   background: {
     default: 'var(--agenda-surface-base)',
     paper: 'var(--agenda-surface-raised)',
@@ -38,6 +50,8 @@ export const theme = createTheme({
     mode: 'dark',
     primary: colors.primary,
     secondary: colors.secondary,
+    warning: colors.warning,
+    error: colors.danger,
     background: {
       default: colors.background.default,
       paper: colors.background.paper,
@@ -145,7 +159,7 @@ export const theme = createTheme({
           '&:hover': {
             borderWidth: '2px',
             borderColor: colors.primary.light,
-            backgroundColor: 'rgba(138, 176, 204, 0.1)',
+            backgroundColor: 'color-mix(in srgb, var(--agenda-accent-primary) 10%, transparent)',
           },
         },
       },

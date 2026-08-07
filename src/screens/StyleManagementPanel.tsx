@@ -34,9 +34,10 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
         { label: UI_STYLE_FIELD_LABELS.textPrimaryColor, key: 'textPrimaryColor' },
         { label: UI_STYLE_FIELD_LABELS.textMutedColor, key: 'textMutedColor' },
         { label: UI_STYLE_FIELD_LABELS.highlightColor, key: 'highlightColor' },
+        { label: UI_STYLE_FIELD_LABELS.warningColor, key: 'warningColor' },
+        { label: UI_STYLE_FIELD_LABELS.dangerTextColor, key: 'dangerTextColor' },
         { label: UI_STYLE_FIELD_LABELS.accentColor, key: 'accentColor' },
         { label: UI_STYLE_FIELD_LABELS.surfaceBaseColor, key: 'surfaceBaseColor' },
-        { label: UI_STYLE_FIELD_LABELS.surfaceRaisedColor, key: 'surfaceRaisedColor' },
         { label: UI_STYLE_FIELD_LABELS.surfaceElevatedColor, key: 'surfaceElevatedColor' },
     ];
 
@@ -45,38 +46,48 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             uiSettings.textPrimaryColor,
             uiSettings.textMutedColor,
             uiSettings.highlightColor,
+            uiSettings.warningColor,
+            uiSettings.dangerTextColor,
             uiSettings.accentColor,
         ]),
         background: buildHexColorSwatches([
             uiSettings.surfaceBaseColor,
-            uiSettings.surfaceRaisedColor,
             uiSettings.surfaceElevatedColor,
         ]),
         all: buildHexColorSwatches([
             uiSettings.textPrimaryColor,
             uiSettings.textMutedColor,
             uiSettings.highlightColor,
+            uiSettings.warningColor,
+            uiSettings.dangerTextColor,
             uiSettings.accentColor,
             uiSettings.surfaceBaseColor,
-            uiSettings.surfaceRaisedColor,
             uiSettings.surfaceElevatedColor,
         ]),
     }), [
         uiSettings.highlightColor,
+        uiSettings.warningColor,
+        uiSettings.dangerTextColor,
         uiSettings.accentColor,
         uiSettings.surfaceBaseColor,
-        uiSettings.surfaceRaisedColor,
         uiSettings.surfaceElevatedColor,
         uiSettings.textMutedColor,
         uiSettings.textPrimaryColor,
     ]);
 
     const getSwatchesForStyleKey = (key: keyof UiSettings): string[] => {
-        if (key === 'textPrimaryColor' || key === 'textMutedColor' || key === 'highlightColor' || key === 'accentColor') {
+        if (
+            key === 'textPrimaryColor'
+            || key === 'textMutedColor'
+            || key === 'highlightColor'
+            || key === 'warningColor'
+            || key === 'dangerTextColor'
+            || key === 'accentColor'
+        ) {
             return groupedStyleSwatches.text;
         }
 
-        if (key === 'surfaceBaseColor' || key === 'surfaceRaisedColor' || key === 'surfaceElevatedColor') {
+        if (key === 'surfaceBaseColor' || key === 'surfaceElevatedColor') {
             return groupedStyleSwatches.background;
         }
 
@@ -277,16 +288,6 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                             value={uiSettings.atmosphereStartColor}
                             onChange={(value) => setUiSettings(prev => ({ ...prev, atmosphereStartColor: value }))}
                             popoverTitle="Choose Overlay Start"
-                            swatches={groupedStyleSwatches.all}
-                            inputStyle={{ width: '100%' }}
-                        />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.atmosphereMidColor}</label>
-                        <AlphaColorPickerInput
-                            value={uiSettings.atmosphereMidColor}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, atmosphereMidColor: value }))}
-                            popoverTitle="Choose Overlay Mid"
                             swatches={groupedStyleSwatches.all}
                             inputStyle={{ width: '100%' }}
                         />

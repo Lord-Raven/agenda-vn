@@ -158,11 +158,17 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                                 right: 0,
                                 bottom: 0,
                                 width: '40px',
-                                background: isCurrentSlot ? 'var(--agenda-disabled-bg)' : 'var(--agenda-danger-soft)',
+                                background: isCurrentSlot
+                                    ? 'color-mix(in srgb, var(--agenda-text-primary) 20%, transparent)'
+                                    : 'color-mix(in srgb, var(--agenda-danger-text) 24%, transparent)',
                                 border: 'none',
-                                borderLeft: isCurrentSlot ? '1px solid var(--agenda-disabled-border)' : '1px solid var(--agenda-danger-border)',
+                                borderLeft: isCurrentSlot
+                                    ? '1px solid color-mix(in srgb, var(--agenda-text-primary) 34%, transparent)'
+                                    : '1px solid color-mix(in srgb, var(--agenda-danger-text) 44%, transparent)',
                                 borderRadius: '0 4px 4px 0',
-                                color: isCurrentSlot ? 'var(--agenda-disabled-text)' : 'var(--agenda-danger-text)',
+                                color: isCurrentSlot
+                                    ? 'color-mix(in srgb, var(--agenda-text-primary) 48%, transparent)'
+                                    : 'var(--agenda-danger-text)',
                                 cursor: isCurrentSlot ? 'not-allowed' : 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -173,13 +179,13 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                             }}
                             onMouseOver={(e) => {
                                 if (!isCurrentSlot) {
-                                    e.currentTarget.style.background = 'var(--agenda-danger-hover-bg)';
-                                    e.currentTarget.style.color = 'var(--agenda-danger-hover-text)';
+                                    e.currentTarget.style.background = 'color-mix(in srgb, var(--agenda-danger-text) 34%, transparent)';
+                                    e.currentTarget.style.color = 'color-mix(in srgb, var(--agenda-danger-text) 80%, var(--agenda-text-primary))';
                                 }
                             }}
                             onMouseOut={(e) => {
                                 if (!isCurrentSlot) {
-                                    e.currentTarget.style.background = 'var(--agenda-danger-soft)';
+                                    e.currentTarget.style.background = 'color-mix(in srgb, var(--agenda-danger-text) 24%, transparent)';
                                     e.currentTarget.style.color = 'var(--agenda-danger-text)';
                                 }
                             }}
@@ -430,9 +436,9 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                                 onMouseLeave={() => clearTooltip()}
                                 style={{
                                     padding: '10px 20px',
-                                    background: 'var(--agenda-danger-soft)',
-                                    border: '2px solid var(--agenda-danger-border)',
-                                    color: 'var(--agenda-danger-hover-text)'
+                                    background: 'color-mix(in srgb, var(--agenda-danger-text) 24%, transparent)',
+                                    border: '2px solid color-mix(in srgb, var(--agenda-danger-text) 44%, transparent)',
+                                    color: 'color-mix(in srgb, var(--agenda-danger-text) 80%, var(--agenda-text-primary))'
                                 }}
                             >
                                 Delete
