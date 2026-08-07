@@ -239,32 +239,32 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
-    const currentDateCellIndex = useMemo(
-        () => monthGrid.findIndex((gridDate) => formatDateKey(gridDate) === currentDateKey),
-        [monthGrid, currentDateKey],
+    const todayDateCellIndex = useMemo(
+        () => monthGrid.findIndex((gridDate) => formatDateKey(gridDate) === todayDateKey),
+        [monthGrid, todayDateKey],
     );
-    const currentWeekRowIndex = useMemo(() => {
-        return currentDateCellIndex >= 0 ? Math.floor((currentDateCellIndex + 1) / 7) : -1;
-    }, [currentDateCellIndex]);
-    const currentWeekdayColumnIndex = useMemo(
-        () => (currentDateCellIndex >= 0 ? (currentDateCellIndex % 7) + 1 : -1),
-        [currentDateCellIndex],
+    const todayWeekRowIndex = useMemo(() => {
+        return todayDateCellIndex >= 0 ? Math.floor((todayDateCellIndex + 1) / 7) : -1;
+    }, [todayDateCellIndex]);
+    const todayWeekdayColumnIndex = useMemo(
+        () => (todayDateCellIndex >= 0 ? (todayDateCellIndex % 7) + 1 : -1),
+        [todayDateCellIndex],
     );
     const calendarGridTemplateColumns = useMemo(
         () => WEEKDAY_LABELS
-            .map((_, dayIndex) => (dayIndex === currentWeekdayColumnIndex ? "1.24fr" : "0.96fr"))
+            .map((_, dayIndex) => (dayIndex === todayWeekdayColumnIndex ? "1.24fr" : "0.96fr"))
             .join(" "),
-        [currentWeekdayColumnIndex],
+        [todayWeekdayColumnIndex],
     );
     const calendarGridTemplateRows = useMemo(
         () => Array.from({ length: CALENDAR_ROW_COUNT }, (_, rowIndex) => {
-            if (currentWeekRowIndex < 0) {
+            if (todayWeekRowIndex < 0) {
                 return "1fr";
             }
 
-            return rowIndex === currentWeekRowIndex ? "1.40fr" : "0.92fr";
+            return rowIndex === todayWeekRowIndex ? "1.40fr" : "0.92fr";
         }).join(" "),
-        [currentWeekRowIndex],
+        [todayWeekRowIndex],
     );
 
     useEffect(() => {
