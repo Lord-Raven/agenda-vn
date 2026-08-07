@@ -4,7 +4,7 @@ import { Add, Close, KeyboardArrowDownRounded, KeyboardArrowUpRounded, Visibilit
 import { Chip } from '@mui/material';
 import { Stage } from '../Stage';
 import { createLoreEntry, Lore } from '../content/Lore';
-import { Button, ConfirmDialog, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
+import { Button, ConfirmDialog, TextArea, TextInput } from './UiComponents';
 import { findBestNameMatch, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { getLinkedLocationLore, updateLocationDescription } from '../content/Location';
 import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
@@ -16,12 +16,13 @@ interface LorebookManagementPanelProps {
 
 type LoreCategory = Lore['type'];
 
-const CORE_CATEGORY_ORDER = ['character', 'location', 'other'] as const;
+const CORE_CATEGORY_ORDER = ['character', 'location', 'world', 'other'] as const;
 const CORE_CATEGORY_SET = new Set<string>(CORE_CATEGORY_ORDER);
 
 const CATEGORY_LABELS: Record<(typeof CORE_CATEGORY_ORDER)[number], string> = {
     character: 'Character',
     location: 'Location',
+    world: 'World',
     other: 'Other',
 };
 
@@ -101,8 +102,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
     const [editingTriggerValue, setEditingTriggerValue] = useState('');
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({
-        character: true,
+        character: false,
         location: false,
+        world: false,
         other: true,
     });
 
@@ -585,6 +587,23 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                 />
                                             </div>
                                         </div>
+
+                                        <label
+                                            style={{
+                                                color: 'var(--agenda-text-muted)',
+                                                fontSize: '13px',
+                                                display: 'flex',
+                                                gap: '8px',
+                                                alignItems: 'center',
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedLore.updatable ?? true}
+                                                onChange={(event) => updateSelectedLore({ updatable: event.target.checked })}
+                                            />
+                                            Generatively Maintained
+                                        </label>
 
                                         <div style={{ display: 'grid', gap: '6px' }}>
                                             <div

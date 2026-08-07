@@ -8,7 +8,7 @@ import { generateContext, Skit, SkitType } from "./content/Skit";
 import { createDefaultAtlas, Location } from "./content/Location";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
-import { createLoreEntry, Lore } from "./content/Lore";
+import { createLoreEntry, Lore, updateLoreEntry } from "./content/Lore";
 import { DEFAULT_PLAYER_THEME_COLOR } from "./screens/SettingsScreen";
 import {buildPrompt} from "./utils/PromptBuilder.js";
 import {
@@ -49,19 +49,6 @@ export type SaveType = {
     uiSettings?: UiSettings;
     betaMode?: boolean;
 }
-
-const LORE_UPDATE_RESPONSE_FIELDS: StructuredFieldDefinition[] = [
-    {
-        key: 'planning',
-        label: 'PLANNING',
-        description: 'Brief explanation of what changes were made and what was retained from the original.',
-    },
-    {
-        key: 'content',
-        label: 'CONTENT',
-        description: 'Revised lore content that preserves still-true original information and integrates new updates.',
-    },
-];
 
 const ACTOR_SEED_FIELDS: StructuredFieldDefinition[] = [
     {
@@ -1440,33 +1427,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 case 'LORE_UPDATE':
                     // For lore updates, we expect details to include a loreEntry with id, title, and content.
                     const loreEntry = findBestNameMatch(outcome.details?.loreTitle, save.lorebook || [], ['title']);
-                    if (loreEntry) {
-                        // Make a call with context and the current lore entry, asking for revisions based on context.
-                        const loreUpdatePromise = this.generateText(buildPrompt()
-                            .addBlock('Instructions', `Based on the current context and recent events, output an updated or revised version of the content below, taking care to maintain all information from the original that remains true. If there are no significant changes, simply return the original content verbatim.`)
-                            .addBlock('Target Lore Title', loreEntry.title)
-                            .addBlock('Content for Revision', loreEntry.content)
-                            .addBlock('Response Format', buildStructuredResponseFormat(LORE_UPDATE_RESPONSE_FIELDS))
-                            .addBlock('Example Response',
-                                buildStructuredExampleResponse(LORE_UPDATE_RESPONSE_FIELDS, {
-                                    planning: '<explanation of changes made and existing content to retain.>',
-                                    content: '<revised content, including relevant updates and persisting other accurate details from the original.>',
-                                }))
-                            .addBlock('Additional Context', generateContext(undefined, this, 3))
-                            .format(),
-                            10,
-                            1000,
-                            LORE_UPDATE_RESPONSE_FIELDS,
-                        ).then(response => {
-                            if (response) {
-                                const parsedResponse = parseStructuredResponse(response, LORE_UPDATE_RESPONSE_FIELDS);
-                                loreEntry.content = parsedResponse.content || loreEntry.content;
-                                this.saveGame();
-                            }
-                        }).catch(error => {
-                            console.error(`Error updating lore entry ${loreEntry.title}`, error);
-                        }).finally(() => delete this.generationPromises[`loreUpdate-${loreEntry.id}`]);
-                        this.generationPromises[`loreUpdate-${loreEntry.id}`] = loreUpdatePromise;
+                    if (loreEntry && loreEntry.updatable) {
+                        updateLoreEntry(loreEntry, this);
                     }
                     break;
                 case 'STAT_CHANGE':

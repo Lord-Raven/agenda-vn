@@ -1,10 +1,15 @@
 type LoreType = "character" | "location" | "other" | string;
 import { v4 as generateUuid } from 'uuid';
+import { buildStructuredExampleResponse, buildStructuredResponseFormat, parseStructuredResponse, StructuredFieldDefinition } from '../utils/StructuredResponse';
+import { Stage } from '../Stage';
+import { generateContext } from './Skit';
+import { buildPrompt } from '../utils/PromptBuilder';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
     character: [],
     location: [],
+    world: [],
     other: [], // Everything else ends up being assigned to this by default.
 };
 
@@ -12,8 +17,22 @@ const TYPE_MAPPING: Record<LoreType, string[]> = {
 export function updateTypeMapping(lore: Lore[]): void {
     TYPE_MAPPING.character = lore.filter(l => l.type === 'character').flatMap(l => l.triggers);
     TYPE_MAPPING.location = lore.filter(l => l.type === 'location').flatMap(l => l.triggers);
+    TYPE_MAPPING.world = lore.filter(l => l.type === 'world').flatMap(l => l.triggers);
     TYPE_MAPPING.other = lore.filter(l => l.type === 'other').flatMap(l => l.triggers);
 }
+
+const LORE_UPDATE_RESPONSE_FIELDS: StructuredFieldDefinition[] = [
+    {
+        key: 'planning',
+        label: 'PLANNING',
+        description: 'Brief explanation of what changes were made and what was retained from the original.',
+    },
+    {
+        key: 'content',
+        label: 'CONTENT',
+        description: 'Revised lore content that preserves still-true original information and integrates new updates.',
+    },
+];
 
 export const MAX_ENTRIES = 30; // Maximum number of lore entries to add to context; if there are more, we'll prioritize based on priority and probability.
 
@@ -34,6 +53,7 @@ export type Lore = {
     triggers: string[];
     enabled: boolean;
     constant: boolean;
+    updatable: boolean; // Whether this entry can be generatively updated.
     scanDepth: number; // default to 10
     insertionOrder: number;
     priority: number;
@@ -81,6 +101,7 @@ export function createLoreEntry(params: Partial<Omit<Lore, 'id'>>): Lore {
         content: "",
         triggers: [],
         enabled: true,
+        updatable: true,
         constant: false,
         scanDepth: 10,
         insertionOrder: 0,
@@ -126,4 +147,34 @@ export async function fetchLorebook() {
     console.log(loreEntries);
     return loreEntries;
 
+}
+
+export async function updateLoreEntry(loreEntry: Lore, stage: Stage): Promise<Lore> {
+// Make a call with context and the current lore entry, asking for revisions based on context.
+    const loreUpdatePromise = stage.generateText(buildPrompt()
+        .addBlock('Instructions', `Based on the current context and recent events, output an updated or revised version of the content below, taking care to maintain all information from the original that remains true. If there are no significant changes, simply return the original content verbatim.`)
+        .addBlock('Target Lore Title', loreEntry.title)
+        .addBlock('Content for Revision', loreEntry.content)
+        .addBlock('Response Format', buildStructuredResponseFormat(LORE_UPDATE_RESPONSE_FIELDS))
+        .addBlock('Example Response',
+            buildStructuredExampleResponse(LORE_UPDATE_RESPONSE_FIELDS, {
+                planning: '<explanation of changes made and existing content to retain.>',
+                content: '<revised content, including relevant updates and persisting other accurate details from the original.>',
+            }))
+        .addBlock('Additional Context', generateContext(undefined, stage, 3))
+        .format(),
+        10,
+        1000,
+        LORE_UPDATE_RESPONSE_FIELDS,
+    ).then(response => {
+        if (response) {
+            const parsedResponse = parseStructuredResponse(response, LORE_UPDATE_RESPONSE_FIELDS);
+            loreEntry.content = parsedResponse.content || loreEntry.content;
+            stage.saveGame();
+        }
+    }).catch(error => {
+        console.error(`Error updating lore entry ${loreEntry.title}`, error);
+    }).finally(() => delete stage.generationPromises[`loreUpdate-${loreEntry.id}`]);
+    stage.generationPromises[`loreUpdate-${loreEntry.id}`] = loreUpdatePromise;
+    return loreUpdatePromise.then(() => loreEntry);
 }

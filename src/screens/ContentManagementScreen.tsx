@@ -15,7 +15,7 @@ interface ContentManagementScreenProps {
     onClose: () => void;
 }
 
-type TabType = 'style' | 'game' | 'lorebook' | 'actors' | 'locations' | 'calendarEvents';
+type TabType = 'game' | 'style' | 'lorebook' | 'actors' | 'locations' | 'calendarEvents';
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [activeTab, setActiveTab] = useState<TabType>('style');
@@ -119,19 +119,6 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 paddingBottom: '10px',
                             }}>
                                 <Button
-                                    onClick={() => setActiveTab('style')}
-                                    variant={activeTab === 'style' ? 'primary' : 'secondary'}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        opacity: activeTab === 'style' ? 1 : 0.6,
-                                    }}
-                                >
-                                    <Palette />
-                                    Style
-                                </Button>
-                                <Button
                                     onClick={() => setActiveTab('game')}
                                     variant={activeTab === 'game' ? 'primary' : 'secondary'}
                                     style={{
@@ -143,6 +130,19 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 >
                                     <Tune />
                                     Game
+                                </Button>
+                                <Button
+                                    onClick={() => setActiveTab('style')}
+                                    variant={activeTab === 'style' ? 'primary' : 'secondary'}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        opacity: activeTab === 'style' ? 1 : 0.6,
+                                    }}
+                                >
+                                    <Palette />
+                                    Style
                                 </Button>
                                 <Button
                                     onClick={() => setActiveTab('lorebook')}
