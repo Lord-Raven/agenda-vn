@@ -134,6 +134,7 @@ export async function distillLocation(location: Location, definition: any, stage
 			.format(),
 		50,
 		300,
+		LOCATION_DISTILLATION_FIELDS,
 	).then((generatedResponse: string) => {
 		console.log('Generated location distillation:');
 		console.log(generatedResponse);

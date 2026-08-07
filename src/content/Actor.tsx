@@ -154,24 +154,6 @@ export async function loadSupportedActor(data: Partial<Actor>, stage: Stage): Pr
             newActor.voiceId = definition.voice_id;
         }
 
-        if (definition.embedded_lorebook) {
-            // Create lore entries with this character name as the category:
-            const loreEntries = definition.embedded_lorebook.entries.map((entry: any) => {
-                return createLoreEntry({
-                    type: data.name,
-                    title: entry.name,
-                    content: entry.content,
-                    triggers: entry.keys,
-                    enabled: entry.enabled,
-                    constant: entry.constant,
-                    insertionOrder: entry.insertion_order,
-                    priority: entry.priority,
-                    probability: entry.probability
-                });
-            });
-            stage.getSave().lorebook?.push(...loreEntries);
-        }
-
         // if newActor is missing critical fields like personality or outfits, distill these details to fill the gaps
         if (!newActor.profile || !newActor.outfits?.length) {
             return await distillActor(newActor, definition, stage);
@@ -255,7 +237,9 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
                 ))
         .format(),
         100,
-        400);
+        400,
+        distillationFields,
+    );
         stage.generationPromises[`distilling_actor/${actor.id}`] = generationRequest.finally(() => {
             console.log('Finished generating distillation for actor:', actor.name);
             delete stage.generationPromises[`distilling_actor/${actor.id}`];
@@ -325,7 +309,7 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
     }
     loreEntry.title = actor.name;
     loreEntry.content = actor.profile;
-    loreEntry.triggers = [...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)), ...actor.name.split(' ')];
+    loreEntry.triggers = [...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)), ...actor.name.split(' ').filter(word => word.length > 2 && word.charAt(word.length - 1) !== '.')];
 }
 
 function getActiveOutfit(actor: Actor): Outfit {

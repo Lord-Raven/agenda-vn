@@ -29,6 +29,14 @@ function getFieldTag(field: StructuredFieldDefinition): string {
     return normalized || normalizeTag(field.key);
 }
 
+export function getStructuredFieldTags(fields: StructuredFieldDefinition[]): string[] {
+    const uniqueTags = new Set<string>();
+    for (const field of fields) {
+        uniqueTags.add(getFieldTag(field));
+    }
+    return Array.from(uniqueTags);
+}
+
 function normalizeLabel(rawLabel: string): string {
     return rawLabel
         .replace(/\*\*/g, '')

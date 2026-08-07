@@ -168,6 +168,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                 }),
                 80,
                 550,
+                UI_SETTINGS_GENERATION_FIELDS,
             );
 
             const parsed = parseStructuredResponse(response, UI_SETTINGS_GENERATION_FIELDS);

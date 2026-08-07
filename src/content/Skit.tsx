@@ -329,7 +329,9 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     .addBlock('Additional Context',
                         generateContext(skit, stage, 5))
                     .format(),
-                10, 400
+                10,
+                400,
+                SKIT_GUIDANCE_FIELDS,
             ).catch(err => {
                 console.error('Error generating skit guidance: ', err);
             });

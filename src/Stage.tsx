@@ -14,6 +14,7 @@ import {buildPrompt} from "./utils/PromptBuilder.js";
 import {
     buildStructuredExampleResponse,
     buildStructuredResponseFormat,
+    getStructuredFieldTags,
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "./utils/StructuredResponse.js";
@@ -1421,9 +1422,28 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return save.upcomingEvents;
     }
 
-    // Retry assumes that this generateText request is expecting <tag>-based content.
-    public async generateText(prompt: string, minTokens: number = 50, maxTokens: number = 200, retry: boolean = true): Promise<string> {
-        const tries = retry ? 3 : 1;
+    private escapeRegex(text: string): string {
+        return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    private hasExpectedResponseTags(result: string, expectedFields?: StructuredFieldDefinition[]): boolean {
+        const expectedFromFields = expectedFields ? getStructuredFieldTags(expectedFields) : [];
+        
+        return expectedFromFields.every(tag => {
+            const escapedTag = this.escapeRegex(tag);
+            const tagPattern = new RegExp(`<\\s*${escapedTag}\\s*>[\\s\\S]*?<\\s*\\/\\s*${escapedTag}\\s*>`, 'i');
+            return tagPattern.test(result);
+        });
+    }
+
+    public async generateText(
+        prompt: string,
+        minTokens: number = 50,
+        maxTokens: number = 200,
+        expectedFields?: StructuredFieldDefinition[]
+    ): Promise<string> {
+
+        const tries = expectedFields?.length || 0 > 0 ? 3 : 1;
         for (let attempt = 1; attempt <= tries; attempt += 1) {
             try {
                 const response = await this.generator.textGen({
@@ -1433,11 +1453,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     include_history: true,
                     stop: ['#END']
                 });
-                // Response must have at least one <tag> to be considered valid. If not, retry.
-                if (!response?.result || !/<[^>]+>/.test(response.result)) {
-                    throw new Error(`Invalid response format: missing required tags. Response: ${response?.result || ''}`);
+                const result = response?.result || '';
+                if (!result || !this.hasExpectedResponseTags(result, expectedFields)) {
+                    const expectedTags = expectedFields ? getStructuredFieldTags(expectedFields) : [];
+                    const errorText = expectedTags.length > 0
+                        ? `missing expected tags: ${expectedTags.join(', ')}`
+                        : 'empty response';
+                    throw new Error(`Invalid response format: ${errorText}. Response: ${result}`);
                 }
-                return response?.result || '';
+                return result;
             } catch (error) {
                 if (attempt === tries) {
                     throw error;
