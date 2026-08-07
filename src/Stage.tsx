@@ -412,6 +412,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const actors: {[key: string]: Actor} = {
                 [this.primaryUser.anonymizedId]: {
                     id: this.primaryUser.anonymizedId,
+                    loreId: '',
                     active: true,
                     name: playerData.name,
                     description: '',

@@ -24,6 +24,7 @@ export type Outfit = {
 
 export class Actor {
     id: string = ''; // UUID
+    loreId: string = ''; // The ID of the lore entry associated with this actor, if any. This is used to link the actor to their description in the lorebook.
     active: boolean = true; // Soft-delete flag. Inactive actors are hidden from management UIs.
     name: string = ''; // Display name
     description: string = ''; // Core physical description—not outfit-oriented
@@ -295,7 +296,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 }
 
 export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage): void {
-    let loreEntry = getLinkedActorLore(oldName, stage);
+    let loreEntry = getLinkedActorLore(actor, stage);
     // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
     if (!loreEntry) {
         loreEntry = createLoreEntry({
@@ -533,8 +534,19 @@ export async function generateEmotionImage(actor: Actor, emotion: Emotion, stage
     return '';
 }
 
-export function getLinkedActorLore(actorName: string, stage: Stage) {
-	return findBestNameMatch(actorName, stage.getSave().lorebook?.filter(lore => lore.type === 'character') ?? [], ['title']);
+export function getLinkedActorLore(actor: Actor, stage: Stage) {
+    if (actor && actor.loreId) {
+        const loreEntry = stage.getSave().lorebook?.find(lore => lore.id === actor.loreId);
+        if (loreEntry) {
+            return loreEntry;
+        }
+        actor.loreId = ''; // Clear the loreId if it no longer exists
+    }
+    const bestMatch = findBestNameMatch(actor.name, stage.getSave().lorebook?.filter(lore => lore.type === 'character') ?? [], ['title']);
+    if (bestMatch) {
+        actor.loreId = bestMatch.id; // Link the actor to the best matching lore entry
+    }
+	return bestMatch;
 }
 
 export function getActorLore(actorId: string, stage: Stage) {
@@ -543,7 +555,7 @@ export function getActorLore(actorId: string, stage: Stage) {
 		return '';
 	}
 
-    const lore = getLinkedActorLore(actor.name, stage);
+    const lore = getLinkedActorLore(actor, stage);
 	return lore?.content ?? '';
 }
 
@@ -562,7 +574,7 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage) {
 		return;
 	}
 
-    const linkedLore = getLinkedActorLore(actor.name, stage);
+    const linkedLore = getLinkedActorLore(actor, stage);
 	if (linkedLore) {
 		linkedLore.content = lore;
 		return;

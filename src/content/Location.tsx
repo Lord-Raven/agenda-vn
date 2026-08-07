@@ -25,8 +25,19 @@ export const createDefaultAtlas = () => {
 	return atlas;
 };
 
-export function getLinkedLocationLore(locationName: string, stage: Stage) {
-	return findBestNameMatch(locationName, stage.getSave().lorebook?.filter(lore => lore.type === 'location') ?? [], ['title']);
+export function getLinkedLocationLore(location: Location, stage: Stage) {
+	if (location && location.loreId) {
+		const loreEntry = stage.getSave().lorebook?.find(lore => lore.id === location.loreId);
+		if (loreEntry) {
+			return loreEntry;
+		}
+		location.loreId = ''; // Clear the loreId if it no longer exists
+	}
+	const bestMatch = findBestNameMatch(location.name, stage.getSave().lorebook?.filter(lore => lore.type === 'location') ?? [], ['title']);
+	if (bestMatch) {
+		location.loreId = bestMatch.id; // Link the location to the best matching lore entry
+	}
+	return bestMatch;
 }
 
 export function getLocationDescription(locationId: string, stage: Stage) {
@@ -35,7 +46,7 @@ export function getLocationDescription(locationId: string, stage: Stage) {
 		return '';
 	}
 
-	const lore = getLinkedLocationLore(location.name, stage);
+	const lore = getLinkedLocationLore(location, stage);
 	return lore?.content ?? location.description;
 }
 
@@ -45,7 +56,7 @@ export function updateLocationDescription(locationId: string, description: strin
 		return;
 	}
 
-	const lore = getLinkedLocationLore(location.name, stage);
+	const lore = getLinkedLocationLore(location, stage);
 	if (lore) {
 		lore.content = description;
 		return;
@@ -55,7 +66,7 @@ export function updateLocationDescription(locationId: string, description: strin
 }
 
 export function upsertLocationLoreEntry(location: Location, oldName: string, stage: Stage): void {
-	let loreEntry = getLinkedLocationLore(oldName, stage);
+	let loreEntry = getLinkedLocationLore(location, stage);
 	if (!loreEntry) {
 		loreEntry = createLoreEntry({
 			type: 'location',
@@ -421,6 +432,7 @@ export async function distillLocation(location: Location, definition: any, stage
 
 export class Location {
     id: string = '';
+	loreId: string = ''; // The ID of the lore entry associated with this location, if any. This is used to link the location to its description in the lorebook.
 	active: boolean = true; // Soft-delete flag. Inactive locations are hidden from management UIs.
     name: string = '';
     description: string = '';

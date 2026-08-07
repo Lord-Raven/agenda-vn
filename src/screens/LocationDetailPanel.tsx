@@ -28,7 +28,7 @@ interface LocationDetailPanelProps {
 }
 
 export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onDeactivate }) => {
-    const linkedLoreEntry = getLinkedLocationLore(location.name, stage());
+    const linkedLoreEntry = getLinkedLocationLore(location, stage());
     const isDescriptionBackedByLore = !!linkedLoreEntry;
 
     const [editedLocation, setEditedLocation] = useState<{
@@ -296,7 +296,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         const nextLocation = editedLocationRef.current;
         persistLocation(nextLocation);
 
-        const linkedLore = getLinkedLocationLore(location.name, stage());
+        const linkedLore = getLinkedLocationLore(location, stage());
         const previousState = {
             name: location.name,
             category: location.category,
@@ -343,7 +343,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             location.timeOfDayImageUrls = { ...(previousState.timeOfDayImageUrls || {}) };
             location.focalPoint = previousState.focalPoint;
 
-            const restoredLore = getLinkedLocationLore(previousState.name, stage());
+            const restoredLore = getLinkedLocationLore(location, stage());
             if (restoredLore && previousState.linkedLore) {
                 restoredLore.title = previousState.linkedLore.title;
                 restoredLore.content = previousState.linkedLore.content;
@@ -358,7 +358,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     };
 
     const handleDeactivateLocation = () => {
-        const linkedLore = getLinkedLocationLore(location.name, stage());
+        const linkedLore = getLinkedLocationLore(location, stage());
         location.active = false;
 
         if (linkedLore) {
