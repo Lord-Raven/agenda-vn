@@ -85,7 +85,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     const linkedLoreEntry = getLinkedActorLore(actor.name, stage());
     const isProfileBackedByLore = !!linkedLoreEntry;
     const actorStats = useMemo(() => {
-        const configured = stage().getSave().agendaConfig?.actorStats || [];
+        const configured = stage().getConfiguration().actorStats || [];
         const uniqueStatMap: { [name: string]: ActorStat } = {};
         configured.forEach((stat) => {
             const name = stat?.name?.trim();

@@ -33,10 +33,6 @@ interface SettingsData {
 }
 
 const resolveActivePlayerStats = (stageInstance: Stage): ActorStat[] => {
-    const saveStats = stageInstance.getSave()?.agendaConfig?.playerStats || [];
-    if (saveStats.length > 0) {
-        return saveStats;
-    }
 
     return stageInstance.getConfiguration()?.playerStats || [];
 };
@@ -101,25 +97,6 @@ const buildPlayerStatValues = (
     return nextValues;
 };
 
-const ensureAgendaConfig = (saveData: SaveType, stageInstance: Stage) => {
-    if (saveData.agendaConfig) {
-        return;
-    }
-
-    const configuration = stageInstance.getConfiguration();
-    saveData.agendaConfig = {
-        title: configuration.title || 'Agenda VN',
-        titleImageUrl: configuration.titleImageUrl || '',
-        titleImagePrompt: configuration.titleImagePrompt || '',
-        backgroundImageUrl: configuration.backgroundImageUrl || '',
-        backgroundImagePrompt: configuration.backgroundImagePrompt || '',
-        startingDate: configuration.startingDate,
-        playerStats: configuration.playerStats || [],
-        playerStatValues: { ...(configuration.playerStatValues || {}) },
-        actorStats: configuration.actorStats || [],
-    };
-};
-
 export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onConfirm, isNewGame = false, setScreenType }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const stageInstance = stage();
@@ -147,7 +124,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
     const [playerStats] = useState<ActorStat[]>(() => resolveActivePlayerStats(stageInstance));
     const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: number | string }>(() => {
-        const savePlayerStatValues = stageInstance.getSave()?.agendaConfig?.playerStatValues || {};
+        const savePlayerStatValues = stageInstance.getSave()?.playerStatValues || {};
         return buildPlayerStatValues(resolveActivePlayerStats(stageInstance), savePlayerStatValues);
     });
 
@@ -175,8 +152,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             });
 
             const newSave = stageInstance.getSave();
-            ensureAgendaConfig(newSave, stageInstance);
-            newSave.agendaConfig!.playerStatValues = resolvedPlayerStatValues;
+            newSave.playerStatValues = resolvedPlayerStatValues;
             setScreenType(ScreenType.LOADING);
         } else {
             console.log('Updating settings');
@@ -186,8 +162,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             saveData.disableImpersonation = settings.disableImpersonation;
             saveData.betaMode = settings.betaMode;
             saveData.language = settings.language;
-            ensureAgendaConfig(saveData, stageInstance);
-            saveData.agendaConfig!.playerStatValues = resolvedPlayerStatValues;
+            saveData.playerStatValues = resolvedPlayerStatValues;
 
             const player = stageInstance.getPlayerActor();
             player.name = settings.playerName;
