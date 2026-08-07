@@ -41,12 +41,6 @@ config_schema:
   title: Agenda VN Settings
   type: object
   properties:
-    json:
-      title: Configuration
-      description: JSON configuration for the stage.
-      type: string
-      value: >
-        {}
     beta_mode:
       title: Beta Mode
       description: Enable experimental beta features.
