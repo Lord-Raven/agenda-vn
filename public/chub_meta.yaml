@@ -40,6 +40,11 @@ creator_notes: "
 config_schema:
   type: object
   properties:
+    configuration:
+      title: Configuration
+      description: JSON configuration for the stage.
+      type: string
+      default: ""
     beta_mode:
       title: Beta Mode
       description: Enable experimental beta features.

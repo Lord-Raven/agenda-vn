@@ -5,6 +5,7 @@
   --agenda-text-primary: #edf2f2;
   --agenda-accent-primary: #8ab0cc;
   --agenda-highlight: #89cd87;
+  --agenda-warning: #cda959;
   --agenda-text-muted: #b9d2e3;
   --agenda-line-subtle: rgba(138, 176, 204, 0.34);
   --agenda-line-strong: rgba(137, 205, 135, 0.44);
@@ -18,6 +19,14 @@
   --agenda-atmosphere-end: rgba(35, 24, 56, 0.78);
   --agenda-panel-surface: rgba(28, 34, 52, 0.92);
   --agenda-panel-border: rgba(138, 176, 204, 0.34);
+  --agenda-danger-soft: rgba(255, 0, 0, 0.2);
+  --agenda-danger-border: rgba(255, 0, 0, 0.4);
+  --agenda-danger-text: rgba(255, 100, 100, 0.9);
+  --agenda-danger-hover-bg: rgba(255, 0, 0, 0.3);
+  --agenda-danger-hover-text: rgba(255, 150, 150, 1);
+  --agenda-disabled-bg: rgba(100, 100, 100, 0.2);
+  --agenda-disabled-border: rgba(100, 100, 100, 0.4);
+  --agenda-disabled-text: rgba(150, 150, 150, 0.5);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -60,17 +69,6 @@ body {
     linear-gradient(color-mix(in srgb, var(--agenda-accent-primary) 18%, transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in srgb, var(--agenda-accent-primary) 15%, transparent) 1px, transparent 1px);
   background-size: 64px 64px;
-}
-
-.grid-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.3;
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--agenda-accent-primary) 28%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--agenda-highlight) 22%, transparent) 1px, transparent 1px);
-  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.86), transparent 88%);
 }
 
 .glass-panel,

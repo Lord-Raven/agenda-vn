@@ -127,11 +127,11 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         alignItems: 'stretch',
                         justifyContent: 'center',
                         background: isCurrentSlot 
-                            ? 'rgba(0, 255, 136, 0.15)' 
+                            ? 'color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' 
                             : hoveredSlot === slotIndex && !(mode === 'load' && isEmpty)
-                                ? 'rgba(0, 255, 136, 0.1)' 
-                                : 'rgba(0, 20, 40, 0.5)',
-                        border: isCurrentSlot ? '2px solid rgba(0, 255, 136, 0.5)' : undefined,
+                                ? 'color-mix(in srgb, var(--agenda-highlight) 10%, transparent)' 
+                                : 'color-mix(in srgb, var(--agenda-surface-base) 50%, transparent)',
+                        border: isCurrentSlot ? '2px solid color-mix(in srgb, var(--agenda-highlight) 50%, transparent)' : undefined,
                         position: 'relative',
                         overflow: 'hidden'
                     }}
@@ -158,11 +158,11 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                                 right: 0,
                                 bottom: 0,
                                 width: '40px',
-                                background: isCurrentSlot ? 'rgba(100, 100, 100, 0.2)' : 'rgba(255, 0, 0, 0.2)',
+                                background: isCurrentSlot ? 'var(--agenda-disabled-bg)' : 'var(--agenda-danger-soft)',
                                 border: 'none',
-                                borderLeft: isCurrentSlot ? '1px solid rgba(100, 100, 100, 0.4)' : '1px solid rgba(255, 0, 0, 0.4)',
+                                borderLeft: isCurrentSlot ? '1px solid var(--agenda-disabled-border)' : '1px solid var(--agenda-danger-border)',
                                 borderRadius: '0 4px 4px 0',
-                                color: isCurrentSlot ? 'rgba(150, 150, 150, 0.5)' : 'rgba(255, 100, 100, 0.9)',
+                                color: isCurrentSlot ? 'var(--agenda-disabled-text)' : 'var(--agenda-danger-text)',
                                 cursor: isCurrentSlot ? 'not-allowed' : 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -173,14 +173,14 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                             }}
                             onMouseOver={(e) => {
                                 if (!isCurrentSlot) {
-                                    e.currentTarget.style.background = 'rgba(255, 0, 0, 0.3)';
-                                    e.currentTarget.style.color = 'rgba(255, 150, 150, 1)';
+                                    e.currentTarget.style.background = 'var(--agenda-danger-hover-bg)';
+                                    e.currentTarget.style.color = 'var(--agenda-danger-hover-text)';
                                 }
                             }}
                             onMouseOut={(e) => {
                                 if (!isCurrentSlot) {
-                                    e.currentTarget.style.background = 'rgba(255, 0, 0, 0.2)';
-                                    e.currentTarget.style.color = 'rgba(255, 100, 100, 0.9)';
+                                    e.currentTarget.style.background = 'var(--agenda-danger-soft)';
+                                    e.currentTarget.style.color = 'var(--agenda-danger-text)';
                                 }
                             }}
                         >
@@ -194,7 +194,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                             alignItems: 'center',
                             justifyContent: 'center',
                             height: '100%',
-                            color: 'rgba(0, 255, 136, 0.3)',
+                            color: 'color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                             fontSize: '14px',
                             fontStyle: 'italic'
                         }}>
@@ -247,14 +247,14 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                             }}>
                                 <div style={{
                                     fontSize: '12px',
-                                    color: 'rgba(0, 255, 136, 0.7)'
+                                    color: 'color-mix(in srgb, var(--agenda-highlight) 70%, transparent)'
                                 }}>
                                     {formatTimestamp(save.timestamp)}
                                 </div>
                                 <div style={{
                                     fontSize: '16px',
                                     fontWeight: 'bold',
-                                    color: 'rgba(0, 255, 136, 1)'
+                                    color: 'var(--agenda-highlight)'
                                 }}>
                                     {save.actors[save.playerId].name} - Day {save.currentDate || 'Unknown'}
                                 </div>
@@ -274,7 +274,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                 left: 0,
                 right: 0,
                 bottom: 0,
-                background: 'rgba(0, 0, 0, 0.8)',
+                background: 'color-mix(in srgb, var(--agenda-surface-base) 58%, #000)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -321,7 +321,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         style={{
                             background: 'transparent',
                             border: 'none',
-                            color: 'rgba(0, 255, 136, 0.7)',
+                            color: 'color-mix(in srgb, var(--agenda-highlight) 70%, transparent)',
                             cursor: 'pointer',
                             fontSize: '24px',
                             padding: '5px',
@@ -338,7 +338,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                 {mode === 'save' && (
                     <div style={{
                         fontSize: '12px',
-                        color: 'rgba(0, 255, 136, 0.6)',
+                        color: 'color-mix(in srgb, var(--agenda-highlight) 60%, transparent)',
                         fontStyle: 'italic',
                         marginBottom: '15px',
                         textAlign: 'left'
@@ -371,7 +371,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        background: 'rgba(0, 0, 0, 0.7)',
+                        background: 'color-mix(in srgb, var(--agenda-surface-base) 48%, #000)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -400,7 +400,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                             Delete Save?
                         </Title>
                         <div style={{
-                            color: 'rgba(0, 255, 136, 0.8)',
+                            color: 'color-mix(in srgb, var(--agenda-highlight) 80%, transparent)',
                             textAlign: 'center',
                             fontSize: '14px'
                         }}>
@@ -418,7 +418,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                                 onMouseLeave={() => clearTooltip()}
                                 style={{
                                     padding: '10px 20px',
-                                    background: 'rgba(0, 255, 136, 0.1)'
+                                    background: 'color-mix(in srgb, var(--agenda-highlight) 10%, transparent)'
                                 }}
                             >
                                 Cancel
@@ -430,9 +430,9 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                                 onMouseLeave={() => clearTooltip()}
                                 style={{
                                     padding: '10px 20px',
-                                    background: 'rgba(255, 0, 0, 0.2)',
-                                    border: '2px solid rgba(255, 0, 0, 0.4)',
-                                    color: 'rgba(255, 150, 150, 1)'
+                                    background: 'var(--agenda-danger-soft)',
+                                    border: '2px solid var(--agenda-danger-border)',
+                                    color: 'var(--agenda-danger-hover-text)'
                                 }}
                             >
                                 Delete

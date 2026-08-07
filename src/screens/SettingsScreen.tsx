@@ -260,7 +260,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    background: 'rgba(10, 14, 24, 0.84)',
+                    background: 'color-mix(in srgb, var(--agenda-surface-base) 76%, #000)',
                     backdropFilter: 'blur(8px)',
                     display: 'flex',
                     alignItems: 'center',
@@ -314,7 +314,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                 style={{
                                     background: 'transparent',
                                     border: 'none',
-                                    color: 'rgba(138, 176, 204, 0.75)',
+                                    color: 'color-mix(in srgb, var(--agenda-accent-primary) 75%, transparent)',
                                     cursor: 'pointer',
                                     fontSize: '24px',
                                     padding: '5px',
@@ -343,7 +343,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         htmlFor="player-name"
                                         style={{
                                             display: 'block',
-                                            color: '#b9d2e3',
+                                            color: 'var(--agenda-text-muted)',
                                             fontSize: '14px',
                                             fontWeight: 'bold',
                                             marginBottom: '8px',
@@ -365,7 +365,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                     <label
                                         style={{
                                             display: 'block',
-                                            color: '#b9d2e3',
+                                            color: 'var(--agenda-text-muted)',
                                             fontSize: '14px',
                                             fontWeight: 'bold',
                                             marginBottom: '8px',
@@ -389,7 +389,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                     htmlFor="player-description"
                                     style={{
                                         display: 'block',
-                                        color: '#b9d2e3',
+                                        color: 'var(--agenda-text-muted)',
                                         fontSize: '14px',
                                         fontWeight: 'bold',
                                         marginBottom: '8px',
@@ -417,7 +417,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                     <label
                                         style={{
                                             display: 'block',
-                                            color: '#b9d2e3',
+                                            color: 'var(--agenda-text-muted)',
                                             fontSize: '14px',
                                             fontWeight: 'bold',
                                             marginBottom: '4px'
@@ -440,17 +440,17 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 style={{
                                                     padding: '12px',
                                                     borderRadius: '8px',
-                                                    background: 'rgba(28, 34, 52, 0.8)',
-                                                    border: '2px solid rgba(138, 176, 204, 0.34)',
+                                                    background: 'color-mix(in srgb, var(--agenda-panel-surface) 86%, transparent)',
+                                                    border: '2px solid var(--agenda-panel-border)',
                                                     display: 'flex',
                                                     flexDirection: 'column',
                                                     gap: '8px',
                                                 }}
                                             >
-                                                <div style={{ color: '#edf2f2', fontSize: '14px', fontWeight: 700 }}>
+                                                <div style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
                                                     {statName}
                                                 </div>
-                                                <div style={{ color: 'rgba(185, 210, 227, 0.8)', fontSize: '13px' }}>
+                                                <div style={{ color: 'color-mix(in srgb, var(--agenda-text-muted) 80%, transparent)', fontSize: '13px' }}>
                                                     {stat.description}
                                                 </div>
 
@@ -470,7 +470,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 )}
 
                                                 {stat.displayType === 'option' && optionEntries.length === 0 && (
-                                                    <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
+                                                    <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)', fontSize: '12px' }}>
                                                         No options configured for this setting.
                                                     </div>
                                                 )}
@@ -494,7 +494,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                             style={{ fontSize: '13px' }}
                                                         />
                                                         {(typeof stat.min === 'number' || typeof stat.max === 'number') && (
-                                                            <div style={{ color: 'rgba(237, 242, 242, 0.72)', fontSize: '12px' }}>
+                                                            <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)', fontSize: '12px' }}>
                                                                 Range: {typeof stat.min === 'number' ? stat.min : '-inf'} to {typeof stat.max === 'number' ? stat.max : '+inf'}
                                                             </div>
                                                         )}
@@ -511,7 +511,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                 <label 
                                     style={{
                                         display: 'block',
-                                        color: '#b9d2e3',
+                                        color: 'var(--agenda-text-muted)',
                                         fontSize: '14px',
                                         fontWeight: 'bold',
                                         marginBottom: '12px',
@@ -530,11 +530,11 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         style={{
                                             padding: '12px',
                                             background: settings.textToSpeech
-                                                ? 'rgba(137, 205, 135, 0.18)'
-                                                : 'rgba(28, 34, 52, 0.8)',
+                                                ? 'color-mix(in srgb, var(--agenda-highlight) 18%, transparent)'
+                                                : 'color-mix(in srgb, var(--agenda-panel-surface) 86%, transparent)',
                                             border: settings.textToSpeech
-                                                ? '2px solid rgba(137, 205, 135, 0.5)'
-                                                : '2px solid rgba(138, 176, 204, 0.34)',
+                                                ? '2px solid color-mix(in srgb, var(--agenda-highlight) 50%, transparent)'
+                                                : '2px solid var(--agenda-panel-border)',
                                             borderRadius: '8px',
                                             cursor: 'pointer',
                                             transition: 'all 0.2s ease',
@@ -548,8 +548,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 width: '20px',
                                                 height: '20px',
                                                 borderRadius: '4px',
-                                                background: settings.textToSpeech ? '#89cd87' : 'rgba(255, 255, 255, 0.1)',
-                                                border: '2px solid ' + (settings.textToSpeech ? '#89cd87' : 'rgba(138, 176, 204, 0.35)'),
+                                                background: settings.textToSpeech ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
+                                                border: '2px solid ' + (settings.textToSpeech ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -562,7 +562,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     initial={{ scale: 0 }}
                                                     animate={{ scale: 1 }}
                                                     style={{
-                                                        color: '#FFFFFF',
+                                                        color: 'var(--agenda-text-primary)',
                                                         fontSize: '14px',
                                                         fontWeight: 'bold',
                                                     }}
@@ -573,7 +573,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         </div>
                                         <span
                                             style={{
-                                                color: settings.textToSpeech ? '#89cd87' : 'rgba(237, 242, 242, 0.72)',
+                                                color: settings.textToSpeech ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
                                                 fontSize: '13px',
                                                 fontWeight: settings.textToSpeech ? 'bold' : 'normal',
                                             }}
@@ -592,11 +592,11 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         style={{
                                             padding: '12px',
                                             background: settings.disableImpersonation
-                                                ? 'rgba(137, 205, 135, 0.18)'
-                                                : 'rgba(28, 34, 52, 0.8)',
+                                                ? 'color-mix(in srgb, var(--agenda-highlight) 18%, transparent)'
+                                                : 'color-mix(in srgb, var(--agenda-panel-surface) 86%, transparent)',
                                             border: settings.disableImpersonation
-                                                ? '2px solid rgba(137, 205, 135, 0.5)'
-                                                : '2px solid rgba(138, 176, 204, 0.34)',
+                                                ? '2px solid color-mix(in srgb, var(--agenda-highlight) 50%, transparent)'
+                                                : '2px solid var(--agenda-panel-border)',
                                             borderRadius: '8px',
                                             cursor: 'pointer',
                                             transition: 'all 0.2s ease',
@@ -610,8 +610,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 width: '20px',
                                                 height: '20px',
                                                 borderRadius: '4px',
-                                                background: settings.disableImpersonation ? '#89cd87' : 'rgba(255, 255, 255, 0.1)',
-                                                border: '2px solid ' + (settings.disableImpersonation ? '#89cd87' : 'rgba(138, 176, 204, 0.35)'),
+                                                background: settings.disableImpersonation ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
+                                                border: '2px solid ' + (settings.disableImpersonation ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -624,7 +624,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     initial={{ scale: 0 }}
                                                     animate={{ scale: 1 }}
                                                     style={{
-                                                        color: '#FFFFFF',
+                                                        color: 'var(--agenda-text-primary)',
                                                         fontSize: '14px',
                                                         fontWeight: 'bold',
                                                     }}
@@ -635,7 +635,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         </div>
                                         <span
                                             style={{
-                                                color: settings.disableImpersonation ? '#89cd87' : 'rgba(237, 242, 242, 0.72)',
+                                                color: settings.disableImpersonation ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
                                                 fontSize: '13px',
                                                 fontWeight: settings.disableImpersonation ? 'bold' : 'normal',
                                             }}
@@ -652,11 +652,11 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         style={{
                                             padding: '12px',
                                             background: settings.betaMode
-                                                ? 'rgba(205, 169, 89, 0.18)'
-                                                : 'rgba(28, 34, 52, 0.8)',
+                                                ? 'color-mix(in srgb, var(--agenda-warning) 18%, transparent)'
+                                                : 'color-mix(in srgb, var(--agenda-panel-surface) 86%, transparent)',
                                             border: settings.betaMode
-                                                ? '2px solid rgba(205, 169, 89, 0.5)'
-                                                : '2px solid rgba(138, 176, 204, 0.34)',
+                                                ? '2px solid color-mix(in srgb, var(--agenda-warning) 50%, transparent)'
+                                                : '2px solid var(--agenda-panel-border)',
                                             borderRadius: '8px',
                                             cursor: 'pointer',
                                             transition: 'all 0.2s ease',
@@ -670,8 +670,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 width: '20px',
                                                 height: '20px',
                                                 borderRadius: '4px',
-                                                background: settings.betaMode ? '#cda959' : 'rgba(255, 255, 255, 0.1)',
-                                                border: '2px solid ' + (settings.betaMode ? '#cda959' : 'rgba(138, 176, 204, 0.35)'),
+                                                background: settings.betaMode ? 'var(--agenda-warning)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
+                                                border: '2px solid ' + (settings.betaMode ? 'var(--agenda-warning)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -684,7 +684,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     initial={{ scale: 0 }}
                                                     animate={{ scale: 1 }}
                                                     style={{
-                                                        color: '#FFFFFF',
+                                                        color: 'var(--agenda-text-primary)',
                                                         fontSize: '14px',
                                                         fontWeight: 'bold',
                                                     }}
@@ -695,7 +695,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         </div>
                                         <span
                                             style={{
-                                                color: settings.betaMode ? '#cda959' : 'rgba(237, 242, 242, 0.72)',
+                                                color: settings.betaMode ? 'var(--agenda-warning)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
                                                 fontSize: '13px',
                                                 fontWeight: settings.betaMode ? 'bold' : 'normal',
                                             }}
@@ -710,7 +710,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                             htmlFor="language-input"
                                             style={{
                                                 display: 'block',
-                                                color: '#b9d2e3',
+                                                color: 'var(--agenda-text-muted)',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 marginBottom: '12px'
@@ -750,8 +750,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                             left: 0,
                                                             right: 0,
                                                             marginTop: '4px',
-                                                            background: 'rgba(26, 32, 49, 0.97)',
-                                                            border: '2px solid rgba(138, 176, 204, 0.5)',
+                                                            background: 'color-mix(in srgb, var(--agenda-surface-base) 92%, var(--agenda-surface-raised))',
+                                                            border: '2px solid color-mix(in srgb, var(--agenda-accent-primary) 50%, transparent)',
                                                             borderRadius: '8px',
                                                             overflow: 'hidden',
                                                             zIndex: 1000,
@@ -770,20 +770,20 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                                 style={{
                                                                     padding: '10px 12px',
                                                                     cursor: 'pointer',
-                                                                    color: 'rgba(255, 255, 255, 0.8)',
+                                                                    color: 'color-mix(in srgb, var(--agenda-text-primary) 80%, transparent)',
                                                                     fontSize: '13px',
                                                                     transition: 'all 0.15s ease',
                                                                     borderBottom: index < languageSuggestions.length - 1 
-                                                                        ? '1px solid rgba(138, 176, 204, 0.14)' 
+                                                                        ? '1px solid color-mix(in srgb, var(--agenda-accent-primary) 14%, transparent)' 
                                                                         : 'none',
                                                                 }}
                                                                 onMouseEnter={(e) => {
-                                                                    e.currentTarget.style.background = 'rgba(138, 176, 204, 0.17)';
-                                                                    e.currentTarget.style.color = '#8ab0cc';
+                                                                    e.currentTarget.style.background = 'color-mix(in srgb, var(--agenda-accent-primary) 17%, transparent)';
+                                                                    e.currentTarget.style.color = 'var(--agenda-accent-primary)';
                                                                 }}
                                                                 onMouseLeave={(e) => {
                                                                     e.currentTarget.style.background = 'transparent';
-                                                                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
+                                                                    e.currentTarget.style.color = 'color-mix(in srgb, var(--agenda-text-primary) 80%, transparent)';
                                                                 }}
                                                             >
                                                                 {lang}
