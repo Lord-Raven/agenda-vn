@@ -283,10 +283,6 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
     upsertActorLoreEntry(actor, oldName, stage);
 
-    if (actor.outfitId === '') {
-        actor.outfitId = actor.outfits[0].id;
-    }
-
     const currentOutfit = getActiveOutfit(actor);
     if (!currentOutfit.emotionPack['base']) {
         // Kick off base image generation:
@@ -323,14 +319,16 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
 function getActiveOutfit(actor: Actor): Outfit {
     if (actor.outfits.length === 0) {
         // Return a default outfit if none exist to avoid errors; this will be updated with real data when the emotion images are generated.
-        return {
-            id: '',
+        actor.outfits.push({
+            id: generateUuid(),
             name: 'Default Outfit',
             description: '',
             prompts: {},
             emotionPack: {}
-        };
-    } else if (!actor.outfitId) {
+        });
+    }
+    if (!actor.outfitId) {
+        actor.outfitId = actor.outfits[0].id;
         return actor.outfits[0];
     } else {
         return actor.outfits.find(outfit => outfit.id === actor.outfitId) || actor.outfits[0];

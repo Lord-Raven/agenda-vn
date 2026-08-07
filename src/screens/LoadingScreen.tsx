@@ -14,6 +14,7 @@ import { DEFAULT_ATLAS_LOCATIONS } from '../content/Location';
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const CALENDAR_ROWS = 5;
 const TOTAL_DAYS = DAY_LABELS.length * CALENDAR_ROWS; // 35
+const LOADABLE_DAYS = 31;
 
 interface LoadingScreenProps {
     stage: () => Stage;
@@ -31,6 +32,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) => {
     const [progress, setProgress] = useState(0);
+    const [animatedMarkedCount, setAnimatedMarkedCount] = useState(0);
     const seenPromiseKeysRef = useRef<Set<string>>(new Set());
     const hasObservedPromiseActivityRef = useRef(false);
 
@@ -92,6 +94,25 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
 
         return () => clearInterval(interval);
     }, [setScreenType, stage]);
+
+    const targetMarkedCount = Math.floor((progress / 100) * LOADABLE_DAYS);
+
+    useEffect(() => {
+        if (animatedMarkedCount === targetMarkedCount) {
+            return;
+        }
+
+        // Draw one strike at a time so progress advances in a readable sequence.
+        const timeout = setTimeout(() => {
+            if (animatedMarkedCount < targetMarkedCount) {
+                setAnimatedMarkedCount((prev) => Math.min(prev + 1, targetMarkedCount));
+            } else {
+                setAnimatedMarkedCount(targetMarkedCount);
+            }
+        }, 42);
+
+        return () => clearTimeout(timeout);
+    }, [animatedMarkedCount, targetMarkedCount]);
 
     return (
         <Box
@@ -201,8 +222,8 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
 
                         {/* Day cells */}
                         {Array.from({ length: TOTAL_DAYS }).map((_, i) => {
-                            const markedCount = Math.floor((progress / 100) * TOTAL_DAYS);
-                            const isMarked = i < markedCount;
+                            const isLoadableDay = i < LOADABLE_DAYS;
+                            const isMarked = isLoadableDay && i < animatedMarkedCount;
                             return (
                                 <Box
                                     key={i}
@@ -213,73 +234,59 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                                         border: '1px solid',
                                         borderColor: isMarked
                                             ? 'rgba(185, 143, 110, 0.35)'
-                                            : 'rgba(138, 176, 204, 0.2)',
+                                            : isLoadableDay
+                                                ? 'rgba(138, 176, 204, 0.2)'
+                                                : 'rgba(14, 18, 30, 0.58)',
                                         background: isMarked
                                             ? 'rgba(185, 143, 110, 0.08)'
-                                            : 'rgba(138, 176, 204, 0.04)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
+                                            : isLoadableDay
+                                                ? 'rgba(138, 176, 204, 0.04)'
+                                                : 'rgba(11, 14, 24, 0.64)',
                                         overflow: 'hidden',
                                         transition: 'border-color 0.3s, background 0.3s',
                                     }}
                                 >
                                     <Typography
                                         sx={{
+                                            position: 'absolute',
+                                            top: '3px',
+                                            left: '4px',
                                             fontSize: 'clamp(0.5rem, 1.5vw, 0.7rem)',
                                             fontFamily: 'var(--agenda-font-display)',
                                             color: isMarked
                                                 ? 'rgba(185, 143, 110, 0.55)'
-                                                : 'var(--agenda-text-muted)',
-                                            opacity: isMarked ? 0.6 : 0.5,
+                                                : isLoadableDay
+                                                    ? 'var(--agenda-text-muted)'
+                                                    : 'rgba(117, 132, 154, 0.42)',
+                                            opacity: isMarked ? 0.6 : isLoadableDay ? 0.5 : 0.4,
                                             userSelect: 'none',
                                             lineHeight: 1,
                                             transition: 'color 0.3s, opacity 0.3s',
                                         }}
                                     >
-                                        {i + 1}
+                                        {isLoadableDay ? i + 1 : ''}
                                     </Typography>
 
                                     <AnimatePresence>
                                         {isMarked && (
-                                            <>
-                                                <motion.div
-                                                    key={`x1-${i}`}
-                                                    initial={{ scaleX: 0, opacity: 0 }}
-                                                    animate={{ scaleX: 1, opacity: 1 }}
-                                                    exit={{ scaleX: 0, opacity: 0 }}
-                                                    transition={{ duration: 0.18, ease: 'easeOut' }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        width: '72%',
-                                                        height: '1.5px',
-                                                        background: 'rgba(185, 143, 110, 0.72)',
-                                                        top: '50%',
-                                                        left: '14%',
-                                                        borderRadius: '1px',
-                                                        transform: 'translateY(-50%) rotate(38deg)',
-                                                        transformOrigin: 'left center',
-                                                    }}
-                                                />
-                                                <motion.div
-                                                    key={`x2-${i}`}
-                                                    initial={{ scaleX: 0, opacity: 0 }}
-                                                    animate={{ scaleX: 1, opacity: 1 }}
-                                                    exit={{ scaleX: 0, opacity: 0 }}
-                                                    transition={{ duration: 0.18, ease: 'easeOut', delay: 0.06 }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        width: '72%',
-                                                        height: '1.5px',
-                                                        background: 'rgba(185, 143, 110, 0.72)',
-                                                        top: '50%',
-                                                        left: '14%',
-                                                        borderRadius: '1px',
-                                                        transform: 'translateY(-50%) rotate(-38deg)',
-                                                        transformOrigin: 'left center',
-                                                    }}
-                                                />
-                                            </>
+                                            <motion.div
+                                                key={`strike-${i}`}
+                                                initial={{ scaleX: 0, opacity: 0 }}
+                                                animate={{ scaleX: 1, opacity: 1 }}
+                                                exit={{ scaleX: 0, opacity: 0 }}
+                                                transition={{ duration: 0.2, ease: 'easeOut' }}
+                                                style={{
+                                                    position: 'absolute',
+                                                    width: '150%',
+                                                    height: '1.6px',
+                                                    background: 'rgba(185, 143, 110, 0.76)',
+                                                    top: '50%',
+                                                    left: '-25%',
+                                                    borderRadius: '1px',
+                                                    transform: 'translateY(-50%) rotate(-45deg)',
+                                                    transformOrigin: 'left center',
+                                                }}
+                                            />
                                         )}
                                     </AnimatePresence>
                                 </Box>

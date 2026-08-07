@@ -606,9 +606,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const groupedBySeries = new Map<string, CalendarEvent[]>();
         (save.upcomingEvents || []).forEach((event) => {
-            if (!this.isFutureEvent(event)) {
-                return;
-            }
             const seriesId = event.recurrenceParentId || event.id;
             const existing = groupedBySeries.get(seriesId) || [];
             existing.push(event);
