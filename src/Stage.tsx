@@ -1521,9 +1521,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     async makeImageFromImage(imageToImageRequest: any, defaultUrl: string): Promise<string> {
-        if (this.getConfiguration().artStyle) {
+        /*if (this.getConfiguration().artStyle) {
             imageToImageRequest.prompt = `${imageToImageRequest.prompt || ''}\nArt Style: ${this.getConfiguration().artStyle}`;
-        }
+        }*/
         const imageUrl = (await this.generator.imageToImage(imageToImageRequest))?.url ?? defaultUrl;
         if (imageToImageRequest.remove_background && imageToImageRequest.transfer_type == 'edit' && imageUrl != defaultUrl) {
             try {
