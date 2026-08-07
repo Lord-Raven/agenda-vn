@@ -1,7 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { findBestNameMatch } from './Actor';
-import { formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
+import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import { buildPrompt } from '../utils/PromptBuilder.js';
 import {
 	buildStructuredExampleResponse,
@@ -50,6 +50,30 @@ export function updateLocationDescription(locationId: string, description: strin
 	}
 
 	location.description = description;
+}
+
+export function upsertLocationLoreEntry(location: Location, oldName: string, stage: Stage): void {
+	let loreEntry = getLinkedLocationLore(oldName, stage);
+	if (!loreEntry) {
+		loreEntry = createLoreEntry({
+			type: 'location',
+			title: location.name,
+			content: location.description,
+			triggers: [],
+			enabled: true,
+			constant: false,
+			insertionOrder: 0,
+			priority: 0,
+			probability: 100,
+		});
+		stage.getSave().lorebook?.push(loreEntry);
+	}
+
+	loreEntry.title = location.name;
+	loreEntry.triggers = [
+		...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)),
+		...location.name.split(' '),
+	];
 }
 
 const LOCATION_DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
@@ -114,7 +138,7 @@ export async function distillLocation(location: Location, definition: any, stage
 		console.log(generatedResponse);
 
 		const parsedData = parseStructuredResponse(generatedResponse, LOCATION_DISTILLATION_FIELDS);
-		const existingLore = getLinkedLocationLore(location.name, stage);
+		const oldName = location.name;
 		const nextName = (parsedData['name'] || location.name || '').trim() || location.name;
 		const nextCategory = (parsedData['category'] || location.category || '').trim();
 		const nextDescription = (parsedData['description'] || getLocationDescription(location.id, stage) || location.description || '').trim();
@@ -131,9 +155,10 @@ export async function distillLocation(location: Location, definition: any, stage
 		location.themeColor = nextThemeColor;
 		location.lightColor = nextLightColor;
 
-		if (existingLore) {
-			existingLore.title = nextName;
-			existingLore.content = nextDescription;
+		upsertLocationLoreEntry(location, oldName, stage);
+		const linkedLore = getLinkedLocationLore(location.name, stage);
+		if (linkedLore) {
+			linkedLore.content = nextDescription;
 		}
 
 		return location;

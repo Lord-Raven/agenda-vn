@@ -270,12 +270,14 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
             parsedData['color'] :
             ['#788ebdff', '#d3aa68ff', '#75c275ff', '#c28891ff', '#55bbb2ff'][Math.floor(Math.random() * 5)];
 
+    const oldName = actor.name;
     // Fill in actor, but favor any current settings:
-    actor.description = actor.description || parsedData['description'] || '';
-    actor.profile = actor.profile || parsedData['profile'] || '';
-    actor.voiceId = actor.voiceId || parsedData['voice'] || '';
-    actor.themeColor = actor.themeColor || themeColor;
-    actor.themeFontFamily = actor.themeFontFamily || parsedData['font'] || 'Arial, sans-serif';
+    actor.name = parsedData['name'] || actor.name || '';
+    actor.description = parsedData['description'] || actor.description || '';
+    actor.profile = parsedData['profile'] || actor.profile || '';
+    actor.voiceId = parsedData['voice'] || actor.voiceId || '';
+    actor.themeColor = themeColor || actor.themeColor;
+    actor.themeFontFamily = parsedData['font'] || actor.themeFontFamily || 'Arial, sans-serif';
     actor.outfits = actor.outfits.length > 0 ? actor.outfits : [];
     actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
 
@@ -287,40 +289,10 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         actor.statMap[stat.name] = clampActorStatValue(resolvedValue, stat);
     });
 
-    if (actor.outfits.length === 0) {
-
-        const defaultOutfitName = parsedData['outfit_name'] || 'Default Outfit';
-        const defaultOutfitDescription = parsedData['outfit_description'] || '';
-
-        // Add shell of an initial outfit
-        actor.outfits.push({
-            id: generateUuid(),
-            name: defaultOutfitName,
-            description: defaultOutfitDescription,
-            prompts: {},
-            emotionPack: {}, // This will be filled in later when the player views this character and the emotions are generated on demand.
-        });
-    }
+    upsertActorLoreEntry(actor, oldName, stage);
 
     if (actor.outfitId === '') {
         actor.outfitId = actor.outfits[0].id;
-    }
-
-    // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
-    const existingLore = getLinkedActorLore(actor.name, stage);
-    if (!existingLore) {
-        const newLore = createLoreEntry({
-            type: 'character',
-            title: actor.name,
-            content: actor.profile,
-            triggers: [actor.name, ...actor.name.split(' ').filter(word => word.length > 2 && word.charAt(word.length - 1) !== '.')],
-            enabled: true,
-            constant: false,
-            insertionOrder: 0,
-            priority: 0,
-            probability: 1.0
-        });
-        stage.getSave().lorebook?.push(newLore);
     }
 
     const currentOutfit = getActiveOutfit(actor);
@@ -332,6 +304,27 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         await generateEmotionImage(actor, Emotion.neutral, stage, false, actor.outfitId);
     }
     return actor;
+}
+
+export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage): void {
+    let loreEntry = getLinkedActorLore(oldName, stage);
+    // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
+    if (!loreEntry) {
+        loreEntry = createLoreEntry({
+            type: 'character',
+            title: actor.name,
+            content: actor.profile,
+            triggers: [],
+            enabled: true,
+            constant: false,
+            insertionOrder: 0,
+            priority: 0,
+            probability: 100
+        });
+        stage.getSave().lorebook?.push(loreEntry);
+    }
+    loreEntry.title = actor.name;
+    loreEntry.triggers = [...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)), ...actor.name.split(' ')];
 }
 
 function getActiveOutfit(actor: Actor): Outfit {

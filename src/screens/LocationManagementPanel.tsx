@@ -115,7 +115,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                 constant: false,
                 insertionOrder: 0,
                 priority: 0,
-                probability: 1.0
+                probability: 100
             });
             save.lorebook = save.lorebook || [];
             save.lorebook.push(newLore);

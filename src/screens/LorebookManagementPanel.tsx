@@ -255,19 +255,55 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
         )));
     };
 
+    const getLinkedActorByLoreId = (loreId: string) => {
+        return Object.values(stage().getSave().actors || {}).find((actor) => {
+            if (actor.active === false) {
+                return false;
+            }
+            const linkedLore = getLinkedActorLore(actor.name, stage());
+            return linkedLore?.id === loreId;
+        }) || null;
+    };
+
+    const getLinkedLocationByLoreId = (loreId: string) => {
+        return Object.values(stage().getSave().atlas || {}).find((location) => {
+            if (location.active === false) {
+                return false;
+            }
+            const linkedLore = getLinkedLocationLore(location.name, stage());
+            return linkedLore?.id === loreId;
+        }) || null;
+    };
+
+    const updateSelectedLoreTitle = (title: string) => {
+        if (!selectedLoreId || !selectedLore) {
+            return;
+        }
+
+        if (selectedLore.type === 'character') {
+            const linkedActor = getLinkedActorByLoreId(selectedLore.id);
+            if (linkedActor) {
+                linkedActor.name = title;
+            }
+        }
+
+        if (selectedLore.type === 'location') {
+            const linkedLocation = getLinkedLocationByLoreId(selectedLore.id);
+            if (linkedLocation) {
+                linkedLocation.name = title;
+            }
+        }
+
+        updateSelectedLore({ title });
+    };
+
     const updateSelectedLoreContent = (content: string) => {
         if (!selectedLore) {
             return;
         }
 
         if (selectedLore.type === 'character') {
-            const linkedActor = Object.values(stage().getSave().actors || {}).find((actor) => {
-                if (actor.active === false) {
-                    return false;
-                }
-                const linkedLore = getLinkedActorLore(actor.name, stage());
-                return linkedLore?.id === selectedLore.id;
-            });
+            const linkedActor = getLinkedActorByLoreId(selectedLore.id);
 
             if (linkedActor) {
                 updateActorLore(linkedActor.id, content, stage());
@@ -277,13 +313,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
         }
 
         if (selectedLore.type === 'location') {
-            const linkedLocation = Object.values(stage().getSave().atlas || {}).find((location) => {
-                if (location.active === false) {
-                    return false;
-                }
-                const linkedLore = getLinkedLocationLore(location.name, stage());
-                return linkedLore?.id === selectedLore.id;
-            });
+            const linkedLocation = getLinkedLocationByLoreId(selectedLore.id);
 
             if (linkedLocation) {
                 updateLocationDescription(linkedLocation.id, content, stage());
@@ -495,7 +525,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Title</label>
                                             <TextInput
                                                 value={selectedLore.title}
-                                                onChange={(event) => updateSelectedLore({ title: event.target.value })}
+                                                onChange={(event) => updateSelectedLoreTitle(event.target.value)}
                                                 fullWidth
                                             />
                                         </div>

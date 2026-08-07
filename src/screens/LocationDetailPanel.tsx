@@ -2,7 +2,7 @@ import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import { Stage } from '../Stage';
-import { distillLocation, getLocationDescription, getLinkedLocationLore, Location, updateLocationDescription } from '../content/Location';
+import { distillLocation, getLocationDescription, getLinkedLocationLore, Location, updateLocationDescription, upsertLocationLoreEntry } from '../content/Location';
 import { Image as ImageIcon, Place } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
@@ -90,8 +90,13 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             autoSaveTimeoutRef.current = null;
         }
 
+        const oldName = location.name;
         location.name = nextLocation.name;
         location.category = nextLocation.category.trim();
+        if (location.name !== oldName) {
+            console.log(`Location name changed from "${oldName}" to "${location.name}". Updating linked lore entry.`);
+            upsertLocationLoreEntry(location, oldName, stage());
+        }
         updateLocationDescription(location.id, nextLocation.description, stage());
         location.themeColor = nextLocation.themeColor;
         location.lightColor = nextLocation.lightColor;

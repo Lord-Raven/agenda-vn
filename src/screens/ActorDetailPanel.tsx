@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { ActorStat, Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore } from '../content/Actor';
+import { Actor, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
@@ -240,6 +240,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                 emotionPack: { ...(outfit.emotionPack || {}) },
             }));
 
+        const oldName = actor.name;
         actor.name = nextEditedActor.name;
         actor.category = nextEditedActor.category.trim();
         actor.description = nextEditedActor.description;
@@ -253,6 +254,11 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.themeFontFamily = nextEditedActor.themeFontFamily;
         actor.outfits = persistedOutfits;
         actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
+
+        if (actor.name !== oldName) {
+            console.log(`Actor name changed from "${oldName}" to "${actor.name}". Updating linked lore entry.`);
+            upsertActorLoreEntry(actor, oldName, stage());
+        }
 
         const activeStatNames = new Set<string>();
         actorStats.forEach((stat) => {
@@ -562,6 +568,7 @@ ${indent}}`;
         setIsGeneratingActorDetails(true);
 
         const previousGeneratedState = {
+            name: actor.name,
             description: actor.description,
             profile: actor.profile,
             voiceId: actor.voiceId,
@@ -573,6 +580,7 @@ ${indent}}`;
         };
 
         try {
+            const lore = getLinkedActorLore(actor.name, stage());
             actor.description = '';
             actor.profile = '';
             actor.voiceId = '';
@@ -581,10 +589,16 @@ ${indent}}`;
             actor.outfitId = '';
             actor.outfits = [];
             actor.statMap = {};
-
             const distilledActor = await distillActor(actor, generationDefinition, stage());
             if (!distilledActor) {
                 throw new Error('Actor distillation returned no actor.');
+            }
+            if (lore) {
+                // Update lore properties
+                lore.title = distilledActor.name;
+                lore.content = distilledActor.profile;
+                // Update triggers, removing words that were part of the previous name and adding words from the new name
+                lore.triggers = [...lore.triggers.filter((trigger) => !previousGeneratedState.name.includes(trigger)), ...distilledActor.name.split(' ')];
             }
 
             syncEditedFieldsFromActor();
