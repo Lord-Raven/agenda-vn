@@ -247,7 +247,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
         return todayDateCellIndex >= 0 ? Math.floor((todayDateCellIndex + 1) / 7) : -1;
     }, [todayDateCellIndex]);
     const todayWeekdayColumnIndex = useMemo(
-        () => (todayDateCellIndex >= 0 ? (todayDateCellIndex % 7) + 1 : -1),
+        () => (todayDateCellIndex >= 0 ? (todayDateCellIndex % 7) : -1),
         [todayDateCellIndex],
     );
     const calendarGridTemplateColumns = useMemo(
