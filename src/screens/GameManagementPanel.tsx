@@ -640,12 +640,12 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             onUploadFile={handleTitleImageUpload}
                             isUploading={isUploadingTitleImage}
                             inputLabel="Title Image URL"
-                            uploadButtonLabel="Upload Title Image"
                             previewBorder="3px solid var(--agenda-line-strong)"
                             previewBackgroundPosition="50% 45%"
                             previewWidth="220px"
                             previewHeight="124px"
                             previewPlaceholder={<ImageIcon style={{ fontSize: '46px', color: 'rgba(138, 176, 204, 0.35)' }} />}
+                            previewUploadHint={isUploadingTitleImage ? 'Uploading...' : 'Click image to upload'}
                             onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
                         />
                     </div>
@@ -678,12 +678,12 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             onUploadFile={handleBackgroundImageUpload}
                             isUploading={isUploadingBackgroundImage}
                             inputLabel="Background Image URL"
-                            uploadButtonLabel="Upload Background Image"
                             previewBorder="3px solid var(--agenda-line-strong)"
                             previewBackgroundPosition="50% 45%"
                             previewWidth="220px"
                             previewHeight="124px"
                             previewPlaceholder={<ImageIcon style={{ fontSize: '46px', color: 'rgba(138, 176, 204, 0.35)' }} />}
+                            previewUploadHint={isUploadingBackgroundImage ? 'Uploading...' : 'Click image to upload'}
                             onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
                         />
                         {!backgroundImageUrl && (

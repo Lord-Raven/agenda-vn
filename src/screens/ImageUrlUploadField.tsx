@@ -1,6 +1,5 @@
 import { FC, ReactNode, useRef } from 'react';
-import { Image as ImageIcon } from '@mui/icons-material';
-import { Button, TextInput } from './UiComponents';
+import { TextInput } from './UiComponents';
 
 type ImageUrlUploadFieldProps = {
     imageUrl: string;
@@ -10,8 +9,6 @@ type ImageUrlUploadFieldProps = {
     disabled?: boolean;
     inputLabel?: string;
     inputPlaceholder?: string;
-    uploadButtonLabel?: string;
-    uploadingButtonLabel?: string;
     previewWidth?: string | number;
     previewHeight?: string | number;
     previewBorder?: string;
@@ -19,6 +16,7 @@ type ImageUrlUploadFieldProps = {
     previewBackgroundColor?: string;
     previewBackgroundPosition?: string;
     previewPlaceholder?: ReactNode;
+    previewUploadHint?: ReactNode;
     accept?: string;
     onInvalidFile?: () => void;
 };
@@ -31,8 +29,6 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
     disabled = false,
     inputLabel = 'Image URL',
     inputPlaceholder = 'https://... or leave empty',
-    uploadButtonLabel = 'Upload Image',
-    uploadingButtonLabel = 'Uploading...',
     previewWidth = '160px',
     previewHeight = '120px',
     previewBorder = '2px solid var(--agenda-line-strong)',
@@ -40,6 +36,7 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
     previewBackgroundColor = 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)',
     previewBackgroundPosition = '50% 50%',
     previewPlaceholder,
+    previewUploadHint,
     accept = 'image/*',
     onInvalidFile,
 }) => {
@@ -71,7 +68,22 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
     return (
         <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <div
+                role="button"
+                tabIndex={disabled || isUploading ? -1 : 0}
+                aria-label={isUploading ? 'Uploading image' : 'Upload image'}
+                onClick={() => {
+                    if (!disabled && !isUploading) {
+                        uploadInputRef.current?.click();
+                    }
+                }}
+                onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !disabled && !isUploading) {
+                        e.preventDefault();
+                        uploadInputRef.current?.click();
+                    }
+                }}
                 style={{
+                    position: 'relative',
                     width: previewWidth,
                     height: previewHeight,
                     borderRadius: previewBorderRadius,
@@ -85,9 +97,28 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
                     justifyContent: 'center',
                     flexShrink: 0,
                     overflow: 'hidden',
+                    cursor: disabled || isUploading ? 'not-allowed' : 'pointer',
+                    opacity: disabled ? 0.7 : 1,
                 }}
             >
                 {!imageUrl && previewPlaceholder}
+                {previewUploadHint && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            padding: '6px 8px',
+                            fontSize: '12px',
+                            color: 'var(--agenda-text-primary)',
+                            background: 'linear-gradient(180deg, transparent, color-mix(in srgb, var(--agenda-surface-base) 82%, black 18%))',
+                            textAlign: 'center',
+                        }}
+                    >
+                        {previewUploadHint}
+                    </div>
+                )}
             </div>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '220px' }}>
@@ -101,23 +132,13 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
                         disabled={disabled}
                     />
                 </div>
-                <div>
-                    <Button
-                        onClick={() => uploadInputRef.current?.click()}
-                        disabled={disabled || isUploading}
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                    >
-                        <ImageIcon style={{ fontSize: '18px' }} />
-                        {isUploading ? uploadingButtonLabel : uploadButtonLabel}
-                    </Button>
-                    <input
-                        ref={uploadInputRef}
-                        type="file"
-                        accept={accept}
-                        style={{ display: 'none' }}
-                        onChange={handleImageFileChange}
-                    />
-                </div>
+                <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept={accept}
+                    style={{ display: 'none' }}
+                    onChange={handleImageFileChange}
+                />
             </div>
         </div>
     );
