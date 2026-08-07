@@ -38,9 +38,10 @@ creator_notes: "
 # If your stage requires a configuration but has no
 #   defined schema, it won't work.
 config_schema:
+  title: Agenda VN Settings
   type: object
   properties:
-    configuration:
+    json:
       title: Configuration
       description: JSON configuration for the stage.
       type: string

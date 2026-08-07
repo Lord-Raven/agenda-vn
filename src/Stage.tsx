@@ -281,7 +281,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.primaryCharacter = Object.values(characters)[0];
 
         // config may be a JSON representation of a configuration; if so, we can use it to populate the default configuration for new games.
-        const loadedConfiguration = config && config.configuration ? JSON.parse(config.configuration) : {};
+        const loadedConfiguration = config && config.json ? JSON.parse(config.json) : {};
         const defaultConfiguration = {...this.createDefaultNewGameConfiguration(), ...loadedConfiguration};
 
 
