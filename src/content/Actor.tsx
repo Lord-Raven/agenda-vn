@@ -324,6 +324,7 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
         stage.getSave().lorebook?.push(loreEntry);
     }
     loreEntry.title = actor.name;
+    loreEntry.content = actor.profile;
     loreEntry.triggers = [...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)), ...actor.name.split(' ')];
 }
 

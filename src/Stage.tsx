@@ -1421,15 +1421,30 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return save.upcomingEvents;
     }
 
-    public async generateText(prompt: string, minTokens: number = 50, maxTokens: number = 200): Promise<string> {
-        const response = await this.generator.textGen({
-            prompt: `{{messages}}${prompt}`,
-            min_tokens: minTokens,
-            max_tokens: maxTokens,
-            include_history: true,
-            stop: ['#END']
-        });
-        return response?.result || '';
+    // Retry assumes that this generateText request is expecting <tag>-based content.
+    public async generateText(prompt: string, minTokens: number = 50, maxTokens: number = 200, retry: boolean = true): Promise<string> {
+        const tries = retry ? 3 : 1;
+        for (let attempt = 1; attempt <= tries; attempt += 1) {
+            try {
+                const response = await this.generator.textGen({
+                    prompt: `{{messages}}${prompt}`,
+                    min_tokens: minTokens,
+                    max_tokens: maxTokens,
+                    include_history: true,
+                    stop: ['#END']
+                });
+                // Response must have at least one <tag> to be considered valid. If not, retry.
+                if (!response?.result || !/<[^>]+>/.test(response.result)) {
+                    throw new Error(`Invalid response format: missing required tags. Response: ${response?.result || ''}`);
+                }
+                return response?.result || '';
+            } catch (error) {
+                if (attempt === tries) {
+                    throw error;
+                }
+            }
+        }
+        return ''; // Return an empty string if all attempts fail
     }
 
     startSkit(calendarEvent: CalendarEvent): Skit | null {

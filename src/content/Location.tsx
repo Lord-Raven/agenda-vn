@@ -70,6 +70,7 @@ export function upsertLocationLoreEntry(location: Location, oldName: string, sta
 	}
 
 	loreEntry.title = location.name;
+	loreEntry.content = location.description;
 	loreEntry.triggers = [
 		...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)),
 		...location.name.split(' '),
@@ -131,8 +132,8 @@ export async function distillLocation(location: Location, definition: any, stage
 				),
 			)
 			.format(),
-		40,
-		220,
+		50,
+		300,
 	).then((generatedResponse: string) => {
 		console.log('Generated location distillation:');
 		console.log(generatedResponse);
@@ -156,10 +157,6 @@ export async function distillLocation(location: Location, definition: any, stage
 		location.lightColor = nextLightColor;
 
 		upsertLocationLoreEntry(location, oldName, stage);
-		const linkedLore = getLinkedLocationLore(location.name, stage);
-		if (linkedLore) {
-			linkedLore.content = nextDescription;
-		}
 
 		return location;
 	}).finally(() => {
