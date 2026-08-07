@@ -7,8 +7,10 @@ import {
     distillLocation,
     generateBaseLocationImage,
     generateLocationImageForTimeOfDay,
+    generateLocationImagePrompt,
     generateLocationTimeOfDayPrompt,
     getLocationDescription,
+    getLocationImagePrompt,
     getLocationTimeOfDayPrompt,
     getLinkedLocationLore,
     Location,
@@ -37,6 +39,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         description: string;
         themeColor: string;
         lightColor: string;
+        imagePrompt: string;
         imageUrl: string;
         timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>>;
         timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>>;
@@ -48,6 +51,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         description: getLocationDescription(location.id, stage()),
         themeColor: location.themeColor,
         lightColor: location.lightColor,
+        imagePrompt: getLocationImagePrompt(location),
         imageUrl: location.imageUrl,
         timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
         timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
@@ -130,6 +134,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         updateLocationDescription(location.id, nextLocation.description, stage());
         location.themeColor = nextLocation.themeColor;
         location.lightColor = nextLocation.lightColor;
+        location.imagePrompt = nextLocation.imagePrompt;
         location.imageUrl = nextLocation.imageUrl;
         location.timeOfDayImagePrompts = { ...(nextLocation.timeOfDayImagePrompts || {}) };
         location.timeOfDayImageUrls = { ...(nextLocation.timeOfDayImageUrls || {}) };
@@ -143,6 +148,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             description: getLocationDescription(location.id, stage()),
             themeColor: location.themeColor,
             lightColor: location.lightColor,
+            imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,
             timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
             timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
@@ -202,6 +208,35 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         }
     };
 
+    const handleImagePromptChange = (value: string) => {
+        setEditedLocation((current) => {
+            location.imagePrompt = value;
+            return { ...current, imagePrompt: value };
+        });
+    };
+
+    const handleGenerateImagePrompt = async () => {
+        if (editedLocation.imagePrompt.trim()) {
+            return;
+        }
+
+        setIsGeneratingLocationDetails(true);
+        try {
+            const prompt = await generateLocationImagePrompt(location, stage(), false);
+            if (!prompt) {
+                throw new Error('Failed to generate base image prompt.');
+            }
+
+            syncEditedLocationFromSource();
+            stage().showPriorityMessage(`Generated base image prompt for ${location.name || 'location'}.`);
+        } catch (error) {
+            console.error('Failed to generate base image prompt:', error);
+            stage().showPriorityMessage('Failed to generate base image prompt. Check console for details.');
+        } finally {
+            setIsGeneratingLocationDetails(false);
+        }
+    };
+
     const handleTimeOfDayImageUpload = async (timeOfDay: CalendarTimeOfDay, file: File) => {
         setIsUploadingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: true }));
         try {
@@ -228,9 +263,13 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     };
 
     const handleGenerateTimeOfDayPrompt = async (timeOfDay: CalendarTimeOfDay) => {
+        if ((editedLocation.timeOfDayImagePrompts?.[timeOfDay] || '').trim()) {
+            return;
+        }
+
         setIsGeneratingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: true }));
         try {
-            const prompt = await generateLocationTimeOfDayPrompt(location, timeOfDay, stage(), true);
+            const prompt = await generateLocationTimeOfDayPrompt(location, timeOfDay, stage(), false);
             if (!prompt) {
                 throw new Error(`Failed to generate ${timeOfDay} prompt.`);
             }
@@ -287,6 +326,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             description: location.description,
             themeColor: location.themeColor,
             lightColor: location.lightColor,
+            imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,
             timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
             focalPoint: location.focalPoint ? { ...location.focalPoint } : { x: 0.5, y: 0.5 },
@@ -321,6 +361,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             location.description = previousState.description;
             location.themeColor = previousState.themeColor;
             location.lightColor = previousState.lightColor;
+            location.imagePrompt = previousState.imagePrompt;
             location.imageUrl = previousState.imageUrl;
             location.timeOfDayImageUrls = { ...(previousState.timeOfDayImageUrls || {}) };
             location.focalPoint = previousState.focalPoint;
@@ -642,6 +683,23 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                     previewPlaceholder={<Place style={{ fontSize: '48px', color: 'var(--agenda-accent-primary)' }} />}
                                     onInvalidFile={() => stage().showPriorityMessage('Please select a valid image file.')}
                                 />
+                                <div style={{ marginTop: '12px' }}>
+                                    <label style={labelStyle}>Base Image Prompt</label>
+                                    <TextArea
+                                        value={editedLocation.imagePrompt}
+                                        onChange={(e) => handleImagePromptChange(e.target.value)}
+                                        placeholder="Describe the base image to generate for this location"
+                                        style={textareaStyle}
+                                    />
+                                    <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
+                                        <Button
+                                            onClick={handleGenerateImagePrompt}
+                                            disabled={Boolean(editedLocation.imagePrompt.trim()) || isGeneratingLocationDetails}
+                                        >
+                                            Generate Base Prompt
+                                        </Button>
+                                    </div>
+                                </div>
                             </section>
 
                             <section>
@@ -708,7 +766,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                 <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
                                                     <Button
                                                         onClick={() => handleGenerateTimeOfDayPrompt(timeOfDay)}
-                                                        disabled={isGeneratingVariant}
+                                                        disabled={Boolean((editedLocation.timeOfDayImagePrompts?.[timeOfDay] || '').trim()) || isGeneratingVariant}
                                                     >
                                                         {isGeneratingVariant ? 'Generating...' : `Generate ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} Prompt`}
                                                     </Button>

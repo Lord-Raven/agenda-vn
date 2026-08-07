@@ -92,6 +92,10 @@ const LOCATION_TIME_OF_DAY_PROMPT_FIELDS: StructuredFieldDefinition[] = [
 	{ key: 'prompt', label: 'PROMPT', description: 'A concise image-edit prompt describing how the location should change for the selected time of day.' },
 ];
 
+const LOCATION_BASE_IMAGE_PROMPT_FIELDS: StructuredFieldDefinition[] = [
+	{ key: 'prompt', label: 'PROMPT', description: 'A concise image-generation prompt describing the base visual composition for this location.' },
+];
+
 const LOCATION_TIME_OF_DAY_DESCRIPTIONS: Record<CalendarTimeOfDay, string> = {
 	morning: 'soft early light, cooler shadows, dew, first activity, and a sense of the day just beginning',
 	afternoon: 'brighter neutral daylight, crisp visibility, busier activity, and a clear view of the location',
@@ -125,6 +129,63 @@ export function getLocationTimeOfDayPrompt(location: Location | undefined, timeO
 	return location?.timeOfDayImagePrompts?.[timeOfDay] || '';
 }
 
+export function getLocationImagePrompt(location: Location | undefined): string {
+	return location?.imagePrompt || '';
+}
+
+export async function generateLocationImagePrompt(location: Location, stage: Stage, force: boolean = false): Promise<string> {
+	const existingPrompt = getLocationImagePrompt(location).trim();
+	if (existingPrompt && !force) {
+		return existingPrompt;
+	}
+
+	const generationKey = `location-image-prompt/${location.id}`;
+	const existingGeneration = stage.generationPromises[generationKey];
+	if (existingGeneration) {
+		return existingGeneration as Promise<string>;
+	}
+
+	const promptRequest = stage.generateText(buildPrompt()
+		.addBlock('Instructions',
+			`This is a preparatory request for a single image-generation prompt for location art. ` +
+			`Write exactly one concise prompt for an image generation model to create a base image of this location. ` +
+			`The prompt should describe the setting in a vivid but practical way, preserving the location's identity and leaving room for later time-of-day adjustments. ` +
+			`Return the result using the Response Format tags.`)
+		.addBlock('Location Details',
+			`Name: ${location.name || 'Unnamed location'}\n` +
+			`Category: ${location.category || 'Uncategorized'}\n` +
+			`Description: ${location.description || 'No description provided.'}\n` +
+			`Theme Color: ${location.themeColor || '#8ab0cc'}\n` +
+			`Light Color: ${location.lightColor || '#ffffff'}`)
+		.addBlock('Response Format', buildStructuredResponseFormat(LOCATION_BASE_IMAGE_PROMPT_FIELDS, { includeEndTag: true }))
+		.addBlock('Example Response', buildStructuredExampleResponse(
+			LOCATION_BASE_IMAGE_PROMPT_FIELDS,
+			{
+				prompt: 'A moody vertical illustration of a narrow late-night cafe with amber pendant lights, scratched brass trim, and rain-streaked front windows, framed as a welcoming backdrop for story scenes.',
+			},
+			{ includeEndTag: true },
+		))
+		.format(),
+		10,
+		100,
+		LOCATION_BASE_IMAGE_PROMPT_FIELDS,
+	)
+		.then((response: any) => {
+			const parsedPrompt = parseStructuredResponse(`${response || ''}`, LOCATION_BASE_IMAGE_PROMPT_FIELDS);
+			const prompt = (parsedPrompt.prompt || '').trim();
+			if (prompt) {
+				location.imagePrompt = prompt;
+			}
+			return prompt;
+		})
+		.finally(() => {
+			delete stage.generationPromises[generationKey];
+		});
+
+	stage.generationPromises[generationKey] = promptRequest;
+	return promptRequest;
+}
+
 export async function generateBaseLocationImage(location: Location, stage: Stage, force: boolean = false): Promise<string> {
 	const generationKey = `location-base/${location.id}`;
 	const existingGeneration = stage.generationPromises[generationKey];
@@ -138,15 +199,13 @@ export async function generateBaseLocationImage(location: Location, stage: Stage
 	}
 
 	const request = (async () => {
+		const basePrompt = await generateLocationImagePrompt(location, stage, false);
+		if (!basePrompt) {
+			return '';
+		}
+
 		const generatedImage = await stage.makeImage({
-			prompt:
-				`Create a detailed background illustration for a location in a narrative game.\n` +
-				`Location name: ${location.name || 'Unnamed location'}\n` +
-				`Category: ${location.category || 'Uncategorized'}\n` +
-				`Description: ${location.description || 'No description provided.'}\n` +
-				`Theme color: ${location.themeColor || '#8ab0cc'}\n` +
-				`Lighting color: ${location.lightColor || '#ffffff'}\n` +
-				`Compose it as an evocative environment that can later be adapted for different times of day.`,
+			prompt: basePrompt,
 			aspect_ratio: AspectRatio.PHOTO_VERTICAL,
 		}, '');
 
@@ -366,7 +425,8 @@ export class Location {
     name: string = '';
     description: string = '';
 	category: string = ''; // A category for filtering or organization in the UI. Could be a region ("house", "city") or could be a type of location ("dungeons", "shops"); it is for organizational and not gameplay purposes.
-    imageUrl: string = ''; // URL for a base image representing this location, used as a fallback background in skits or location displays.
+    imagePrompt: string = ''; // A prompt for generating a base image representing this location, used as a fallback background in skits or location displays.
+	imageUrl: string = ''; // URL for a base image representing this location, used as a fallback background in skits or location displays.
 	timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>> = {}; // Optional mapping of time-of-day to image-edit prompts for this location. Keys are "morning", "afternoon", "evening", "night".
 	timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>> = {}; // Optional mapping of time-of-day to image URLs for this location. Keys are "morning", "afternoon", "evening", "night".
     focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
