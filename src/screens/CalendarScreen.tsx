@@ -239,14 +239,20 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
+    const currentDateCellIndex = useMemo(
+        () => monthGrid.findIndex((gridDate) => formatDateKey(gridDate) === currentDateKey),
+        [monthGrid, currentDateKey],
+    );
     const currentWeekRowIndex = useMemo(() => {
-        const index = monthGrid.findIndex((gridDate) => isSameDate(gridDate, currentDate));
-        return index >= 0 ? Math.floor((index + 1) / 7) : -1;
-    }, [monthGrid, currentDateKey]);
-    const currentWeekdayColumnIndex = currentDate.getUTCDay() + 1;
+        return currentDateCellIndex >= 0 ? Math.floor((currentDateCellIndex + 1) / 7) : -1;
+    }, [currentDateCellIndex]);
+    const currentWeekdayColumnIndex = useMemo(
+        () => (currentDateCellIndex >= 0 ? (currentDateCellIndex % 7) + 1 : -1),
+        [currentDateCellIndex],
+    );
     const calendarGridTemplateColumns = useMemo(
         () => WEEKDAY_LABELS
-            .map((_, dayIndex) => (dayIndex === currentWeekdayColumnIndex ? "1.21fr" : "0.97fr"))
+            .map((_, dayIndex) => (dayIndex === currentWeekdayColumnIndex ? "1.24fr" : "0.96fr"))
             .join(" "),
         [currentWeekdayColumnIndex],
     );
@@ -256,7 +262,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                 return "1fr";
             }
 
-            return rowIndex === currentWeekRowIndex ? "1.35fr" : "0.93fr";
+            return rowIndex === currentWeekRowIndex ? "1.40fr" : "0.92fr";
         }).join(" "),
         [currentWeekRowIndex],
     );
