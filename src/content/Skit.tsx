@@ -169,7 +169,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e => e.skit !== skit);
     const currentActors = skit ? getCurrentActors(skit, skit.script.length - 1).map(actorId => save.actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[] : [];
     const lorebook = save.lorebook || [];
-    const agendaConfig = save.agendaConfig;
+    const agendaConfig = stage.getConfiguration();
     const passedProbabilityLoreIds = new Set(
         lorebook.filter((lore) => isLoreProbabilityActive(lore)).map((lore) => lore.id),
     );

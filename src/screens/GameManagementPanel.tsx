@@ -123,20 +123,22 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [isUploadingBackgroundImage, setIsUploadingBackgroundImage] = useState(false);
     const [isGeneratingBackgroundImage, setIsGeneratingBackgroundImage] = useState(false);
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
+    const [artStyle, setArtStyle] = useState<string>(() => configuration.artStyle || '');
     const [playerStats, setPlayerStats] = useState<ActorStat[]>(() =>
-        (configuration.playerStats || save.agendaConfig?.playerStats || []).map(cloneActorStat),
+        (configuration.playerStats || []).map(cloneActorStat),
     );
     const [collapsedPlayerStats, setCollapsedPlayerStats] = useState<boolean[]>(() =>
-        (configuration.playerStats || save.agendaConfig?.playerStats || []).map(() => true),
+        (configuration.playerStats || []).map(() => true),
     );
     const [collapsedActorStats, setCollapsedActorStats] = useState<boolean[]>(() =>
-        (configuration.actorStats || save.agendaConfig?.actorStats || []).map(() => true),
+        (configuration.actorStats || []).map(() => true),
     );
     const [actorStats, setActorStats] = useState<ActorStat[]>(() =>
-        (configuration.actorStats || save.agendaConfig?.actorStats || []).map(cloneActorStat),
+        (configuration.actorStats || []).map(cloneActorStat),
     );
     const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: number | string }>(() => ({
-        ...(save.agendaConfig?.playerStatValues || configuration.playerStatValues || {}),
+        ...configuration.playerStatValues,
+        ...save.playerStatValues,
     }));
     const [isCopyingConfigurationJson, setIsCopyingConfigurationJson] = useState(false);
     const autoSaveTimeoutRef = useRef<number | null>(null);
@@ -274,20 +276,10 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             backgroundImageUrl,
             backgroundImagePrompt: backgroundImagePrompt,
             startingDate,
+            artStyle,
         });
 
         const currentSave = stageInstance.getSave();
-        currentSave.agendaConfig = {
-            title: title,
-            titleImageUrl: titleImageUrl,
-            titleImagePrompt: titleImagePrompt,
-            backgroundImageUrl: backgroundImageUrl,
-            backgroundImagePrompt: backgroundImagePrompt,
-            actorStats: actorStats.map(cloneActorStat),
-            playerStats: playerStats.map(cloneActorStat),
-            playerStatValues: { ...validPlayerStatValues },
-            startingDate: startingDate,
-        };
 
         const statNames = new Set(
             actorStats
@@ -612,7 +604,15 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             onChange={(e) => setStartingDate(e.target.value)}
                         />
                     </div>
-
+                    <div>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Art Style</label>
+                        <TextInput
+                            fullWidth
+                            value={artStyle}
+                            onChange={(e) => setArtStyle(e.target.value)}
+                            placeholder="Describe the art style for image generation."
+                        />
+                    </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Title Image Prompt</label>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'start' }}>

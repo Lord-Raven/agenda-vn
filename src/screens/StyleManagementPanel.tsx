@@ -128,7 +128,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     return '';
                 }
 
-                const selectedValue = save.agendaConfig?.playerStatValues?.[statName] ?? stat.default;
+                const selectedValue = save.playerStatValues?.[statName] ?? stat.default;
                 const valueText = typeof selectedValue === 'number' ? String(selectedValue) : String(selectedValue || '');
                 if (!valueText) {
                     return '';

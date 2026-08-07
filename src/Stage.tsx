@@ -45,17 +45,7 @@ export type SaveType = {
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
     upcomingEvents?: CalendarEvent[];
-    agendaConfig?: {
-        title: string;
-        titleImageUrl?: string;
-        titleImagePrompt?: string;
-        backgroundImageUrl?: string;
-        backgroundImagePrompt?: string;
-        playerStats?: ActorStat[];
-        playerStatValues?: {[key: string]: number | string};
-        actorStats?: ActorStat[];
-        startingDate?: string;
-    };
+    playerStatValues?: {[key: string]: number | string};
     uiSettings?: UiSettings;
     betaMode?: boolean;
 }
@@ -148,6 +138,7 @@ export type GameConfiguration = {
     backgroundImageUrl: string, // URL of a background image for the menu and calendar screens
     backgroundImagePrompt: string, // Prompt for generating a background image for the menu and calendar screens
     startingDate: string; // The starting date of the game, in YYYY-MM-DD format (applies to new game)
+    artStyle: string; // Describes the art style used for image generation
 
 }
 
@@ -316,6 +307,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             backgroundImageUrl: '',
             backgroundImagePrompt: 'Generate a background image for the menu and calendar screens of a visual novel game called "Agenda VN".',
             startingDate: new Date().toISOString().slice(0, 10),
+            artStyle: 'Anime-inspired concept art with thick brush strokes and vibrant colors, emphasizing expression and dynamic composition.',
         };
     }
 
@@ -338,9 +330,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 locations: [],
                 lorebook: (activeSave?.lorebook || []).map(cloneLore),
                 calendarEvents: [],
-                actorStats: (activeSave?.agendaConfig?.actorStats || []).map(cloneActorStat),
-                playerStats: (activeSave?.agendaConfig?.playerStats || []).map(cloneActorStat),
-                playerStatValues: { ...(activeSave?.agendaConfig?.playerStatValues || {}) },
+                actorStats: (this.getConfiguration()?.actorStats || []).map(cloneActorStat),
+                playerStats: (this.getConfiguration()?.playerStats || []).map(cloneActorStat),
+                playerStatValues: { ...(activeSave?.playerStatValues || {}) },
                 uiSettings: cloneUiSettings(activeSave?.uiSettings || {}),
             };
             return;
@@ -361,6 +353,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             titleImagePrompt: this.saveData.configuration.titleImagePrompt || defaultConfiguration.titleImagePrompt,
             backgroundImageUrl: this.saveData.configuration.backgroundImageUrl || defaultConfiguration.backgroundImageUrl,
             backgroundImagePrompt: this.saveData.configuration.backgroundImagePrompt || defaultConfiguration.backgroundImagePrompt,
+            artStyle: this.saveData.configuration.artStyle || defaultConfiguration.artStyle,
         };
     }
 
@@ -393,22 +386,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const currentSave = this.saveData.saves[this.saveData.lastSaveSlot];
         if (currentSave) {
-            if (!currentSave.agendaConfig) {
-                currentSave.agendaConfig = {
-                    title: "Agenda VN",
-                    titleImageUrl: "",
-                    titleImagePrompt: "Generate a title image for a visual novel game called 'Agenda VN'.",
-                    backgroundImageUrl: "",
-                    backgroundImagePrompt: "Generate a background image for the menu and calendar screens of a visual novel game called 'Agenda VN'.",
-                    actorStats: [],
-                    playerStats: [],
-                    playerStatValues: {},
-                    startingDate: new Date().toISOString().slice(0, 10),
-                };
-            }
-            currentSave.agendaConfig.actorStats = this.saveData.configuration.actorStats.map(cloneActorStat);
-            currentSave.agendaConfig.playerStats = this.saveData.configuration.playerStats.map(cloneActorStat);
-            currentSave.agendaConfig.playerStatValues = { ...(this.saveData.configuration.playerStatValues || {}) };
+            currentSave.playerStatValues = { ...(this.saveData.configuration.playerStatValues || {}) };
             this.syncActorStats(currentSave);
             this.syncPlayerStats(currentSave);
         }
@@ -501,17 +479,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             currentTimeOfDay: 'morning',
             upcomingEvents: seededEvents,
             lorebook: (configuration.lorebook || []).map(cloneLore),
-            agendaConfig: {
-                title: configuration.title || 'Agenda VN',
-                titleImageUrl: configuration.titleImageUrl || '',
-                titleImagePrompt: configuration.titleImagePrompt || '',
-                backgroundImageUrl: configuration.backgroundImageUrl || '',
-                backgroundImagePrompt: configuration.backgroundImagePrompt || '',
-                startingDate,
-                actorStats: configuration.actorStats.map(cloneActorStat),
-                playerStats: configuration.playerStats.map(cloneActorStat),
-                playerStatValues: { ...(configuration.playerStatValues || {}) },
-            },
+            playerStatValues: { ...(configuration.playerStatValues || {}) },
             uiSettings: cloneUiSettings(configuration.uiSettings || DEFAULT_UI_SETTINGS),
         };
     }
@@ -529,28 +497,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         Object.assign(newSave, playerData.data);
 
         const persistedConfiguration = this.getConfiguration();
-        if (!newSave.agendaConfig) {
-            newSave.agendaConfig = {
-                title: persistedConfiguration.title || 'Agenda VN',
-                titleImageUrl: persistedConfiguration.titleImageUrl || '',
-                titleImagePrompt: persistedConfiguration.titleImagePrompt || '',
-                backgroundImageUrl: persistedConfiguration.backgroundImageUrl || '',
-                backgroundImagePrompt: persistedConfiguration.backgroundImagePrompt || '',
-                startingDate: persistedConfiguration.startingDate || new Date().toISOString().slice(0, 10),
-                actorStats: persistedConfiguration.actorStats.map(cloneActorStat),
-                playerStats: persistedConfiguration.playerStats.map(cloneActorStat),
-                playerStatValues: { ...(persistedConfiguration.playerStatValues || {}) },
-            };
-        } else if (!newSave.agendaConfig.actorStats) {
-            newSave.agendaConfig.actorStats = persistedConfiguration.actorStats.map(cloneActorStat);
-        }
 
-        if (!newSave.agendaConfig.playerStats) {
-            newSave.agendaConfig.playerStats = persistedConfiguration.playerStats.map(cloneActorStat);
-        }
-
-        if (!newSave.agendaConfig.playerStatValues) {
-            newSave.agendaConfig.playerStatValues = { ...(persistedConfiguration.playerStatValues || {}) };
+        if (!newSave.playerStatValues) {
+            newSave.playerStatValues = { ...(persistedConfiguration.playerStatValues || {}) };
         }
 
         if (!newSave.lorebook || newSave.lorebook.length === 0) {
@@ -1250,31 +1199,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 : undefined,
         }));
 
-        if (!save.agendaConfig) {
-            save.agendaConfig = {
-                title: this.getConfiguration().title || 'Agenda VN',
-                titleImageUrl: this.getConfiguration().titleImageUrl || '',
-                titleImagePrompt: this.getConfiguration().titleImagePrompt || '',
-                backgroundImageUrl: this.getConfiguration().backgroundImageUrl || '',
-                backgroundImagePrompt: this.getConfiguration().backgroundImagePrompt || '',
-                startingDate: this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10),
-                actorStats: [],
-                playerStats: [],
-                playerStatValues: {},
-            };
-        }
-
-        if (!save.agendaConfig.actorStats) {
-            save.agendaConfig.actorStats = this.getConfiguration().actorStats.map(cloneActorStat);
-        }
-
-        if (!save.agendaConfig.playerStats) {
-            save.agendaConfig.playerStats = this.getConfiguration().playerStats.map(cloneActorStat);
-        }
-
-        if (!save.agendaConfig.playerStatValues) {
-            save.agendaConfig.playerStatValues = { ...(this.getConfiguration().playerStatValues || {}) };
-        }
+        save.playerStatValues = { ...(this.getConfiguration().playerStatValues || {}) };
 
         this.syncActorStats(save);
         this.syncPlayerStats(save);
@@ -1287,7 +1212,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private syncActorStats(save: SaveType) {
-        const configuredStats = (save.agendaConfig?.actorStats || [])
+        const configuredStats = (this.getConfiguration().actorStats || [])
             .filter(stat => stat?.name?.trim())
             .filter(isNumericActorStat);
         const statNames = new Set(configuredStats.map(stat => stat.name.trim()));
@@ -1313,13 +1238,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private syncPlayerStats(save: SaveType) {
-        if (!save.agendaConfig) {
-            return;
-        }
-
-        const configuredStats = (save.agendaConfig.playerStats || []).filter(stat => stat?.name?.trim());
-        const currentValues = save.agendaConfig.playerStatValues && typeof save.agendaConfig.playerStatValues === 'object'
-            ? save.agendaConfig.playerStatValues
+        const configuredStats = (this.getConfiguration().playerStats || []).filter(stat => stat?.name?.trim());
+        const currentValues = save.playerStatValues && typeof save.playerStatValues === 'object'
+            ? save.playerStatValues
             : {};
 
         const normalizedValues: { [key: string]: number | string } = {};
@@ -1328,7 +1249,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             normalizedValues[statName] = normalizeActorStatValue(currentValues[statName], stat);
         });
 
-        save.agendaConfig.playerStatValues = normalizedValues;
+        save.playerStatValues = normalizedValues;
     }
 
     private createCalendarEvents(save: SaveType, count: number): CalendarEvent[] {
@@ -1533,7 +1454,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                                 }))
                             .addBlock('Additional Context', generateContext(undefined, this, 3))
                             .format(),
-                            10, 1000
+                            10,
+                            1000,
+                            LORE_UPDATE_RESPONSE_FIELDS,
                         ).then(response => {
                             if (response) {
                                 const parsedResponse = parseStructuredResponse(response, LORE_UPDATE_RESPONSE_FIELDS);
@@ -1552,7 +1475,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     const statMap = outcome.details?.statMap || {};
                     if (actorId && save.actors?.[actorId]) {
                         const actor = save.actors[actorId];
-                        const configuredStats = (save.agendaConfig?.actorStats || []).filter(stat => stat?.name?.trim());
+                        const configuredStats = (this.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
                         const configuredStatByName = new Map(configuredStats.map(stat => [stat.name, stat]));
                         for (const [stat, value] of Object.entries(statMap)) {
                             const incomingStatName = `${stat}`.trim();
@@ -1628,12 +1551,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
     }
 
-    async makeImage(imageRequest: Object, defaultUrl: string): Promise<string> {
+    async makeImage(imageRequest: any, defaultUrl: string): Promise<string> {
+        if (this.getConfiguration().artStyle) {
+            imageRequest.prompt = `${imageRequest.prompt || ''}\nArt Style: ${this.getConfiguration().artStyle}`;
+        }
         return (await this.generator.makeImage(imageRequest))?.url ?? defaultUrl;
     }
 
     async makeImageFromImage(imageToImageRequest: any, defaultUrl: string): Promise<string> {
-
+        if (this.getConfiguration().artStyle) {
+            imageToImageRequest.prompt = `${imageToImageRequest.prompt || ''}\nArt Style: ${this.getConfiguration().artStyle}`;
+        }
         const imageUrl = (await this.generator.imageToImage(imageToImageRequest))?.url ?? defaultUrl;
         if (imageToImageRequest.remove_background && imageToImageRequest.transfer_type == 'edit' && imageUrl != defaultUrl) {
             try {
@@ -1669,7 +1597,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private buildActiveSettingContextSummary(save: SaveType): string {
-        const agendaConfig = save.agendaConfig;
+        const agendaConfig = this.getConfiguration();
         if (!agendaConfig?.playerStats?.length) {
             return 'No player stat context is active.';
         }
@@ -1681,7 +1609,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 continue;
             }
 
-            const value = normalizeActorStatValue(agendaConfig.playerStatValues?.[statName], stat);
+            const value = normalizeActorStatValue(save.playerStatValues?.[statName], stat);
             const valueText = typeof value === 'number' ? String(value) : value;
 
             if (stat.displayType === 'option') {
@@ -1733,7 +1661,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .map(actor => actor.name?.trim())
             .filter((name): name is string => Boolean(name));
 
-        const response = await this.generateText(this.buildActorSeedPrompt(save, existingActorNames), 40, 220);
+        const response = await this.generateText(
+            this.buildActorSeedPrompt(save, existingActorNames),
+            40,
+            220,
+            ACTOR_SEED_FIELDS,
+        );
         const parsed = parseStructuredResponse(response, ACTOR_SEED_FIELDS);
         const name = (parsed['name'] || '').trim();
         if (!name) {
@@ -1795,6 +1728,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     .format(),
                 20,
                 360,
+                INTRO_SKIT_FIELDS,
             ).catch(error => {
                 console.error('Error generating intro skit seed', error);
                 return '';

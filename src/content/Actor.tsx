@@ -97,6 +97,14 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
     },
 ];
 
+const OUTFIT_PROMPT_FIELDS: StructuredFieldDefinition[] = [
+    {
+        key: 'prompt',
+        label: 'PROMPT',
+        description: 'One concise image-edit prompt describing expression, posture, and demeanor changes for the target mood.',
+    },
+];
+
 function buildActorStatFields(actorStats: ActorStat[]): StructuredFieldDefinition[] {
     return actorStats.map((stat, index) => ({
         key: `stat_${index}`,
@@ -176,7 +184,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     console.log('Loading reserve actor:', definition.name);
     console.log(definition);
 
-    const actorStats = (stage.getSave().agendaConfig?.actorStats || []).filter(stat => stat?.name?.trim());
+    const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
     const actorStatFields = buildActorStatFields(actorStats);
     const distillationFields = [...DISTILLATION_FIELDS, ...actorStatFields];
 
@@ -359,21 +367,38 @@ export async function generateOutfitEmotionPrompt(actor: Actor, emotion: Emotion
             `Write exactly one concise prompt for an image editing model to revise a base image of this character already in this outfit. ` +
             `The prompt is intended to guide the model in adjusting an image to suit the target mood by visually describing changes to this character's expression, posture, gesture, ` +
             `and demeanor in a way that takes their style, personality, and outfit into account where appropriate. ` +
-            `Only describe elements that are relevant to the target image.\n\n` +
-            `Output only the final prompt text and then #END#`)
+            `Only describe elements that are relevant to the target image. ` +
+            `Return the result using the Response Format tags.`)
         .addBlock('Character Core Appearance', actor.description)
         .addBlock('Current Outfit', outfit.description)
         .addBlock('Personality and Public Persona', actor.profile)
         .addBlock('Target Mood', `${emotion} (${EMOTION_PROMPTS[emotion]})`)
+        .addBlock('Response Format',
+            buildStructuredResponseFormat(OUTFIT_PROMPT_FIELDS, { includeEndTag: true }))
         .addBlock('Example Response',
-            `This woman is now in a flirty, playful mood. She smiles and leans forward slightly, with a glint in her half-lidded eyes. She blushes and plays with her hair.\n#END#`)
+            buildStructuredExampleResponse(
+                OUTFIT_PROMPT_FIELDS,
+                {
+                    prompt: 'This woman is now in a flirty, playful mood. She smiles and leans forward slightly, with a glint in her half-lidded eyes. She blushes and plays with her hair.',
+                },
+                { includeEndTag: true },
+            ))
         .addBlock('Example Response',
-            `This man is now in a somber, reflective mood. He looks downcast, with slumped shoulders and a frown. His eyes look down and away, and he appears lost in thought.\n#END#`)
+            buildStructuredExampleResponse(
+                OUTFIT_PROMPT_FIELDS,
+                {
+                    prompt: 'This man is now in a somber, reflective mood. He looks downcast, with slumped shoulders and a frown. His eyes look down and away, and he appears lost in thought.',
+                },
+                { includeEndTag: true },
+            ))
         .format(),
-        10, 100
+        10,
+        100,
+        OUTFIT_PROMPT_FIELDS,
     )
     .then((response: any) => {
-        const generatedPrompt = response.trim() || '';
+        const parsedPrompt = parseStructuredResponse(`${response || ''}`, OUTFIT_PROMPT_FIELDS);
+        const generatedPrompt = (parsedPrompt.prompt || '').trim();
         if (generatedPrompt) {
             setOutfitPrompt(outfit, emotion, generatedPrompt);
             stage.saveGame();
@@ -435,33 +460,23 @@ export async function generateBaseActorImage(
             console.log(`Generating new image for actor ${actor.name} from description`);
             // Use stage.makeImage to create a neutral expression based on the description
             imageUrl = await stage.makeImage({
-                prompt: `Illustrate this character in a rich, vibrant, anime-inspired concept-art style with thick brush strokes. ` +
-                    `Core appearance: ${actor.description}\n` +
+                prompt: `Core appearance: ${actor.description}\n` +
                     `Outfit: ${getOutfitById(actor, targetOutfitId).description}.\n` +
-                    `Create a waist-up portrait of this character with a neutral expression and pose, placed on a light gray background.`,
+                    `Ignore feet details, and create a waist-up portrait of this character with a neutral expression and pose, placed on a light gray background.`,
                 aspect_ratio: AspectRatio.PHOTO_VERTICAL
             }, '');
             baseSourceImage = imageUrl || '';
-        } else {
-            // Need to adjust the base image to the right size/aspect ratio, and add a margin
-            /*try {
-                baseSourceImage = await normalizeBaseSourceImage(baseSourceImage);
-                console.log(baseSourceImage);
-            } catch (error) {
-                console.warn('Failed to normalize base source image, using original source image instead.', error);
-            }*/
-
-            // Use stage.makeImageFromImage to create a base image.
-            imageUrl = await stage.makeImageFromImage({
-                image: await getDataUrl(baseSourceImage),
-                prompt: `If necessary, alter this character to match their physical description:\n` +
-                    `${actor.description}\n` +
-                    `And current outfit:\n${getOutfitById(actor, targetOutfitId).description}\n` +
-                    `Swap the background to a textured gradient that garishly clashes with the character's palette.\n`,
-                remove_background: false,
-                transfer_type: 'edit'
-            }, '');
         }
+        // Use stage.makeImageFromImage to create a base image.
+        imageUrl = await stage.makeImageFromImage({
+            image: await getDataUrl(baseSourceImage),
+            prompt: `If necessary, alter this character to match their physical description:\n` +
+                `${actor.description}\n` +
+                `And current outfit:\n${getOutfitById(actor, targetOutfitId).description}\n` +
+                `Swap the background to a textured gradient that garishly clashes with the character's palette.`,
+            remove_background: false,
+            transfer_type: 'edit'
+        }, '');
         
         console.log(`Generated base emotion image for actor ${actor.name} from avatar image: ${imageUrl || ''}`);
         
