@@ -117,7 +117,9 @@ jobs:
         env:
           CHUB_AUTH_TOKEN: ${{ secrets.CHUB_AUTH_TOKEN }}
         run: |
-          STAGE_ID="$(echo -n "${{ env.STAGE_ID }}" | tr -d '\n' | xargs)"
+          STAGE_ID="${{ env.STAGE_ID }}"
+          STAGE_ID="$(echo -n "$STAGE_ID" | tr -d '\n' | xargs)"
+
           curl \
             -H "CH-API-KEY: ${{ secrets.CHUB_AUTH_TOKEN }}" \
             -F "file=@build.zip" \
