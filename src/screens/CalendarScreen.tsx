@@ -241,7 +241,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
     const currentWeekRowIndex = useMemo(() => {
         const index = monthGrid.findIndex((gridDate) => isSameDate(gridDate, currentDate));
-        return index >= 0 ? Math.floor(index / 7) : -1;
+        return index >= 0 ? Math.floor((index + 1) / 7) : -1;
     }, [monthGrid, currentDateKey]);
     const currentWeekdayColumnIndex = currentDate.getUTCDay() + 1;
     const calendarGridTemplateColumns = useMemo(
