@@ -44,7 +44,8 @@ config_schema:
       title: Configuration
       description: JSON configuration for the stage.
       type: string
-      value: ""
+      value: >
+        {}
     beta_mode:
       title: Beta Mode
       description: Enable experimental beta features.
