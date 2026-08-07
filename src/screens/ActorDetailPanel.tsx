@@ -274,8 +274,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                 delete actor.statMap[statName];
             }
         });
-
-        stage().saveGame();
     };
 
     useEffect(() => {
@@ -602,7 +600,6 @@ ${indent}}`;
             }
 
             syncEditedFieldsFromActor();
-            stage().saveGame();
             forceUpdate({});
             stage().showPriorityMessage(`Generated new details for ${actor.name}.`);
         } catch (error) {
@@ -631,7 +628,6 @@ ${indent}}`;
             save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
         }
 
-        stage().saveGame();
         stage().showPriorityMessage(`${actor.name || 'Actor'} is now inactive and hidden from management.`);
         onDeactivate?.(actor.id);
     };
@@ -702,7 +698,6 @@ ${indent}}`;
         }
 
         updateEmotionPrompt(emotion, trimmedPrompt);
-        stage().saveGame();
         return true;
     };
 
@@ -763,7 +758,6 @@ ${indent}}`;
                 prompts: { ...(outfit.prompts || {}) },
                 emotionPack: { ...(outfit.emotionPack || {}) },
             }));
-            stage().saveGame();
             forceUpdate({});
         } catch (error) {
             console.error(`Failed to upload ${target} image:`, error);
@@ -872,7 +866,6 @@ ${indent}}`;
                             prompts: { ...(outfit.prompts || {}) },
                             emotionPack: { ...(outfit.emotionPack || {}) },
                         }));
-                        stage().saveGame();
                         forceUpdate({});
                     },
                     variant: 'primary',

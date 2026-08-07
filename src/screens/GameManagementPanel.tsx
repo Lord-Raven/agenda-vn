@@ -310,7 +310,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             });
         });
 
-        stageInstance.saveGame();
     }, [activeActors, activeLocations, actorStats, backgroundImagePrompt, backgroundImageUrl, managedCalendarEvents, playerStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validPlayerStatValues]);
 
     useEffect(() => {

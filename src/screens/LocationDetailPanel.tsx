@@ -102,8 +102,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.lightColor = nextLocation.lightColor;
         location.imageUrl = nextLocation.imageUrl;
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
-
-        stage().saveGame();
     };
 
     const syncEditedLocationFromSource = () => {
@@ -162,7 +160,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             const uploadedUrl = await stage().uploadFile(`location-${location.id}.png`, file);
             handleInputChange('imageUrl', uploadedUrl);
             location.imageUrl = uploadedUrl;
-            stage().saveGame();
         } catch (error) {
             console.error('Failed to upload location image:', error);
             stage().showPriorityMessage('Failed to upload location image. Check console for details.');
@@ -212,7 +209,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             }
 
             syncEditedLocationFromSource();
-            stage().saveGame();
             stage().showPriorityMessage(`Generated new details for ${location.name}.`);
         } catch (error) {
             location.name = previousState.name;
@@ -246,7 +242,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
         }
 
-        stage().saveGame();
         stage().showPriorityMessage(`${location.name || 'Location'} is now inactive and hidden from management.`);
         onDeactivate?.(location.id);
     };

@@ -177,7 +177,6 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             const nextEntries = sortLoreEntries(updater(currentEntries));
             const save = stage().getSave();
             save.lorebook = nextEntries;
-            stage().saveGame();
             return nextEntries;
         });
     };

@@ -845,7 +845,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
             {showContentManagement && (
                 <ContentManagementScreen
                     stage={stage}
-                    onClose={() => setShowContentManagement(false)}
+                    onClose={() => {stage().saveGame(); setShowContentManagement(false);}}
                 />
             )}
         </>

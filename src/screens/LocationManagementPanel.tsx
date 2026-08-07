@@ -121,7 +121,6 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
             save.lorebook.push(newLore);
         }
 
-        stage().saveGame();
         setSelectedLocationId(location.id);
     };
 
