@@ -282,7 +282,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
         if (selectedLore.type === 'character') {
             const linkedActor = getLinkedActorByLoreId(selectedLore.id);
+            console.log('Updating linked actor name for lore entry:', selectedLore.id, 'to', title);
             if (linkedActor) {
+                console.log('Found linked actor:', linkedActor.id, linkedActor.name);
                 linkedActor.name = title;
             }
         }
