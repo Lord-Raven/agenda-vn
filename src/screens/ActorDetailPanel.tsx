@@ -82,7 +82,7 @@ const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [ke
 export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDeactivate }) => {
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
-    const linkedLoreEntry = getLinkedActorLore(actor.name, stage());
+    const linkedLoreEntry = getLinkedActorLore(actor, stage());
     const isProfileBackedByLore = !!linkedLoreEntry;
     const actorStats = useMemo(() => {
         const configured = stage().getConfiguration().actorStats || [];
@@ -350,7 +350,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     };
 
     const syncEditedFieldsFromActor = () => {
-        const latestLinkedLoreEntry = getLinkedActorLore(actor.name, stage());
+        const latestLinkedLoreEntry = getLinkedActorLore(actor, stage());
         setEditedActor({
             name: actor.name,
             category: actor.category ?? '',
@@ -578,7 +578,7 @@ ${indent}}`;
         };
 
         try {
-            const lore = getLinkedActorLore(actor.name, stage());
+            const lore = getLinkedActorLore(actor, stage());
             actor.description = '';
             actor.profile = '';
             actor.voiceId = '';
@@ -620,7 +620,7 @@ ${indent}}`;
     };
 
     const handleDeactivateActor = () => {
-        const linkedLore = getLinkedActorLore(actor.name, stage());
+        const linkedLore = getLinkedActorLore(actor, stage());
         actor.active = false;
 
         if (linkedLore) {

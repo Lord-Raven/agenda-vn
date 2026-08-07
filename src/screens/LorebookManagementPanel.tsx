@@ -169,7 +169,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
         return Object.values(stage().getSave().atlas || {})
             .filter((location) => location.active !== false)
             .some((location) => {
-            const linkedLore = getLinkedLocationLore(location.name, stage());
+            const linkedLore = getLinkedLocationLore(location, stage());
             return linkedLore?.id === selectedLore.id;
         });
     }, [selectedLore]);
@@ -261,7 +261,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             if (actor.active === false) {
                 return false;
             }
-            const linkedLore = getLinkedActorLore(actor.name, stage());
+            const linkedLore = getLinkedActorLore(actor, stage());
             return linkedLore?.id === loreId;
         }) || null;
     };
@@ -271,7 +271,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             if (location.active === false) {
                 return false;
             }
-            const linkedLore = getLinkedLocationLore(location.name, stage());
+            const linkedLore = getLinkedLocationLore(location, stage());
             return linkedLore?.id === loreId;
         }) || null;
     };
