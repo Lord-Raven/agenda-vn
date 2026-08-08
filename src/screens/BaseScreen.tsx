@@ -7,6 +7,7 @@ import { MenuScreen } from './MenuScreen';
 import { TooltipBar } from './TooltipBar';
 import { theme } from './Theme';
 import { CalendarScreen } from './CalendarScreen';
+import { MapScreen } from './MapScreen';
 import { SkitScreen } from './SkitScreen';
 import { LoadingScreen } from './LoadingScreen';
 import { applyUiSettingsToRoot } from '../content/Style';
@@ -19,6 +20,7 @@ export enum ScreenType {
     MENU = 'menu',
     LOADING = 'loading',
     CALENDAR = 'calendar',
+    MAP = 'map',
     SKIT = 'skit',
 }
 
@@ -71,6 +73,9 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
                     )}
                     {screenType === ScreenType.CALENDAR && (
                         <CalendarScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
+                    )}
+                    {screenType === ScreenType.MAP && (
+                        <MapScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
                     )}
                     {screenType === ScreenType.SKIT && (
                         <SkitScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />

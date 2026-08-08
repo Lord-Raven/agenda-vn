@@ -9,6 +9,7 @@ import {
     Bed,
     Bedtime,
     EventAvailable,
+    MapRounded,
     MenuRounded,
     Settings,
     TodayRounded,
@@ -375,6 +376,15 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                     style={{ padding: "8px 10px" }}
                                 >
                                     <ArrowForwardRounded fontSize="small" />
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setScreenType(ScreenType.MAP)}
+                                    onMouseEnter={() => setTooltip("Switch to map", MapRounded)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 14px" }}
+                                >
+                                    Map
                                 </Button>
                                 <Button
                                     variant="secondary"
