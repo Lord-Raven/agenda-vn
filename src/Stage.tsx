@@ -324,7 +324,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         this.saveData.saves.forEach((save) => {
             if (save) {
-                save.maps = (save.maps || []).map(cloneMap);
+                save.maps = (save.maps || []).map(map => map instanceof GameMap ? map : cloneMap(map));
             }
         });
 
