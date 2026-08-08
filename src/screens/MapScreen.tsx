@@ -273,13 +273,24 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                             const imageUrl = getLocationImageUrl(location, stageInstance, currentTimeOfDay) || configuredBackgroundImageUrl;
                             const focalPoint = location.focalPoint || { x: 0.5, y: 0.5 };
                             const borderColor = location.themeColor || "var(--agenda-accent-primary)";
+                            const currentEvent = stageInstance.getCurrentLocationEvent(location.id);
+                            const canVisit = stageInstance.canVisitLocation(location.id);
+                            const openLocation = () => {
+                                if (stageInstance.startLocationVisit(location.id)) {
+                                    setScreenType(ScreenType.SKIT);
+                                }
+                            };
 
                             return (
-                                <motion.div
+                                <motion.button
                                     key={location.id}
+                                    type="button"
+                                    disabled={!canVisit}
+                                    onClick={openLocation}
                                     initial={{ opacity: 0, y: 16 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.22, delay: Math.min(index * 0.04, 0.18) }}
+                                    style={{ width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'inherit', cursor: canVisit ? 'pointer' : 'not-allowed', opacity: canVisit ? 1 : 0.56 }}
                                 >
                                     <Box
                                         sx={{
@@ -345,10 +356,20 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                                 >
                                                     {location.name || "Unnamed Location"}
                                                 </Typography>
+                                                <Typography
+                                                    sx={{
+                                                        color: currentEvent ? "var(--agenda-highlight)" : "var(--agenda-text-muted)",
+                                                        fontSize: "0.76rem",
+                                                        fontWeight: currentEvent ? 700 : 500,
+                                                        mt: 0.5,
+                                                    }}
+                                                >
+                                                    {currentEvent ? currentEvent.name : canVisit ? "Open for visits" : "Closed"}
+                                                </Typography>
                                             </Box>
                                         </Box>
                                     </Box>
-                                </motion.div>
+                                </motion.button>
                             );
                         })}
                     </Box>

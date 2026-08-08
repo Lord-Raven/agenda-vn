@@ -110,25 +110,41 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const markerKey = `${link.childId}-${index}`;
                                     const isHovered = hoveredLink === markerKey;
                                     const locationImageUrl = getLocationImageUrl(linkedLocation, stage(), currentTimeOfDay);
-                                    const markerName = linkedLocation?.name || linkedMap?.name || 'Unnamed';
+                                    const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
+                                    const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
+                                    const markerName = currentEvent?.name || linkedLocation?.name || linkedMap?.name || 'Unnamed';
                                     const markerSize = isVerticalLayout ? 44 : 52;
+                                    const isInteractive = Boolean(linkedMap || canVisitLocation);
+                                    const handleMarkerClick = () => {
+                                        if (linkedMap) {
+                                            setDisplayedMapId(linkedMap.id);
+                                            return;
+                                        }
+                                        if (linkedLocation && stage().startLocationVisit(linkedLocation.id)) {
+                                            setScreenType(ScreenType.SKIT);
+                                        }
+                                    };
 
                                     return (
                                         <motion.button
                                             key={markerKey}
                                             type="button"
-                                            aria-label={linkedMap ? `Open map ${markerName}` : markerName}
-                                            onClick={linkedMap ? () => setDisplayedMapId(linkedMap.id) : undefined}
+                                            aria-label={linkedMap ? `Open map ${markerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : markerName}
+                                            disabled={!isInteractive}
+                                            onClick={handleMarkerClick}
                                             onMouseEnter={() => setHoveredLink(markerKey)}
                                             onMouseLeave={() => setHoveredLink(null)}
                                             animate={{ width: isHovered ? Math.max(markerSize, Math.min(220, markerName.length * 9 + markerSize)) : markerSize }}
                                             transition={{ duration: 0.2, ease: 'easeOut' }}
-                                            style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', borderRadius: markerSize / 2, border: '2px solid var(--agenda-text-primary)', background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: linkedMap ? 'pointer' : 'default', zIndex: isHovered ? 2 : 1 }}
+                                            style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed', opacity: isInteractive ? 1 : 0.5, zIndex: isHovered ? 2 : 1 }}
                                         >
                                             <span style={{ width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : (linkedMap?.imageUrl ? `url(${linkedMap.imageUrl})` : 'none'), backgroundSize: 'cover', backgroundPosition: 'center' }}>
                                                 {!locationImageUrl && !linkedMap?.imageUrl && <MapRounded fontSize="small" />}
                                             </span>
-                                            <span style={{ padding: '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700 }}>{markerName}</span>
+                                            <span style={{ padding: '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700 }}>
+                                                {markerName}
+                                                {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 500 }}>{linkedLocation?.name}</span>}
+                                            </span>
                                         </motion.button>
                                     );
                                 })}

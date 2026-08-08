@@ -1,4 +1,4 @@
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, PointerEvent, useEffect, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, AutoAwesome, Delete, Image as ImageIcon, Place } from '@mui/icons-material';
 import { Map as GameMap, MapLink } from '../content/Map';
@@ -31,6 +31,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
     const [isGenerating, setIsGenerating] = useState(false);
     const [draft, setDraft] = useState<MapDraft>(() => createMapDraft(map));
     const draftRef = useRef(draft);
+    const previewRef = useRef<HTMLDivElement>(null);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const structuralSaveTimeoutRef = useRef<number | null>(null);
     const structuralSyncRef = useRef<() => void>(() => {});
@@ -183,6 +184,20 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
         || activeLocations.find(location => location.id === childId)?.name
         || 'Missing target';
 
+    const updateLinkFromPointer = (index: number, event: PointerEvent<HTMLElement>) => {
+        const previewBounds = previewRef.current?.getBoundingClientRect();
+        if (!previewBounds) {
+            return;
+        }
+
+        updateLink(index, {
+            coordinates: {
+                x: (event.clientX - previewBounds.left) / previewBounds.width,
+                y: (event.clientY - previewBounds.top) / previewBounds.height,
+            },
+        });
+    };
+
     return (
         <div style={{ padding: '20px', overflowY: 'auto', display: 'grid', gap: '16px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px', gap: '12px' }}>
@@ -247,12 +262,31 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
 
             <div>
                 <strong style={{ display: 'block', color: 'var(--agenda-text-primary)', marginBottom: 8 }}>Preview</strong>
-                <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: draft.imageUrl ? `url(${draft.imageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden' }}>
-                    {map.links.map((link, index) => (
-                        <div key={`${link.childId}-marker-${index}`} title={resolveTargetName(link.childId)} style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', width: 30, height: 30, borderRadius: '50%', color: 'var(--agenda-text-primary)', background: 'var(--agenda-active)', border: '2px solid var(--agenda-text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,.65)' }}>
-                            <Place style={{ fontSize: 18 }} />
-                        </div>
-                    ))}
+                <div ref={previewRef} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: draft.imageUrl ? `url(${draft.imageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden', touchAction: 'none' }}>
+                    {map.links.map((link, index) => {
+                        const locationImageUrl = activeLocations.find(location => location.id === link.childId)?.imageUrl;
+                        return (
+                            <div
+                                key={`${link.childId}-marker-${index}`}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Drag ${resolveTargetName(link.childId)} marker`}
+                                title={`Drag to position ${resolveTargetName(link.childId)}`}
+                                onPointerDown={event => {
+                                    event.currentTarget.setPointerCapture(event.pointerId);
+                                    updateLinkFromPointer(index, event);
+                                }}
+                                onPointerMove={event => {
+                                    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                                        updateLinkFromPointer(index, event);
+                                    }
+                                }}
+                                style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: '50%', color: 'var(--agenda-text-primary)', backgroundColor: 'var(--agenda-active)', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '2px solid var(--agenda-text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,.65)', cursor: 'grab', userSelect: 'none' }}
+                            >
+                                {!locationImageUrl && <Place style={{ fontSize: 18 }} />}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 

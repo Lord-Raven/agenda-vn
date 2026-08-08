@@ -12,6 +12,60 @@ import {
 } from '../utils/StructuredResponse.js';
 import { CalendarTimeOfDay } from './CalendarEvent';
 
+export type CalendarDayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+export const LOCATION_DAY_OF_WEEK_ORDER: CalendarDayOfWeek[] = [
+	'monday',
+	'tuesday',
+	'wednesday',
+	'thursday',
+	'friday',
+	'saturday',
+	'sunday',
+];
+
+export const LOCATION_DAY_OF_WEEK_LABELS: Record<CalendarDayOfWeek, string> = {
+	monday: 'Monday',
+	tuesday: 'Tuesday',
+	wednesday: 'Wednesday',
+	thursday: 'Thursday',
+	friday: 'Friday',
+	saturday: 'Saturday',
+	sunday: 'Sunday',
+};
+
+export const normalizeLocationOpenTimes = (openTimes: unknown): Partial<Record<CalendarDayOfWeek, CalendarTimeOfDay[]>> => {
+	if (!openTimes || typeof openTimes !== 'object') {
+		return {};
+	}
+
+	return LOCATION_DAY_OF_WEEK_ORDER.reduce<Partial<Record<CalendarDayOfWeek, CalendarTimeOfDay[]>>>((normalized, day) => {
+		const candidate = (openTimes as Partial<Record<CalendarDayOfWeek, unknown>>)[day];
+		if (!Array.isArray(candidate)) {
+			return normalized;
+		}
+
+		const slots = LOCATION_TIME_OF_DAY_ORDER.filter((slot) => candidate.includes(slot));
+		if (slots.length > 0) {
+			normalized[day] = slots;
+		}
+		return normalized;
+	}, {});
+};
+
+export const getCalendarDayOfWeek = (date: string): CalendarDayOfWeek | null => {
+	const parsedDate = new Date(`${date}T00:00:00Z`);
+	if (Number.isNaN(parsedDate.getTime())) {
+		return null;
+	}
+	return LOCATION_DAY_OF_WEEK_ORDER[(parsedDate.getUTCDay() + 6) % 7];
+};
+
+export const isLocationOpen = (location: Location, date: string, timeOfDay: CalendarTimeOfDay): boolean => {
+	const dayOfWeek = getCalendarDayOfWeek(date);
+	return dayOfWeek ? (location.openTimes?.[dayOfWeek] || []).includes(timeOfDay) : false;
+};
+
 
 // Customize this list to define which locations are restored when the map is cleared.
 export const DEFAULT_ATLAS_LOCATIONS: Location[] = [];
@@ -444,6 +498,7 @@ export class Location {
     focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
 	lightColor: string = ''; // This is the lighting color for the location, used to tint character images in skits. If not set, default to white (#ffffff).
     themeColor: string = ''; // A color associated with this location, used for UI theming.
+	openTimes: Partial<Record<CalendarDayOfWeek, CalendarTimeOfDay[]>> = {}; // Optional mapping of days/times of day when this location is generally open. If empty, the location is not typically open.
 
     constructor(props: any) {
         Object.assign(this, props);
@@ -458,6 +513,7 @@ export class Location {
 		this.timeOfDayImageUrls = this.timeOfDayImageUrls && typeof this.timeOfDayImageUrls === 'object'
 			? { ...(this.timeOfDayImageUrls as Partial<Record<CalendarTimeOfDay, string>>) }
 			: {};
+		this.openTimes = normalizeLocationOpenTimes(this.openTimes);
         if (!this.themeColor) {
             // Pick from the core game theme palette in index.scss.
             const colors = ['#8ab0cc', '#89cd87', '#7a7b6b', '#b98f6e', '#2e354d'];

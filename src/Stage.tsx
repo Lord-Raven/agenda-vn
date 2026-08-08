@@ -5,7 +5,7 @@ import { Actor, findBestNameMatch, loadSupportedActor } from "./content/Actor";
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, Skit, SkitType } from "./content/Skit";
-import { createDefaultAtlas, Location } from "./content/Location";
+import { createDefaultAtlas, isLocationOpen, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
@@ -781,6 +781,70 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         save.upcomingEvents = (save.upcomingEvents || []).filter(event => event.id !== selectedEvent.id);
 
         this.rebuildUpcomingEvents(save);
+        this.saveGame();
+        return skit;
+    }
+
+    getCurrentLocationEvent(locationId: string): CalendarEvent | null {
+        const save = this.getSave();
+        this.ensureCalendarState(save);
+        const currentDate = save.currentDate || this.getStartingDate(save);
+        const currentTimeOfDay = save.currentTimeOfDay || 'morning';
+
+        return [...(save.upcomingEvents || [])]
+            .filter((event) => event.locationId === locationId)
+            .filter((event) => event.date === currentDate)
+            .filter((event) => event.duration.includes(currentTimeOfDay))
+            .sort((left, right) => this.compareCalendarEvents(left, right))[0] || null;
+    }
+
+    canVisitLocation(locationId: string): boolean {
+        const save = this.getSave();
+        const location = save.atlas?.[locationId];
+        if (!location || location.active === false) {
+            return false;
+        }
+
+        return Boolean(this.getCurrentLocationEvent(locationId)) || isLocationOpen(
+            location,
+            save.currentDate || this.getStartingDate(save),
+            save.currentTimeOfDay || 'morning',
+        );
+    }
+
+    startLocationVisit(locationId: string): Skit | null {
+        const save = this.getSave();
+        const location = save.atlas?.[locationId];
+        if (!location || location.active === false) {
+            return null;
+        }
+
+        const currentEvent = this.getCurrentLocationEvent(locationId);
+        if (currentEvent) {
+            return this.startCalendarEventSkit(currentEvent.id);
+        }
+
+        if (!this.canVisitLocation(locationId)) {
+            return null;
+        }
+
+        const initialActors = Object.values(save.actors || {})
+            .filter((actor) => actor.id !== save.playerId && actor.active !== false)
+            .map((actor) => actor.id);
+        const skit = new Skit({
+            skitType: SkitType.SOCIAL,
+            initialLocationId: location.id,
+            guidance: '',
+            script: [],
+            initialActors,
+            summary: '',
+        });
+
+        save.timeline = save.timeline || [];
+        save.timeline.push({
+            date: save.currentDate || this.getStartingDate(save),
+            skit,
+        });
         this.saveGame();
         return skit;
     }
