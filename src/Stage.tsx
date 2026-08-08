@@ -6,6 +6,7 @@ import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEvent
 import { Item } from "./content/Item";
 import { generateContext, Skit, SkitType } from "./content/Skit";
 import { createDefaultAtlas, Location } from "./content/Location";
+import { Map as GameMap } from "./content/Map";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
 import { createLoreEntry, Lore, updateLoreEntry } from "./content/Lore";
@@ -35,6 +36,7 @@ export type SaveType = {
     playerId: string;
     actors: {[key: string]: Actor};
     atlas: {[key: string]: Location};
+    maps: GameMap[];
     inventory: Item[];
     timeline: TimelineEntry[];
     timestamp: number; // Time of last save
@@ -113,6 +115,7 @@ export type GameConfiguration = {
     
     actors: Actor[], // All defined actors for a new game
     locations: Location[], // All defined locations for a new game
+    maps: GameMap[], // All defined maps for a new game
     lorebook: Lore[], // Lore entries to seed into new games
     calendarEvents: CalendarEvent[], // Calendar event series definitions to seed into new games
     actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
@@ -157,6 +160,14 @@ const cloneActor = (actor: Actor): Actor => new Actor({
 const cloneLocation = (location: Location): Location => new Location({
     ...location,
     focalPoint: location.focalPoint ? { ...location.focalPoint } : undefined,
+});
+
+const cloneMap = (map: GameMap): GameMap => new GameMap({
+    ...map,
+    links: (map.links || []).map((link) => ({
+        ...link,
+        coordinates: { ...link.coordinates },
+    })),
 });
 
 const cloneLore = (entry: Lore): Lore => ({
@@ -282,6 +293,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return {
             actors: [],
             locations: [],
+            maps: [],
             lorebook: [],
             calendarEvents: [],
             actorStats: [],
@@ -310,11 +322,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const defaultConfiguration = this.createDefaultNewGameConfiguration();
         const activeSave = this.saveData.saves[this.saveData.lastSaveSlot];
 
+        this.saveData.saves.forEach((save) => {
+            if (save) {
+                save.maps = (save.maps || []).map(cloneMap);
+            }
+        });
+
         if (!this.saveData.configuration) {
             this.saveData.configuration = {
                 ...defaultConfiguration,
                 actors: [],
                 locations: [],
+                maps: (activeSave?.maps || []).map(cloneMap),
                 lorebook: (activeSave?.lorebook || []).map(cloneLore),
                 calendarEvents: [],
                 actorStats: (this.getConfiguration()?.actorStats || []).map(cloneActorStat),
@@ -328,6 +347,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.saveData.configuration = {
             actors: (this.saveData.configuration.actors || defaultConfiguration.actors).map(cloneActor),
             locations: (this.saveData.configuration.locations || defaultConfiguration.locations).map(cloneLocation),
+            maps: (this.saveData.configuration.maps || defaultConfiguration.maps).map(cloneMap),
             lorebook: (this.saveData.configuration.lorebook || defaultConfiguration.lorebook).map(cloneLore),
             calendarEvents: (this.saveData.configuration.calendarEvents || defaultConfiguration.calendarEvents).map(cloneCalendarEvent),
             actorStats: (this.saveData.configuration.actorStats || defaultConfiguration.actorStats).map(cloneActorStat),
@@ -342,6 +362,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             backgroundImagePrompt: this.saveData.configuration.backgroundImagePrompt || defaultConfiguration.backgroundImagePrompt,
             artStyle: this.saveData.configuration.artStyle || defaultConfiguration.artStyle,
         };
+
     }
 
     getConfiguration(): GameConfiguration {
@@ -362,6 +383,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             backgroundImagePrompt: updates.backgroundImagePrompt ?? current.backgroundImagePrompt ?? '',
             actors: (updates.actors ?? current.actors ?? []).map(cloneActor),
             locations: (updates.locations ?? current.locations ?? []).map(cloneLocation),
+            maps: (updates.maps ?? current.maps ?? []).map(cloneMap),
             lorebook: (updates.lorebook ?? current.lorebook ?? []).map(cloneLore),
             calendarEvents: (updates.calendarEvents ?? current.calendarEvents ?? []).map(cloneCalendarEvent),
             actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneActorStat),
@@ -448,6 +470,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             playerId: this.primaryUser.anonymizedId,
             actors,
             atlas,
+            maps: (configuration.maps || []).filter(map => map.active !== false).map(cloneMap),
             inventory: [],
             timeline: [],
             timestamp: Date.now(),
@@ -460,6 +483,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return {playerId: this.primaryUser.anonymizedId,
             actors,
             atlas,
+            maps: (configuration.maps || []).filter(map => map.active !== false).map(cloneMap),
             inventory: [],
             timeline: [],
             timestamp: Date.now(),
@@ -492,6 +516,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         if (!newSave.lorebook || newSave.lorebook.length === 0) {
             newSave.lorebook = persistedConfiguration.lorebook.map(cloneLore);
+        }
+
+        if (!newSave.maps || newSave.maps.length === 0) {
+            newSave.maps = persistedConfiguration.maps.map(cloneMap);
         }
 
         if (!newSave.upcomingEvents || newSave.upcomingEvents.length === 0) {

@@ -1,7 +1,7 @@
 import React, { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
-import { Close, Person, Book, Place, Tune, CalendarMonth, Palette } from '@mui/icons-material';
+import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from './UiComponents';
 import { ActorManagementPanel } from './ActorManagementPanel';
 import { LocationManagementPanel } from './LocationManagementPanel';
@@ -9,13 +9,14 @@ import { LorebookManagementPanel } from './LorebookManagementPanel';
 import { StyleManagementPanel } from './StyleManagementPanel';
 import { GameManagementPanel } from './GameManagementPanel';
 import { CalendarEventManagementPanel } from './CalendarEventManagementPanel';
+import { MapManagementPanel } from './MapManagementPanel';
 
 interface ContentManagementScreenProps {
     stage: () => Stage;
     onClose: () => void;
 }
 
-type TabType = 'game' | 'style' | 'lorebook' | 'actors' | 'locations' | 'calendarEvents';
+type TabType = 'game' | 'style' | 'lorebook' | 'actors' | 'locations' | 'maps' | 'calendarEvents';
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [activeTab, setActiveTab] = useState<TabType>('style');
@@ -184,6 +185,14 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     Locations ({locations.length})
                                 </Button>
                                 <Button
+                                    onClick={() => setActiveTab('maps')}
+                                    variant={activeTab === 'maps' ? 'primary' : 'secondary'}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: activeTab === 'maps' ? 1 : 0.6 }}
+                                >
+                                    <MapIcon />
+                                    Maps ({stage().getSave().maps?.filter(map => map.active !== false).length || 0})
+                                </Button>
+                                <Button
                                     onClick={() => setActiveTab('calendarEvents')}
                                     variant={activeTab === 'calendarEvents' ? 'primary' : 'secondary'}
                                     style={{
@@ -235,6 +244,11 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 {/* Locations Tab */}
                                 {activeTab === 'locations' && (
                                     <LocationManagementPanel stage={stage} />
+                                )}
+
+                                {/* Maps Tab */}
+                                {activeTab === 'maps' && (
+                                    <MapManagementPanel stage={stage} />
                                 )}
                             </div>
                         </GlassPanel>

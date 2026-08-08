@@ -200,6 +200,12 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             .map(location => JSON.parse(JSON.stringify(location)));
     }, [save.atlas]);
 
+    const activeMaps = useMemo(() => {
+        return (save.maps || [])
+            .filter(map => map.active !== false)
+            .map(map => JSON.parse(JSON.stringify(map)));
+    }, [save.maps]);
+
     const managedCalendarEvents = useMemo(() => {
         return stageInstance.getManagedCalendarEvents().map(event => JSON.parse(JSON.stringify(event)));
     }, [stageInstance, save.upcomingEvents, save.currentDate, save.currentTimeOfDay]);
@@ -217,6 +223,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             playerStatValues: { ...validPlayerStatValues },
             actors: activeActors,
             locations: activeLocations,
+            maps: activeMaps,
             lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
             calendarEvents: managedCalendarEvents,
             uiSettings: JSON.parse(JSON.stringify(stageInstance.getUiSettings())),
@@ -224,6 +231,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     }, [
         activeActors,
         activeLocations,
+        activeMaps,
         actorStats,
         backgroundImagePrompt,
         backgroundImageUrl,
@@ -264,6 +272,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         stageInstance.updateConfiguration({
             actors: activeActors,
             locations: activeLocations,
+            maps: activeMaps,
             lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
             calendarEvents: managedCalendarEvents,
             actorStats,
@@ -310,7 +319,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             });
         });
 
-    }, [activeActors, activeLocations, actorStats, backgroundImagePrompt, backgroundImageUrl, managedCalendarEvents, playerStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validPlayerStatValues]);
+    }, [activeActors, activeLocations, activeMaps, actorStats, backgroundImagePrompt, backgroundImageUrl, managedCalendarEvents, playerStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validPlayerStatValues]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;

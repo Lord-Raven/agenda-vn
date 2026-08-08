@@ -8,6 +8,7 @@ import { ScreenType } from "./BaseScreen";
 import { ContentManagementScreen } from "./ContentManagementScreen";
 import { useTooltip } from "./TooltipContext";
 import { Button, GlassPanel } from "./UiComponents";
+import { DefinedMapView } from "./DefinedMapView";
 
 interface MapScreenProps {
     stage: () => Stage;
@@ -33,6 +34,10 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
     const configuredBackgroundImageUrl = (stageInstance.getConfiguration().backgroundImageUrl || "").trim() || DEFAULT_BACKGROUND_IMAGE_URL;
     const save = stageInstance.getSave();
     const currentTimeOfDay = save.currentTimeOfDay || "morning";
+    const activeMaps = useMemo(
+        () => (save.maps || []).filter(map => map.active !== false),
+        [save.maps],
+    );
 
     const activeLocations = useMemo(
         () => Object.values(save.atlas || {})
@@ -94,6 +99,17 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
         const nextIndex = (currentIndex + offset + categories.length) % categories.length;
         setSelectedCategory(categories[nextIndex]);
     };
+
+    if (activeMaps.length > 0) {
+        return (
+            <DefinedMapView
+                stage={stage}
+                maps={activeMaps}
+                setScreenType={setScreenType}
+                isVerticalLayout={isVerticalLayout}
+            />
+        );
+    }
 
     return (
         <>
