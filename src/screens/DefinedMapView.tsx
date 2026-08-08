@@ -18,6 +18,8 @@ interface DefinedMapViewProps {
     isVerticalLayout: boolean;
 }
 
+const DEFAULT_BACKGROUND_IMAGE_URL = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
+
 export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreenType, isVerticalLayout }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
@@ -55,7 +57,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
 
     const displayedMap = sortedMaps.find(map => map.id === displayedMapId) || preferredMap;
     const currentTimeOfDay = save.currentTimeOfDay || 'morning';
-    const configuredBackgroundImageUrl = stage().getConfiguration().backgroundImageUrl || '';
+    const configuredBackgroundImageUrl = stage().getConfiguration().backgroundImageUrl?.trim() || DEFAULT_BACKGROUND_IMAGE_URL;
 
     if (!displayedMap) {
         return null;
@@ -63,7 +65,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
 
     return (
         <>
-            <Box sx={{ width: '100vw', height: '100dvh', boxSizing: 'border-box', p: { xs: '12px', md: '18px' }, overflow: 'hidden', background: 'var(--agenda-surface-base)' }}>
+            <Box sx={{ width: '100vw', height: '100dvh', boxSizing: 'border-box', p: { xs: '12px', md: '18px' }, overflow: 'hidden', backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${configuredBackgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
                 <GlassPanel variant="bright" style={{ height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                         <Button
@@ -71,8 +73,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                             onClick={() => setScreenType(ScreenType.CALENDAR)}
                             onMouseEnter={() => setTooltip('Switch to calendar', EventAvailable)}
                             onMouseLeave={clearTooltip}
-                            style={{ padding: '8px 14px' }}
+                            style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                         >
+                            <EventAvailable fontSize="small" />
                             Calendar
                         </Button>
                         <Box sx={{ minWidth: 0, textAlign: 'center' }}>
@@ -99,7 +102,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.985 }}
                                 transition={{ duration: 0.32, ease: 'easeInOut' }}
-                                style={{ position: 'absolute', inset: 0, backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMap.imageUrl || configuredBackgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
+                                style={{ position: 'absolute', inset: 0, backgroundImage: displayedMap.imageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMap.imageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
                             >
                                 {displayedMap.links.map((link, index) => {
                                     const linkedLocation = save.atlas?.[link.childId];

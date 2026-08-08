@@ -382,8 +382,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                     onClick={() => setScreenType(ScreenType.MAP)}
                                     onMouseEnter={() => setTooltip("Switch to map", MapRounded)}
                                     onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 14px" }}
+                                    style={{ padding: "8px 14px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                                 >
+                                    <MapRounded fontSize="small" />
                                     Map
                                 </Button>
                                 <Button

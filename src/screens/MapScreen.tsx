@@ -138,8 +138,9 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                 onClick={() => setScreenType(ScreenType.CALENDAR)}
                                 onMouseEnter={() => setTooltip("Switch to calendar", EventAvailable)}
                                 onMouseLeave={clearTooltip}
-                                style={{ alignSelf: "flex-start", padding: "8px 14px" }}
+                                style={{ alignSelf: "flex-start", padding: "8px 14px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                             >
+                                <EventAvailable fontSize="small" />
                                 Calendar
                             </Button>
                             <Typography
@@ -270,7 +271,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                         )}
 
                         {visibleLocations.map((location, index) => {
-                            const imageUrl = getLocationImageUrl(location, stageInstance, currentTimeOfDay) || configuredBackgroundImageUrl;
+                            const imageUrl = getLocationImageUrl(location, stageInstance, currentTimeOfDay);
                             const focalPoint = location.focalPoint || { x: 0.5, y: 0.5 };
                             const borderColor = location.themeColor || "var(--agenda-accent-primary)";
                             const currentEvent = stageInstance.getCurrentLocationEvent(location.id);
@@ -299,7 +300,9 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                             borderRadius: "18px",
                                             overflow: "hidden",
                                             border: `1px solid ${borderColor}`,
-                                            backgroundImage: `linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%), url(${imageUrl})`,
+                                            backgroundImage: imageUrl
+                                                ? `linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%), url(${imageUrl})`
+                                                : "linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%)",
                                             backgroundSize: "cover",
                                             backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
                                             boxShadow: "0 10px 28px color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)",
