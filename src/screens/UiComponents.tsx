@@ -185,7 +185,6 @@ export const NamePlate: FC<NamePlateProps> = ({
 	}
 
 	const themeColor = actor.themeColor || '#8ab0cc';
-	const lightColor = lighten(themeColor, 0.6);
 	const { clearTooltip } = useTooltip();
 
 	return (
@@ -212,7 +211,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 				backgroundOrigin: 'border-box',
 				backgroundClip: 'padding-box, padding-box, border-box',
 				boxShadow: `0 6px 16px rgba(0, 0, 0, 0.5), 0 0 15px ${themeColor}33`,
-				color: lightColor,
+				color: '#ffffff',
 				textShadow: `0 0 8px ${themeColor}80, 0 2px 4px rgba(0, 0, 0, 0.8)`,
 				fontWeight: 700,
 				fontSize: '1.2rem',

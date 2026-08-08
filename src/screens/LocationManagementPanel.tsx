@@ -34,6 +34,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        height: '100%',
     };
 
     const sortByName = <T extends { name?: string }>(a: T, b: T) =>
@@ -96,7 +97,6 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
             category: category === UNCATEGORIZED_LABEL ? '' : category,
             imageUrl: '',
             focalPoint: { x: 0.5, y: 0.5 },
-            lightColor: '',
             themeColor: '',
         });
 

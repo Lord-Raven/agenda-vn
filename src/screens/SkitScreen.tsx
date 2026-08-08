@@ -135,7 +135,8 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         );
                     }}
                     getActorImageColorMultiplier={(_actor, _script, index: number) => {
-                        return stage().getSave().atlas?.[getCurrentLocation(currentSkit, index) || ""]?.lightColor || "#eeeeee";
+                        // Later, use an image analysis library to determine a brightness color from the location's time-of-day image colors.
+                        return "#ffffff";
                     }}
                     onSubmitInput={handleSkitSubmit}
                     getSubmitButtonConfig={(_script, index, inputText) => {

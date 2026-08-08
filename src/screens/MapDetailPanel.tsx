@@ -199,7 +199,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
     };
 
     return (
-        <div style={{ padding: '20px', overflowY: 'auto', display: 'grid', gap: '16px' }}>
+        <div style={{ padding: '20px', overflowY: 'auto', display: 'grid', gap: '16px', flex: 1, minHeight: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px', gap: '12px' }}>
                 <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
                     Name

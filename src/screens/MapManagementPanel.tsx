@@ -72,7 +72,7 @@ export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
                 sectionEmptyMessage="No maps."
                 renderSectionAction={section => createMap(section.title)}
             />
-            <div style={{ background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)', border: '1px solid var(--agenda-line-subtle)', borderRadius: 12, overflow: 'hidden', minHeight: 0 }}>
+            <div style={{ background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)', border: '1px solid var(--agenda-line-subtle)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
                 {selectedMap ? (
                     <MapDetailPanel key={selectedMap.id} map={selectedMap} stage={stage} onChange={() => setRevision(current => current + 1)} onDeactivate={() => setSelectedMapId(null)} />
                 ) : (

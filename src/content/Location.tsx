@@ -220,8 +220,7 @@ export async function generateLocationImagePrompt(location: Location, stage: Sta
 			`Name: ${location.name || 'Unnamed location'}\n` +
 			`Category: ${location.category || 'Uncategorized'}\n` +
 			`Description: ${location.description || 'No description provided.'}\n` +
-			`Theme Color: ${location.themeColor || '#8ab0cc'}\n` +
-			`Light Color: ${location.lightColor || '#ffffff'}`)
+			`Theme Color: ${location.themeColor || '#8ab0cc'}`)
 		.addBlock('Response Format', buildStructuredResponseFormat(LOCATION_BASE_IMAGE_PROMPT_FIELDS, { includeEndTag: true }))
 		.addBlock('Example Response', buildStructuredExampleResponse(
 			LOCATION_BASE_IMAGE_PROMPT_FIELDS,
@@ -307,8 +306,7 @@ export async function generateLocationTimeOfDayPrompt(location: Location, timeOf
 			`Name: ${location.name || 'Unnamed location'}\n` +
 			`Category: ${location.category || 'Uncategorized'}\n` +
 			`Description: ${location.description || 'No description provided.'}\n` +
-			`Theme Color: ${location.themeColor || '#8ab0cc'}\n` +
-			`Light Color: ${location.lightColor || '#ffffff'}`)
+			`Theme Color: ${location.themeColor || '#8ab0cc'}`)
 		.addBlock('Target Time of Day', `${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} (${LOCATION_TIME_OF_DAY_DESCRIPTIONS[timeOfDay]})`)
 		.addBlock('Response Format', buildStructuredResponseFormat(LOCATION_TIME_OF_DAY_PROMPT_FIELDS, { includeEndTag: true }))
 		.addBlock('Example Response', buildStructuredExampleResponse(
@@ -418,7 +416,6 @@ export async function distillLocation(location: Location, definition: any, stage
 		`Category: ${String(definition?.category || location.category || '').trim() || 'Uncategorized'}`,
 		`Description: ${String(definition?.description || getLocationDescription(location.id, stage) || location.description || '').trim()}`,
 		`Theme Color: ${String(definition?.themeColor || location.themeColor || '').trim()}`,
-		`Light Color: ${String(definition?.lightColor || location.lightColor || '').trim()}`,
 	].join('\n');
 
 	const request = stage.generateText(
@@ -463,15 +460,11 @@ export async function distillLocation(location: Location, definition: any, stage
 		const nextThemeColor = /^#([0-9A-F]{6}|[0-9A-F]{8})$/i.test(parsedData['theme_color'] || '')
 			? parsedData['theme_color']
 			: location.themeColor;
-		const nextLightColor = /^#([0-9A-F]{6}|[0-9A-F]{8})$/i.test(parsedData['light_color'] || '')
-			? parsedData['light_color']
-			: location.lightColor;
 
 		location.name = nextName;
 		location.category = nextCategory;
 		location.description = nextDescription;
 		location.themeColor = nextThemeColor;
-		location.lightColor = nextLightColor;
 
 		upsertLocationLoreEntry(location, oldName, stage);
 
@@ -496,7 +489,6 @@ export class Location {
 	timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>> = {}; // Optional mapping of time-of-day to image-edit prompts for this location. Keys are "morning", "afternoon", "evening", "night".
 	timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>> = {}; // Optional mapping of time-of-day to image URLs for this location. Keys are "morning", "afternoon", "evening", "night".
     focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
-	lightColor: string = ''; // This is the lighting color for the location, used to tint character images in skits. If not set, default to white (#ffffff).
     themeColor: string = ''; // A color associated with this location, used for UI theming.
 	openTimes: Partial<Record<CalendarDayOfWeek, CalendarTimeOfDay[]>> = {}; // Optional mapping of days/times of day when this location is generally open. If empty, the location is not typically open.
 
@@ -519,8 +511,5 @@ export class Location {
             const colors = ['#8ab0cc', '#89cd87', '#7a7b6b', '#b98f6e', '#2e354d'];
             this.themeColor = colors[Math.floor(Math.random() * colors.length)];
         }
-		if (!this.lightColor) {
-			this.lightColor = '#ffffff';
-		}
     }
 }

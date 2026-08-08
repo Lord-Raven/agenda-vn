@@ -40,7 +40,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         category: string;
         description: string;
         themeColor: string;
-        lightColor: string;
         imagePrompt: string;
         imageUrl: string;
         timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>>;
@@ -53,7 +52,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         category: location.category ?? '',
         description: getLocationDescription(location.id, stage()),
         themeColor: location.themeColor,
-        lightColor: location.lightColor,
         imagePrompt: getLocationImagePrompt(location),
         imageUrl: location.imageUrl,
         timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
@@ -138,7 +136,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         }
         updateLocationDescription(location.id, nextLocation.description, stage());
         location.themeColor = nextLocation.themeColor;
-        location.lightColor = nextLocation.lightColor;
         location.imagePrompt = nextLocation.imagePrompt;
         location.imageUrl = nextLocation.imageUrl;
         location.timeOfDayImagePrompts = { ...(nextLocation.timeOfDayImagePrompts || {}) };
@@ -153,7 +150,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             category: location.category ?? '',
             description: getLocationDescription(location.id, stage()),
             themeColor: location.themeColor,
-            lightColor: location.lightColor,
             imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,
             timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
@@ -348,7 +344,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             category: location.category,
             description: location.description,
             themeColor: location.themeColor,
-            lightColor: location.lightColor,
             imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,
             timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
@@ -369,7 +364,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                 category: nextLocation.category,
                 description: nextLocation.description,
                 themeColor: nextLocation.themeColor,
-                lightColor: nextLocation.lightColor,
             }, stage());
 
             if (!distilledLocation) {
@@ -383,7 +377,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             location.category = previousState.category;
             location.description = previousState.description;
             location.themeColor = previousState.themeColor;
-            location.lightColor = previousState.lightColor;
             location.imagePrompt = previousState.imagePrompt;
             location.imageUrl = previousState.imageUrl;
             location.timeOfDayImageUrls = { ...(previousState.timeOfDayImageUrls || {}) };
@@ -496,28 +489,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         ]);
     }, [editedLocation.category, editedLocation.themeColor, location.id, stage]);
 
-    const locationLightColorSwatches = useMemo(() => {
-        const locations = Object.values(stage().getSave().atlas || {});
-        const activeLocations = locations.filter((candidate) => candidate.active !== false);
-        const targetCategory = (editedLocation.category || '').trim().toLowerCase();
-
-        const sameCategoryLightColors = activeLocations
-            .filter((candidate) => candidate.id !== location.id)
-            .filter((candidate) => (candidate.category || '').trim().toLowerCase() === targetCategory)
-            .map((candidate) => candidate.lightColor);
-
-        const otherLightColors = activeLocations
-            .filter((candidate) => candidate.id !== location.id)
-            .filter((candidate) => (candidate.category || '').trim().toLowerCase() !== targetCategory)
-            .map((candidate) => candidate.lightColor);
-
-        return buildHexColorSwatches([
-            editedLocation.lightColor,
-            ...sameCategoryLightColors,
-            ...otherLightColors,
-        ]);
-    }, [editedLocation.category, editedLocation.lightColor, location.id, stage]);
-
     return (
         <AnimatePresence>
             <motion.div
@@ -535,6 +506,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                     padding: '0',
                     width: '100%',
                     height: '100%',
+                    minHeight: 0,
                 }}
             >
                 <div
@@ -544,6 +516,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                         maxWidth: 'none',
                         maxHeight: 'none',
                         height: '100%',
+                        minHeight: 0,
                     }}
                 >
                     <GlassPanel
@@ -555,6 +528,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             padding: '20px',
                             display: 'flex',
                             flexDirection: 'column',
+                            minHeight: 0,
                         }}
                     >
                         {/* Header */}
@@ -680,17 +654,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                             placeholder="#RRGGBB"
                                             popoverTitle="Choose theme color"
                                             swatches={locationThemeColorSwatches}
-                                            inputStyle={{ flex: 1 }}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>Light Color</label>
-                                        <ColorPickerInput
-                                            value={editedLocation.lightColor}
-                                            onChange={(value) => handleInputChange('lightColor', value)}
-                                            placeholder="#RRGGBB"
-                                            popoverTitle="Choose light color"
-                                            swatches={locationLightColorSwatches}
                                             inputStyle={{ flex: 1 }}
                                         />
                                     </div>
