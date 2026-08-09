@@ -689,7 +689,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                     {LOCATION_TIME_OF_DAY_LABELS[timeOfDay]}
                                                 </div>
                                                 <div style={{ marginBottom: '12px' }}>
-                                                    <label style={labelStyle}>Prompt</label>
                                                     <TextArea
                                                         value={variantPromptValue || ''}
                                                         onChange={(e) => handleTimeOfDayPromptChange(timeOfDay, e.target.value)}
@@ -725,7 +724,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                         onClick={() => handleGenerateTimeOfDayImage(timeOfDay)}
                                                         disabled={isGeneratingVariant}
                                                     >
-                                                        {isGeneratingVariant ? 'Generating...' : `Generate ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} Image`}
+                                                        {isGeneratingVariant ? 'Generating...' : `Generate`}
                                                     </Button>
                                                 </div>
                                             </div>

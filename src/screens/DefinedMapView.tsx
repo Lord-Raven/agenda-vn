@@ -2,7 +2,7 @@ import { FC, useEffect, useMemo, useState } from 'react';
 import { EventAvailable, MapRounded, MenuRounded, Settings } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Map as GameMap } from '../content/Map';
+import { getMapImageUrl, Map as GameMap } from '../content/Map';
 import { getLocationImageUrl } from '../content/Location';
 import { getCurrentLocation } from '../content/Skit';
 import { Stage } from '../Stage';
@@ -64,6 +64,8 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
         return null;
     }
 
+    const displayedMapImageUrl = getMapImageUrl(displayedMap, currentTimeOfDay);
+
     return (
         <>
             <Box sx={{ width: '100vw', height: '100dvh', boxSizing: 'border-box', p: { xs: '12px', md: '18px' }, overflow: 'hidden', backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${configuredBackgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
@@ -103,7 +105,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.985 }}
                                 transition={{ duration: 0.32, ease: 'easeInOut' }}
-                                style={{ position: 'absolute', inset: 0, backgroundImage: displayedMap.imageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMap.imageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
+                                style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
                             >
                                 {displayedMap.links.map((link, index) => {
                                     const linkedLocation = save.atlas?.[link.childId];
@@ -114,6 +116,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const markerKey = `${link.childId}-${index}`;
                                     const isHovered = hoveredLink === markerKey;
                                     const locationImageUrl = getLocationImageUrl(linkedLocation, stage(), currentTimeOfDay);
+                                    const linkedMapImageUrl = getMapImageUrl(linkedMap, currentTimeOfDay);
                                     const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
                                     const markerName = currentEvent?.name || linkedLocation?.name || linkedMap?.name || 'Unnamed';
@@ -143,8 +146,8 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             transition={{ duration: 0.2, ease: 'easeOut' }}
                                             style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed', opacity: isInteractive ? 1 : 0.5, zIndex: isHovered ? 2 : 1 }}
                                         >
-                                            <span style={{ width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : (linkedMap?.imageUrl ? `url(${linkedMap.imageUrl})` : 'none'), backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                                                {!locationImageUrl && !linkedMap?.imageUrl && <MapRounded fontSize="small" />}
+                                            <span style={{ width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : (linkedMapImageUrl ? `url(${linkedMapImageUrl})` : 'none'), backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                                                {!locationImageUrl && !linkedMapImageUrl && <MapRounded fontSize="small" />}
                                             </span>
                                             <span style={{ padding: '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700 }}>
                                                 {markerName}

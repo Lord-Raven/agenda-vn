@@ -1,5 +1,58 @@
 import { v4 as generateUuid } from 'uuid';
 import { Condition } from './Condition';
+import { CalendarTimeOfDay } from './CalendarEvent';
+import type { Stage } from '../Stage';
+
+export function getMapImageUrl(map: Map | undefined, timeOfDay: CalendarTimeOfDay = 'morning'): string {
+    return map?.timeOfDayImageUrls?.[timeOfDay] || map?.imageUrl || '';
+}
+
+async function getDataUrl(imageUrl: string): Promise<string> {
+    if (imageUrl.startsWith('/assets/')) {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+        });
+    }
+    return imageUrl;
+}
+
+export async function generateMapImageForTimeOfDay(map: Map, timeOfDay: CalendarTimeOfDay, stage: Stage): Promise<string> {
+    const baseImageUrl = map.imageUrl?.trim();
+    const prompt = map.timeOfDayImagePrompts?.[timeOfDay]?.trim();
+    if (!baseImageUrl || !prompt) {
+        return '';
+    }
+
+    const generationKey = `map-image/${map.id}/${timeOfDay}`;
+    const existingGeneration = stage.generationPromises[generationKey];
+    if (existingGeneration) {
+        return existingGeneration as Promise<string>;
+    }
+
+    const request = stage.makeImageFromImage({
+        image: await getDataUrl(baseImageUrl),
+        prompt: `Using the provided base image for ${map.name || 'this map'}, adapt it for ${timeOfDay}: ${prompt}`,
+        remove_background: false,
+        transfer_type: 'edit',
+    }, '')
+        .then((imageUrl) => {
+            map.timeOfDayImageUrls = {
+                ...(map.timeOfDayImageUrls || {}),
+                [timeOfDay]: imageUrl || '',
+            };
+            return imageUrl || '';
+        })
+        .finally(() => {
+            delete stage.generationPromises[generationKey];
+        });
+
+    stage.generationPromises[generationKey] = request;
+    return request;
+}
 
 // A map is a collection of links to other Maps or Locations.
 export class Map {
@@ -11,10 +64,14 @@ export class Map {
     category: string = ''; // A category for filtering or organization in the UI. Could be a region, perhaps ("northlands", "ocean"); it is for organizational and not gameplay purposes.
     imagePrompt: string = ''; // A prompt for generating a map image 
     imageUrl: string = ''; // URL for the map image
+    timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>> = {};
+    timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>> = {};
     links: MapLink[] = []; // Links to other maps or locations
 
     constructor(data?: Partial<Map>) {
         Object.assign(this, data || {});
+        this.timeOfDayImagePrompts = { ...(data?.timeOfDayImagePrompts || {}) };
+        this.timeOfDayImageUrls = { ...(data?.timeOfDayImageUrls || {}) };
         this.links = (data?.links || []).map((link) => ({
             ...link,
             parentId: data?.id || this.id,

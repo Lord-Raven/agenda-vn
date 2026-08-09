@@ -68,7 +68,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditions, playerSt
                             : { type: 'playerStat', statName: playerStats[0]?.name || '', comparison: 'equals', value: playerStats[0]?.default ?? 0 })}
                     >
                         <option value="calendar">Calendar</option>
-                        <option value="playerStat">Player stat</option>
+                        <option value="playerStat">Player Stat</option>
                     </select>
                     {condition.type === 'calendar' ? (
                         <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(index, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 })}>
