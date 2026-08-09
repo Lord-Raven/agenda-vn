@@ -325,7 +325,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                     }} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add</Button>
                 </div>
                 <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 12px' }}>The first alternative whose conditions pass replaces the base map image.</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
                     {draft.alternativeImages.map((alternative, index) => {
                         const isUploadingVariant = Boolean(isUploadingVariants[index]);
                         const isGeneratingVariant = Boolean(isGeneratingVariants[index]);

@@ -680,7 +680,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                 >
                                     <Add fontSize="small" /> Add Alternative
                                 </Button>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '16px' }}>
                                     {editedLocation.alternativeImages.map((alternative, index) => {
                                         const isUploadingVariant = isUploadingAlternativeImages[index];
                                         const isGeneratingVariant = isGeneratingAlternativeImages[index];
