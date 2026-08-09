@@ -8,6 +8,7 @@ import { NamePlate } from "./UiComponents";
 import { useTooltip } from "./TooltipContext";
 import { Actor, getEmotionImage } from "../content/Actor";
 import { determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
+import { getLocationImageUrl } from "../content/Location";
 
 interface SkitScreenProps {
     stage: () => Stage;
@@ -123,6 +124,11 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                     isVerticalLayout={isVerticalLayout}
                     actors={stage().getSave().actors}
                     playerActorId={stage().getPlayerActor().id}
+                    getBackgroundImageUrl={(skit, index) => {
+                        const stageInstance = stage();
+                        const locationId = getCurrentLocation(skit, index);
+                        return getLocationImageUrl(stageInstance.getSave().atlas[locationId], stageInstance);
+                    }}
                     getPresentActors={(_script, _index) =>
                         currentSkit.initialActors?.map((id) => stage().getSave().actors[id]).filter(Boolean) || []
                     }

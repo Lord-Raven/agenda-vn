@@ -461,6 +461,27 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 return undefined;
             };
 
+            const parseExpressionTags = (input: string): {[actorId: string]: Emotion} => {
+                const actorEmotions: {[actorId: string]: Emotion} = {};
+                for (const expressionMatch of input.matchAll(/<Expression>\s*<Actor>([\s\S]*?)<\/Actor>\s*<Mood>([\s\S]*?)<\/Mood>\s*<\/Expression>/gi)) {
+                    const actorName = expressionMatch[1].trim();
+                    const moodName = expressionMatch[2].trim();
+                    const matchedActor = findBestNameMatch(actorName, allActors, ['name']);
+                    if (!matchedActor) continue;
+
+                    const finalEmotion = resolveEmotion(moodName, matchedActor.name);
+                    if (finalEmotion) {
+                        actorEmotions[matchedActor.id] = finalEmotion;
+                    }
+                }
+                return actorEmotions;
+            };
+
+            const stripMechanicTags = (input: string): string => input
+                .replace(/<(Expression|OutfitChange|Movement)>[\s\S]*?<\/\1>/gi, '')
+                .replace(/<[^>]+>/g, '')
+                .trim();
+
             const parseXmlScriptEntries = (input: string): ScriptEntry[] => {
                 const entries: ScriptEntry[] = [];
                 const entryMatches = [...input.matchAll(/<Entry>([\s\S]*?)<\/Entry>/gi)];
@@ -475,27 +496,17 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     const message = messageBlock
                         .replace(/[“”]/g, '"')
                         .replace(/[‘’]/g, '\'')
+                        .replace(/<(Expression|OutfitChange|Movement)>[\s\S]*?<\/\1>/gi, '')
                         .replace(/<[^>]+>/g, '')
                         .trim();
 
                     const speakerMatch = findBestNameMatch(speakerName, save.actors ? Object.values(save.actors) : [], ['name']);
                     const speakerId = speakerMatch ? speakerMatch.id : '';
 
-                    const actorEmotions: {[key: string]: Emotion} = {};
+                    const actorEmotions = parseExpressionTags(entryBody);
                     const actorOutfits: {[actorId: string]: string} = {};
                     let updatedActors: string[] | undefined;
                     let updatedLocationId: string | undefined;
-
-                    for (const expressionMatch of entryBody.matchAll(/<Expression>\s*<Actor>([\s\S]*?)<\/Actor>\s*<Mood>([\s\S]*?)<\/Mood>\s*<\/Expression>/gi)) {
-                        const actorName = expressionMatch[1].trim();
-                        const moodName = expressionMatch[2].trim();
-                        const matchedActor = findBestNameMatch(actorName, allActors, ['name']);
-                        if (!matchedActor) continue;
-
-                        const finalEmotion = resolveEmotion(moodName, matchedActor.name);
-                        if (!finalEmotion) continue;
-                        actorEmotions[matchedActor.id] = finalEmotion;
-                    }
 
                     for (const outfitMatch of entryBody.matchAll(/<OutfitChange>\s*<Actor>([\s\S]*?)<\/Actor>\s*<Outfit>([\s\S]*?)<\/Outfit>\s*<\/OutfitChange>/gi)) {
                         const actorName = outfitMatch[1].trim();
@@ -582,8 +593,10 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         const speakerName = speakerLineMatch?.[1]?.trim() || 'NARRATOR';
                         const speakerMatch = findBestNameMatch(speakerName, save.actors ? Object.values(save.actors) : [], ['name']);
                         const speakerId = speakerMatch ? speakerMatch.id : '';
-                        const message = (speakerLineMatch?.[2] || line).trim();
-                        return new ScriptEntry({ speakerId, message, speechUrl: '', actorEmotions: {}, actorOutfits: {}, outcomes: [] });
+                        const rawMessage = speakerLineMatch?.[2] || line;
+                        const message = stripMechanicTags(rawMessage);
+                        const actorEmotions = parseExpressionTags(rawMessage);
+                        return new ScriptEntry({ speakerId, message, speechUrl: '', actorEmotions, actorOutfits: {}, outcomes: [] });
                     });
             }
 
