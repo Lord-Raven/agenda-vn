@@ -8,6 +8,8 @@ import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ActorStatStars } from './ActorStatStars';
+import { Condition } from '../content/Condition';
+import { ConditionEditor } from './ConditionEditor';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -129,6 +131,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         voiceId: string;
         themeColor: string;
         themeFontFamily: string;
+        conditions: Condition[];
     }>({
         name: actor.name,
         category: actor.category ?? '',
@@ -138,6 +141,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         voiceId: actor.voiceId,
         themeColor: actor.themeColor,
         themeFontFamily: actor.themeFontFamily,
+        conditions: [...(actor.conditions || [])],
     });
 
     const categoryInputListId = `actor-category-options-${actor.id}`;
@@ -252,6 +256,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.voiceId = nextEditedActor.voiceId;
         actor.themeColor = nextEditedActor.themeColor;
         actor.themeFontFamily = nextEditedActor.themeFontFamily;
+        actor.conditions = [...nextEditedActor.conditions];
         actor.outfits = persistedOutfits;
         actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
 
@@ -360,6 +365,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             voiceId: actor.voiceId,
             themeColor: actor.themeColor,
             themeFontFamily: actor.themeFontFamily,
+            conditions: [...(actor.conditions || [])],
         });
         setEditedStatMap(createInitialActorStatMap(actor, actorStats));
         const nextOutfits = cloneOutfits(actor.outfits);
@@ -1147,6 +1153,17 @@ ${indent}}`;
                                                 borderRadius: '5px',
                                                 resize: 'vertical',
                                             }}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label style={{ display: 'block', color: 'var(--agenda-highlight)', fontSize: '14px', fontWeight: 'bold', marginBottom: '8px' }}>
+                                            Availability
+                                        </label>
+                                        <ConditionEditor
+                                            conditions={editedActor.conditions}
+                                            playerStats={stage().getConfiguration().playerStats || []}
+                                            onChange={(conditions) => setEditedActor(current => ({ ...current, conditions }))}
                                         />
                                     </div>
 

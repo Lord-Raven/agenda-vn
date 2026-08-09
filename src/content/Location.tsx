@@ -11,6 +11,7 @@ import {
 	StructuredFieldDefinition,
 } from '../utils/StructuredResponse.js';
 import { CalendarTimeOfDay } from './CalendarEvent';
+import { Condition, ConditionContext, evaluateConditions } from './Condition';
 
 export type CalendarDayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
@@ -61,9 +62,8 @@ export const getCalendarDayOfWeek = (date: string): CalendarDayOfWeek | null => 
 	return LOCATION_DAY_OF_WEEK_ORDER[(parsedDate.getUTCDay() + 6) % 7];
 };
 
-export const isLocationOpen = (location: Location, date: string, timeOfDay: CalendarTimeOfDay): boolean => {
-	const dayOfWeek = getCalendarDayOfWeek(date);
-	return dayOfWeek ? (location.openTimes?.[dayOfWeek] || []).includes(timeOfDay) : false;
+export const isLocationAvailable = (location: Location, context: ConditionContext): boolean => {
+	return location.active !== false && evaluateConditions(location.conditions, context);
 };
 
 
@@ -409,7 +409,7 @@ export async function distillLocation(location: Location, definition: any, stage
 		return existingGeneration as Promise<Location | null>;
 	}
 
-	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [])) || 'None provided.';
+	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [], stage.getSave())) || 'None provided.';
 
 	const locationDetails = [
 		`Name: ${String(definition?.name || location.name || '').trim()}`,
@@ -490,7 +490,7 @@ export class Location {
 	timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>> = {}; // Optional mapping of time-of-day to image URLs for this location. Keys are "morning", "afternoon", "evening", "night".
     focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
     themeColor: string = ''; // A color associated with this location, used for UI theming.
-	openTimes: Partial<Record<CalendarDayOfWeek, CalendarTimeOfDay[]>> = {}; // Optional mapping of days/times of day when this location is generally open. If empty, the location is not typically open.
+	conditions: Condition[] = []; // All conditions must pass for this location to be available.
 
     constructor(props: any) {
         Object.assign(this, props);
@@ -505,7 +505,7 @@ export class Location {
 		this.timeOfDayImageUrls = this.timeOfDayImageUrls && typeof this.timeOfDayImageUrls === 'object'
 			? { ...(this.timeOfDayImageUrls as Partial<Record<CalendarTimeOfDay, string>>) }
 			: {};
-		this.openTimes = normalizeLocationOpenTimes(this.openTimes);
+		this.conditions = Array.isArray(this.conditions) ? [...this.conditions] : [];
         if (!this.themeColor) {
             // Pick from the core game theme palette in index.scss.
             const colors = ['#8ab0cc', '#89cd87', '#7a7b6b', '#b98f6e', '#2e354d'];

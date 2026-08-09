@@ -5,6 +5,7 @@ import { Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
 import { Button, TextArea, TextInput } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
+import { ConditionEditor } from './ConditionEditor';
 
 interface MapDetailPanelProps {
     map: GameMap;
@@ -125,7 +126,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
             return;
         }
         persist(() => {
-            map.links.push({ parentId: map.id, childId: firstTarget, coordinates: { x: 0.5, y: 0.5 } });
+            map.links.push({ parentId: map.id, childId: firstTarget, coordinates: { x: 0.5, y: 0.5 }, conditions: [] });
         });
     };
 
@@ -247,14 +248,21 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                 </div>
                 <div style={{ display: 'grid', gap: 8 }}>
                     {map.links.map((link, index) => (
-                        <div key={`${link.childId}-${index}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto', gap: 8, alignItems: 'center' }}>
-                            <select value={link.childId} onChange={event => updateLink(index, { childId: event.target.value })} style={{ minHeight: 38, background: 'var(--agenda-surface-base)', color: 'var(--agenda-text-primary)', border: '1px solid var(--agenda-line-subtle)', borderRadius: 6, padding: '0 8px' }}>
-                                <optgroup label="Locations">{activeLocations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}</optgroup>
-                                <optgroup label="Maps">{activeMaps.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</optgroup>
-                            </select>
-                            <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
-                            <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
-                            <Button variant="danger" onClick={() => persist(() => map.links.splice(index, 1))} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
+                        <div key={`${link.childId}-${index}`} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto', gap: 8, alignItems: 'center' }}>
+                                <select value={link.childId} onChange={event => updateLink(index, { childId: event.target.value })} style={{ minHeight: 38, background: 'var(--agenda-surface-base)', color: 'var(--agenda-text-primary)', border: '1px solid var(--agenda-line-subtle)', borderRadius: 6, padding: '0 8px' }}>
+                                    <optgroup label="Locations">{activeLocations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}</optgroup>
+                                    <optgroup label="Maps">{activeMaps.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</optgroup>
+                                </select>
+                                <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
+                                <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
+                                <Button variant="danger" onClick={() => persist(() => map.links.splice(index, 1))} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
+                            </div>
+                            <ConditionEditor
+                                conditions={link.conditions || []}
+                                playerStats={stageInstance.getConfiguration().playerStats || []}
+                                onChange={(conditions) => updateLink(index, { conditions })}
+                            />
                         </div>
                     ))}
                 </div>

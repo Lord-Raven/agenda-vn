@@ -10,6 +10,7 @@ import { ScreenType } from './BaseScreen';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { useTooltip } from './TooltipContext';
 import { Button, GlassPanel } from './UiComponents';
+import { evaluateConditions } from '../content/Condition';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -117,7 +118,8 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
                                     const markerName = currentEvent?.name || linkedLocation?.name || linkedMap?.name || 'Unnamed';
                                     const markerSize = isVerticalLayout ? 44 : 52;
-                                    const isInteractive = Boolean(linkedMap || canVisitLocation);
+                                    const isLinkAvailable = evaluateConditions(link.conditions, save);
+                                    const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
                                     const handleMarkerClick = () => {
                                         if (linkedMap) {
                                             setDisplayedMapId(linkedMap.id);

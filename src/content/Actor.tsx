@@ -11,6 +11,7 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ActorStat } from "../Stage";
+import { Condition } from './Condition';
 
 
 // An outfit represents a set of clothing or physical transformation that can be applied to a specific actor; each outfit comes with a full set of emotions
@@ -36,6 +37,7 @@ export class Actor {
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
     statMap: { [key: string]: number } = {}; // Map of custom stat name to numeric value for this actor
+    conditions: Condition[] = []; // All conditions must pass for this actor to be available.
 
     /**
      * Rehydrate an Actor from saved data
@@ -45,6 +47,7 @@ export class Actor {
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
+        actor.conditions = Array.isArray(savedActor?.conditions) ? [...savedActor.conditions] : [];
         return actor;
     }
 
@@ -55,6 +58,7 @@ export class Actor {
         }
         this.active = this.active !== false;
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
+        this.conditions = Array.isArray(this.conditions) ? [...this.conditions] : [];
     }
 }
 
@@ -211,7 +215,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     }));
 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
-    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [])) || 'None provided.';
+    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [], stage.getSave())) || 'None provided.';
     
     const generationRequest = stage.generateText(buildPrompt()
             .addBlock('Instructions',

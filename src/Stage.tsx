@@ -5,7 +5,7 @@ import { Actor, findBestNameMatch, loadSupportedActor } from "./content/Actor";
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, Skit, SkitType } from "./content/Skit";
-import { createDefaultAtlas, isLocationOpen, Location } from "./content/Location";
+import { createDefaultAtlas, isLocationAvailable, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
@@ -19,6 +19,7 @@ import {
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "./utils/StructuredResponse.js";
+import { evaluateConditions } from './content/Condition';
 
 type MessageStateType = any;
 
@@ -443,6 +444,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     outfits: [],
                     outfitId: '',
                     statMap: {},
+                    conditions: [],
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
                     themeFontFamily: '',
                     voiceId: ''
@@ -805,11 +807,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return false;
         }
 
-        return Boolean(this.getCurrentLocationEvent(locationId)) || isLocationOpen(
-            location,
-            save.currentDate || this.getStartingDate(save),
-            save.currentTimeOfDay || 'morning',
-        );
+        return Boolean(this.getCurrentLocationEvent(locationId)) || isLocationAvailable(location, save);
     }
 
     startLocationVisit(locationId: string): Skit | null {
@@ -830,6 +828,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const initialActors = Object.values(save.actors || {})
             .filter((actor) => actor.id !== save.playerId && actor.active !== false)
+            .filter((actor) => evaluateConditions(actor.conditions, save))
             .map((actor) => actor.id);
         const skit = new Skit({
             skitType: SkitType.SOCIAL,

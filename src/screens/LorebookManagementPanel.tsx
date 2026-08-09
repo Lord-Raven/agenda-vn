@@ -8,6 +8,7 @@ import { Button, ConfirmDialog, TextArea, TextInput } from './UiComponents';
 import { findBestNameMatch, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { getLinkedLocationLore, updateLocationDescription } from '../content/Location';
 import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
+import { ConditionEditor } from './ConditionEditor';
 
 
 interface LorebookManagementPanelProps {
@@ -545,6 +546,15 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                     <option key={category} value={category}>{getCategoryLabel(category)}</option>
                                                 ))}
                                             </select>
+                                        </div>
+
+                                        <div style={{ display: 'grid', gap: '6px' }}>
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Availability</label>
+                                            <ConditionEditor
+                                                conditions={selectedLore.conditions || []}
+                                                playerStats={stage().getConfiguration().playerStats || []}
+                                                onChange={(conditions) => updateSelectedLore({ conditions })}
+                                            />
                                         </div>
 
                                         <div

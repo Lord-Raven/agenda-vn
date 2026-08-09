@@ -13,6 +13,7 @@ import {
     parseXmlTagsToObjects,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
+import { evaluateConditions } from './Condition';
 
 const getDayDifference = (startDate: string, endDate: string): number => {
     const start = new Date(`${startDate}T00:00:00Z`);
@@ -175,6 +176,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     );
     const activeConstantLore = lorebook
         .filter((lore) => lore.enabled && lore.constant && passedProbabilityLoreIds.has(lore.id))
+        .filter((lore) => evaluateConditions(lore.conditions, save))
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
     const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
     const selectedSettingContext = (agendaConfig?.playerStats || []).map((stat) => {
@@ -208,6 +210,10 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // For lorebook context, we go through lorebook entries and add them 
     let triggeredLore = lorebook.filter(lore => {
             if (!lore.enabled || (!['character', 'location', 'other'].includes(lore.type) && !currentActors.some(actor => actor.name.toLowerCase() === lore.type.toLowerCase()))) {
+                return false;
+            }
+
+            if (!evaluateConditions(lore.conditions, save)) {
                 return false;
             }
 
@@ -299,7 +305,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
         console.log('Generating skit guidance...');
         let attempts = 3;
         const availableActors = Object.values(stage.getSave().actors)
-            .filter(actor => actor.id !== stage.getSave().playerId && actor.active);
+            .filter(actor => actor.id !== stage.getSave().playerId && actor.active)
+            .filter(actor => evaluateConditions(actor.conditions, save));
         while (attempts > 0) {
             const response = await stage.generateText(
                 buildPrompt()

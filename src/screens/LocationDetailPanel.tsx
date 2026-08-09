@@ -1,10 +1,9 @@
-import { FC, Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import { Stage } from '../Stage';
 import { CalendarTimeOfDay } from '../content/CalendarEvent';
 import {
-    CalendarDayOfWeek,
     distillLocation,
     generateBaseLocationImage,
     generateLocationImageForTimeOfDay,
@@ -13,17 +12,16 @@ import {
     getLocationTimeOfDayPrompt,
     getLinkedLocationLore,
     Location,
-    LOCATION_DAY_OF_WEEK_LABELS,
-    LOCATION_DAY_OF_WEEK_ORDER,
     LOCATION_TIME_OF_DAY_LABELS,
     LOCATION_TIME_OF_DAY_ORDER,
-    normalizeLocationOpenTimes,
     updateLocationDescription,
     upsertLocationLoreEntry,
 } from '../content/Location';
 import { Image as ImageIcon, Place } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
+import { Condition } from '../content/Condition';
+import { ConditionEditor } from './ConditionEditor';
 
 interface LocationDetailPanelProps {
     location: Location;
@@ -44,7 +42,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         imageUrl: string;
         timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>>;
         timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>>;
-        openTimes: Partial<Record<CalendarDayOfWeek, CalendarTimeOfDay[]>>;
+        conditions: Condition[];
         focalX: number;
         focalY: number;
     }>({
@@ -56,7 +54,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         imageUrl: location.imageUrl,
         timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
         timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
-        openTimes: normalizeLocationOpenTimes(location.openTimes),
+        conditions: [...(location.conditions || [])],
         focalX: location.focalPoint?.x ?? 0.5,
         focalY: location.focalPoint?.y ?? 0.5,
     });
@@ -140,7 +138,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.imageUrl = nextLocation.imageUrl;
         location.timeOfDayImagePrompts = { ...(nextLocation.timeOfDayImagePrompts || {}) };
         location.timeOfDayImageUrls = { ...(nextLocation.timeOfDayImageUrls || {}) };
-        location.openTimes = normalizeLocationOpenTimes(nextLocation.openTimes);
+        location.conditions = [...nextLocation.conditions];
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
     };
 
@@ -154,7 +152,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             imageUrl: location.imageUrl,
             timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
             timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
-            openTimes: normalizeLocationOpenTimes(location.openTimes),
+            conditions: [...(location.conditions || [])],
             focalX: location.focalPoint?.x ?? 0.5,
             focalY: location.focalPoint?.y ?? 0.5,
         });
@@ -195,44 +193,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
 
     const handleInputChange = (field: string, value: string | number | boolean) => {
         setEditedLocation(prev => ({ ...prev, [field]: value }));
-    };
-
-    const setOpenTime = (day: CalendarDayOfWeek, timeOfDay: CalendarTimeOfDay, isOpen: boolean) => {
-        setEditedLocation((current) => {
-            const nextOpenTimes = normalizeLocationOpenTimes(current.openTimes);
-            const nextDaySlots = new Set(nextOpenTimes[day] || []);
-            if (isOpen) {
-                nextDaySlots.add(timeOfDay);
-            } else {
-                nextDaySlots.delete(timeOfDay);
-            }
-            if (nextDaySlots.size > 0) {
-                nextOpenTimes[day] = LOCATION_TIME_OF_DAY_ORDER.filter((slot) => nextDaySlots.has(slot));
-            } else {
-                delete nextOpenTimes[day];
-            }
-            return { ...current, openTimes: nextOpenTimes };
-        });
-    };
-
-    const setOpenTimeForAllDays = (timeOfDay: CalendarTimeOfDay, isOpen: boolean) => {
-        setEditedLocation((current) => {
-            const nextOpenTimes = normalizeLocationOpenTimes(current.openTimes);
-            for (const day of LOCATION_DAY_OF_WEEK_ORDER) {
-                const nextDaySlots = new Set(nextOpenTimes[day] || []);
-                if (isOpen) {
-                    nextDaySlots.add(timeOfDay);
-                } else {
-                    nextDaySlots.delete(timeOfDay);
-                }
-                if (nextDaySlots.size > 0) {
-                    nextOpenTimes[day] = LOCATION_TIME_OF_DAY_ORDER.filter((slot) => nextDaySlots.has(slot));
-                } else {
-                    delete nextOpenTimes[day];
-                }
-            }
-            return { ...current, openTimes: nextOpenTimes };
-        });
     };
 
     const handleLocationImageUpload = async (file: File) => {
@@ -598,48 +558,12 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             </section>
 
                             <section>
-                                <h2 style={sectionHeadingStyle}>General Visit Hours</h2>
-                                <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
-                                    Choose when this location can be visited without a calendar event.
-                                </p>
-                                <div style={{ overflowX: 'auto' }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 1.2fr) repeat(8, minmax(72px, 1fr))', gap: '6px', minWidth: '760px', alignItems: 'center' }}>
-                                        <span />
-                                        <span style={{ ...labelStyle, textAlign: 'center' }}>All days</span>
-                                        {LOCATION_DAY_OF_WEEK_ORDER.map((day) => (
-                                            <span key={day} style={{ ...labelStyle, textAlign: 'center' }}>
-                                                {LOCATION_DAY_OF_WEEK_LABELS[day].slice(0, 3)}
-                                            </span>
-                                        ))}
-                                        {LOCATION_TIME_OF_DAY_ORDER.map((timeOfDay) => {
-                                            const isOpenEveryDay = LOCATION_DAY_OF_WEEK_ORDER.every((day) => editedLocation.openTimes[day]?.includes(timeOfDay));
-                                            return (
-                                                <Fragment key={timeOfDay}>
-                                                    <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
-                                                        {LOCATION_TIME_OF_DAY_LABELS[timeOfDay]}
-                                                    </span>
-                                                    <input
-                                                        type="checkbox"
-                                                        aria-label={`${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} for all days`}
-                                                        checked={isOpenEveryDay}
-                                                        onChange={(event) => setOpenTimeForAllDays(timeOfDay, event.target.checked)}
-                                                        style={{ width: '18px', height: '18px', margin: 'auto', accentColor: 'var(--agenda-accent-primary)' }}
-                                                    />
-                                                    {LOCATION_DAY_OF_WEEK_ORDER.map((day) => (
-                                                        <input
-                                                            key={day}
-                                                            type="checkbox"
-                                                            aria-label={`${LOCATION_DAY_OF_WEEK_LABELS[day]} ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]}`}
-                                                            checked={editedLocation.openTimes[day]?.includes(timeOfDay) || false}
-                                                            onChange={(event) => setOpenTime(day, timeOfDay, event.target.checked)}
-                                                            style={{ width: '18px', height: '18px', margin: 'auto', accentColor: 'var(--agenda-accent-primary)' }}
-                                                        />
-                                                    ))}
-                                                </Fragment>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
+                                <h2 style={sectionHeadingStyle}>Availability</h2>
+                                <ConditionEditor
+                                    conditions={editedLocation.conditions}
+                                    playerStats={stage().getConfiguration().playerStats || []}
+                                    onChange={(conditions) => setEditedLocation(current => ({ ...current, conditions }))}
+                                />
                             </section>
 
                             {/* Visual Theme */}
