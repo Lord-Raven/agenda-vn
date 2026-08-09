@@ -1,6 +1,6 @@
 import { FC, PointerEvent, useEffect, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
-import { Add, AutoAwesome, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
+import { Add, ArrowDownward, ArrowUpward, AutoAwesome, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
 import { generateMapAlternativeImage, getMapImageUrl, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
 import { Button, TextArea, TextInput } from './UiComponents';
@@ -197,6 +197,24 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
         }));
     };
 
+    const moveAlternative = (index: number, offset: -1 | 1) => {
+        const targetIndex = index + offset;
+        if (targetIndex < 0 || targetIndex >= draft.alternativeImages.length) {
+            return;
+        }
+
+        setDraft(current => {
+            const alternativeImages = [...current.alternativeImages];
+            [alternativeImages[index], alternativeImages[targetIndex]] = [alternativeImages[targetIndex], alternativeImages[index]];
+            return { ...current, alternativeImages };
+        });
+        setCollapsedAlternativeImages(current => {
+            const collapsed = [...current];
+            [collapsed[index], collapsed[targetIndex]] = [collapsed[targetIndex], collapsed[index]];
+            return collapsed;
+        });
+    };
+
     const uploadVariantImage = async (index: number, file: File) => {
         setIsUploadingVariants(current => ({ ...current, [index]: true }));
         try {
@@ -323,6 +341,26 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                         style={{ display: 'grid', placeItems: 'center', padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer' }}
                                     >
                                         <ExpandMore style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`Move ${alternative.description || `alternative ${index + 1}`} up`}
+                                        title="Move up (higher priority)"
+                                        disabled={index === 0 || Object.values(isUploadingVariants).some(Boolean) || Object.values(isGeneratingVariants).some(Boolean)}
+                                        onClick={() => moveAlternative(index, -1)}
+                                        style={{ display: 'grid', placeItems: 'center', padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.35 : 1 }}
+                                    >
+                                        <ArrowUpward fontSize="small" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`Move ${alternative.description || `alternative ${index + 1}`} down`}
+                                        title="Move down (lower priority)"
+                                        disabled={index === draft.alternativeImages.length - 1 || Object.values(isUploadingVariants).some(Boolean) || Object.values(isGeneratingVariants).some(Boolean)}
+                                        onClick={() => moveAlternative(index, 1)}
+                                        style={{ display: 'grid', placeItems: 'center', padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: index === draft.alternativeImages.length - 1 ? 'default' : 'pointer', opacity: index === draft.alternativeImages.length - 1 ? 0.35 : 1 }}
+                                    >
+                                        <ArrowDownward fontSize="small" />
                                     </button>
                                     <TextInput fullWidth value={alternative.description} onChange={event => updateAlternative(index, { description: event.target.value })} placeholder="Description, e.g. Morning or Flooded" />
                                     {!isCollapsed && <Button variant="danger" onClick={() => {

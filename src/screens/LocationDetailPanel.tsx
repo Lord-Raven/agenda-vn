@@ -13,7 +13,7 @@ import {
     updateLocationDescription,
     upsertLocationLoreEntry,
 } from '../content/Location';
-import { Add, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
+import { Add, ArrowDownward, ArrowUpward, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
 import { Condition } from '../content/Condition';
@@ -231,6 +231,24 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                 ? { ...alternative, ...patch }
                 : alternative) || [],
         }));
+    };
+
+    const moveAlternative = (index: number, offset: -1 | 1) => {
+        const targetIndex = index + offset;
+        if (targetIndex < 0 || targetIndex >= editedLocation.alternativeImages.length) {
+            return;
+        }
+
+        setEditedLocation((current) => {
+            const alternativeImages = [...current.alternativeImages];
+            [alternativeImages[index], alternativeImages[targetIndex]] = [alternativeImages[targetIndex], alternativeImages[index]];
+            return { ...current, alternativeImages };
+        });
+        setCollapsedAlternativeImages((current) => {
+            const collapsed = [...current];
+            [collapsed[index], collapsed[targetIndex]] = [collapsed[targetIndex], collapsed[index]];
+            return collapsed;
+        });
     };
 
     const handleAlternativeImageUpload = async (index: number, file: File) => {
@@ -688,6 +706,26 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                         >
                                                             <ExpandMore style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
                                                         </button>
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Move ${alternative.description || `alternative ${index + 1}`} up`}
+                                                        title="Move up (higher priority)"
+                                                        disabled={index === 0 || Object.values(isUploadingAlternativeImages).some(Boolean) || Object.values(isGeneratingAlternativeImages).some(Boolean)}
+                                                        onClick={() => moveAlternative(index, -1)}
+                                                        style={{ display: 'grid', placeItems: 'center', padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.35 : 1 }}
+                                                    >
+                                                        <ArrowUpward fontSize="small" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Move ${alternative.description || `alternative ${index + 1}`} down`}
+                                                        title="Move down (lower priority)"
+                                                        disabled={index === editedLocation.alternativeImages.length - 1 || Object.values(isUploadingAlternativeImages).some(Boolean) || Object.values(isGeneratingAlternativeImages).some(Boolean)}
+                                                        onClick={() => moveAlternative(index, 1)}
+                                                        style={{ display: 'grid', placeItems: 'center', padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: index === editedLocation.alternativeImages.length - 1 ? 'default' : 'pointer', opacity: index === editedLocation.alternativeImages.length - 1 ? 0.35 : 1 }}
+                                                    >
+                                                        <ArrowDownward fontSize="small" />
+                                                    </button>
                                                     <TextInput
                                                         fullWidth
                                                         value={alternative.description}
