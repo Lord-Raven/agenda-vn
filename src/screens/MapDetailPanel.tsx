@@ -1,6 +1,6 @@
 import { FC, PointerEvent, useEffect, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
-import { Add, AutoAwesome, Delete, Image as ImageIcon, Place } from '@mui/icons-material';
+import { Add, AutoAwesome, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
 import { generateMapAlternativeImage, getMapImageUrl, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
 import { Button, TextArea, TextInput } from './UiComponents';
@@ -26,12 +26,13 @@ const createMapDraft = (map: GameMap): MapDraft => ({
     category: map.category,
     imagePrompt: map.imagePrompt,
     imageUrl: map.imageUrl,
-    alternativeImages: map.alternativeImages.map(createAlternativeImage),
+    alternativeImages: map.alternativeImages?.map(createAlternativeImage) || [],
 });
 
 export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, onDeactivate }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [areAlternativeImagesExpanded, setAreAlternativeImagesExpanded] = useState(true);
     const [isUploadingVariants, setIsUploadingVariants] = useState<Record<number, boolean>>({});
     const [isGeneratingVariants, setIsGeneratingVariants] = useState<Record<number, boolean>>({});
     const [draft, setDraft] = useState<MapDraft>(() => createMapDraft(map));
@@ -188,9 +189,9 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
     const updateAlternative = (index: number, patch: Partial<AlternativeImage>) => {
         setDraft(current => ({
             ...current,
-            alternativeImages: current.alternativeImages.map((alternative, alternativeIndex) => alternativeIndex === index
+            alternativeImages: current.alternativeImages?.map((alternative, alternativeIndex) => alternativeIndex === index
                 ? { ...alternative, ...patch }
-                : alternative),
+                : alternative) || [],
         }));
     };
 
@@ -297,12 +298,24 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
 
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <strong style={{ color: 'var(--agenda-text-primary)' }}>Alternative Images</strong>
-                    <Button variant="secondary" onClick={() => updateDraft('alternativeImages', [...draft.alternativeImages, createAlternativeImage()])} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add</Button>
+                    <button
+                        type="button"
+                        aria-expanded={areAlternativeImagesExpanded}
+                        onClick={() => setAreAlternativeImagesExpanded(current => !current)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer', font: 'inherit' }}
+                    >
+                        <ExpandMore style={{ transform: areAlternativeImagesExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 150ms ease' }} />
+                        <strong>Alternative Images</strong>
+                    </button>
+                    {areAlternativeImagesExpanded && (
+                        <Button variant="secondary" onClick={() => updateDraft('alternativeImages', [...draft.alternativeImages, createAlternativeImage()])} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add</Button>
+                    )}
                 </div>
-                <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 12px' }}>The first alternative whose conditions pass replaces the base map image.</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-                    {draft.alternativeImages.map((alternative, index) => {
+                {areAlternativeImagesExpanded && (
+                    <>
+                        <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 12px' }}>The first alternative whose conditions pass replaces the base map image.</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+                            {draft.alternativeImages.map((alternative, index) => {
                         const isUploadingVariant = Boolean(isUploadingVariants[index]);
                         const isGeneratingVariant = Boolean(isGeneratingVariants[index]);
                         return (
@@ -336,8 +349,10 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                 </Button>
                             </div>
                         );
-                    })}
-                </div>
+                            })}
+                        </div>
+                    </>
+                )}
             </div>
 
             <div>

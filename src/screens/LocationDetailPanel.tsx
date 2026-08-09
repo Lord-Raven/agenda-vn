@@ -13,7 +13,7 @@ import {
     updateLocationDescription,
     upsertLocationLoreEntry,
 } from '../content/Location';
-import { Add, Delete, Image as ImageIcon, Place } from '@mui/icons-material';
+import { Add, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
 import { Condition } from '../content/Condition';
@@ -48,7 +48,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         themeColor: location.themeColor,
         imagePrompt: getLocationImagePrompt(location),
         imageUrl: location.imageUrl,
-        alternativeImages: location.alternativeImages.map(createAlternativeImage),
+        alternativeImages: location.alternativeImages?.map(createAlternativeImage) || [],
         conditions: [...(location.conditions || [])],
         focalX: location.focalPoint?.x ?? 0.5,
         focalY: location.focalPoint?.y ?? 0.5,
@@ -90,6 +90,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     const [isUploadingAlternativeImages, setIsUploadingAlternativeImages] = useState<Record<number, boolean>>({});
     const [isGeneratingLocationDetails, setIsGeneratingLocationDetails] = useState(false);
     const [isGeneratingBaseImage, setIsGeneratingBaseImage] = useState(false);
+    const [areAlternativeImagesExpanded, setAreAlternativeImagesExpanded] = useState(true);
     const [isGeneratingAlternativeImages, setIsGeneratingAlternativeImages] = useState<Record<number, boolean>>({});
     const [confirmDialog, setConfirmDialog] = useState<{
         open: boolean;
@@ -134,7 +135,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             themeColor: location.themeColor,
             imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,
-            alternativeImages: location.alternativeImages.map(createAlternativeImage),
+            alternativeImages: location.alternativeImages?.map(createAlternativeImage) || [],
             conditions: [...(location.conditions || [])],
             focalX: location.focalPoint?.x ?? 0.5,
             focalY: location.focalPoint?.y ?? 0.5,
@@ -224,9 +225,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     const updateAlternative = (index: number, patch: Partial<AlternativeImage>) => {
         setEditedLocation((current) => ({
             ...current,
-            alternativeImages: current.alternativeImages.map((alternative, alternativeIndex) => alternativeIndex === index
+            alternativeImages: current.alternativeImages?.map((alternative, alternativeIndex) => alternativeIndex === index
                 ? { ...alternative, ...patch }
-                : alternative),
+                : alternative) || [],
         }));
     };
 
@@ -642,22 +643,32 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             </section>
 
                             <section>
-                                <h2 style={{ ...sectionHeadingStyle, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <ImageIcon />
-                                    Alternative Images
+                                <h2 style={sectionHeadingStyle}>
+                                    <button
+                                        type="button"
+                                        aria-expanded={areAlternativeImagesExpanded}
+                                        onClick={() => setAreAlternativeImagesExpanded(current => !current)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: 0, border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}
+                                    >
+                                        <ExpandMore style={{ transform: areAlternativeImagesExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 150ms ease' }} />
+                                        <ImageIcon />
+                                        Alternative Images
+                                    </button>
                                 </h2>
-                                <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
-                                    The first alternative whose conditions pass replaces the base location image.
-                                </p>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => handleInputChange('alternativeImages', [...editedLocation.alternativeImages, createAlternativeImage()])}
-                                    style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '12px' }}
-                                >
-                                    <Add fontSize="small" /> Add Alternative
-                                </Button>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-                                    {editedLocation.alternativeImages.map((alternative, index) => {
+                                {areAlternativeImagesExpanded && (
+                                    <>
+                                        <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
+                                            The first alternative whose conditions pass replaces the base location image.
+                                        </p>
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => handleInputChange('alternativeImages', [...editedLocation.alternativeImages, createAlternativeImage()])}
+                                            style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '12px' }}
+                                        >
+                                            <Add fontSize="small" /> Add Alternative
+                                        </Button>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                                            {editedLocation.alternativeImages.map((alternative, index) => {
                                         const isUploadingVariant = isUploadingAlternativeImages[index];
                                         const isGeneratingVariant = isGeneratingAlternativeImages[index];
 
@@ -722,8 +733,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                 </div>
                                             </div>
                                         );
-                                    })}
-                                </div>
+                                            })}
+                                        </div>
+                                    </>
+                                )}
                             </section>
 
                             <div
