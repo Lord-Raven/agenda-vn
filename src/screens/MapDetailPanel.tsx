@@ -1,13 +1,12 @@
 import { FC, PointerEvent, useEffect, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, AutoAwesome, Delete, Image as ImageIcon, Place } from '@mui/icons-material';
-import { generateMapImageForTimeOfDay, generateMapTimeOfDayPrompt, getMapImageUrl, Map as GameMap, MapLink } from '../content/Map';
+import { generateMapAlternativeImage, getMapImageUrl, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
 import { Button, TextArea, TextInput } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
 import { ConditionEditor } from './ConditionEditor';
-import { CalendarTimeOfDay } from '../content/CalendarEvent';
-import { LOCATION_TIME_OF_DAY_LABELS, LOCATION_TIME_OF_DAY_ORDER } from '../content/Location';
+import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 
 interface MapDetailPanelProps {
     map: GameMap;
@@ -18,7 +17,7 @@ interface MapDetailPanelProps {
 
 const clampCoordinate = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 
-type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'timeOfDayImagePrompts' | 'timeOfDayImageUrls'>;
+type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages'>;
 
 const createMapDraft = (map: GameMap): MapDraft => ({
     name: map.name,
@@ -27,15 +26,14 @@ const createMapDraft = (map: GameMap): MapDraft => ({
     category: map.category,
     imagePrompt: map.imagePrompt,
     imageUrl: map.imageUrl,
-    timeOfDayImagePrompts: { ...(map.timeOfDayImagePrompts || {}) },
-    timeOfDayImageUrls: { ...(map.timeOfDayImageUrls || {}) },
+    alternativeImages: map.alternativeImages.map(createAlternativeImage),
 });
 
 export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, onDeactivate }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [isUploadingVariants, setIsUploadingVariants] = useState<Partial<Record<CalendarTimeOfDay, boolean>>>({});
-    const [isGeneratingVariants, setIsGeneratingVariants] = useState<Partial<Record<CalendarTimeOfDay, boolean>>>({});
+    const [isUploadingVariants, setIsUploadingVariants] = useState<Record<number, boolean>>({});
+    const [isGeneratingVariants, setIsGeneratingVariants] = useState<Record<number, boolean>>({});
     const [draft, setDraft] = useState<MapDraft>(() => createMapDraft(map));
     const draftRef = useRef(draft);
     const previewRef = useRef<HTMLDivElement>(null);
@@ -75,8 +73,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
         map.category = nextDraft.category.trim();
         map.imagePrompt = nextDraft.imagePrompt;
         map.imageUrl = nextDraft.imageUrl;
-        map.timeOfDayImagePrompts = { ...(nextDraft.timeOfDayImagePrompts || {}) };
-        map.timeOfDayImageUrls = { ...(nextDraft.timeOfDayImageUrls || {}) };
+        map.alternativeImages = nextDraft.alternativeImages.map(createAlternativeImage);
 
         const nextPriority = Number.isFinite(nextDraft.priority) ? nextDraft.priority : 0;
         const conflict = (save.maps || []).find(candidate => candidate.id !== map.id && candidate.active !== false && candidate.priority === nextPriority);
@@ -188,57 +185,52 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
         }
     };
 
-    const updateVariant = (field: 'timeOfDayImagePrompts' | 'timeOfDayImageUrls', timeOfDay: CalendarTimeOfDay, value: string) => {
+    const updateAlternative = (index: number, patch: Partial<AlternativeImage>) => {
         setDraft(current => ({
             ...current,
-            [field]: { ...(current[field] || {}), [timeOfDay]: value },
+            alternativeImages: current.alternativeImages.map((alternative, alternativeIndex) => alternativeIndex === index
+                ? { ...alternative, ...patch }
+                : alternative),
         }));
     };
 
-    const uploadVariantImage = async (timeOfDay: CalendarTimeOfDay, file: File) => {
-        setIsUploadingVariants(current => ({ ...current, [timeOfDay]: true }));
+    const uploadVariantImage = async (index: number, file: File) => {
+        setIsUploadingVariants(current => ({ ...current, [index]: true }));
         try {
-            const imageUrl = await stageInstance.uploadFile(`map-${map.id}-${timeOfDay}.png`, file);
-            updateVariant('timeOfDayImageUrls', timeOfDay, imageUrl);
-            stageInstance.showPriorityMessage(`Map ${timeOfDay} image uploaded.`);
+            const imageUrl = await stageInstance.uploadFile(`map-${map.id}-alternative-${index}.png`, file);
+            updateAlternative(index, { imageUrl });
+            stageInstance.showPriorityMessage('Alternative map image uploaded.');
         } catch (error) {
-            console.error(`Failed to upload map ${timeOfDay} image:`, error);
-            stageInstance.showPriorityMessage(`Failed to upload map ${timeOfDay} image. Check console for details.`);
+            console.error('Failed to upload alternative map image:', error);
+            stageInstance.showPriorityMessage('Failed to upload alternative map image. Check console for details.');
         } finally {
-            setIsUploadingVariants(current => ({ ...current, [timeOfDay]: false }));
+            setIsUploadingVariants(current => ({ ...current, [index]: false }));
         }
     };
 
-    const generateVariantImage = async (timeOfDay: CalendarTimeOfDay) => {
-        if (!draft.imageUrl.trim() || isGeneratingVariants[timeOfDay]) {
+    const generateVariantImage = async (index: number) => {
+        if (!draft.imageUrl.trim() || isGeneratingVariants[index]) {
             if (!draft.imageUrl.trim()) {
-                stageInstance.showPriorityMessage('Add a base map image before generating a time-of-day variant.');
+                stageInstance.showPriorityMessage('Add a base map image before generating an alternative.');
             }
             return;
         }
 
-        setIsGeneratingVariants(current => ({ ...current, [timeOfDay]: true }));
+        setIsGeneratingVariants(current => ({ ...current, [index]: true }));
         try {
-            map.imageUrl = draft.imageUrl;
-            map.timeOfDayImagePrompts = { ...(draft.timeOfDayImagePrompts || {}) };
-            if (!map.timeOfDayImagePrompts[timeOfDay]?.trim()) {
-                const generatedPrompt = await generateMapTimeOfDayPrompt(map, timeOfDay, stageInstance);
-                if (!generatedPrompt) {
-                    throw new Error(`Failed to generate a map ${timeOfDay} prompt.`);
-                }
-                updateVariant('timeOfDayImagePrompts', timeOfDay, generatedPrompt);
-            }
-            const imageUrl = await generateMapImageForTimeOfDay(map, timeOfDay, stageInstance);
+            persistDraft(draftRef.current);
+            const alternative = map.alternativeImages[index];
+            const imageUrl = await generateMapAlternativeImage(map, alternative, stageInstance);
             if (!imageUrl) {
-                throw new Error(`Failed to generate map ${timeOfDay} image.`);
+                throw new Error('Failed to generate alternative map image.');
             }
-            updateVariant('timeOfDayImageUrls', timeOfDay, imageUrl);
-            stageInstance.showPriorityMessage(`Generated map ${timeOfDay} image.`);
+            setDraft(createMapDraft(map));
+            stageInstance.showPriorityMessage('Generated alternative map image.');
         } catch (error) {
-            console.error(`Failed to generate map ${timeOfDay} image:`, error);
-            stageInstance.showPriorityMessage(`Failed to generate map ${timeOfDay} image. Check console for details.`);
+            console.error('Failed to generate alternative map image:', error);
+            stageInstance.showPriorityMessage('Failed to generate alternative map image. Check console for details.');
         } finally {
-            setIsGeneratingVariants(current => ({ ...current, [timeOfDay]: false }));
+            setIsGeneratingVariants(current => ({ ...current, [index]: false }));
         }
     };
 
@@ -304,35 +296,42 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
             />
 
             <div>
-                <strong style={{ display: 'block', color: 'var(--agenda-text-primary)', marginBottom: 4 }}>Time of Day Variants</strong>
-                <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 12px' }}>Upload each variant directly or generate it from the base map image.</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <strong style={{ color: 'var(--agenda-text-primary)' }}>Alternative Images</strong>
+                    <Button variant="secondary" onClick={() => updateDraft('alternativeImages', [...draft.alternativeImages, createAlternativeImage()])} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add</Button>
+                </div>
+                <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 12px' }}>The first alternative whose conditions pass replaces the base map image.</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-                    {LOCATION_TIME_OF_DAY_ORDER.map(timeOfDay => {
-                        const isUploadingVariant = Boolean(isUploadingVariants[timeOfDay]);
-                        const isGeneratingVariant = Boolean(isGeneratingVariants[timeOfDay]);
+                    {draft.alternativeImages.map((alternative, index) => {
+                        const isUploadingVariant = Boolean(isUploadingVariants[index]);
+                        const isGeneratingVariant = Boolean(isGeneratingVariants[index]);
                         return (
-                            <div key={timeOfDay} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
-                                <strong style={{ color: 'var(--agenda-highlight)' }}>{LOCATION_TIME_OF_DAY_LABELS[timeOfDay]}</strong>
+                            <div key={index} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <TextInput fullWidth value={alternative.description} onChange={event => updateAlternative(index, { description: event.target.value })} placeholder="Description, e.g. Morning or Flooded" />
+                                    <Button variant="danger" onClick={() => updateDraft('alternativeImages', draft.alternativeImages.filter((_, alternativeIndex) => alternativeIndex !== index))} style={{ padding: 7 }} aria-label="Delete alternative"><Delete fontSize="small" /></Button>
+                                </div>
                                 <TextArea
                                     fullWidth
                                     rows={3}
-                                    value={draft.timeOfDayImagePrompts?.[timeOfDay] || ''}
-                                    onChange={event => updateVariant('timeOfDayImagePrompts', timeOfDay, event.target.value)}
-                                    placeholder={`Describe how the map should change for ${timeOfDay}.`}
+                                    value={alternative.imagePrompt}
+                                    onChange={event => updateAlternative(index, { imagePrompt: event.target.value })}
+                                    placeholder="Describe how the map image should change, or leave blank to generate from the description."
                                 />
                                 <ImageUrlUploadField
-                                    imageUrl={draft.timeOfDayImageUrls?.[timeOfDay] || ''}
-                                    onImageUrlChange={value => updateVariant('timeOfDayImageUrls', timeOfDay, value)}
-                                    onUploadFile={file => uploadVariantImage(timeOfDay, file)}
+                                    imageUrl={alternative.imageUrl}
+                                    onImageUrlChange={value => updateAlternative(index, { imageUrl: value })}
+                                    onUploadFile={file => uploadVariantImage(index, file)}
                                     isUploading={isUploadingVariant}
-                                    inputLabel={`${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} Image URL`}
+                                    inputLabel="Alternative Image URL"
                                     previewWidth="180px"
                                     previewHeight="101px"
                                     previewPlaceholder={<ImageIcon style={{ fontSize: 38, color: 'var(--agenda-text-muted)' }} />}
                                     previewUploadHint={isUploadingVariant ? 'Uploading...' : 'Click image to upload'}
                                     onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
                                 />
-                                <Button variant="secondary" onClick={() => generateVariantImage(timeOfDay)} disabled={isGeneratingVariant} style={{ justifySelf: 'end', display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <ConditionEditor conditions={alternative.conditions} playerStats={stageInstance.getConfiguration().playerStats || []} onChange={conditions => updateAlternative(index, { conditions })} />
+                                <Button variant="secondary" onClick={() => generateVariantImage(index)} disabled={isGeneratingVariant} style={{ justifySelf: 'end', display: 'flex', gap: 8, alignItems: 'center' }}>
                                     <AutoAwesome style={{ fontSize: 18 }} /> {isGeneratingVariant ? 'Generating...' : 'Generate'}
                                 </Button>
                             </div>
@@ -370,7 +369,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
 
             <div>
                 <strong style={{ display: 'block', color: 'var(--agenda-text-primary)', marginBottom: 8 }}>Preview</strong>
-                <div ref={previewRef} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: getMapImageUrl(draft as GameMap, save.currentTimeOfDay || 'morning') ? `url(${getMapImageUrl(draft as GameMap, save.currentTimeOfDay || 'morning')})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden', touchAction: 'none' }}>
+                <div ref={previewRef} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: getMapImageUrl({ ...map, ...draft } as GameMap, stageInstance) ? `url(${getMapImageUrl({ ...map, ...draft } as GameMap, stageInstance)})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden', touchAction: 'none' }}>
                     {map.links.map((link, index) => {
                         const locationImageUrl = activeLocations.find(location => location.id === link.childId)?.imageUrl;
                         return (

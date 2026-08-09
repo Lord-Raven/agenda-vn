@@ -2,26 +2,23 @@ import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import { Stage } from '../Stage';
-import { CalendarTimeOfDay } from '../content/CalendarEvent';
 import {
     distillLocation,
     generateBaseLocationImage,
-    generateLocationImageForTimeOfDay,
+    generateLocationAlternativeImage,
     getLocationDescription,
     getLocationImagePrompt,
-    getLocationTimeOfDayPrompt,
     getLinkedLocationLore,
     Location,
-    LOCATION_TIME_OF_DAY_LABELS,
-    LOCATION_TIME_OF_DAY_ORDER,
     updateLocationDescription,
     upsertLocationLoreEntry,
 } from '../content/Location';
-import { Image as ImageIcon, Place } from '@mui/icons-material';
+import { Add, Delete, Image as ImageIcon, Place } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
 import { Condition } from '../content/Condition';
 import { ConditionEditor } from './ConditionEditor';
+import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 
 interface LocationDetailPanelProps {
     location: Location;
@@ -40,8 +37,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         themeColor: string;
         imagePrompt: string;
         imageUrl: string;
-        timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>>;
-        timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>>;
+        alternativeImages: AlternativeImage[];
         conditions: Condition[];
         focalX: number;
         focalY: number;
@@ -52,8 +48,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         themeColor: location.themeColor,
         imagePrompt: getLocationImagePrompt(location),
         imageUrl: location.imageUrl,
-        timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
-        timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
+        alternativeImages: location.alternativeImages.map(createAlternativeImage),
         conditions: [...(location.conditions || [])],
         focalX: location.focalPoint?.x ?? 0.5,
         focalY: location.focalPoint?.y ?? 0.5,
@@ -92,20 +87,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     }, [location.id, stage]);
 
     const [isUploadingImage, setIsUploadingImage] = useState(false);
-    const [isUploadingTimeOfDayImages, setIsUploadingTimeOfDayImages] = useState<Record<CalendarTimeOfDay, boolean>>({
-        morning: false,
-        afternoon: false,
-        evening: false,
-        night: false,
-    });
+    const [isUploadingAlternativeImages, setIsUploadingAlternativeImages] = useState<Record<number, boolean>>({});
     const [isGeneratingLocationDetails, setIsGeneratingLocationDetails] = useState(false);
     const [isGeneratingBaseImage, setIsGeneratingBaseImage] = useState(false);
-    const [isGeneratingTimeOfDayImages, setIsGeneratingTimeOfDayImages] = useState<Record<CalendarTimeOfDay, boolean>>({
-        morning: false,
-        afternoon: false,
-        evening: false,
-        night: false,
-    });
+    const [isGeneratingAlternativeImages, setIsGeneratingAlternativeImages] = useState<Record<number, boolean>>({});
     const [confirmDialog, setConfirmDialog] = useState<{
         open: boolean;
         title: string;
@@ -136,8 +121,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.themeColor = nextLocation.themeColor;
         location.imagePrompt = nextLocation.imagePrompt;
         location.imageUrl = nextLocation.imageUrl;
-        location.timeOfDayImagePrompts = { ...(nextLocation.timeOfDayImagePrompts || {}) };
-        location.timeOfDayImageUrls = { ...(nextLocation.timeOfDayImageUrls || {}) };
+        location.alternativeImages = nextLocation.alternativeImages.map(createAlternativeImage);
         location.conditions = [...nextLocation.conditions];
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
     };
@@ -150,8 +134,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             themeColor: location.themeColor,
             imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,
-            timeOfDayImagePrompts: { ...(location.timeOfDayImagePrompts || {}) },
-            timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
+            alternativeImages: location.alternativeImages.map(createAlternativeImage),
             conditions: [...(location.conditions || [])],
             focalX: location.focalPoint?.x ?? 0.5,
             focalY: location.focalPoint?.y ?? 0.5,
@@ -191,7 +174,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         };
     }, []);
 
-    const handleInputChange = (field: string, value: string | number | boolean) => {
+    const handleInputChange = <K extends keyof typeof editedLocation,>(field: K, value: (typeof editedLocation)[K]) => {
         setEditedLocation(prev => ({ ...prev, [field]: value }));
     };
 
@@ -238,55 +221,53 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         }
     };
 
-    const handleTimeOfDayPromptChange = (timeOfDay: CalendarTimeOfDay, value: string) => {
-        setEditedLocation((current) => {
-            const nextTimeOfDayImagePrompts = { ...(current.timeOfDayImagePrompts || {}), [timeOfDay]: value };
-            location.timeOfDayImagePrompts = nextTimeOfDayImagePrompts;
-            return { ...current, timeOfDayImagePrompts: nextTimeOfDayImagePrompts };
-        });
+    const updateAlternative = (index: number, patch: Partial<AlternativeImage>) => {
+        setEditedLocation((current) => ({
+            ...current,
+            alternativeImages: current.alternativeImages.map((alternative, alternativeIndex) => alternativeIndex === index
+                ? { ...alternative, ...patch }
+                : alternative),
+        }));
     };
 
-    const handleTimeOfDayImageUpload = async (timeOfDay: CalendarTimeOfDay, file: File) => {
-        setIsUploadingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: true }));
+    const handleAlternativeImageUpload = async (index: number, file: File) => {
+        setIsUploadingAlternativeImages((current) => ({ ...current, [index]: true }));
         try {
-            const uploadedUrl = await stage().uploadFile(`location-${location.id}-${timeOfDay}.png`, file);
-            setEditedLocation((current) => {
-                const nextTimeOfDayImageUrls = { ...(current.timeOfDayImageUrls || {}), [timeOfDay]: uploadedUrl };
-                location.timeOfDayImageUrls = nextTimeOfDayImageUrls;
-                return { ...current, timeOfDayImageUrls: nextTimeOfDayImageUrls };
-            });
+            const uploadedUrl = await stage().uploadFile(`location-${location.id}-alternative-${index}.png`, file);
+            updateAlternative(index, { imageUrl: uploadedUrl });
         } catch (error) {
-            console.error(`Failed to upload ${timeOfDay} location image:`, error);
-            stage().showPriorityMessage(`Failed to upload ${timeOfDay} location image. Check console for details.`);
+            console.error('Failed to upload alternative location image:', error);
+            stage().showPriorityMessage('Failed to upload alternative location image. Check console for details.');
         } finally {
-            setIsUploadingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: false }));
+            setIsUploadingAlternativeImages((current) => ({ ...current, [index]: false }));
         }
     };
 
-    const handleGenerateTimeOfDayImage = async (timeOfDay: CalendarTimeOfDay) => {
-        if (isGeneratingTimeOfDayImages[timeOfDay]) {
+    const handleGenerateAlternativeImage = async (index: number) => {
+        if (isGeneratingAlternativeImages[index]) {
             return;
         }
 
-        setIsGeneratingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: true }));
+        setIsGeneratingAlternativeImages((current) => ({ ...current, [index]: true }));
         try {
+            persistLocation(editedLocationRef.current);
             if (!location.imageUrl) {
                 await generateBaseLocationImage(location, stage());
-                syncEditedLocationFromSource();
             }
 
-            const generatedImageUrl = await generateLocationImageForTimeOfDay(location, timeOfDay, stage(), true);
+            const alternative = location.alternativeImages[index];
+            const generatedImageUrl = await generateLocationAlternativeImage(location, alternative, stage(), true);
             if (!generatedImageUrl) {
-                throw new Error(`Failed to generate ${timeOfDay} location image.`);
+                throw new Error('Failed to generate alternative location image.');
             }
 
             syncEditedLocationFromSource();
-            stage().showPriorityMessage(`Generated ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay].toLowerCase()} image for ${location.name || 'location'}.`);
+            stage().showPriorityMessage(`Generated alternative image for ${location.name || 'location'}.`);
         } catch (error) {
-            console.error(`Failed to generate ${timeOfDay} location image:`, error);
-            stage().showPriorityMessage(`Failed to generate ${timeOfDay} location image. Check console for details.`);
+            console.error('Failed to generate alternative location image:', error);
+            stage().showPriorityMessage('Failed to generate alternative location image. Check console for details.');
         } finally {
-            setIsGeneratingTimeOfDayImages((current) => ({ ...current, [timeOfDay]: false }));
+            setIsGeneratingAlternativeImages((current) => ({ ...current, [index]: false }));
         }
     };
 
@@ -306,7 +287,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             themeColor: location.themeColor,
             imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,
-            timeOfDayImageUrls: { ...(location.timeOfDayImageUrls || {}) },
+            alternativeImages: location.alternativeImages.map(createAlternativeImage),
             focalPoint: location.focalPoint ? { ...location.focalPoint } : { x: 0.5, y: 0.5 },
             linkedLore: linkedLore
                 ? {
@@ -339,7 +320,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             location.themeColor = previousState.themeColor;
             location.imagePrompt = previousState.imagePrompt;
             location.imageUrl = previousState.imageUrl;
-            location.timeOfDayImageUrls = { ...(previousState.timeOfDayImageUrls || {}) };
+            location.alternativeImages = previousState.alternativeImages.map(createAlternativeImage);
             location.focalPoint = previousState.focalPoint;
 
             const restoredLore = getLinkedLocationLore(location, stage());
@@ -628,7 +609,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                     Base Location Image
                                 </h2>
                                 <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
-                                    This is the fallback image used when no time-of-day variant is available.
+                                    This is the fallback image used when no alternative image conditions match.
                                 </p>
                                 <ImageUrlUploadField
                                     imageUrl={editedLocation.imageUrl}
@@ -663,21 +644,26 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             <section>
                                 <h2 style={{ ...sectionHeadingStyle, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <ImageIcon />
-                                    Time of Day Variants
+                                    Alternative Images
                                 </h2>
                                 <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
-                                    Each variant can be uploaded directly or generated from the base location image.
+                                    The first alternative whose conditions pass replaces the base location image.
                                 </p>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => handleInputChange('alternativeImages', [...editedLocation.alternativeImages, createAlternativeImage()])}
+                                    style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '12px' }}
+                                >
+                                    <Add fontSize="small" /> Add Alternative
+                                </Button>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-                                    {LOCATION_TIME_OF_DAY_ORDER.map((timeOfDay) => {
-                                        const variantImageUrl = editedLocation.timeOfDayImageUrls?.[timeOfDay] || '';
-                                        const variantPromptValue = editedLocation.timeOfDayImagePrompts?.[timeOfDay] ?? getLocationTimeOfDayPrompt(location, timeOfDay);
-                                        const isUploadingVariant = isUploadingTimeOfDayImages[timeOfDay];
-                                        const isGeneratingVariant = isGeneratingTimeOfDayImages[timeOfDay];
+                                    {editedLocation.alternativeImages.map((alternative, index) => {
+                                        const isUploadingVariant = isUploadingAlternativeImages[index];
+                                        const isGeneratingVariant = isGeneratingAlternativeImages[index];
 
                                         return (
                                             <div
-                                                key={timeOfDay}
+                                                key={index}
                                                 style={{
                                                     padding: '14px',
                                                     borderRadius: '10px',
@@ -685,14 +671,20 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                     background: 'color-mix(in srgb, var(--agenda-surface-base) 86%, transparent)',
                                                 }}
                                             >
-                                                <div style={{ marginBottom: '10px', color: 'var(--agenda-highlight)', fontWeight: 700, letterSpacing: '0.04em' }}>
-                                                    {LOCATION_TIME_OF_DAY_LABELS[timeOfDay]}
+                                                <div style={{ marginBottom: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <TextInput
+                                                        fullWidth
+                                                        value={alternative.description}
+                                                        onChange={(event) => updateAlternative(index, { description: event.target.value })}
+                                                        placeholder="Description, e.g. Morning or Flooded"
+                                                    />
+                                                    <Button variant="danger" onClick={() => handleInputChange('alternativeImages', editedLocation.alternativeImages.filter((_, alternativeIndex) => alternativeIndex !== index))} style={{ padding: 7 }} aria-label="Delete alternative"><Delete fontSize="small" /></Button>
                                                 </div>
                                                 <div style={{ marginBottom: '12px' }}>
                                                     <TextArea
-                                                        value={variantPromptValue || ''}
-                                                        onChange={(e) => handleTimeOfDayPromptChange(timeOfDay, e.target.value)}
-                                                        placeholder={`Describe how the scene should change for ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay].toLowerCase()}`}
+                                                        value={alternative.imagePrompt}
+                                                        onChange={(e) => updateAlternative(index, { imagePrompt: e.target.value })}
+                                                        placeholder="Describe how the scene should change, or leave blank to generate from the description."
                                                         style={{
                                                             ...textareaStyle,
                                                             minHeight: '88px',
@@ -700,17 +692,11 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                     />
                                                 </div>
                                                 <ImageUrlUploadField
-                                                    imageUrl={variantImageUrl}
-                                                    onImageUrlChange={(value) => {
-                                                        setEditedLocation((current) => {
-                                                            const nextTimeOfDayImageUrls = { ...(current.timeOfDayImageUrls || {}), [timeOfDay]: value };
-                                                            location.timeOfDayImageUrls = nextTimeOfDayImageUrls;
-                                                            return { ...current, timeOfDayImageUrls: nextTimeOfDayImageUrls };
-                                                        });
-                                                    }}
-                                                    onUploadFile={(file) => handleTimeOfDayImageUpload(timeOfDay, file)}
+                                                    imageUrl={alternative.imageUrl}
+                                                    onImageUrlChange={(value) => updateAlternative(index, { imageUrl: value })}
+                                                    onUploadFile={(file) => handleAlternativeImageUpload(index, file)}
                                                     isUploading={isUploadingVariant}
-                                                    inputLabel={`${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} Image URL`}
+                                                    inputLabel="Alternative Image URL"
                                                     previewWidth="140px"
                                                     previewHeight="105px"
                                                     previewBorder={`2px solid ${editedLocation.themeColor || 'var(--agenda-line-strong)'}`}
@@ -719,9 +705,16 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                     previewUploadHint={isUploadingVariant ? 'Uploading...' : 'Click image to upload'}
                                                     onInvalidFile={() => stage().showPriorityMessage('Please select a valid image file.')}
                                                 />
+                                                <div style={{ marginTop: '12px' }}>
+                                                    <ConditionEditor
+                                                        conditions={alternative.conditions}
+                                                        playerStats={stage().getConfiguration().playerStats || []}
+                                                        onChange={(conditions) => updateAlternative(index, { conditions })}
+                                                    />
+                                                </div>
                                                 <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
                                                     <Button
-                                                        onClick={() => handleGenerateTimeOfDayImage(timeOfDay)}
+                                                        onClick={() => handleGenerateAlternativeImage(index)}
                                                         disabled={isGeneratingVariant}
                                                     >
                                                         {isGeneratingVariant ? 'Generating...' : `Generate`}

@@ -1,7 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Condition } from './Condition';
-import { CalendarTimeOfDay } from './CalendarEvent';
 import type { Stage } from '../Stage';
+import { AlternativeImage, createAlternativeImage, getMatchingAlternativeImage } from './AlternativeImage';
 import { buildPrompt } from '../utils/PromptBuilder.js';
 import {
     buildStructuredExampleResponse,
@@ -10,19 +10,15 @@ import {
     StructuredFieldDefinition,
 } from '../utils/StructuredResponse.js';
 
-const MAP_TIME_OF_DAY_PROMPT_FIELDS: StructuredFieldDefinition[] = [
-    { key: 'artPrompt', label: 'ARTPROMPT', description: 'A concise image-edit prompt describing how the map art should be updated for the selected time of day.' },
+const MAP_ALTERNATIVE_IMAGE_PROMPT_FIELDS: StructuredFieldDefinition[] = [
+    { key: 'artPrompt', label: 'ARTPROMPT', description: 'A concise image-edit prompt describing how the map art should be updated for the alternative description.' },
 ];
 
-const MAP_TIME_OF_DAY_DESCRIPTIONS: Record<CalendarTimeOfDay, string> = {
-    morning: 'soft early light, cooler shadows, and a sense of the day beginning',
-    afternoon: 'bright neutral daylight, crisp visibility, and clear landmark details',
-    evening: 'warm sunset tones, longer shadows, and lights beginning to glow',
-    night: 'deep darkness, moonlight, artificial lights, and strong illuminated landmarks',
-};
-
-export function getMapImageUrl(map: Map | undefined, timeOfDay: CalendarTimeOfDay = 'morning'): string {
-    return map?.timeOfDayImageUrls?.[timeOfDay] || map?.imageUrl || '';
+export function getMapImageUrl(map: Map | undefined, stage?: Stage): string {
+    if (!map) {
+        return '';
+    }
+    return getMatchingAlternativeImage(map.alternativeImages, stage?.getSave())?.imageUrl || map.imageUrl || '';
 }
 
 async function getDataUrl(imageUrl: string): Promise<string> {
@@ -38,13 +34,14 @@ async function getDataUrl(imageUrl: string): Promise<string> {
     return imageUrl;
 }
 
-export async function generateMapTimeOfDayPrompt(map: Map, timeOfDay: CalendarTimeOfDay, stage: Stage): Promise<string> {
-    const existingPrompt = map.timeOfDayImagePrompts?.[timeOfDay]?.trim();
+export async function generateMapAlternativeImagePrompt(map: Map, alternative: AlternativeImage, stage: Stage): Promise<string> {
+    const existingPrompt = alternative.imagePrompt.trim();
     if (existingPrompt) {
         return existingPrompt;
     }
 
-    const generationKey = `map-prompt/${map.id}/${timeOfDay}`;
+    const alternativeIndex = map.alternativeImages.indexOf(alternative);
+    const generationKey = `map-alternative-prompt/${map.id}/${alternativeIndex}`;
     const existingGeneration = stage.generationPromises[generationKey];
     if (existingGeneration) {
         return existingGeneration as Promise<string>;
@@ -53,7 +50,7 @@ export async function generateMapTimeOfDayPrompt(map: Map, timeOfDay: CalendarTi
     const promptRequest = stage.generateText(buildPrompt()
         .addBlock('Instructions',
             `This is a preparatory request for a single image-edit instruction for map art generation. ` +
-            `Write exactly one concise prompt for an image editing model to revise a base map image for the selected time of day. ` +
+            `Write exactly one concise prompt for an image editing model to revise a base map image according to the alternative description. ` +
             `Preserve the map's layout, labels, landmarks, paths, and composition. ` +
             `Focus on lighting, color temperature, shadows, atmosphere, and illuminated details. ` +
             `Return the result using the Response Format tags.`)
@@ -61,28 +58,25 @@ export async function generateMapTimeOfDayPrompt(map: Map, timeOfDay: CalendarTi
             `Name: ${map.name || 'Unnamed map'}\n` +
             `Category: ${map.category || 'Uncategorized'}\n` +
             `Description: ${map.description || 'No description provided.'}`)
-        .addBlock('Target Time of Day', `${timeOfDay} (${MAP_TIME_OF_DAY_DESCRIPTIONS[timeOfDay]})`)
-        .addBlock('Response Format', buildStructuredResponseFormat(MAP_TIME_OF_DAY_PROMPT_FIELDS, { includeEndTag: true }))
+        .addBlock('Alternative Description', alternative.description || 'No description provided.')
+        .addBlock('Response Format', buildStructuredResponseFormat(MAP_ALTERNATIVE_IMAGE_PROMPT_FIELDS, { includeEndTag: true }))
         .addBlock('Example Response', buildStructuredExampleResponse(
-            MAP_TIME_OF_DAY_PROMPT_FIELDS,
+            MAP_ALTERNATIVE_IMAGE_PROMPT_FIELDS,
             {
-                artPrompt: 'Shift the map into evening with warm low-angle light, long landmark shadows, and softly glowing windows while preserving every path, label, and structure.',
+                artPrompt: 'Cover the map in fresh snow with pale winter light and partially frozen waterways while preserving every path, label, and structure.',
             },
             { includeEndTag: true },
         ))
         .format(),
         10,
         100,
-        MAP_TIME_OF_DAY_PROMPT_FIELDS,
+        MAP_ALTERNATIVE_IMAGE_PROMPT_FIELDS,
     )
         .then((response: any) => {
-            const parsedPrompt = parseStructuredResponse(`${response || ''}`, MAP_TIME_OF_DAY_PROMPT_FIELDS);
+            const parsedPrompt = parseStructuredResponse(`${response || ''}`, MAP_ALTERNATIVE_IMAGE_PROMPT_FIELDS);
             const prompt = (parsedPrompt.artPrompt || '').trim();
             if (prompt) {
-                map.timeOfDayImagePrompts = {
-                    ...(map.timeOfDayImagePrompts || {}),
-                    [timeOfDay]: prompt,
-                };
+                alternative.imagePrompt = prompt;
             }
             return prompt;
         })
@@ -94,42 +88,37 @@ export async function generateMapTimeOfDayPrompt(map: Map, timeOfDay: CalendarTi
     return promptRequest;
 }
 
-export async function generateMapImageForTimeOfDay(map: Map, timeOfDay: CalendarTimeOfDay, stage: Stage): Promise<string> {
+export async function generateMapAlternativeImage(map: Map, alternative: AlternativeImage, stage: Stage): Promise<string> {
     const baseImageUrl = map.imageUrl?.trim();
     if (!baseImageUrl) {
         return '';
     }
 
-    const generationKey = `map-image/${map.id}/${timeOfDay}`;
+    const alternativeIndex = map.alternativeImages.indexOf(alternative);
+    const generationKey = `map-alternative-image/${map.id}/${alternativeIndex}`;
     const existingGeneration = stage.generationPromises[generationKey];
     if (existingGeneration) {
         return existingGeneration as Promise<string>;
     }
 
     const request = (async () => {
-        const prompt = await generateMapTimeOfDayPrompt(map, timeOfDay, stage);
+        const prompt = await generateMapAlternativeImagePrompt(map, alternative, stage);
         if (!prompt) {
             return '';
         }
 
         const imageUrl = await stage.makeImageFromImage({
             image: await getDataUrl(baseImageUrl),
-            prompt: `Using the provided base image for ${map.name || 'this map'}, adapt it for ${timeOfDay}: ${prompt}`,
+            prompt: `Using the provided base image for ${map.name || 'this map'}, adapt it for ${alternative.description || 'the requested alternative'}: ${prompt}`,
             remove_background: false,
             transfer_type: 'edit',
         }, '');
 
-        map.timeOfDayImageUrls = {
-            ...(map.timeOfDayImageUrls || {}),
-            [timeOfDay]: imageUrl || '',
-        };
+        alternative.imageUrl = imageUrl || '';
         return imageUrl || '';
     })()
         .then((imageUrl) => {
-            map.timeOfDayImageUrls = {
-                ...(map.timeOfDayImageUrls || {}),
-                [timeOfDay]: imageUrl || '',
-            };
+            alternative.imageUrl = imageUrl || '';
             return imageUrl || '';
         })
         .finally(() => {
@@ -150,14 +139,12 @@ export class Map {
     category: string = ''; // A category for filtering or organization in the UI. Could be a region, perhaps ("northlands", "ocean"); it is for organizational and not gameplay purposes.
     imagePrompt: string = ''; // A prompt for generating a map image 
     imageUrl: string = ''; // URL for the map image
-    timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>> = {};
-    timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>> = {};
+    alternativeImages: AlternativeImage[] = [];
     links: MapLink[] = []; // Links to other maps or locations
 
     constructor(data?: Partial<Map>) {
         Object.assign(this, data || {});
-        this.timeOfDayImagePrompts = { ...(data?.timeOfDayImagePrompts || {}) };
-        this.timeOfDayImageUrls = { ...(data?.timeOfDayImageUrls || {}) };
+        this.alternativeImages = (data?.alternativeImages || []).map(createAlternativeImage);
         this.links = (data?.links || []).map((link) => ({
             ...link,
             parentId: data?.id || this.id,

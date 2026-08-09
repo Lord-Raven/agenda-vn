@@ -271,7 +271,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                         )}
 
                         {visibleLocations.map((location, index) => {
-                            const imageUrl = getLocationImageUrl(location, stageInstance, currentTimeOfDay);
+                            const imageUrl = getLocationImageUrl(location, stageInstance);
                             const focalPoint = location.focalPoint || { x: 0.5, y: 0.5 };
                             const borderColor = location.themeColor || "var(--agenda-accent-primary)";
                             const currentEvent = stageInstance.getCurrentLocationEvent(location.id);

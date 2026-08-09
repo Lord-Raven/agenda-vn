@@ -12,6 +12,7 @@ import {
 } from '../utils/StructuredResponse.js';
 import { CalendarTimeOfDay } from './CalendarEvent';
 import { Condition, ConditionContext, evaluateConditions } from './Condition';
+import { AlternativeImage, createAlternativeImage, getMatchingAlternativeImage } from './AlternativeImage';
 
 export type CalendarDayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
@@ -153,20 +154,13 @@ export const LOCATION_TIME_OF_DAY_LABELS: Record<CalendarTimeOfDay, string> = {
 	night: 'Night',
 };
 
-const LOCATION_TIME_OF_DAY_PROMPT_FIELDS: StructuredFieldDefinition[] = [
-	{ key: 'artPrompt', label: 'ARTPROMPT', description: 'A concise image-edit prompt describing how the location image should be updated for the selected time of day.' },
+const LOCATION_ALTERNATIVE_IMAGE_PROMPT_FIELDS: StructuredFieldDefinition[] = [
+	{ key: 'artPrompt', label: 'ARTPROMPT', description: 'A concise image-edit prompt describing how the location image should be updated for the alternative description.' },
 ];
 
 const LOCATION_BASE_IMAGE_PROMPT_FIELDS: StructuredFieldDefinition[] = [
 	{ key: 'artPrompt', label: 'ARTPROMPT', description: 'A concise image-generation prompt describing the base visual composition for this location.' },
 ];
-
-const LOCATION_TIME_OF_DAY_DESCRIPTIONS: Record<CalendarTimeOfDay, string> = {
-	morning: 'soft early light, cooler shadows, dew, first activity, and a sense of the day just beginning',
-	afternoon: 'brighter neutral daylight, crisp visibility, busier activity, and a clear view of the location',
-	evening: 'warm sunset tones, longer shadows, glowing windows and lamps, and a gentle winding-down atmosphere',
-	night: 'deep darkness, artificial light sources, reflections, moonlight, and a quieter after-hours mood',
-};
 
 async function getDataUrl(baseImageUrl: string): Promise<string> {
 	if (baseImageUrl && baseImageUrl.startsWith('/assets/')) {
@@ -181,17 +175,12 @@ async function getDataUrl(baseImageUrl: string): Promise<string> {
 	return baseImageUrl;
 }
 
-export function getLocationImageUrl(location: Location | undefined, stage?: Stage, timeOfDay?: CalendarTimeOfDay): string {
+export function getLocationImageUrl(location: Location | undefined, stage?: Stage): string {
 	if (!location) {
 		return '';
 	}
 
-	const resolvedTimeOfDay = timeOfDay || stage?.getSave().currentTimeOfDay || 'morning';
-	return location.timeOfDayImageUrls?.[resolvedTimeOfDay] || location.imageUrl || '';
-}
-
-export function getLocationTimeOfDayPrompt(location: Location | undefined, timeOfDay: CalendarTimeOfDay): string {
-	return location?.timeOfDayImagePrompts?.[timeOfDay] || '';
+	return getMatchingAlternativeImage(location.alternativeImages, stage?.getSave())?.imageUrl || location.imageUrl || '';
 }
 
 export function getLocationImagePrompt(location: Location | undefined): string {
@@ -225,7 +214,7 @@ export async function generateLocationImagePrompt(location: Location, stage: Sta
 		.addBlock('Example Response', buildStructuredExampleResponse(
 			LOCATION_BASE_IMAGE_PROMPT_FIELDS,
 			{
-				prompt: 'A moody vertical illustration of a narrow late-night cafe with amber pendant lights, scratched brass trim, and rain-streaked front windows, framed as a welcoming backdrop for story scenes.',
+					artPrompt: 'A moody vertical illustration of a narrow late-night cafe with amber pendant lights, scratched brass trim, and rain-streaked front windows, framed as a welcoming backdrop for story scenes.',
 			},
 			{ includeEndTag: true },
 		))
@@ -236,7 +225,7 @@ export async function generateLocationImagePrompt(location: Location, stage: Sta
 	)
 		.then((response: any) => {
 			const parsedPrompt = parseStructuredResponse(`${response || ''}`, LOCATION_BASE_IMAGE_PROMPT_FIELDS);
-			const prompt = (parsedPrompt.prompt || '').trim();
+			const prompt = (parsedPrompt.artPrompt || '').trim();
 			if (prompt) {
 				location.imagePrompt = prompt;
 			}
@@ -283,13 +272,14 @@ export async function generateBaseLocationImage(location: Location, stage: Stage
 	return request;
 }
 
-export async function generateLocationTimeOfDayPrompt(location: Location, timeOfDay: CalendarTimeOfDay, stage: Stage, force: boolean = false): Promise<string> {
-	const existingPrompt = getLocationTimeOfDayPrompt(location, timeOfDay).trim();
+export async function generateLocationAlternativeImagePrompt(location: Location, alternative: AlternativeImage, stage: Stage, force: boolean = false): Promise<string> {
+	const existingPrompt = alternative.imagePrompt.trim();
 	if (existingPrompt && !force) {
 		return existingPrompt;
 	}
 
-	const generationKey = `location-prompt/${location.id}/${timeOfDay}`;
+	const alternativeIndex = location.alternativeImages.indexOf(alternative);
+	const generationKey = `location-alternative-prompt/${location.id}/${alternativeIndex}`;
 	const existingGeneration = stage.generationPromises[generationKey];
 	if (existingGeneration) {
 		return existingGeneration as Promise<string>;
@@ -298,37 +288,34 @@ export async function generateLocationTimeOfDayPrompt(location: Location, timeOf
 	const promptRequest = stage.generateText(buildPrompt()
 		.addBlock('Instructions',
 			`This is a preparatory request for a single image-edit instruction for location art generation. ` +
-			`Write exactly one concise prompt for an image editing model to revise a base image of this location for the selected time of day. ` +
+			`Write exactly one concise prompt for an image editing model to revise a base image of this location according to the alternative description. ` +
 			`The prompt should describe how the environment changes while preserving the same location, composition, and major structures. ` +
-			`Focus on lighting, atmosphere, color temperature, weather, reflections, shadows, and any practical details that distinguish this time of day. ` +
+			`Focus on the visual changes implied by the description, including lighting, atmosphere, weather, objects, or other practical details. ` +
 			`Return the result using the Response Format tags.`)
 		.addBlock('Location Details',
 			`Name: ${location.name || 'Unnamed location'}\n` +
 			`Category: ${location.category || 'Uncategorized'}\n` +
 			`Description: ${location.description || 'No description provided.'}\n` +
 			`Theme Color: ${location.themeColor || '#8ab0cc'}`)
-		.addBlock('Target Time of Day', `${LOCATION_TIME_OF_DAY_LABELS[timeOfDay]} (${LOCATION_TIME_OF_DAY_DESCRIPTIONS[timeOfDay]})`)
-		.addBlock('Response Format', buildStructuredResponseFormat(LOCATION_TIME_OF_DAY_PROMPT_FIELDS, { includeEndTag: true }))
+		.addBlock('Alternative Description', alternative.description || 'No description provided.')
+		.addBlock('Response Format', buildStructuredResponseFormat(LOCATION_ALTERNATIVE_IMAGE_PROMPT_FIELDS, { includeEndTag: true }))
 		.addBlock('Example Response', buildStructuredExampleResponse(
-			LOCATION_TIME_OF_DAY_PROMPT_FIELDS,
+			LOCATION_ALTERNATIVE_IMAGE_PROMPT_FIELDS,
 			{
-				prompt: 'Shift the scene into evening by warming the light, lengthening the shadows, and turning on windows and lamps while preserving the same building layout.',
+				artPrompt: 'Cover the scene in fresh snow with pale winter light and frosted windows while preserving the same building layout.',
 			},
 			{ includeEndTag: true },
 		))
 		.format(),
 		10,
 		100,
-		LOCATION_TIME_OF_DAY_PROMPT_FIELDS,
+		LOCATION_ALTERNATIVE_IMAGE_PROMPT_FIELDS,
 	)
 		.then((response: any) => {
-			const parsedPrompt = parseStructuredResponse(`${response || ''}`, LOCATION_TIME_OF_DAY_PROMPT_FIELDS);
-			const prompt = (parsedPrompt.prompt || '').trim();
+			const parsedPrompt = parseStructuredResponse(`${response || ''}`, LOCATION_ALTERNATIVE_IMAGE_PROMPT_FIELDS);
+			const prompt = (parsedPrompt.artPrompt || '').trim();
 			if (prompt) {
-				location.timeOfDayImagePrompts = {
-					...(location.timeOfDayImagePrompts || {}),
-					[timeOfDay]: prompt,
-				};
+				alternative.imagePrompt = prompt;
 			}
 			return prompt;
 		})
@@ -340,22 +327,22 @@ export async function generateLocationTimeOfDayPrompt(location: Location, timeOf
 	return promptRequest;
 }
 
-export async function generateLocationImageForTimeOfDay(
+export async function generateLocationAlternativeImage(
 	location: Location,
-	timeOfDay: CalendarTimeOfDay,
+	alternative: AlternativeImage,
 	stage: Stage,
 	force: boolean = false,
 ): Promise<string> {
-	const generationKey = `location-image/${location.id}/${timeOfDay}`;
+	const alternativeIndex = location.alternativeImages.indexOf(alternative);
+	const generationKey = `location-alternative-image/${location.id}/${alternativeIndex}`;
 	const existingGeneration = stage.generationPromises[generationKey];
 	if (existingGeneration) {
 		return existingGeneration as Promise<string>;
 	}
 
 	if (!force) {
-		const existingTimeOfDayImage = location.timeOfDayImageUrls?.[timeOfDay] || '';
-		if (existingTimeOfDayImage) {
-			return existingTimeOfDayImage;
+		if (alternative.imageUrl) {
+			return alternative.imageUrl;
 		}
 	}
 
@@ -365,22 +352,19 @@ export async function generateLocationImageForTimeOfDay(
 			return '';
 		}
 
-		const prompt = await generateLocationTimeOfDayPrompt(location, timeOfDay, stage);
+		const prompt = await generateLocationAlternativeImagePrompt(location, alternative, stage);
 		if (!prompt) {
 			return '';
 		}
 
 		const imageUrl = await stage.makeImageFromImage({
 			image: await getDataUrl(baseImageUrl),
-			prompt: `Using the provided base image for ${location.name || 'this location'}, adapt the scene for ${LOCATION_TIME_OF_DAY_LABELS[timeOfDay].toLowerCase()}: ${prompt}`,
+			prompt: `Using the provided base image for ${location.name || 'this location'}, adapt the scene for ${alternative.description || 'the requested alternative'}: ${prompt}`,
 			remove_background: false,
 			transfer_type: 'edit',
 		}, '');
 
-		location.timeOfDayImageUrls = {
-			...(location.timeOfDayImageUrls || {}),
-			[timeOfDay]: imageUrl || '',
-		};
+		alternative.imageUrl = imageUrl || '';
 
 		return imageUrl || '';
 	})().finally(() => {
@@ -486,8 +470,7 @@ export class Location {
 	category: string = ''; // A category for filtering or organization in the UI. Could be a region ("house", "city") or could be a type of location ("dungeons", "shops"); it is for organizational and not gameplay purposes.
     imagePrompt: string = ''; // A prompt for generating a base image representing this location, used as a fallback background in skits or location displays.
 	imageUrl: string = ''; // URL for a base image representing this location, used as a fallback background in skits or location displays.
-	timeOfDayImagePrompts: Partial<Record<CalendarTimeOfDay, string>> = {}; // Optional mapping of time-of-day to image-edit prompts for this location. Keys are "morning", "afternoon", "evening", "night".
-	timeOfDayImageUrls: Partial<Record<CalendarTimeOfDay, string>> = {}; // Optional mapping of time-of-day to image URLs for this location. Keys are "morning", "afternoon", "evening", "night".
+	alternativeImages: AlternativeImage[] = [];
     focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
     themeColor: string = ''; // A color associated with this location, used for UI theming.
 	conditions: Condition[] = []; // All conditions must pass for this location to be available.
@@ -499,12 +482,7 @@ export class Location {
             this.id = generateUuid();
         }
 		this.active = this.active !== false;
-		this.timeOfDayImagePrompts = this.timeOfDayImagePrompts && typeof this.timeOfDayImagePrompts === 'object'
-			? { ...(this.timeOfDayImagePrompts as Partial<Record<CalendarTimeOfDay, string>>) }
-			: {};
-		this.timeOfDayImageUrls = this.timeOfDayImageUrls && typeof this.timeOfDayImageUrls === 'object'
-			? { ...(this.timeOfDayImageUrls as Partial<Record<CalendarTimeOfDay, string>>) }
-			: {};
+		this.alternativeImages = Array.isArray(this.alternativeImages) ? this.alternativeImages.map(createAlternativeImage) : [];
 		this.conditions = Array.isArray(this.conditions) ? [...this.conditions] : [];
         if (!this.themeColor) {
             // Pick from the core game theme palette in index.scss.

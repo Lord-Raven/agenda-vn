@@ -57,14 +57,13 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
     }, [displayedMapId, preferredMap, sortedMaps]);
 
     const displayedMap = sortedMaps.find(map => map.id === displayedMapId) || preferredMap;
-    const currentTimeOfDay = save.currentTimeOfDay || 'morning';
     const configuredBackgroundImageUrl = stage().getConfiguration().backgroundImageUrl?.trim() || DEFAULT_BACKGROUND_IMAGE_URL;
 
     if (!displayedMap) {
         return null;
     }
 
-    const displayedMapImageUrl = getMapImageUrl(displayedMap, currentTimeOfDay);
+    const displayedMapImageUrl = getMapImageUrl(displayedMap, stage());
 
     return (
         <>
@@ -115,8 +114,8 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     }
                                     const markerKey = `${link.childId}-${index}`;
                                     const isHovered = hoveredLink === markerKey;
-                                    const locationImageUrl = getLocationImageUrl(linkedLocation, stage(), currentTimeOfDay);
-                                    const linkedMapImageUrl = getMapImageUrl(linkedMap, currentTimeOfDay);
+                                    const locationImageUrl = getLocationImageUrl(linkedLocation, stage());
+                                    const linkedMapImageUrl = getMapImageUrl(linkedMap, stage());
                                     const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
                                     const markerName = currentEvent?.name || linkedLocation?.name || linkedMap?.name || 'Unnamed';
