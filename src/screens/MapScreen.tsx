@@ -141,7 +141,6 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                 style={{ alignSelf: "flex-start", padding: "8px 14px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                             >
                                 <EventAvailable fontSize="small" />
-                                Calendar
                             </Button>
                             <Typography
                                 sx={{

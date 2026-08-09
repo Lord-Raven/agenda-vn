@@ -24,6 +24,35 @@ const getDayDifference = (startDate: string, endDate: string): number => {
     return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
 };
 
+const formatCurrentDate = (currentDate?: string, currentTimeOfDay?: string): string => {
+    const date = currentDate ? new Date(`${currentDate}T00:00:00Z`) : null;
+    if (!date || Number.isNaN(date.getTime())) {
+        return 'Unknown Date';
+    }
+
+    const dayOfMonth = date.getUTCDate();
+    const remainder = dayOfMonth % 100;
+    const suffix = remainder >= 11 && remainder <= 13
+        ? 'th'
+        : dayOfMonth % 10 === 1
+            ? 'st'
+            : dayOfMonth % 10 === 2
+                ? 'nd'
+                : dayOfMonth % 10 === 3
+                    ? 'rd'
+                    : 'th';
+    const dateLabel = date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        timeZone: 'UTC',
+    });
+    const timeOfDayLabel = currentTimeOfDay
+        ? `${currentTimeOfDay[0].toUpperCase()}${currentTimeOfDay.slice(1)}`
+        : 'Unknown Time';
+
+    return `${dateLabel} ${dayOfMonth}${suffix}, ${date.getUTCFullYear()} - ${timeOfDayLabel}`;
+};
+
 export enum SkitType {
     INTRO = 'INTRO',
     SOCIAL = 'SOCIAL',
@@ -153,16 +182,6 @@ function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage
         : '(None so far)';
 }
 
-export function buildPremise(playerName: string, worldContext = ''): string {
-    // Fallback generic premise if no configuration context available
-    if (!worldContext) {
-        worldContext = `This is a science-fantasy game set in a unique world. The player is one of many characters navigating this world, interacting with others and embarking on expeditions to discover artifacts and remnants of the old world.`;
-    }
-    
-    return `${worldContext}\n\nThe player of this game, ${playerName}, is one of the citizens of this world. ` +
-            `This game revolves around ${playerName}'s journey through this world, as they interact with other characters or embark on dangerous or intriguing expeditions.`;
-}
-
 export function generateContext(skit: Skit|undefined, stage: Stage, historyLength: number): ((b: PromptBuilder) => any) {
     const playerName = stage.getPlayerActor()?.name || 'J. Doe';
     const save = stage.getSave();
@@ -179,9 +198,11 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         .filter((lore) => evaluateConditions(lore.conditions, save))
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
     const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
-    const selectedSettingContext = (agendaConfig?.playerStats || []).map((stat) => {
+
+    // Exposed settings are conscious choices player's made; present them as settings.
+    const playerSettingContext = (agendaConfig?.playerStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
-        if (!statName) {
+        if (!statName || !stat.exposed) {
             return '';
         }
 
@@ -196,7 +217,34 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             const optionDescription = selectedOption?.description?.trim() || '';
             return [
                 `${statName}: ${valueText}`,
-                stat.description?.trim(),
+                optionDescription,
+            ].filter(Boolean).join('\n');
+        }
+
+        return [
+            `${statName}: ${valueText}`,
+            stat.description?.trim(),
+        ].filter(Boolean).join('\n');
+    }).filter(Boolean).join('\n\n');
+
+    // Unexposed settings are more like stats beyond their control; present them that way.
+    const playerStatContext = (agendaConfig?.playerStats || []).map((stat) => {
+        const statName = (stat.name || '').trim();
+        if (!statName || stat.exposed) {
+            return '';
+        }
+
+        const value = agendaConfig?.playerStatValues?.[statName] ?? stat.default;
+        const valueText = typeof value === 'number' ? String(value) : String(value || '');
+        if (!valueText) {
+            return '';
+        }
+
+        if (stat.displayType === 'option') {
+            const selectedOption = (stat.options || []).find((option) => option.name === valueText);
+            const optionDescription = selectedOption?.description?.trim() || '';
+            return [
+                `${statName}: ${valueText}`,
                 optionDescription,
             ].filter(Boolean).join('\n');
         }
@@ -258,9 +306,9 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Finally, order the triggeredLore list by insertion order, so that earlier lore entries appear first in the context.
     triggeredLore = triggeredLore.sort((a, b) => a.insertionOrder - b.insertionOrder);
 
-    return (builder: PromptBuilder) => builder.addBlock(`Premise`, buildPremise(playerName, agendaContext))
-        .addBlock(`Agenda Context`, agendaContext || 'None.')
-        .addBlock(`Selected Player Settings`, selectedSettingContext || 'None.')
+    return (builder: PromptBuilder) => builder.addBlock(`World Context`, agendaContext || 'None.')
+        .addBlock(`Selected Player Settings`, playerSettingContext || 'None.')
+        .addBlock(`Player Stats`, playerStatContext || 'None.')
         .addBlock(`Lore Entries`, (builder) => {
             // Add each lore entry as a separate block, with the title and content.
             triggeredLore.forEach(lore => {
@@ -277,8 +325,10 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
                         (event.skit.summary ? `Summary: ${event.skit.summary}` : `Script:\n${buildScriptLog(event.skit, [], stage)}`));
                 }
             });
-        }).addBlock(`Current Location`, `The following scene is set in ` +
-            `${location?.name || 'Unknown Location'}. ${getLocationDescription(location?.id || '', stage) || 'No description available.'}`
+        }).addBlock(`Current Location`, 
+            `${location?.name || 'Unknown Location'}:\n  ${getLocationDescription(location?.id || '', stage) || 'No description available.'}`
+        ).addBlock(`Current Date`,
+            formatCurrentDate(save.currentDate, save.currentTimeOfDay)
         ).addBlock(`Player Profile`,
             `${playerName}:\n  ${stage.getPlayerActor().profile}`
         ).addBlock(`Characters Present`, (builder) => {
@@ -286,10 +336,8 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
                 currentActors.forEach(actor => {
                     const currentOutfit = actor.outfits.find(a => a.id === determineOutfit(actor.id, skit, skit.script.length - 1)) ?? actor.outfits[0];
                     const otherOutfits = actor.outfits.filter(o => o.id !== currentOutfit?.id && o.emotionPack['neutral']);
-                    builder.addBlock(`${actor.name}`, `  Current Outfit (${currentOutfit.name}): ${currentOutfit.description}\n` +
-                        (otherOutfits.length > 0 ? `  Other Outfits: ${otherOutfits.map(o => o.name).join(', ')}\n` : '') +
-                        `  Profile: ${actor.profile}\n` +
-                        `  Lore: ${getActorLore(actor.id, stage)}`
+                    builder.addBlock(`${actor.name}`, `Profile: ${getActorLore(actor.id, stage)}\n  Description: ${actor.description}\n  Current Outfit (${currentOutfit.name}): ${currentOutfit.description}\n` +
+                        (otherOutfits.length > 0 ? `  Other Outfits: ${otherOutfits.map(o => o.name).join(', ')}\n` : '')
                     );
                 })
             }

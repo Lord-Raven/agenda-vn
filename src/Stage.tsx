@@ -826,16 +826,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return null;
         }
 
-        const initialActors = Object.values(save.actors || {})
+        /*const initialActors = Object.values(save.actors || {})
             .filter((actor) => actor.id !== save.playerId && actor.active !== false)
             .filter((actor) => evaluateConditions(actor.conditions, save))
-            .map((actor) => actor.id);
+            .map((actor) => actor.id);*/
         const skit = new Skit({
             skitType: SkitType.SOCIAL,
             initialLocationId: location.id,
             guidance: '',
             script: [],
-            initialActors,
+            initialActors: [],
             summary: '',
         });
 
