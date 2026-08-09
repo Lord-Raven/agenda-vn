@@ -154,11 +154,11 @@ export const LOCATION_TIME_OF_DAY_LABELS: Record<CalendarTimeOfDay, string> = {
 };
 
 const LOCATION_TIME_OF_DAY_PROMPT_FIELDS: StructuredFieldDefinition[] = [
-	{ key: 'prompt', label: 'PROMPT', description: 'A concise image-edit prompt describing how the location should change for the selected time of day.' },
+	{ key: 'artPrompt', label: 'ARTPROMPT', description: 'A concise image-edit prompt describing how the location image should be updated for the selected time of day.' },
 ];
 
 const LOCATION_BASE_IMAGE_PROMPT_FIELDS: StructuredFieldDefinition[] = [
-	{ key: 'prompt', label: 'PROMPT', description: 'A concise image-generation prompt describing the base visual composition for this location.' },
+	{ key: 'artPrompt', label: 'ARTPROMPT', description: 'A concise image-generation prompt describing the base visual composition for this location.' },
 ];
 
 const LOCATION_TIME_OF_DAY_DESCRIPTIONS: Record<CalendarTimeOfDay, string> = {

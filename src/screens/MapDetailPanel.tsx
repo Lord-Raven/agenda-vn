@@ -1,7 +1,7 @@
 import { FC, PointerEvent, useEffect, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, AutoAwesome, Delete, Image as ImageIcon, Place } from '@mui/icons-material';
-import { generateMapImageForTimeOfDay, getMapImageUrl, Map as GameMap, MapLink } from '../content/Map';
+import { generateMapImageForTimeOfDay, generateMapTimeOfDayPrompt, getMapImageUrl, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
 import { Button, TextArea, TextInput } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
@@ -210,11 +210,10 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
     };
 
     const generateVariantImage = async (timeOfDay: CalendarTimeOfDay) => {
-        const prompt = draft.timeOfDayImagePrompts?.[timeOfDay]?.trim();
-        if (!draft.imageUrl.trim() || !prompt || isGeneratingVariants[timeOfDay]) {
-            stageInstance.showPriorityMessage(!draft.imageUrl.trim()
-                ? 'Add a base map image before generating a time-of-day variant.'
-                : 'Add a time-of-day image prompt before generating.');
+        if (!draft.imageUrl.trim() || isGeneratingVariants[timeOfDay]) {
+            if (!draft.imageUrl.trim()) {
+                stageInstance.showPriorityMessage('Add a base map image before generating a time-of-day variant.');
+            }
             return;
         }
 
@@ -222,6 +221,13 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
         try {
             map.imageUrl = draft.imageUrl;
             map.timeOfDayImagePrompts = { ...(draft.timeOfDayImagePrompts || {}) };
+            if (!map.timeOfDayImagePrompts[timeOfDay]?.trim()) {
+                const generatedPrompt = await generateMapTimeOfDayPrompt(map, timeOfDay, stageInstance);
+                if (!generatedPrompt) {
+                    throw new Error(`Failed to generate a map ${timeOfDay} prompt.`);
+                }
+                updateVariant('timeOfDayImagePrompts', timeOfDay, generatedPrompt);
+            }
             const imageUrl = await generateMapImageForTimeOfDay(map, timeOfDay, stageInstance);
             if (!imageUrl) {
                 throw new Error(`Failed to generate map ${timeOfDay} image.`);
