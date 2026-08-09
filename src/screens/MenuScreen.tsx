@@ -58,8 +58,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     }, [showSettings]);
 
     const handleContinue = () => {
-        stage().loadCalendarScreen();
-        setScreenType(ScreenType.CALENDAR);
+        setScreenType(stage().getCurrentSkit() ? ScreenType.SKIT : ScreenType.MAP);
     };
 
     const handleNewGame = () => {

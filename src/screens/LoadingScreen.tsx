@@ -87,8 +87,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
             if (currentPromiseKeys.length === 0 && hasObservedPromiseActivityRef.current) {
                 console.log('Done loading');
                 currentStage.saveGame();
-                currentStage.loadCalendarScreen();
-                setScreenType(ScreenType.CALENDAR);
+                setScreenType(currentStage.getCurrentSkit() ? ScreenType.SKIT : ScreenType.MAP);
             }
         }, 100);
 
