@@ -90,7 +90,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     const [isUploadingAlternativeImages, setIsUploadingAlternativeImages] = useState<Record<number, boolean>>({});
     const [isGeneratingLocationDetails, setIsGeneratingLocationDetails] = useState(false);
     const [isGeneratingBaseImage, setIsGeneratingBaseImage] = useState(false);
-    const [areAlternativeImagesExpanded, setAreAlternativeImagesExpanded] = useState(true);
+    const [collapsedAlternativeImages, setCollapsedAlternativeImages] = useState<boolean[]>(() =>
+        (location.alternativeImages || []).map(() => false)
+    );
     const [isGeneratingAlternativeImages, setIsGeneratingAlternativeImages] = useState<Record<number, boolean>>({});
     const [confirmDialog, setConfirmDialog] = useState<{
         open: boolean;
@@ -643,34 +645,28 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             </section>
 
                             <section>
-                                <h2 style={sectionHeadingStyle}>
-                                    <button
-                                        type="button"
-                                        aria-expanded={areAlternativeImagesExpanded}
-                                        onClick={() => setAreAlternativeImagesExpanded(current => !current)}
-                                        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: 0, border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}
-                                    >
-                                        <ExpandMore style={{ transform: areAlternativeImagesExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 150ms ease' }} />
-                                        <ImageIcon />
-                                        Alternative Images
-                                    </button>
+                                <h2 style={{ ...sectionHeadingStyle, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <ImageIcon />
+                                    Alternative Images
                                 </h2>
-                                {areAlternativeImagesExpanded && (
-                                    <>
-                                        <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
-                                            The first alternative whose conditions pass replaces the base location image.
-                                        </p>
-                                        <Button
-                                            variant="secondary"
-                                            onClick={() => handleInputChange('alternativeImages', [...editedLocation.alternativeImages, createAlternativeImage()])}
-                                            style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '12px' }}
-                                        >
-                                            <Add fontSize="small" /> Add Alternative
-                                        </Button>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-                                            {editedLocation.alternativeImages.map((alternative, index) => {
+                                <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
+                                    The first alternative whose conditions pass replaces the base location image.
+                                </p>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => {
+                                        handleInputChange('alternativeImages', [...editedLocation.alternativeImages, createAlternativeImage()]);
+                                        setCollapsedAlternativeImages(current => [...current, false]);
+                                    }}
+                                    style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '12px' }}
+                                >
+                                    <Add fontSize="small" /> Add Alternative
+                                </Button>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                                    {editedLocation.alternativeImages.map((alternative, index) => {
                                         const isUploadingVariant = isUploadingAlternativeImages[index];
                                         const isGeneratingVariant = isGeneratingAlternativeImages[index];
+                                        const isCollapsed = Boolean(collapsedAlternativeImages[index]);
 
                                         return (
                                             <div
@@ -683,60 +679,74 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                 }}
                                             >
                                                 <div style={{ marginBottom: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${alternative.description || `alternative ${index + 1}`}`}
+                                                            aria-expanded={!isCollapsed}
+                                                            onClick={() => setCollapsedAlternativeImages(current => current.map((collapsed, alternativeIndex) => alternativeIndex === index ? !collapsed : collapsed))}
+                                                            style={{ display: 'grid', placeItems: 'center', padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer' }}
+                                                        >
+                                                            <ExpandMore style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
+                                                        </button>
                                                     <TextInput
                                                         fullWidth
                                                         value={alternative.description}
                                                         onChange={(event) => updateAlternative(index, { description: event.target.value })}
                                                         placeholder="Description, e.g. Morning or Flooded"
                                                     />
-                                                    <Button variant="danger" onClick={() => handleInputChange('alternativeImages', editedLocation.alternativeImages.filter((_, alternativeIndex) => alternativeIndex !== index))} style={{ padding: 7 }} aria-label="Delete alternative"><Delete fontSize="small" /></Button>
+                                                        {!isCollapsed && <Button variant="danger" onClick={() => {
+                                                            handleInputChange('alternativeImages', editedLocation.alternativeImages.filter((_, alternativeIndex) => alternativeIndex !== index));
+                                                            setCollapsedAlternativeImages(current => current.filter((_, alternativeIndex) => alternativeIndex !== index));
+                                                        }} style={{ padding: 7 }} aria-label="Delete alternative"><Delete fontSize="small" /></Button>}
                                                 </div>
-                                                <div style={{ marginBottom: '12px' }}>
-                                                    <TextArea
-                                                        value={alternative.imagePrompt}
-                                                        onChange={(e) => updateAlternative(index, { imagePrompt: e.target.value })}
-                                                        placeholder="Describe how the scene should change, or leave blank to generate from the description."
-                                                        style={{
-                                                            ...textareaStyle,
-                                                            minHeight: '88px',
-                                                        }}
-                                                    />
-                                                </div>
-                                                <ImageUrlUploadField
-                                                    imageUrl={alternative.imageUrl}
-                                                    onImageUrlChange={(value) => updateAlternative(index, { imageUrl: value })}
-                                                    onUploadFile={(file) => handleAlternativeImageUpload(index, file)}
-                                                    isUploading={isUploadingVariant}
-                                                    inputLabel="Alternative Image URL"
-                                                    previewWidth="140px"
-                                                    previewHeight="105px"
-                                                    previewBorder={`2px solid ${editedLocation.themeColor || 'var(--agenda-line-strong)'}`}
-                                                    previewBackgroundPosition={`${editedLocation.focalX * 100}% ${editedLocation.focalY * 100}%`}
-                                                    previewPlaceholder={<Place style={{ fontSize: '36px', color: 'var(--agenda-accent-primary)' }} />}
-                                                    previewUploadHint={isUploadingVariant ? 'Uploading...' : 'Click image to upload'}
-                                                    onInvalidFile={() => stage().showPriorityMessage('Please select a valid image file.')}
-                                                />
-                                                <div style={{ marginTop: '12px' }}>
-                                                    <ConditionEditor
-                                                        conditions={alternative.conditions}
-                                                        playerStats={stage().getConfiguration().playerStats || []}
-                                                        onChange={(conditions) => updateAlternative(index, { conditions })}
-                                                    />
-                                                </div>
-                                                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
-                                                    <Button
-                                                        onClick={() => handleGenerateAlternativeImage(index)}
-                                                        disabled={isGeneratingVariant}
-                                                    >
-                                                        {isGeneratingVariant ? 'Generating...' : `Generate`}
-                                                    </Button>
-                                                </div>
+                                                    {!isCollapsed && (
+                                                        <>
+                                                            <div style={{ marginBottom: '12px' }}>
+                                                                <TextArea
+                                                                    value={alternative.imagePrompt}
+                                                                    onChange={(e) => updateAlternative(index, { imagePrompt: e.target.value })}
+                                                                    placeholder="Describe how the scene should change, or leave blank to generate from the description."
+                                                                    style={{
+                                                                        ...textareaStyle,
+                                                                        minHeight: '88px',
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <ImageUrlUploadField
+                                                                imageUrl={alternative.imageUrl}
+                                                                onImageUrlChange={(value) => updateAlternative(index, { imageUrl: value })}
+                                                                onUploadFile={(file) => handleAlternativeImageUpload(index, file)}
+                                                                isUploading={isUploadingVariant}
+                                                                inputLabel="Alternative Image URL"
+                                                                previewWidth="140px"
+                                                                previewHeight="105px"
+                                                                previewBorder={`2px solid ${editedLocation.themeColor || 'var(--agenda-line-strong)'}`}
+                                                                previewBackgroundPosition={`${editedLocation.focalX * 100}% ${editedLocation.focalY * 100}%`}
+                                                                previewPlaceholder={<Place style={{ fontSize: '36px', color: 'var(--agenda-accent-primary)' }} />}
+                                                                previewUploadHint={isUploadingVariant ? 'Uploading...' : 'Click image to upload'}
+                                                                onInvalidFile={() => stage().showPriorityMessage('Please select a valid image file.')}
+                                                            />
+                                                            <div style={{ marginTop: '12px' }}>
+                                                                <ConditionEditor
+                                                                    conditions={alternative.conditions}
+                                                                    playerStats={stage().getConfiguration().playerStats || []}
+                                                                    onChange={(conditions) => updateAlternative(index, { conditions })}
+                                                                />
+                                                            </div>
+                                                            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+                                                                <Button
+                                                                    onClick={() => handleGenerateAlternativeImage(index)}
+                                                                    disabled={isGeneratingVariant}
+                                                                >
+                                                                    {isGeneratingVariant ? 'Generating...' : `Generate`}
+                                                                </Button>
+                                                            </div>
+                                                        </>
+                                                    )}
                                             </div>
                                         );
-                                            })}
-                                        </div>
-                                    </>
-                                )}
+                                        })}
+                                    </div>
                             </section>
 
                             <div

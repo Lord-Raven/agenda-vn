@@ -32,7 +32,9 @@ const createMapDraft = (map: GameMap): MapDraft => ({
 export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, onDeactivate }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [areAlternativeImagesExpanded, setAreAlternativeImagesExpanded] = useState(true);
+    const [collapsedAlternativeImages, setCollapsedAlternativeImages] = useState<boolean[]>(() =>
+        (map.alternativeImages || []).map(() => false)
+    );
     const [isUploadingVariants, setIsUploadingVariants] = useState<Record<number, boolean>>({});
     const [isGeneratingVariants, setIsGeneratingVariants] = useState<Record<number, boolean>>({});
     const [draft, setDraft] = useState<MapDraft>(() => createMapDraft(map));
@@ -298,61 +300,67 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
 
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <button
-                        type="button"
-                        aria-expanded={areAlternativeImagesExpanded}
-                        onClick={() => setAreAlternativeImagesExpanded(current => !current)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer', font: 'inherit' }}
-                    >
-                        <ExpandMore style={{ transform: areAlternativeImagesExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 150ms ease' }} />
-                        <strong>Alternative Images</strong>
-                    </button>
-                    {areAlternativeImagesExpanded && (
-                        <Button variant="secondary" onClick={() => updateDraft('alternativeImages', [...draft.alternativeImages, createAlternativeImage()])} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add</Button>
-                    )}
+                    <strong style={{ color: 'var(--agenda-text-primary)' }}>Alternative Images</strong>
+                    <Button variant="secondary" onClick={() => {
+                        updateDraft('alternativeImages', [...draft.alternativeImages, createAlternativeImage()]);
+                        setCollapsedAlternativeImages(current => [...current, false]);
+                    }} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add</Button>
                 </div>
-                {areAlternativeImagesExpanded && (
-                    <>
-                        <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 12px' }}>The first alternative whose conditions pass replaces the base map image.</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-                            {draft.alternativeImages.map((alternative, index) => {
+                <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 12px' }}>The first alternative whose conditions pass replaces the base map image.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+                    {draft.alternativeImages.map((alternative, index) => {
                         const isUploadingVariant = Boolean(isUploadingVariants[index]);
                         const isGeneratingVariant = Boolean(isGeneratingVariants[index]);
+                        const isCollapsed = Boolean(collapsedAlternativeImages[index]);
                         return (
                             <div key={index} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <button
+                                        type="button"
+                                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${alternative.description || `alternative ${index + 1}`}`}
+                                        aria-expanded={!isCollapsed}
+                                        onClick={() => setCollapsedAlternativeImages(current => current.map((collapsed, alternativeIndex) => alternativeIndex === index ? !collapsed : collapsed))}
+                                        style={{ display: 'grid', placeItems: 'center', padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer' }}
+                                    >
+                                        <ExpandMore style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
+                                    </button>
                                     <TextInput fullWidth value={alternative.description} onChange={event => updateAlternative(index, { description: event.target.value })} placeholder="Description, e.g. Morning or Flooded" />
-                                    <Button variant="danger" onClick={() => updateDraft('alternativeImages', draft.alternativeImages.filter((_, alternativeIndex) => alternativeIndex !== index))} style={{ padding: 7 }} aria-label="Delete alternative"><Delete fontSize="small" /></Button>
+                                    {!isCollapsed && <Button variant="danger" onClick={() => {
+                                        updateDraft('alternativeImages', draft.alternativeImages.filter((_, alternativeIndex) => alternativeIndex !== index));
+                                        setCollapsedAlternativeImages(current => current.filter((_, alternativeIndex) => alternativeIndex !== index));
+                                    }} style={{ padding: 7 }} aria-label="Delete alternative"><Delete fontSize="small" /></Button>}
                                 </div>
-                                <TextArea
-                                    fullWidth
-                                    rows={3}
-                                    value={alternative.imagePrompt}
-                                    onChange={event => updateAlternative(index, { imagePrompt: event.target.value })}
-                                    placeholder="Describe how the map image should change, or leave blank to generate from the description."
-                                />
-                                <ImageUrlUploadField
-                                    imageUrl={alternative.imageUrl}
-                                    onImageUrlChange={value => updateAlternative(index, { imageUrl: value })}
-                                    onUploadFile={file => uploadVariantImage(index, file)}
-                                    isUploading={isUploadingVariant}
-                                    inputLabel="Alternative Image URL"
-                                    previewWidth="180px"
-                                    previewHeight="101px"
-                                    previewPlaceholder={<ImageIcon style={{ fontSize: 38, color: 'var(--agenda-text-muted)' }} />}
-                                    previewUploadHint={isUploadingVariant ? 'Uploading...' : 'Click image to upload'}
-                                    onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
-                                />
-                                <ConditionEditor conditions={alternative.conditions} playerStats={stageInstance.getConfiguration().playerStats || []} onChange={conditions => updateAlternative(index, { conditions })} />
-                                <Button variant="secondary" onClick={() => generateVariantImage(index)} disabled={isGeneratingVariant} style={{ justifySelf: 'end', display: 'flex', gap: 8, alignItems: 'center' }}>
-                                    <AutoAwesome style={{ fontSize: 18 }} /> {isGeneratingVariant ? 'Generating...' : 'Generate'}
-                                </Button>
+                                {!isCollapsed && (
+                                    <>
+                                        <TextArea
+                                            fullWidth
+                                            rows={3}
+                                            value={alternative.imagePrompt}
+                                            onChange={event => updateAlternative(index, { imagePrompt: event.target.value })}
+                                            placeholder="Describe how the map image should change, or leave blank to generate from the description."
+                                        />
+                                        <ImageUrlUploadField
+                                            imageUrl={alternative.imageUrl}
+                                            onImageUrlChange={value => updateAlternative(index, { imageUrl: value })}
+                                            onUploadFile={file => uploadVariantImage(index, file)}
+                                            isUploading={isUploadingVariant}
+                                            inputLabel="Alternative Image URL"
+                                            previewWidth="180px"
+                                            previewHeight="101px"
+                                            previewPlaceholder={<ImageIcon style={{ fontSize: 38, color: 'var(--agenda-text-muted)' }} />}
+                                            previewUploadHint={isUploadingVariant ? 'Uploading...' : 'Click image to upload'}
+                                            onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
+                                        />
+                                        <ConditionEditor conditions={alternative.conditions} playerStats={stageInstance.getConfiguration().playerStats || []} onChange={conditions => updateAlternative(index, { conditions })} />
+                                        <Button variant="secondary" onClick={() => generateVariantImage(index)} disabled={isGeneratingVariant} style={{ justifySelf: 'end', display: 'flex', gap: 8, alignItems: 'center' }}>
+                                            <AutoAwesome style={{ fontSize: 18 }} /> {isGeneratingVariant ? 'Generating...' : 'Generate'}
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                         );
-                            })}
-                        </div>
-                    </>
-                )}
+                    })}
+                </div>
             </div>
 
             <div>
