@@ -329,6 +329,17 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
     upsertActorLoreEntry(actor, oldName, stage);
 
+    if (parsedData['outfit_description'] && parsedData['outfit_name']) {
+        const outfit: Outfit = {
+            id: generateUuid(),
+            name: parsedData['outfit_name'],
+            description: parsedData['outfit_description'],
+            prompts: {},
+            emotionPack: {},
+        };
+        actor.outfits.push(outfit);
+    }
+
     const currentOutfit = getActiveOutfit(actor);
     if (!currentOutfit.emotionPack['base']) {
         // Kick off base image generation:
