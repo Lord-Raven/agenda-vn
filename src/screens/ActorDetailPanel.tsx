@@ -3,13 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress } from '@mui/material';
 import { ActorStat, Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
+import { Actor, ActorSchedule, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ActorStatStars } from './ActorStatStars';
-import { ConditionCollection } from '../content/Condition';
-import { ConditionEditor } from './ConditionEditor';
+import { ActorScheduleEditor } from './ActorScheduleEditor';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -133,7 +132,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         voiceId: string;
         themeColor: string;
         themeFontFamily: string;
-        conditionCollections: ConditionCollection[];
+        schedule: ActorSchedule;
     }>({
         name: actor.name,
         category: actor.category ?? '',
@@ -143,7 +142,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         voiceId: actor.voiceId,
         themeColor: actor.themeColor,
         themeFontFamily: actor.themeFontFamily,
-        conditionCollections: (actor.conditionCollections || []).map(collection => [...collection]),
+        schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
     });
 
     const categoryInputListId = `actor-category-options-${actor.id}`;
@@ -260,7 +259,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.voiceId = nextEditedActor.voiceId;
         actor.themeColor = nextEditedActor.themeColor;
         actor.themeFontFamily = nextEditedActor.themeFontFamily;
-        actor.conditionCollections = nextEditedActor.conditionCollections.map(collection => [...collection]);
+        actor.schedule = Object.fromEntries(Object.entries(nextEditedActor.schedule).map(([destination, collections]) => [destination, collections.map(collection => [...collection])]));
         actor.outfits = persistedOutfits;
         actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
 
@@ -369,7 +368,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             voiceId: actor.voiceId,
             themeColor: actor.themeColor,
             themeFontFamily: actor.themeFontFamily,
-            conditionCollections: (actor.conditionCollections || []).map(collection => [...collection]),
+            schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
         });
         setEditedStatMap(createInitialActorStatMap(actor, actorStats));
         const nextOutfits = cloneOutfits(actor.outfits);
@@ -1232,12 +1231,13 @@ ${indent}}`;
 
                                     <div>
                                         <label style={{ display: 'block', color: 'var(--agenda-highlight)', fontSize: '14px', fontWeight: 'bold', marginBottom: '8px' }}>
-                                            Availability
+                                            Schedule
                                         </label>
-                                        <ConditionEditor
-                                            conditionCollections={editedActor.conditionCollections}
+                                        <ActorScheduleEditor
+                                            schedule={editedActor.schedule}
+                                            locations={Object.values(stage().getSave().atlas || {}).filter(location => location.active !== false)}
                                             playerStats={stage().getConfiguration().playerStats || []}
-                                            onChange={(conditionCollections) => setEditedActor(current => ({ ...current, conditionCollections }))}
+                                            onChange={(schedule) => setEditedActor(current => ({ ...current, schedule }))}
                                         />
                                     </div>
 

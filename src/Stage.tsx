@@ -1,7 +1,7 @@
 import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
-import { Actor, findBestNameMatch, loadSupportedActor } from "./content/Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, findBestNameMatch, loadSupportedActor, resolveActorSchedule } from "./content/Actor";
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
@@ -19,7 +19,6 @@ import {
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "./utils/StructuredResponse.js";
-import { evaluateConditionCollections } from './content/Condition';
 
 type MessageStateType = any;
 
@@ -447,7 +446,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     outfits: [],
                     outfitId: '',
                     statMap: {},
-                    conditionCollections: [],
+                    schedule: {},
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
                     themeFontFamily: '',
                     voiceId: ''
@@ -763,11 +762,22 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return null;
         }
 
+        const requestedActorIds = selectedEvent.actorIds || selectedEvent.participantActorIds || [];
+        const scheduledActorIds = Object.values(save.actors || {})
+            .filter(actor => actor.id !== save.playerId && actor.active !== false)
+            .filter(actor => resolveActorSchedule(actor, save) === selectedLocation.id)
+            .map(actor => actor.id);
+        const eligibleRequestedActorIds = requestedActorIds.filter(actorId => {
+            const actor = save.actors?.[actorId];
+            const destination = actor ? resolveActorSchedule(actor, save) : '';
+            return actor?.active !== false && (destination === ACTOR_SCHEDULE_AVAILABLE || destination === selectedLocation.id);
+        });
+
         const skit = new Skit({
             initialLocationId: selectedLocation.id,
             guidance: selectedEvent.guidance || selectedEvent.description,
             script: [],
-            initialActors: selectedEvent.actorIds || selectedEvent.participantActorIds || [],
+            initialActors: Array.from(new Set([...scheduledActorIds, ...eligibleRequestedActorIds])),
             summary: '',
         });
 
@@ -840,15 +850,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return null;
         }
 
-        /*const initialActors = Object.values(save.actors || {})
+        const initialActors = Object.values(save.actors || {})
             .filter((actor) => actor.id !== save.playerId && actor.active !== false)
-            .filter((actor) => evaluateConditionCollections(actor.conditionCollections, save))
-            .map((actor) => actor.id);*/
+            .filter((actor) => resolveActorSchedule(actor, save) === location.id)
+            .map((actor) => actor.id);
         const skit = new Skit({
             initialLocationId: location.id,
             guidance: '',
             script: [],
-            initialActors: [],
+            initialActors,
             summary: '',
         });
 
@@ -1491,11 +1501,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         let skit: Skit;
 
+        const initialActors = Object.values(save.actors || {})
+            .filter(actor => actor.id !== save.playerId && actor.active !== false)
+            .filter(actor => resolveActorSchedule(actor, save) === selectedLocation.id)
+            .map(actor => actor.id);
+
         skit = new Skit({
             initialLocationId: selectedLocation.id,
             guidance: calendarEvent.guidance || calendarEvent.description,
             script: [],
-            initialActors: [],
+            initialActors,
             summary: '',
         });
 

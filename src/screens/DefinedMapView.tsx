@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from 'react';
+import { FC, Fragment, useEffect, useMemo, useState } from 'react';
 import { EventAvailable, MapRounded, MenuRounded, Settings } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -11,6 +11,7 @@ import { ContentManagementScreen } from './ContentManagementScreen';
 import { useTooltip } from './TooltipContext';
 import { Button, GlassPanel } from './UiComponents';
 import { evaluateConditionCollections } from '../content/Condition';
+import { LocationActorPortraits } from './LocationActorPortraits';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -133,8 +134,8 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     };
 
                                     return (
+                                        <Fragment key={markerKey}>
                                         <motion.button
-                                            key={markerKey}
                                             type="button"
                                             aria-label={linkedMap ? `Open map ${markerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : markerName}
                                             disabled={!isInteractive}
@@ -153,6 +154,12 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                 {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 500 }}>{linkedLocation?.name}</span>}
                                             </span>
                                         </motion.button>
+                                        {linkedLocation && (
+                                            <div style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `calc(${link.coordinates.y * 100}% + ${markerSize / 2 + 7}px)`, transform: 'translateX(-50%)', zIndex: isHovered ? 3 : 2 }}>
+                                                <LocationActorPortraits locationId={linkedLocation.id} stage={stage()} size={isVerticalLayout ? 28 : 32} />
+                                            </div>
+                                        )}
+                                        </Fragment>
                                     );
                                 })}
                             </motion.div>

@@ -9,6 +9,7 @@ import { ContentManagementScreen } from "./ContentManagementScreen";
 import { useTooltip } from "./TooltipContext";
 import { Button, GlassPanel } from "./UiComponents";
 import { DefinedMapView } from "./DefinedMapView";
+import { LocationActorPortraits } from "./LocationActorPortraits";
 
 interface MapScreenProps {
     stage: () => Stage;
@@ -307,6 +308,9 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                             boxShadow: "0 10px 28px color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)",
                                         }}
                                     >
+                                        <Box sx={{ position: "absolute", top: 12, right: 12, zIndex: 2 }}>
+                                            <LocationActorPortraits locationId={location.id} stage={stageInstance} size={isVerticalLayout ? 34 : 40} />
+                                        </Box>
                                         <Box
                                             sx={{
                                                 position: "absolute",

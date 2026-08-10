@@ -2,7 +2,7 @@ import { Emotion, EMOTION_MAPPING } from "./Emotion";
 import { v4 as generateUuid } from 'uuid';
 import { Outcome, OutcomeType } from "./Outcome";
 import { Stage } from "../Stage";
-import { Actor, findBestNameMatch, getActorLore } from "./Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, findBestNameMatch, getActorLore, resolveActorSchedule } from "./Actor";
 import { getLocationDescription } from "./Location";
 import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -345,9 +345,15 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
         // Generate guidance and initial actors for this skit based on its type and the current context
         console.log('Generating skit guidance...');
         let attempts = 3;
-        const availableActors = Object.values(stage.getSave().actors)
-            .filter(actor => actor.id !== stage.getSave().playerId && actor.active)
-            .filter(actor => evaluateConditionCollections(actor.conditionCollections, save));
+        const activeActors = Object.values(stage.getSave().actors)
+            .filter(actor => actor.id !== stage.getSave().playerId && actor.active !== false);
+        const actorsAtLocation = activeActors.filter(actor => resolveActorSchedule(actor, save) === skit.initialLocationId);
+        const generallyAvailableActors = activeActors.filter(actor => resolveActorSchedule(actor, save) === ACTOR_SCHEDULE_AVAILABLE);
+        const availableActors = Array.from(new Map([...actorsAtLocation, ...generallyAvailableActors].map(actor => [actor.id, actor])).values());
+        skit.initialActors = Array.from(new Set([
+            ...actorsAtLocation.map(actor => actor.id),
+            ...skit.initialActors.filter(actorId => availableActors.some(actor => actor.id === actorId)),
+        ]));
         while (attempts > 0) {
             const response = await stage.generateText(
                 buildPrompt()
@@ -359,10 +365,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         `  ${skit.initialLocationId ? (save.atlas?.[skit.initialLocationId]?.name || 'Unknown Location') : 'Unknown Location'}\n` +
                         `    ${getLocationDescription(skit.initialLocationId, stage) || 'No description available.'}`)
                     .addBlock('Available Characters',
-                        skit.initialActors.map(actorId => {
-                            const actor = stage.getSave().actors?.[actorId];
-                            return actor ? `  ${actor.name}\n    ${getActorLore(actor.id, stage)}` : '';
-                        }))
+                        availableActors.map(actor => `  ${actor.name}\n    ${getActorLore(actor.id, stage)}`))
                     .addBlock('Response Format',
                         buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
                     .addBlock('Example Response',
@@ -391,7 +394,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 const participantsText = parsedResponse.participants?.trim();
                 if (guidanceText && participantsText) {
                     skit.guidance = guidanceText;
-                    skit.initialActors = participantsText.split(',').map(name => findBestNameMatch(name.trim(), availableActors, ['name'])?.id).filter(id => id !== undefined) as string[];
+                    const selectedActorIds = participantsText.split(',').map(name => findBestNameMatch(name.trim(), availableActors, ['name'])?.id).filter(id => id !== undefined) as string[];
+                    skit.initialActors = Array.from(new Set([...actorsAtLocation.map(actor => actor.id), ...selectedActorIds]));
                     break;
                 }
             }
@@ -405,7 +409,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             buildPrompt()
                 .addBlock(`Instructions`,
                     `${skit.script.length == 0 ? 'Produce the initial moments of a scene (perhaps joined in medias res)' : 'Extend or conclude the current scene script'} with three to five entries, ` +
-                    `based upon the Premise and the specified Scene Prompt. Primarily involve the Present Characters, although Absent Characters may be moved to this location using appropriate tags, if warranted. ` +
+                    `based upon the Premise and the specified Scene Prompt. Involve only the Present Characters; do not introduce Absent Characters. ` +
                     `The script should tacitly consider characters motives, relationships, and past events. ` +
                     `\n\nFollow the structure of the strict Example Script formatting; ` +
                     `actions are depicted in prose and character dialogue in quotation marks. ` +
@@ -431,12 +435,11 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `When establishing a character at the beginning of a scene or when moving to this location with a movement tag, give special consideration to the inclusion of a 'wears' tag to explicitly call out an appropriate look. ` +
                             `OUTFIT NAME must be found under the specified character—either their current outfit or one of their listed alternatives.`)
                         .addBlock('Movement Tags',
-                            `\n\nA Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be used when an Absent Character engages in the scene (even if they are already narratively present). ` +
-                            `\n\nCharacter movement tags must also be included when a character leaves the scene or moves to another location. ` +
+                            `\n\nA Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be included when a Present Character leaves the scene or moves to another location. ` +
                             `\n\nA Scene movement tag ("<Movement><Scene/><Location>[HERE|location name|location ID]</Location></Movement>") may be used when the scene itself transitions to another location. ` +
                             `When this tag is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
                             `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "HERE" to move to the scene's location, or "AWAY" to leave this area. ` +
-                            `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when Absent Characters enter the scene, Present Characters leave, or the scene itself relocates.`)
+                            `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when Present Characters leave or the scene itself relocates.`)
                         
                 ).addBlock('Example Script',
                     `<Entry><Speaker>NARRATOR</Speaker><Message>The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.</Message></Entry>\n` +
@@ -469,8 +472,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 text = text.slice(7).trim();
             }
 
-            // Prepare list of all actors (not just present)
-            const allActors: Actor[] = Object.values(stage.getSave().actors);
+            const eligibleActorIds = new Set([...getCurrentActors(skit, skit.script.length - 1), save.playerId]);
+            const allActors: Actor[] = Object.values(stage.getSave().actors).filter(actor => eligibleActorIds.has(actor.id));
             const allLocations = Object.values(stage.getSave().atlas || {});
             const resolveLocationId = (locationNameOrId: string): string | undefined => {
                 const locationText = locationNameOrId.trim();

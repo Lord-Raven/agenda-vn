@@ -11,7 +11,36 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ActorStat } from "../Stage";
-import { ConditionCollection } from './Condition';
+import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
+
+export const ACTOR_SCHEDULE_AVAILABLE = 'available';
+export const ACTOR_SCHEDULE_UNAVAILABLE = 'unavailable';
+export type ActorSchedule = Record<string, ConditionCollection[]>;
+
+const cloneSchedule = (schedule: unknown): ActorSchedule => {
+    if (!schedule || typeof schedule !== 'object' || Array.isArray(schedule)) {
+        return {};
+    }
+
+    return Object.fromEntries(Object.entries(schedule).map(([destination, collections]) => {
+        if (!Array.isArray(collections)) {
+            return [destination, []];
+        }
+        const normalizedCollections = collections.length > 0 && !Array.isArray(collections[0])
+            ? [collections]
+            : collections;
+        return [destination, normalizedCollections.map(collection => Array.isArray(collection) ? [...collection] : [])];
+    }));
+};
+
+export const resolveActorSchedule = (actor: Pick<Actor, 'schedule'>, context: ConditionContext): string => {
+    for (const [destination, conditionCollections] of Object.entries(actor.schedule || {})) {
+        if (evaluateConditionCollections(conditionCollections, context)) {
+            return destination;
+        }
+    }
+    return ACTOR_SCHEDULE_AVAILABLE;
+};
 
 
 // An outfit represents a set of clothing or physical transformation that can be applied to a specific actor; each outfit comes with a full set of emotions
@@ -37,8 +66,7 @@ export class Actor {
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
     statMap: { [key: string]: number } = {}; // Map of custom stat name to numeric value for this actor
-    // schedule: { [key: string]: ConditionCollection } = {}; // A map of location ID | 'available' | 'unavailable' to conditions. Will replace the below.
-    conditionCollections: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
+    schedule: ActorSchedule = {}; // Destinations are evaluated in insertion order; the first matching collection wins.
 
     /**
      * Rehydrate an Actor from saved data
@@ -48,7 +76,13 @@ export class Actor {
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
-        actor.conditionCollections = (savedActor?.conditionCollections || []).map((collection: ConditionCollection) => [...collection]);
+        actor.schedule = cloneSchedule(savedActor?.schedule);
+        if (!Object.keys(actor.schedule).length && savedActor?.conditionCollections?.length) {
+            actor.schedule = {
+                [ACTOR_SCHEDULE_AVAILABLE]: savedActor.conditionCollections.map((collection: ConditionCollection) => [...collection]),
+                [ACTOR_SCHEDULE_UNAVAILABLE]: [[]],
+            };
+        }
         return actor;
     }
 
@@ -59,7 +93,13 @@ export class Actor {
         }
         this.active = this.active !== false;
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
-        this.conditionCollections = (this.conditionCollections || []).map((collection) => [...collection]);
+        this.schedule = cloneSchedule(this.schedule);
+        if (!Object.keys(this.schedule).length && props?.conditionCollections?.length) {
+            this.schedule = {
+                [ACTOR_SCHEDULE_AVAILABLE]: props.conditionCollections.map((collection: ConditionCollection) => [...collection]),
+                [ACTOR_SCHEDULE_UNAVAILABLE]: [[]],
+            };
+        }
     }
 }
 
