@@ -10,8 +10,6 @@
   --agenda-text-muted: #b9d2e3;
   --agenda-line-subtle: rgba(138, 176, 204, 0.34);
   --agenda-line-strong: rgba(137, 205, 135, 0.44);
-  --agenda-glass: rgba(26, 30, 48, 0.62);
-  --agenda-glass-bright: rgba(36, 41, 63, 0.78);
   --agenda-shadow: 0 14px 34px rgba(2, 8, 18, 0.48);
   --agenda-font-display: "Lora", Georgia, serif;
   --agenda-font-base: "Geologica", sans-serif;
@@ -311,11 +309,11 @@ body {
 
 .number-stepper-button:hover {
   color: var(--agenda-text-primary);
-  background: var(--agenda-glass-bright);
+  background: var(--agenda-surface-raised);
 }
 
 .number-stepper-button:active {
-  background: var(--agenda-glass);
+  background: var(--agenda-surface-base);
 }
 
 .number-stepper-button:focus-visible {

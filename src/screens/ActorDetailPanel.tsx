@@ -1317,7 +1317,7 @@ ${indent}}`;
                                                                             width: '100%',
                                                                             padding: '10px',
                                                                             fontSize: '14px',
-                                                                            backgroundColor: 'var(--agenda-glass-bright)',
+                                                                            backgroundColor: 'var(--agenda-surface-raised)',
                                                                             border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                                             borderRadius: '5px',
                                                                             color: 'var(--agenda-text-primary)',
@@ -1389,45 +1389,47 @@ ${indent}}`;
                                         >
                                             Voice ID
                                         </label>
-                                        <select
-                                            value={editedActor.voiceId}
-                                            onChange={(e) => handleInputChange('voiceId', e.target.value)}
-                                            style={{
-                                                width: '100%',
-                                                padding: '12px',
-                                                fontSize: '14px',
-                                                backgroundColor: 'var(--agenda-glass-bright)',
-                                                border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                                                borderRadius: '5px',
-                                                color: 'var(--agenda-text-primary)',
-                                                fontFamily: 'inherit',
-                                                cursor: 'pointer',
-                                            }}
-                                        >
-                                            {Object.entries(VOICE_MAP).sort(([idA, descriptionA], [idB, descriptionB]) => descriptionA.localeCompare(descriptionB)).map(([id, description]) => (
-                                                <option key={id} value={id}>
-                                                    {description}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <Button
-                                                onClick={handlePlayDemoSpeech}
-                                                disabled={isGeneratingDemoSpeech || !editedActor.voiceId}
+                                        <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
+                                            <select
+                                                value={editedActor.voiceId}
+                                                onChange={(e) => handleInputChange('voiceId', e.target.value)}
                                                 style={{
-                                                    alignSelf: 'stretch',
-                                                    minWidth: '120px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    gap: '6px',
+                                                    width: '100%',
+                                                    padding: '12px',
+                                                    fontSize: '14px',
+                                                    backgroundColor: 'var(--agenda-surface-raised)',
+                                                    border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
+                                                    borderRadius: '5px',
+                                                    color: 'var(--agenda-text-primary)',
+                                                    fontFamily: 'inherit',
+                                                    cursor: 'pointer',
                                                 }}
                                             >
-                                                {isGeneratingDemoSpeech ? (
-                                                    <CircularProgress size={14} style={{ color: 'var(--agenda-accent-primary)' }} />
-                                                ) : (
-                                                    <PlayArrow style={{ fontSize: '18px' }} />
-                                                )}
-                                        </Button>
+                                                {Object.entries(VOICE_MAP).sort(([idA, descriptionA], [idB, descriptionB]) => descriptionA.localeCompare(descriptionB)).map(([id, description]) => (
+                                                    <option key={id} value={id}>
+                                                        {description}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <Button
+                                                    onClick={handlePlayDemoSpeech}
+                                                    disabled={isGeneratingDemoSpeech || !editedActor.voiceId}
+                                                    style={{
+                                                        alignSelf: 'stretch',
+                                                        minWidth: '60px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '6px',
+                                                    }}
+                                                >
+                                                    {isGeneratingDemoSpeech ? (
+                                                        <CircularProgress size={14} style={{ color: 'var(--agenda-accent-primary)' }} />
+                                                    ) : (
+                                                        <PlayArrow style={{ fontSize: '18px' }} />
+                                                    )}
+                                            </Button>
+                                        </div>
                                     </div>
 
                                     {/* Theme Color */}
@@ -1510,7 +1512,7 @@ ${indent}}`;
                                                     width: '100%',
                                                     padding: '12px',
                                                     fontSize: '14px',
-                                                    backgroundColor: 'var(--agenda-glass-bright)',
+                                                    backgroundColor: 'var(--agenda-surface-raised)',
                                                     border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                     borderRadius: '5px',
                                                     color: 'var(--agenda-text-primary)',
@@ -1581,7 +1583,7 @@ ${indent}}`;
                                                 minHeight: '100px',
                                                 padding: '12px',
                                                 fontSize: '14px',
-                                                backgroundColor: 'var(--agenda-glass-bright)',
+                                                backgroundColor: 'var(--agenda-surface-raised)',
                                                 border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                 borderRadius: '5px',
                                                 color: 'var(--agenda-text-primary)',
@@ -1618,7 +1620,7 @@ ${indent}}`;
                                                     minHeight: '160px',
                                                     padding: '12px',
                                                     fontSize: '13px',
-                                                    backgroundColor: 'var(--agenda-glass-bright)',
+                                                    backgroundColor: 'var(--agenda-surface-raised)',
                                                     border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                                     borderRadius: '5px',
                                                     color: 'var(--agenda-text-primary)',
@@ -1681,7 +1683,7 @@ ${indent}}`;
                                             style={{
                                                 width: '120px',
                                                 height: '120px',
-                                                backgroundColor: getSelectedOutfitImageUrl('base') ? 'transparent' : 'var(--agenda-glass-bright)',
+                                                backgroundColor: getSelectedOutfitImageUrl('base') ? 'transparent' : 'var(--agenda-surface-raised)',
                                                 border: `2px solid ${getSelectedOutfitImageUrl('base') ? 'color-mix(in srgb, var(--agenda-accent-primary) 56%, transparent)' : 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)'}`,
                                                 borderRadius: '8px',
                                                 display: 'flex',
@@ -1765,7 +1767,7 @@ ${indent}}`;
                                                     style={{
                                                         width: '120px',
                                                         height: '120px',
-                                                        backgroundColor: hasImage ? 'transparent' : 'var(--agenda-glass-bright)',
+                                                        backgroundColor: hasImage ? 'transparent' : 'var(--agenda-surface-raised)',
                                                         border: `2px solid ${hasImage ? 'color-mix(in srgb, var(--agenda-highlight) 50%, transparent)' : 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)'}`,
                                                         borderRadius: '8px',
                                                         display: 'flex',
@@ -1819,7 +1821,7 @@ ${indent}}`;
                                                 <Chip style={{
                                                     fontSize: '11px',
                                                     textTransform: 'capitalize',
-                                                    backgroundColor: hasImage ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)' : 'var(--agenda-glass-bright)',
+                                                    backgroundColor: hasImage ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)' : 'var(--agenda-surface-raised)',
                                                 }}>
                                                     {emotion}
                                                 </Chip>
@@ -1991,7 +1993,7 @@ ${indent}}`;
                                     width: '100%',
                                     minHeight: '360px',
                                     height: '100%',
-                                    backgroundColor: currentImageUrl ? 'transparent' : 'var(--agenda-glass-bright)',
+                                    backgroundColor: currentImageUrl ? 'transparent' : 'var(--agenda-surface-raised)',
                                     border: `2px dashed ${isImageDropActive ? 'color-mix(in srgb, var(--agenda-highlight) 80%, transparent)' : 'color-mix(in srgb, var(--agenda-highlight) 35%, transparent)'}`,
                                     borderRadius: '8px',
                                     backgroundImage: currentImageUrl ? `url(${currentImageUrl})` : 'none',
@@ -2186,7 +2188,7 @@ ${indent}}`;
                                             boxSizing: 'border-box',
                                             padding: '12px',
                                             fontSize: '14px',
-                                            backgroundColor: 'var(--agenda-glass-bright)',
+                                            backgroundColor: 'var(--agenda-surface-raised)',
                                             border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                             borderRadius: '5px',
                                             color: 'var(--agenda-text-primary)',
@@ -2225,7 +2227,7 @@ ${indent}}`;
                                             minHeight: '120px',
                                             padding: '12px',
                                             fontSize: '13px',
-                                            backgroundColor: 'var(--agenda-glass-bright)',
+                                            backgroundColor: 'var(--agenda-surface-raised)',
                                             border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
                                             borderRadius: '5px',
                                             color: 'var(--agenda-text-primary)',
