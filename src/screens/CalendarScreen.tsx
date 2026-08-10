@@ -715,7 +715,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                         flex: 1,
                                         border: "1px solid var(--agenda-panel-border)",
                                         borderRadius: "12px",
-                                        background: "linear-gradient(180deg, var(--agenda-panel-surface), var(--agenda-glass))",
+                                        background: "linear-gradient(180deg, var(--agenda-panel-surface), var(--agenda-surface-raised))",
                                         padding: "12px",
                                         minHeight: 0,
                                         overflowY: "auto",
