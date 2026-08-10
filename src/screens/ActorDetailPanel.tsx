@@ -1,11 +1,11 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress } from '@mui/material';
 import { ActorStat, Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
-import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
+import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ActorStatStars } from './ActorStatStars';
 import { Condition } from '../content/Condition';
@@ -16,6 +16,8 @@ interface ActorDetailPanelProps {
     stage: () => Stage;
     onDeactivate?: (actorId: string) => void;
 }
+
+const voiceSampleCache = new Map<string, string>();
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 
@@ -186,6 +188,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         return outfits[0]?.id || '';
     });
 
+    const [isGeneratingDemoSpeech, setIsGeneratingDemoSpeech] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
     const [regeneratingImages, setRegeneratingImages] = useState<Set<string>>(new Set());
     const [isFillingMissingEmotions, setIsFillingMissingEmotions] = useState(false);
     const [isGeneratingActorDetails, setIsGeneratingActorDetails] = useState(false);
@@ -497,6 +501,76 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                 },
             ],
         });
+    };
+
+        async function generateDemoSpeech(voiceId: string, transcript: string) {
+        const ttsResponse = await stage().generator.speak({
+            transcript,
+            voice_id: voiceId || undefined
+        });
+        if (ttsResponse && ttsResponse.url) {
+            return ttsResponse.url;
+        } else {
+            return '';
+        }
+    }
+
+    const getVoiceSampleCacheKey = (actorId: string, voiceId: string): string => `${actorId}:${voiceId}`;
+
+    const playSampleUrl = async (sampleUrl: string) => {
+        if (!sampleUrl) {
+            return;
+        }
+
+        try {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.src = '';
+            }
+
+            const audio = new Audio(sampleUrl);
+            audioRef.current = audio;
+            await audio.play();
+        } catch (error) {
+            console.error('Failed to play demo speech sample:', error);
+            stage().showPriorityMessage('Unable to play voice sample. Please try again.');
+        }
+    };
+
+    const handlePlayDemoSpeech = async () => {
+        if (isGeneratingDemoSpeech) {
+            return;
+        }
+
+        const selectedVoiceId = editedActor.voiceId?.trim();
+        if (!selectedVoiceId) {
+            stage().showPriorityMessage('Please select a voice ID first.');
+            return;
+        }
+
+        const cacheKey = getVoiceSampleCacheKey(actor.id, selectedVoiceId);
+        const cachedSampleUrl = voiceSampleCache.get(cacheKey);
+        if (cachedSampleUrl) {
+            await playSampleUrl(cachedSampleUrl);
+            return;
+        }
+
+        setIsGeneratingDemoSpeech(true);
+        try {
+            const sampleUrl = await generateDemoSpeech(selectedVoiceId, editedActor.profile || actor.profile || actor.name);
+            if (!sampleUrl) {
+                stage().showPriorityMessage('Voice sample generation returned no audio URL.');
+                return;
+            }
+
+            voiceSampleCache.set(cacheKey, sampleUrl);
+            await playSampleUrl(sampleUrl);
+        } catch (error) {
+            console.error('Failed to generate demo speech sample:', error);
+            stage().showPriorityMessage('Failed to generate voice sample. Please try again.');
+        } finally {
+            setIsGeneratingDemoSpeech(false);
+        }
     };
 
     const buildOutfitsExport = () => ({
@@ -1330,12 +1404,30 @@ ${indent}}`;
                                                 cursor: 'pointer',
                                             }}
                                         >
-                                            {Object.entries(VOICE_MAP).map(([id, description]) => (
+                                            {Object.entries(VOICE_MAP).sort(([idA, descriptionA], [idB, descriptionB]) => descriptionA.localeCompare(descriptionB)).map(([id, description]) => (
                                                 <option key={id} value={id}>
                                                     {description}
                                                 </option>
                                             ))}
                                         </select>
+                                        <Button
+                                                onClick={handlePlayDemoSpeech}
+                                                disabled={isGeneratingDemoSpeech || !editedActor.voiceId}
+                                                style={{
+                                                    alignSelf: 'stretch',
+                                                    minWidth: '120px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '6px',
+                                                }}
+                                            >
+                                                {isGeneratingDemoSpeech ? (
+                                                    <CircularProgress size={14} style={{ color: 'var(--agenda-accent-primary)' }} />
+                                                ) : (
+                                                    <PlayArrow style={{ fontSize: '18px' }} />
+                                                )}
+                                        </Button>
                                     </div>
 
                                     {/* Theme Color */}
