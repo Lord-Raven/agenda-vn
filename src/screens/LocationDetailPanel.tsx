@@ -16,7 +16,7 @@ import {
 import { Add, ArrowDownward, ArrowUpward, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ImageUrlUploadField } from './ImageUrlUploadField';
-import { Condition } from '../content/Condition';
+import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from './ConditionEditor';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 
@@ -38,7 +38,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         imagePrompt: string;
         imageUrl: string;
         alternativeImages: AlternativeImage[];
-        conditions: Condition[];
+        conditionCollections: ConditionCollection[];
         focalX: number;
         focalY: number;
     }>({
@@ -49,7 +49,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         imagePrompt: getLocationImagePrompt(location),
         imageUrl: location.imageUrl,
         alternativeImages: location.alternativeImages?.map(createAlternativeImage) || [],
-        conditions: [...(location.conditions || [])],
+        conditionCollections: (location.conditionCollections || []).map(collection => [...collection]),
         focalX: location.focalPoint?.x ?? 0.5,
         focalY: location.focalPoint?.y ?? 0.5,
     });
@@ -125,7 +125,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.imagePrompt = nextLocation.imagePrompt;
         location.imageUrl = nextLocation.imageUrl;
         location.alternativeImages = nextLocation.alternativeImages.map(createAlternativeImage);
-        location.conditions = [...nextLocation.conditions];
+        location.conditionCollections = nextLocation.conditionCollections.map(collection => [...collection]);
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
     };
 
@@ -138,7 +138,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,
             alternativeImages: location.alternativeImages?.map(createAlternativeImage) || [],
-            conditions: [...(location.conditions || [])],
+            conditionCollections: (location.conditionCollections || []).map(collection => [...collection]),
             focalX: location.focalPoint?.x ?? 0.5,
             focalY: location.focalPoint?.y ?? 0.5,
         });
@@ -562,9 +562,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             <section>
                                 <h2 style={sectionHeadingStyle}>Availability</h2>
                                 <ConditionEditor
-                                    conditions={editedLocation.conditions}
+                                    conditionCollections={editedLocation.conditionCollections}
                                     playerStats={stage().getConfiguration().playerStats || []}
-                                    onChange={(conditions) => setEditedLocation(current => ({ ...current, conditions }))}
+                                    onChange={(conditionCollections) => setEditedLocation(current => ({ ...current, conditionCollections }))}
                                 />
                             </section>
 
@@ -766,9 +766,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                             />
                                                             <div style={{ marginTop: '12px' }}>
                                                                 <ConditionEditor
-                                                                    conditions={alternative.conditions}
+                                                                    conditionCollections={alternative.conditionCollections}
                                                                     playerStats={stage().getConfiguration().playerStats || []}
-                                                                    onChange={(conditions) => updateAlternative(index, { conditions })}
+                                                                    onChange={(conditionCollections) => updateAlternative(index, { conditionCollections })}
                                                                 />
                                                             </div>
                                                             <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>

@@ -110,8 +110,8 @@ export function createLoreEntry(params: Partial<Omit<Lore, 'id'>>): Lore {
         insertionOrder: 0,
         priority: 0,
         probability: 100,
-        conditionCollections: [],
         ...params,
+        conditionCollections: (params.conditionCollections || []).map((collection) => [...collection]),
         id: generateUuid()
     };
 }

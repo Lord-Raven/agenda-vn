@@ -134,7 +134,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
             return;
         }
         persist(() => {
-            map.links.push({ parentId: map.id, childId: firstTarget, coordinates: { x: 0.5, y: 0.5 }, conditions: [] });
+            map.links.push({ parentId: map.id, childId: firstTarget, coordinates: { x: 0.5, y: 0.5 }, conditionCollections: [] });
         });
     };
 
@@ -389,7 +389,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                             previewUploadHint={isUploadingVariant ? 'Uploading...' : 'Click image to upload'}
                                             onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
                                         />
-                                        <ConditionEditor conditions={alternative.conditions} playerStats={stageInstance.getConfiguration().playerStats || []} onChange={conditions => updateAlternative(index, { conditions })} />
+                                        <ConditionEditor conditionCollections={alternative.conditionCollections} playerStats={stageInstance.getConfiguration().playerStats || []} onChange={conditionCollections => updateAlternative(index, { conditionCollections })} />
                                         <Button variant="secondary" onClick={() => generateVariantImage(index)} disabled={isGeneratingVariant} style={{ justifySelf: 'end', display: 'flex', gap: 8, alignItems: 'center' }}>
                                             <AutoAwesome style={{ fontSize: 18 }} /> {isGeneratingVariant ? 'Generating...' : 'Generate'}
                                         </Button>
@@ -419,9 +419,9 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                 <Button variant="danger" onClick={() => persist(() => map.links.splice(index, 1))} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
                             </div>
                             <ConditionEditor
-                                conditions={link.conditions || []}
+                                conditionCollections={link.conditionCollections || []}
                                 playerStats={stageInstance.getConfiguration().playerStats || []}
-                                onChange={(conditions) => updateLink(index, { conditions })}
+                                onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
                             />
                         </div>
                     ))}

@@ -551,9 +551,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         <div style={{ display: 'grid', gap: '6px' }}>
                                             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Availability</label>
                                             <ConditionEditor
-                                                conditions={selectedLore.conditions || []}
+                                                conditionCollections={selectedLore.conditionCollections || []}
                                                 playerStats={stage().getConfiguration().playerStats || []}
-                                                onChange={(conditions) => updateSelectedLore({ conditions })}
+                                                onChange={(conditionCollections) => updateSelectedLore({ conditionCollections })}
                                             />
                                         </div>
 

@@ -176,6 +176,7 @@ const cloneMap = (map: GameMap): GameMap => new GameMap({
 const cloneLore = (entry: Lore): Lore => ({
     ...entry,
     triggers: [...(entry.triggers || [])],
+    conditionCollections: (entry.conditionCollections || []).map((collection) => [...collection]),
 });
 
 const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({

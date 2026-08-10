@@ -8,7 +8,7 @@ import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
 import { ActorStatStars } from './ActorStatStars';
-import { Condition } from '../content/Condition';
+import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from './ConditionEditor';
 
 interface ActorDetailPanelProps {
@@ -133,7 +133,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         voiceId: string;
         themeColor: string;
         themeFontFamily: string;
-        conditions: Condition[];
+        conditionCollections: ConditionCollection[];
     }>({
         name: actor.name,
         category: actor.category ?? '',
@@ -143,7 +143,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         voiceId: actor.voiceId,
         themeColor: actor.themeColor,
         themeFontFamily: actor.themeFontFamily,
-        conditions: [...(actor.conditions || [])],
+        conditionCollections: (actor.conditionCollections || []).map(collection => [...collection]),
     });
 
     const categoryInputListId = `actor-category-options-${actor.id}`;
@@ -260,7 +260,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.voiceId = nextEditedActor.voiceId;
         actor.themeColor = nextEditedActor.themeColor;
         actor.themeFontFamily = nextEditedActor.themeFontFamily;
-        actor.conditions = [...nextEditedActor.conditions];
+        actor.conditionCollections = nextEditedActor.conditionCollections.map(collection => [...collection]);
         actor.outfits = persistedOutfits;
         actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
 
@@ -369,7 +369,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             voiceId: actor.voiceId,
             themeColor: actor.themeColor,
             themeFontFamily: actor.themeFontFamily,
-            conditions: [...(actor.conditions || [])],
+            conditionCollections: (actor.conditionCollections || []).map(collection => [...collection]),
         });
         setEditedStatMap(createInitialActorStatMap(actor, actorStats));
         const nextOutfits = cloneOutfits(actor.outfits);
@@ -1235,9 +1235,9 @@ ${indent}}`;
                                             Availability
                                         </label>
                                         <ConditionEditor
-                                            conditions={editedActor.conditions}
+                                            conditionCollections={editedActor.conditionCollections}
                                             playerStats={stage().getConfiguration().playerStats || []}
-                                            onChange={(conditions) => setEditedActor(current => ({ ...current, conditions }))}
+                                            onChange={(conditionCollections) => setEditedActor(current => ({ ...current, conditionCollections }))}
                                         />
                                     </div>
 

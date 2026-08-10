@@ -27,8 +27,9 @@ interface SettingsData {
     playerDescription: string;
     playerColor: string;
     textToSpeech: boolean;
-    disableImpersonation: boolean;
-    disableFontEffects: boolean;
+    enableImpersonation: boolean;
+    enableFontEffects: boolean;
+    enableTextToSpeech: boolean;
     betaMode: boolean;
     language: string;
 }
@@ -118,8 +119,9 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         playerDescription: stageInstance.getPlayerActor()?.profile || stageInstance.primaryUser?.chatProfile || 'An enigmatic individual.',
         playerColor: resolvePlayerThemeColor(stageInstance.getPlayerActor()?.themeColor || ''),
         textToSpeech: (stageInstance.getSave()?.textToSpeech ?? true),
-        disableImpersonation: (stageInstance.getSave()?.disableImpersonation ?? false),
-        disableFontEffects: (stageInstance.getSave()?.disableFontEffects ?? false),
+        enableImpersonation: (stageInstance.getSave()?.enableImpersonation ?? true),
+        enableFontEffects: (stageInstance.getSave()?.enableFontEffects ?? true),
+        enableTextToSpeech: (stageInstance.getSave()?.enableTextToSpeech ?? true),
         betaMode: (stageInstance.getSave()?.betaMode ?? false),
         language: stageInstance.getSave()?.language || 'English',
     });
@@ -146,8 +148,9 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                 themeColor: playerThemeColor,
                 data: {
                     textToSpeech: settings.textToSpeech,
-                    disableImpersonation: settings.disableImpersonation,
-                    disableFontEffects: settings.disableFontEffects,
+                    enableImpersonation: settings.enableImpersonation,
+                    enableFontEffects: settings.enableFontEffects,
+                    enableTextToSpeech: settings.enableTextToSpeech,
                     betaMode: settings.betaMode,
                     language: settings.language,
                 },
@@ -162,8 +165,9 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             const saveData = stageInstance.getSave();
 
             saveData.textToSpeech = settings.textToSpeech;
-            saveData.disableImpersonation = settings.disableImpersonation;
-            saveData.disableFontEffects = settings.disableFontEffects;
+            saveData.enableImpersonation = settings.enableImpersonation;
+            saveData.enableFontEffects = settings.enableFontEffects;
+            saveData.enableTextToSpeech = settings.enableTextToSpeech;
             saveData.betaMode = settings.betaMode;
             saveData.language = settings.language;
             saveData.playerStatValues = resolvedPlayerStatValues;
@@ -565,15 +569,15 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                     <motion.div
                                         whileHover={{ scale: 1.01 }}
                                         whileTap={{ scale: 0.99 }}
-                                        onClick={() => setSettings(prev => ({ ...prev, disableImpersonation: !prev.disableImpersonation }))}
-                                        onMouseEnter={() => setTooltip('Prevent the game from incorporating your actions; this will reduce response sizes.', Forum)}
+                                        onClick={() => setSettings(prev => ({ ...prev, enableImpersonation: !prev.enableImpersonation }))}
+                                        onMouseEnter={() => setTooltip('Allow the game to suggest your actions or speech (can be replaced).', Forum)}
                                         onMouseLeave={clearTooltip}
                                         style={{
                                             padding: '12px',
-                                            background: settings.disableImpersonation
+                                            background: settings.enableImpersonation
                                                 ? 'color-mix(in srgb, var(--agenda-highlight) 18%, transparent)'
                                                 : 'color-mix(in srgb, var(--agenda-panel-surface) 86%, transparent)',
-                                            border: settings.disableImpersonation
+                                            border: settings.enableImpersonation
                                                 ? '2px solid color-mix(in srgb, var(--agenda-highlight) 50%, transparent)'
                                                 : '2px solid var(--agenda-panel-border)',
                                             borderRadius: '8px',
@@ -589,8 +593,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 width: '20px',
                                                 height: '20px',
                                                 borderRadius: '4px',
-                                                background: settings.disableImpersonation ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
-                                                border: '2px solid ' + (settings.disableImpersonation ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
+                                                background: settings.enableImpersonation ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
+                                                border: '2px solid ' + (settings.enableImpersonation ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -598,7 +602,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 transition: 'all 0.2s ease',
                                             }}
                                         >
-                                            {settings.disableImpersonation && (
+                                            {settings.enableImpersonation && (
                                                 <motion.span
                                                     initial={{ scale: 0 }}
                                                     animate={{ scale: 1 }}
@@ -614,28 +618,28 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         </div>
                                         <span
                                             style={{
-                                                color: settings.disableImpersonation ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
+                                                color: settings.enableImpersonation ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
                                                 fontSize: '13px',
-                                                fontWeight: settings.disableImpersonation ? 'bold' : 'normal',
+                                                fontWeight: settings.enableImpersonation ? 'bold' : 'normal',
                                             }}
                                         >
-                                            Disable Impersonation
+                                            Allow Impersonation
                                         </span>
                                     </motion.div>
 
-                                    {/* Disable Font Effects Toggle */}
+                                    {/* Font Effects Toggle */}
                                     <motion.div
                                         whileHover={{ scale: 1.01 }}
                                         whileTap={{ scale: 0.99 }}
-                                        onClick={() => setSettings(prev => ({ ...prev, disableFontEffects: !prev.disableFontEffects }))}
-                                        onMouseEnter={() => setTooltip('Prevent the game from applying font effects to text.', Forum)}
+                                        onClick={() => setSettings(prev => ({ ...prev, enableFontEffects: !prev.enableFontEffects }))}
+                                        onMouseEnter={() => setTooltip('Allow special font effects on text.', Forum)}
                                         onMouseLeave={clearTooltip}
                                         style={{
                                             padding: '12px',
-                                            background: settings.disableFontEffects
+                                            background: settings.enableFontEffects
                                                 ? 'color-mix(in srgb, var(--agenda-highlight) 18%, transparent)'
                                                 : 'color-mix(in srgb, var(--agenda-panel-surface) 86%, transparent)',
-                                            border: settings.disableFontEffects
+                                            border: settings.enableFontEffects
                                                 ? '2px solid color-mix(in srgb, var(--agenda-highlight) 50%, transparent)'
                                                 : '2px solid var(--agenda-panel-border)',
                                             borderRadius: '8px',
@@ -651,8 +655,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 width: '20px',
                                                 height: '20px',
                                                 borderRadius: '4px',
-                                                background: settings.disableFontEffects ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
-                                                border: '2px solid ' + (settings.disableFontEffects ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
+                                                background: settings.enableFontEffects ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
+                                                border: '2px solid ' + (settings.enableFontEffects ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -660,7 +664,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 transition: 'all 0.2s ease',
                                             }}
                                         >
-                                            {settings.disableFontEffects && (
+                                            {settings.enableFontEffects && (
                                                 <motion.span
                                                     initial={{ scale: 0 }}
                                                     animate={{ scale: 1 }}
@@ -676,12 +680,12 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         </div>
                                         <span
                                             style={{
-                                                color: settings.disableFontEffects ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
+                                                color: settings.enableFontEffects ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
                                                 fontSize: '13px',
-                                                fontWeight: settings.disableFontEffects ? 'bold' : 'normal',
+                                                fontWeight: settings.enableFontEffects ? 'bold' : 'normal',
                                             }}
                                         >
-                                            Disable Font Effects
+                                            Enable Font Effects
                                         </span>
                                     </motion.div>
 
