@@ -3,10 +3,10 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Place } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { getLocationImageUrl, Location } from '../content/Location';
-import { Button } from './UiComponents';
+import { Button } from '../components/UiComponents';
 import { LocationDetailPanel } from './LocationDetailPanel';
 import { createLoreEntry } from '../content/Lore';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
+import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
 
 interface LocationManagementPanelProps {
     stage: () => Stage;

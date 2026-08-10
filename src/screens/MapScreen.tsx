@@ -6,10 +6,10 @@ import { Stage } from "../Stage";
 import { getLocationImageUrl, LOCATION_TIME_OF_DAY_LABELS, Location } from "../content/Location";
 import { ScreenType } from "./BaseScreen";
 import { ContentManagementScreen } from "./ContentManagementScreen";
-import { useTooltip } from "./TooltipContext";
-import { Button, GlassPanel } from "./UiComponents";
+import { useTooltip } from "../components/TooltipContext";
+import { Button, GlassPanel } from "../components/UiComponents";
 import { DefinedMapView } from "./DefinedMapView";
-import { LocationActorPortraits } from "./LocationActorPortraits";
+import { LocationActorPortraits } from "../components/LocationActorPortraits";
 
 interface MapScreenProps {
     stage: () => Stage;

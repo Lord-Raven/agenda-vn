@@ -12,7 +12,7 @@ import {
 } from '../content/Style';
 import { formatLoreEntriesAsContext, selectConstantLoreEntries } from '../content/Lore';
 import { parseStructuredResponse } from '../utils/StructuredResponse.js';
-import { AlphaColorPickerInput, buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from './UiComponents';
+import { AlphaColorPickerInput, buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from '../components/UiComponents';
 
 interface StyleManagementPanelProps {
     stage: () => Stage;

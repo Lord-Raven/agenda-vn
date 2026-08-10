@@ -14,10 +14,10 @@ import {
     upsertLocationLoreEntry,
 } from '../content/Location';
 import { Add, ArrowDownward, ArrowUpward, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
-import { ImageUrlUploadField } from './ImageUrlUploadField';
+import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionCollection } from '../content/Condition';
-import { ConditionEditor } from './ConditionEditor';
+import { ConditionEditor } from '../components/ConditionEditor';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 
 interface LocationDetailPanelProps {

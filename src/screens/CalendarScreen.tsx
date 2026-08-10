@@ -17,8 +17,8 @@ import {
     WbTwilight,
 } from "@mui/icons-material";
 import { AnimatePresence, motion } from "framer-motion";
-import { Button, GlassPanel } from "./UiComponents";
-import { useTooltip } from "./TooltipContext";
+import { Button, GlassPanel } from "../components/UiComponents";
+import { useTooltip } from "../components/TooltipContext";
 import { ContentManagementScreen } from "./ContentManagementScreen";
 import { Actor, getEmotionImage } from "../content/Actor";
 

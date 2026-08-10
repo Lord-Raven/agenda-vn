@@ -2,7 +2,7 @@ import React, { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
 import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon } from '@mui/icons-material';
-import { Button, GlassPanel, Title } from './UiComponents';
+import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorManagementPanel } from './ActorManagementPanel';
 import { LocationManagementPanel } from './LocationManagementPanel';
 import { LorebookManagementPanel } from './LorebookManagementPanel';

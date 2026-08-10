@@ -3,9 +3,9 @@ import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, ArrowDownward, ArrowUpward, AutoAwesome, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
 import { generateMapAlternativeImage, getMapImageUrl, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
-import { Button, TextArea, TextInput } from './UiComponents';
-import { ImageUrlUploadField } from './ImageUrlUploadField';
-import { ConditionEditor } from './ConditionEditor';
+import { Button, TextArea, TextInput } from '../components/UiComponents';
+import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
+import { ConditionEditor } from '../components/ConditionEditor';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 
 interface MapDetailPanelProps {

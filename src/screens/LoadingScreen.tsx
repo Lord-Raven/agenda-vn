@@ -2,7 +2,7 @@ import { FC, useEffect, useRef, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { ScreenType } from './BaseScreen';
 import { Stage } from '../Stage';
-import { GlassPanel, Title } from './UiComponents';
+import { GlassPanel, Title } from '../components/UiComponents';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEFAULT_ATLAS_LOCATIONS, getLocationImageUrl } from '../content/Location';
 

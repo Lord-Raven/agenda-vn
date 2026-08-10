@@ -1,8 +1,8 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { ActorStat, ActorStatDisplayType, Stage } from '../Stage';
-import { Button, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
-import { ImageUrlUploadField } from './ImageUrlUploadField';
+import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 
 interface GameManagementPanelProps {
     stage: () => Stage;

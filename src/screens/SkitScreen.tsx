@@ -3,8 +3,8 @@ import { SaveType, Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer";
 import { Box, Typography } from "@mui/material";
-import { Button, NamePlate } from "./UiComponents";
-import { useTooltip } from "./TooltipContext";
+import { Button, NamePlate } from "../components/UiComponents";
+import { useTooltip } from "../components/TooltipContext";
 import { Actor, getActorLore, getEmotionImage } from "../content/Actor";
 import { accumulateOutcomes, determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
 import { getLocationImageUrl } from "../content/Location";
@@ -106,40 +106,6 @@ const getActorOutfitsAtIndex = (skit: Skit, scriptIndex: number, allActors: {[ke
     }
 
     return currentOutfits;
-};
-
-const clampHexColor = (color: string, minBrightness: number = 0.3, maxBrightness: number = 0.6): string => {
-    const match = /^#([0-9A-F]{6})([0-9A-F]{2})?$/i.exec(color);
-    if (!match) {
-        return color;
-    }
-
-    const hex = match[1];
-    const alpha = match[2] || '';
-    const red = parseInt(hex.slice(0, 2), 16);
-    const green = parseInt(hex.slice(2, 4), 16);
-    const blue = parseInt(hex.slice(4, 6), 16);
-
-    const brightness = (red + green + blue) / (255 * 3);
-    if (brightness >= minBrightness && brightness <= maxBrightness) {
-        return color;
-    }
-
-    const targetBrightness = brightness > maxBrightness ? maxBrightness : minBrightness;
-    if (brightness === 0) {
-        const channel = Math.round(targetBrightness * 255).toString(16).padStart(2, '0');
-        return `#${channel}${channel}${channel}${alpha}`;
-    }
-
-    const scale = targetBrightness / brightness;
-    const adjustChannel = (channel: number): string =>
-        Math.max(0, Math.min(255, Math.round(channel * scale))).toString(16).padStart(2, '0');
-
-    const dimmedRed = adjustChannel(red);
-    const dimmedGreen = adjustChannel(green);
-    const dimmedBlue = adjustChannel(blue);
-
-    return `#${dimmedRed}${dimmedGreen}${dimmedBlue}${alpha}`;
 };
 
 export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVerticalLayout }) => {
@@ -254,7 +220,6 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
             }}>
                 {/* Top right control buttons */}
                 <div style={{
-                    width: '100%',
                     justifyContent: 'flex-end',
                     padding: '1rem',
                     display: 'flex',

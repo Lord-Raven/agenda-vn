@@ -1,9 +1,9 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ActorStat, SaveType, Stage } from '../Stage';
-import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from './UiComponents';
+import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
-import { useTooltip } from './TooltipContext';
+import { useTooltip } from '../components/TooltipContext';
 import { ScreenType } from './BaseScreen';
 
 export const DEFAULT_PLAYER_THEME_COLOR = '#66bbee';

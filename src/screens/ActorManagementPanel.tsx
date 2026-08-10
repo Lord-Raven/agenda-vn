@@ -3,9 +3,9 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Person } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
-import { Button } from './UiComponents';
+import { Button } from '../components/UiComponents';
 import { ActorDetailPanel } from './ActorDetailPanel';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
+import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
 
 interface ActorManagementPanelProps {
     stage: () => Stage;

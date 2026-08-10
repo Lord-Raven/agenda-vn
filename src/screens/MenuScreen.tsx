@@ -4,10 +4,10 @@ import { ScreenType } from "./BaseScreen";
 import { FiberNew, Folder, PlayArrow, Save, SaveAlt, Settings } from "@mui/icons-material";
 import { SettingsScreen } from "./SettingsScreen";
 import { BlurredBackground } from "@lord-raven/novel-visualizer";
-import { Button } from "./UiComponents";
+import { Button } from "../components/UiComponents";
 import { motion, AnimatePresence } from "framer-motion";
 import { Box } from "@mui/material";
-import { useTooltip } from "./TooltipContext";
+import { useTooltip } from "../components/TooltipContext";
 import React from "react";
 import { SaveLoadScreen } from "./SaveLoadScreen";
 

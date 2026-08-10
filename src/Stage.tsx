@@ -402,8 +402,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             this.syncActorStats(currentSave);
             this.syncPlayerStats(currentSave);
         }
-
-        this.saveGame();
     }
 
     async load(): Promise<Partial<LoadResponse<InitStateType, ChatStateType, MessageStateType>>> {

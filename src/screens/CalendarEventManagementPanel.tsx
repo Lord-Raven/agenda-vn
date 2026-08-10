@@ -2,8 +2,8 @@ import React, { FC, useMemo, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
-import { Button, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
+import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
 
 interface CalendarEventManagementPanelProps {
     stage: () => Stage;

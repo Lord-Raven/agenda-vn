@@ -4,11 +4,11 @@ import { Add, Close, KeyboardArrowDownRounded, KeyboardArrowUpRounded, Visibilit
 import { Chip } from '@mui/material';
 import { Stage } from '../Stage';
 import { createLoreEntry, Lore } from '../content/Lore';
-import { Button, ConfirmDialog, TextArea, TextInput } from './UiComponents';
+import { Button, ConfirmDialog, TextArea, TextInput } from '../components/UiComponents';
 import { findBestNameMatch, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { getLinkedLocationLore, updateLocationDescription } from '../content/Location';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
-import { ConditionEditor } from './ConditionEditor';
+import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
+import { ConditionEditor } from '../components/ConditionEditor';
 
 
 interface LorebookManagementPanelProps {

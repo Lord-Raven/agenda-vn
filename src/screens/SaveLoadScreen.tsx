@@ -3,9 +3,9 @@ import { motion } from 'framer-motion';
 import { Stage, SaveType } from '../Stage';
 import { Save, FolderOpen, Close, Delete } from '@mui/icons-material';
 import { ScreenType } from './BaseScreen';
-import { useTooltip } from './TooltipContext';
+import { useTooltip } from '../components/TooltipContext';
 import { getEmotionImage } from '../content/Actor';
-import { Button, Title } from './UiComponents';
+import { Button, Title } from '../components/UiComponents';
 
 interface SaveLoadScreenProps {
     stage: () => Stage;

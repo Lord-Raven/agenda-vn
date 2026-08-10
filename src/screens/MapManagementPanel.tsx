@@ -3,7 +3,7 @@ import { Map as MapIcon } from '@mui/icons-material';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Map as GameMap } from '../content/Map';
 import { Stage } from '../Stage';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from './CategorizedEntrySidebar';
+import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
 import { MapDetailPanel } from './MapDetailPanel';
 
 interface MapManagementPanelProps {

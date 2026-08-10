@@ -6,9 +6,9 @@ import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from './UiComponents';
-import { ActorStatStars } from './ActorStatStars';
-import { ActorScheduleEditor } from './ActorScheduleEditor';
+import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { ActorStatStars } from '../components/ActorStatStars';
+import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -1828,39 +1828,6 @@ ${indent}}`;
                                             </motion.div>
                                         );
                                     })}
-                                </div>
-                            </section>
-
-                            {/* Read-only Info Section */}
-                            <section>
-                                <h2 style={{ 
-                                    color: 'var(--agenda-highlight)', 
-                                    fontSize: '18px', 
-                                    fontWeight: 'bold',
-                                    marginBottom: '15px',
-                                    borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                                    paddingBottom: '5px'
-                                }}>
-                                    Additional Information
-                                </h2>
-                                
-                                <div style={{ 
-                                    display: 'grid', 
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                                    gap: '15px',
-                                    backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 60%, transparent)',
-                                    padding: '15px',
-                                    borderRadius: '5px',
-                                    border: '1px solid color-mix(in srgb, var(--agenda-highlight) 20%, transparent)',
-                                }}>
-                                    <div>
-                                        <div style={{ color: 'color-mix(in srgb, var(--agenda-highlight) 70%, transparent)', fontSize: '12px', marginBottom: '4px' }}>
-                                            Actor ID
-                                        </div>
-                                        <div style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontFamily: 'monospace' }}>
-                                            {actor.id}
-                                        </div>
-                                    </div>
                                 </div>
                             </section>
 
