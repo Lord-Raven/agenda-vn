@@ -3,12 +3,13 @@ import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer";
 import { Box, Typography } from "@mui/material";
-import { LastPage, PlayArrow, Send } from "@mui/icons-material";
-import { NamePlate } from "./UiComponents";
+import { LastPage, MenuRounded, PlayArrow, Send, Settings } from "@mui/icons-material";
+import { Button, NamePlate } from "./UiComponents";
 import { useTooltip } from "./TooltipContext";
 import { Actor, getEmotionImage } from "../content/Actor";
 import { determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
 import { getLocationImageUrl } from "../content/Location";
+import { ContentManagementScreen } from "./ContentManagementScreen";
 
 interface SkitScreenProps {
     stage: () => Stage;
@@ -18,8 +19,9 @@ interface SkitScreenProps {
 
 const CALENDAR_BACKGROUND_IMAGE = "https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png";
 export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVerticalLayout }) => {
-    const { setTooltip } = useTooltip();
+    const { setTooltip, clearTooltip } = useTooltip();
     const [isGeneratingNextSkit, setIsGeneratingNextSkit] = useState(false);
+    const [showContentManagement, setShowContentManagement] = useState(false);
     const initializedSkitIdRef = useRef<string | null>(null);
     const currentSkit = stage().getCurrentSkit();
 
@@ -78,39 +80,71 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
     }
 
     return (
-        <BlurredBackground
-            imageUrl={CALENDAR_BACKGROUND_IMAGE}
-            overlay="linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%)"
-        >
-            <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
+        <>
+            <BlurredBackground
+                imageUrl={CALENDAR_BACKGROUND_IMAGE}
+                overlay="linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%)"
+            >
+                <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
                 <Box
                     sx={{
                         position: "absolute",
                         top: 16,
                         left: 16,
+                        right: 16,
                         zIndex: 1000,
-                        backgroundColor: "rgba(22, 28, 44, 0.76)",
-                        backdropFilter: "blur(6px)",
-                        padding: "8px 24px",
-                        borderRadius: "20px",
-                        border: "1px solid rgba(138, 176, 204, 0.48)",
-                        boxShadow: "0 4px 18px rgba(10, 16, 29, 0.55), 0 0 16px rgba(138, 176, 204, 0.2)",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        gap: 2,
                     }}
                 >
-                    <Typography
-                        variant="h6"
+                    <Box
                         sx={{
-                            color: "#edf2f2",
-                            fontWeight: "bold",
-                            fontSize: "1.1rem",
-                            letterSpacing: "0.08em",
-                            textTransform: "uppercase",
+                            backgroundColor: "rgba(22, 28, 44, 0.76)",
+                            backdropFilter: "blur(6px)",
+                            padding: "8px 24px",
+                            borderRadius: "20px",
+                            border: "1px solid rgba(138, 176, 204, 0.48)",
+                            boxShadow: "0 4px 18px rgba(10, 16, 29, 0.55), 0 0 16px rgba(138, 176, 204, 0.2)",
                         }}
                     >
-                        {currentSkit.initialLocationId
-                            ? (stage().getSave().atlas[currentSkit.initialLocationId]?.name || currentSkit.initialLocationId)
-                            : (stage().getConfiguration().title || "Agenda VN")}
-                    </Typography>
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                color: "#edf2f2",
+                                fontWeight: "bold",
+                                fontSize: "1.1rem",
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                            }}
+                        >
+                            {currentSkit.initialLocationId
+                                ? (stage().getSave().atlas[currentSkit.initialLocationId]?.name || currentSkit.initialLocationId)
+                                : (stage().getConfiguration().title || "Agenda VN")}
+                        </Typography>
+                    </Box>
+
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, opacity: 0.82 }}>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setShowContentManagement(true)}
+                            onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", Settings)}
+                            onMouseLeave={clearTooltip}
+                            style={{ padding: "8px 10px" }}
+                        >
+                            <Settings fontSize="small" />
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setScreenType(ScreenType.MENU)}
+                            onMouseEnter={() => setTooltip("Main menu", MenuRounded)}
+                            onMouseLeave={clearTooltip}
+                            style={{ padding: "8px 10px" }}
+                        >
+                            <MenuRounded fontSize="small" />
+                        </Button>
+                    </Box>
                 </Box>
 
                 <NovelVisualizer
@@ -181,7 +215,15 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         );
                     }}
                 />
-            </Box>
-        </BlurredBackground>
+                </Box>
+            </BlurredBackground>
+
+            {showContentManagement && (
+                <ContentManagementScreen
+                    stage={stage}
+                    onClose={() => {stage().saveGame(); setShowContentManagement(false);}}
+                />
+            )}
+        </>
     );
 };
