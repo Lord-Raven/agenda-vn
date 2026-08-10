@@ -4,7 +4,7 @@ import { buildStructuredExampleResponse, buildStructuredResponseFormat, parseStr
 import { Stage } from '../Stage';
 import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
-import { Condition, ConditionContext, evaluateConditions } from './Condition';
+import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -59,7 +59,7 @@ export type Lore = {
     insertionOrder: number;
     priority: number;
     probability: number; // 1 to 100
-    conditions: Condition[]; // All conditions must pass for this entry to be available.
+    conditionCollections: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
 }
 
 const resolveLoreProbability = (entry: Lore): number => {
@@ -78,7 +78,7 @@ export const isLoreProbabilityActive = (entry: Lore): boolean => {
 export const selectConstantLoreEntries = (lorebook: Lore[] = [], context: ConditionContext = {}): Lore[] => {
     return lorebook
         .filter((entry) => entry?.enabled && entry?.constant)
-    .filter((entry) => evaluateConditions(entry.conditions, context))
+        .filter((entry) => evaluateConditionCollections(entry.conditionCollections, context))
         .filter((entry) => isLoreProbabilityActive(entry));
 };
 
@@ -110,7 +110,7 @@ export function createLoreEntry(params: Partial<Omit<Lore, 'id'>>): Lore {
         insertionOrder: 0,
         priority: 0,
         probability: 100,
-        conditions: [],
+        conditionCollections: [],
         ...params,
         id: generateUuid()
     };

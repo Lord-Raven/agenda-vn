@@ -1,7 +1,9 @@
 export enum OutcomeType {
     LORE_UPDATE = 'LORE_UPDATE',
-    STAT_CHANGE = 'STAT_CHANGE',
+    ACTOR_STAT = 'ACTOR_STAT',
+    PLAYER_STAT = 'PLAYER_STAT',
     NEW_EVENT = 'NEW_EVENT',
+    NEW_ACTOR = 'NEW_ACTOR',
     OTHER = 'OTHER',
 }
 

@@ -28,6 +28,7 @@ interface SettingsData {
     playerColor: string;
     textToSpeech: boolean;
     disableImpersonation: boolean;
+    disableFontEffects: boolean;
     betaMode: boolean;
     language: string;
 }
@@ -118,6 +119,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         playerColor: resolvePlayerThemeColor(stageInstance.getPlayerActor()?.themeColor || ''),
         textToSpeech: (stageInstance.getSave()?.textToSpeech ?? true),
         disableImpersonation: (stageInstance.getSave()?.disableImpersonation ?? false),
+        disableFontEffects: (stageInstance.getSave()?.disableFontEffects ?? false),
         betaMode: (stageInstance.getSave()?.betaMode ?? false),
         language: stageInstance.getSave()?.language || 'English',
     });
@@ -145,6 +147,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                 data: {
                     textToSpeech: settings.textToSpeech,
                     disableImpersonation: settings.disableImpersonation,
+                    disableFontEffects: settings.disableFontEffects,
                     betaMode: settings.betaMode,
                     language: settings.language,
                 },
@@ -160,6 +163,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
             saveData.textToSpeech = settings.textToSpeech;
             saveData.disableImpersonation = settings.disableImpersonation;
+            saveData.disableFontEffects = settings.disableFontEffects;
             saveData.betaMode = settings.betaMode;
             saveData.language = settings.language;
             saveData.playerStatValues = resolvedPlayerStatValues;
@@ -616,6 +620,68 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                             }}
                                         >
                                             Disable Impersonation
+                                        </span>
+                                    </motion.div>
+
+                                    {/* Disable Font Effects Toggle */}
+                                    <motion.div
+                                        whileHover={{ scale: 1.01 }}
+                                        whileTap={{ scale: 0.99 }}
+                                        onClick={() => setSettings(prev => ({ ...prev, disableFontEffects: !prev.disableFontEffects }))}
+                                        onMouseEnter={() => setTooltip('Prevent the game from applying font effects to text.', Forum)}
+                                        onMouseLeave={clearTooltip}
+                                        style={{
+                                            padding: '12px',
+                                            background: settings.disableFontEffects
+                                                ? 'color-mix(in srgb, var(--agenda-highlight) 18%, transparent)'
+                                                : 'color-mix(in srgb, var(--agenda-panel-surface) 86%, transparent)',
+                                            border: settings.disableFontEffects
+                                                ? '2px solid color-mix(in srgb, var(--agenda-highlight) 50%, transparent)'
+                                                : '2px solid var(--agenda-panel-border)',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                width: '20px',
+                                                height: '20px',
+                                                borderRadius: '4px',
+                                                background: settings.disableFontEffects ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
+                                                border: '2px solid ' + (settings.disableFontEffects ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0,
+                                                transition: 'all 0.2s ease',
+                                            }}
+                                        >
+                                            {settings.disableFontEffects && (
+                                                <motion.span
+                                                    initial={{ scale: 0 }}
+                                                    animate={{ scale: 1 }}
+                                                    style={{
+                                                        color: 'var(--agenda-text-primary)',
+                                                        fontSize: '14px',
+                                                        fontWeight: 'bold',
+                                                    }}
+                                                >
+                                                    ✓
+                                                </motion.span>
+                                            )}
+                                        </div>
+                                        <span
+                                            style={{
+                                                color: settings.disableFontEffects ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
+                                                fontSize: '13px',
+                                                fontWeight: settings.disableFontEffects ? 'bold' : 'normal',
+                                            }}
+                                        >
+                                            Disable Font Effects
                                         </span>
                                     </motion.div>
 

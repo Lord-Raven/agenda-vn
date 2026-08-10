@@ -13,7 +13,7 @@ import {
     parseXmlTagsToObjects,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-import { evaluateConditions } from './Condition';
+import { evaluateConditionCollections } from './Condition';
 
 const getDayDifference = (startDate: string, endDate: string): number => {
     const start = new Date(`${startDate}T00:00:00Z`);
@@ -53,19 +53,12 @@ const formatCurrentDate = (currentDate?: string, currentTimeOfDay?: string): str
     return `${dateLabel} ${dayOfMonth}${suffix}, ${date.getUTCFullYear()} - ${timeOfDayLabel}`;
 };
 
-export enum SkitType {
-    INTRO = 'INTRO',
-    SOCIAL = 'SOCIAL',
-    EXPEDITION = 'EXPEDITION',
-    DISCOVERY = 'DISCOVERY',
-}
-
 export class Skit {
     id: string = '';
-    skitType: SkitType = SkitType.SOCIAL;
     guidance: string = ''; // Optional guidance for the goal of this skit.
     script: ScriptEntry[] = [];
     initialActors: string[] = []; // List of Actor IDs present in this skit
+    initialActorOutfits: {[actorId: string]: string} = {}; // Map of Actor IDs to their initial outfit IDs for this skit
     initialLocationId: string = ''; // Initial location for the skit, can be used to set background or context
     summary: string = ''; // Final summary of this skit
     over: boolean = false; // Whether this skit has concluded. This flag is set upon closing a skit.
@@ -195,7 +188,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     );
     const activeConstantLore = lorebook
         .filter((lore) => lore.enabled && lore.constant && passedProbabilityLoreIds.has(lore.id))
-        .filter((lore) => evaluateConditions(lore.conditions, save))
+        .filter((lore) => evaluateConditionCollections(lore.conditionCollections, save))
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
     const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
 
@@ -261,7 +254,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
                 return false;
             }
 
-            if (!evaluateConditions(lore.conditions, save)) {
+            if (!evaluateConditionCollections(lore.conditionCollections, save)) {
                 return false;
             }
 
@@ -354,7 +347,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
         let attempts = 3;
         const availableActors = Object.values(stage.getSave().actors)
             .filter(actor => actor.id !== stage.getSave().playerId && actor.active)
-            .filter(actor => evaluateConditions(actor.conditions, save));
+            .filter(actor => evaluateConditionCollections(actor.conditionCollections, save));
         while (attempts > 0) {
             const response = await stage.generateText(
                 buildPrompt()
@@ -418,9 +411,9 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     `actions are depicted in prose and character dialogue in quotation marks. ` +
                     `Characters present their own actions and dialogue, while other events within the scene are attributed to NARRATOR. ` +
                     `Although a script format is employed, the actual content should be professionally edited narrative prose. ` +
-                    (save.disableImpersonation ?
-                        `New entries refer to the player, ${playerName}, in second-person; all other characters are referred to in third-person, even in their own entries.` :
-                        (`Entries from the player, ${playerName}, are written in first-person, while other entries consistently refer to ${playerName} in second-person; all other characters are referred to in third-person, even in their own entries.`)) +
+                    (save.enableImpersonation ?
+                        `Entries from the player, ${playerName}, are written in first-person, while other entries consistently refer to ${playerName} in second-person; all other characters are referred to in third-person, even in their own entries.` :
+                        `New entries refer to the player, ${playerName}, in second-person; all other characters are referred to in third-person, even in their own entries.`) +
                     `This scene is a brief visual novel skit within a video game; as such, the scene avoids major developments or concrete details which would fundamentally alter or subvert the mechanics of the game. ` +
                     (skit.script.length == 0 ? 'As this is the initial, establishing moment of a new scene, evaluate the current outfit and alternative outfits of each character and use Outfit ("wears") tags to update the characters to the most appropriate outfit for the moment. Begin the scene with appropriate tags at the "System:" prompt.' : 'Continue the scene at the "System:" prompt.') +
                     `Generally, focus upon interpersonal dynamics, character growth, and discovery or trials within this strange world.` +
@@ -450,7 +443,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     `<Entry><Speaker>CYANEA</Speaker><Message>"I can't believe we're finally here. It's been a long journey."</Message></Entry>\n` +
                     `<Entry><Speaker>PERSEPHONE</Speaker><Message>"Yes, but the real challenge is just beginning. We must stay vigilant." Persephone gently chides Cyanea.</Message></Entry>\n` +
                     `<Entry><Speaker>CYANEA</Speaker><Expression><Actor>Cyanea</Actor><Mood>Determination</Mood></Expression><Message>Cyanea frowns uncharacteristically with determination, "Of course." She nods with almost comical sobriety.</Message></Entry>\n` +
-                    (!save.disableImpersonation ? `<Entry><Speaker>${playerName.toUpperCase()}</Speaker><Message>I smile warmly at the two women, "I agree. We need to be careful and work together."</Message></Entry>\n` : '') +
+                    (save.enableImpersonation ? `<Entry><Speaker>${playerName.toUpperCase()}</Speaker><Message>I smile warmly at the two women, "I agree. We need to be careful and work together."</Message></Entry>\n` : '') +
                     `<Entry><Speaker>RED HOOD</Speaker><Movement><Actor>Red Hood</Actor><Location>Here</Location></Movement><Message>A crimson-clad figure approaches with supplies."</Message></Entry>\n`
                 )
                 .addBlock('Scene Prompt',
@@ -668,7 +661,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             }
 
             // If impersonation is disabled, find any player entries and remove it and everything that follows:
-            if (save.disableImpersonation) {
+            if (!save.enableImpersonation) {
                 // If impersonation is undesired, find any entry where the speaker matches the player's name and drop all messages beyond that point.
                 const playerEntryIndex = scriptEntries.findIndex(entry => entry.speakerId === stage.getPlayerActor().id);
                 if (playerEntryIndex !== -1) {
@@ -778,7 +771,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             const matchedActor = findBestNameMatch(actorName, Object.values(save.actors), ['name']);
                             if (matchedActor && !isNaN(changeValue) && changeValue !== 0) {
                                 outcomes.push(new Outcome({
-                                    type: OutcomeType.STAT_CHANGE,
+                                    type: OutcomeType.ACTOR_STAT,
                                     description: `Stat for ${matchedActor.name} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
                                     details: {
                                         actorId: matchedActor.id,
@@ -936,5 +929,10 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
     return [];
 
 
+}
+
+// This function goes through current outcomes on the provided scriptEntries and produces an accumulated Outcome array that combines like stat changes.
+export function accumulateOutcomes(scriptEntries: ScriptEntry[], stage: Stage): Outcome[] {
+    return [];
 }
 

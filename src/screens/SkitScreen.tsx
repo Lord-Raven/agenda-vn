@@ -1,15 +1,31 @@
 import { FC, useCallback, useEffect, useRef, useState } from "react";
-import { Stage } from "../Stage";
+import { SaveType, Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer";
 import { Box, Typography } from "@mui/material";
-import { LastPage, MenuRounded, PlayArrow, Send, Settings } from "@mui/icons-material";
 import { Button, NamePlate } from "./UiComponents";
 import { useTooltip } from "./TooltipContext";
-import { Actor, getEmotionImage } from "../content/Actor";
-import { determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
+import { Actor, getActorLore, getEmotionImage } from "../content/Actor";
+import { accumulateOutcomes, determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
 import { getLocationImageUrl } from "../content/Location";
 import { ContentManagementScreen } from "./ContentManagementScreen";
+
+
+import {
+    Send,
+    LastPage,
+    PlayArrow,
+    Menu as MenuIcon,
+    EditNote,
+    Close,
+    Warning,
+    VolumeUp,
+    VolumeOff
+} from '@mui/icons-material';
+import { IconButton } from '@mui/material';
+import React from "react";
+import { Emotion } from "../content/Emotion";
+import { Outcome } from "../content/Outcome";
 
 interface SkitScreenProps {
     stage: () => Stage;
@@ -17,213 +33,386 @@ interface SkitScreenProps {
     isVerticalLayout: boolean;
 }
 
-const CALENDAR_BACKGROUND_IMAGE = "https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png";
+/**
+ * Helper function to get the active scene location ID at a given script index.
+ * Applies scene-level location transitions up to and including the index.
+ */
+const getSceneLocationIdAtIndex = (skit: Skit, scriptIndex: number): string => {
+    let sceneLocationId = skit.initialLocationId;
+
+    for (let i = 0; i <= scriptIndex && i < skit.script.length; i++) {
+        const entry = skit.script[i];
+        if (entry.updatedLocationId) {
+            sceneLocationId = entry.updatedLocationId;
+        }
+    }
+
+    return sceneLocationId;
+};
+
+/**
+ * Helper function to get the actors present in the scene at a given script index.
+ * Walks through movements from initialActorLocations, filtering by scene location at index.
+ */
+const getActorsAtIndex = (skit: Skit, scriptIndex: number, allActors: {[key: string]: Actor}, save: SaveType): Actor[] => {
+    // Start with initial actor locations
+    const currentLocations = {...(skit.initialActors || {})};
+    const movedActorIds = new Set<string>();
+    
+    // Apply movements up to and including the current index
+    /*for (let i = 0; i <= scriptIndex && i < skit.script.length; i++) {
+        const entry = skit.script[i];
+        if (entry.movements) {
+            Object.entries(entry.movements).forEach(([actorId, newLocationId]) => {
+                movedActorIds.add(actorId);
+                currentLocations[actorId] = newLocationId;
+            });
+        }
+    }*/
+    
+    const sceneLocationId = getSceneLocationIdAtIndex(skit, scriptIndex);
+
+    // Filter actors who are at the skit's location and are active in the save
+    const actorsInScene: Actor[] = [];
+    Object.entries(currentLocations).forEach(([actorId, locationId]) => {
+        if (locationId === sceneLocationId && allActors[actorId]) {
+            actorsInScene.push(allActors[actorId]);
+        }
+    });
+    
+    return actorsInScene;
+};
+
+/**
+ * Helper function to get actor outfit IDs at a given script index.
+ * Walks from initialActorOutfits and applies per-entry outfitChanges.
+ */
+const getActorOutfitsAtIndex = (skit: Skit, scriptIndex: number, allActors: {[key: string]: Actor}): {[actorId: string]: string} => {
+    const currentOutfits = {
+        ...Object.values(allActors).reduce((acc, actor) => {
+            acc[actor.id] = actor.outfitId;
+            return acc;
+        }, {} as {[actorId: string]: string}),
+        ...(skit.initialActorOutfits || {})
+    };
+
+    for (let i = 0; i <= scriptIndex && i < skit.script.length; i++) {
+        const entry = skit.script[i];
+        if (entry.actorOutfits) {
+            Object.entries(entry.actorOutfits).forEach(([actorId, newOutfitId]) => {
+                currentOutfits[actorId] = newOutfitId;
+            });
+        }
+    }
+
+    return currentOutfits;
+};
+
+const clampHexColor = (color: string, minBrightness: number = 0.3, maxBrightness: number = 0.6): string => {
+    const match = /^#([0-9A-F]{6})([0-9A-F]{2})?$/i.exec(color);
+    if (!match) {
+        return color;
+    }
+
+    const hex = match[1];
+    const alpha = match[2] || '';
+    const red = parseInt(hex.slice(0, 2), 16);
+    const green = parseInt(hex.slice(2, 4), 16);
+    const blue = parseInt(hex.slice(4, 6), 16);
+
+    const brightness = (red + green + blue) / (255 * 3);
+    if (brightness >= minBrightness && brightness <= maxBrightness) {
+        return color;
+    }
+
+    const targetBrightness = brightness > maxBrightness ? maxBrightness : minBrightness;
+    if (brightness === 0) {
+        const channel = Math.round(targetBrightness * 255).toString(16).padStart(2, '0');
+        return `#${channel}${channel}${channel}${alpha}`;
+    }
+
+    const scale = targetBrightness / brightness;
+    const adjustChannel = (channel: number): string =>
+        Math.max(0, Math.min(255, Math.round(channel * scale))).toString(16).padStart(2, '0');
+
+    const dimmedRed = adjustChannel(red);
+    const dimmedGreen = adjustChannel(green);
+    const dimmedBlue = adjustChannel(blue);
+
+    return `#${dimmedRed}${dimmedGreen}${dimmedBlue}${alpha}`;
+};
+
 export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVerticalLayout }) => {
     const { setTooltip, clearTooltip } = useTooltip();
-    const [isGeneratingNextSkit, setIsGeneratingNextSkit] = useState(false);
-    const [showContentManagement, setShowContentManagement] = useState(false);
-    const initializedSkitIdRef = useRef<string | null>(null);
-    const currentSkit = stage().getCurrentSkit();
+    const [skit, setSkit] = React.useState<Skit>(stage().getCurrentSkit() as Skit);
+    const [, setSkitRevision] = React.useState(0);
+    const [isLoading, setIsLoading] = React.useState<boolean>(false);
+    const [accumulatedOutcomes, setAccumulatedOutcomes] = React.useState<Outcome[]>([]);
+    const [showContentManagement, setShowContentManagement] = React.useState(false);
+    const [isAudioEnabled, setIsAudioEnabled] = React.useState<boolean>(stage().getSave().enableTextToSpeech || true);
+    const isTextToSpeechEnabled = stage().getSave().enableTextToSpeech;
+    const currentScriptIndex = Math.min(Math.max(skit.currentIndex || 0, 0), Math.max(skit.script.length - 1, 0));
+    const shouldHighlightCloseButton = !isLoading && skit.script.length >= 3 && currentScriptIndex >= skit.script.length - 1;
+
+    const currentLocationId = getSceneLocationIdAtIndex(skit, skit.currentIndex || 0);
+    const location = stage().getSave().atlas[currentLocationId || ''];
+    const locationImageUrl = getLocationImageUrl(location);
+    const cornerButtonSx = {
+        color: 'var(--agenda-accent-primary)',
+        opacity: 0.8,
+        '&:hover': {
+            color: 'var(--agenda-text-muted)',
+            backgroundColor: 'color-mix(in srgb, var(--agenda-accent-primary) 10%, transparent)'
+        }
+    };
+    
+    const actors = {...stage().getSave().actors};
+
+    
+    const onSkitChange = useCallback((newSkit: Skit) => {
+        // Keep skit object identity stable, but force this component to re-render.
+        setSkitRevision(prev => prev + 1);
+    }, [stage]);
 
     useEffect(() => {
-        if (!currentSkit) {
-            setScreenType(ScreenType.CALENDAR);
-            return;
+        setSkitRevision(prev => prev + 1);
+    }, [isLoading]);
+
+    const handleClose = useCallback(() => {
+        const clampedCurrentIndex = Math.min(Math.max(skit.currentIndex || 0, 0), Math.max(skit.script.length - 1, 0));
+        const endedEarly = clampedCurrentIndex < skit.script.length - 1;
+        const finalizedSkit: Skit = {
+            ...skit,
+            script: skit.script.slice(0, clampedCurrentIndex + 1)
+        };
+
+        setSkit(finalizedSkit);
+        stage().endSkit();
+    }, [stage, setScreenType]);
+
+	const handleSkitSubmit = useCallback(async (input: string, skitArg: Skit, index: number) => {
+		index = Math.max(0, index);
+        setIsLoading(true);
+        const nextEntries = await generateSkitScript(skitArg, stage());
+        setIsLoading(false);
+        skitArg.script.push(...nextEntries);
+        stage().saveGame();
+
+        return skitArg;
+	}, [stage]);
+
+    useEffect(() => {
+        if (skit.script.length == 0 && !isLoading) {
+            setIsLoading(true);
+            stage().continueSkit().then(() => {
+                setIsLoading(false);
+                stage().saveGame();
+            });
         }
+        const visibleScriptEntries = skit.script.slice(0, Math.min((skit.currentIndex || 0) + 1, skit.script.length));
 
-        if (currentSkit.script.length > 0) {
-            return;
-        }
+        const outcomes = accumulateOutcomes(visibleScriptEntries, stage()) || [];
+        setAccumulatedOutcomes(outcomes);
 
-        if (initializedSkitIdRef.current === currentSkit.id) {
-            return;
-        }
+    }, [skit, skit.currentIndex, isLoading]);
 
-        initializedSkitIdRef.current = currentSkit.id;
-
-        const initScript = async () => {
-            setIsGeneratingNextSkit(true);
-            try {
-                const nextEntries = await generateSkitScript(currentSkit, stage());
-                if (nextEntries.length > 0) {
-                    currentSkit.script.push(...nextEntries);
-                    stage().saveGame();
-                }
-            } finally {
-                setIsGeneratingNextSkit(false);
+    // Handle Escape key to open menu
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && !showContentManagement) {
+                setScreenType(ScreenType.MENU);
             }
         };
 
-        initScript();
-    }, [currentSkit, setScreenType, stage]);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [setScreenType, showContentManagement]);
 
-    const handleSkitSubmit = useCallback(async (input: string, skitArg: any, index: number) => {
-        index = Math.max(0, index);
-        if (input.trim() === "" && skitArg.script.length > 0 && skitArg.script[index].endScene) {
-            stage().endSkit();
-            setScreenType(ScreenType.CALENDAR);
-            return null;
+    const outcomesAnimationKey = React.useMemo(() => {
+        if (accumulatedOutcomes.length === 0) {
+            return 'no-outcomes';
         }
 
-        const nextEntries = await generateSkitScript(skitArg as Skit, stage());
-        (skitArg as Skit).script.push(...nextEntries);
-        const currentTimelineEvent = stage().getSave().timeline?.find(entry => entry.skit?.id === skitArg.id);
-        if (currentTimelineEvent) {
-            currentTimelineEvent.skit = skitArg as Skit;
-            stage().saveGame();
-        }
-        return skitArg;
-    }, [setScreenType, stage]);
-
-    if (!currentSkit) {
-        return null;
-    }
+        return accumulatedOutcomes
+            .map((outcome, index) => JSON.stringify({ ...outcome, index }))
+            .join('|');
+    }, [accumulatedOutcomes]);
 
     return (
-        <>
-            <BlurredBackground
-                imageUrl={CALENDAR_BACKGROUND_IMAGE}
-                overlay="linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%)"
-            >
-                <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
-                <Box
-                    sx={{
-                        position: "absolute",
-                        top: 16,
-                        left: 16,
-                        right: 16,
-                        zIndex: 1000,
-                        display: "flex",
-                        alignItems: "flex-start",
-                        justifyContent: "space-between",
-                        gap: 2,
-                    }}
-                >
-                    <Box
-                        sx={{
-                            backgroundColor: "rgba(22, 28, 44, 0.76)",
-                            backdropFilter: "blur(6px)",
-                            padding: "8px 24px",
-                            borderRadius: "20px",
-                            border: "1px solid rgba(138, 176, 204, 0.48)",
-                            boxShadow: "0 4px 18px rgba(10, 16, 29, 0.55), 0 0 16px rgba(138, 176, 204, 0.2)",
-                        }}
-                    >
-                        <Typography
-                            variant="h6"
+        <BlurredBackground
+            imageUrl={locationImageUrl}
+            // overlay="linear-gradient(130deg, rgba(5, 24, 34, 0.78) 0%, rgba(18, 47, 32, 0.72) 50%, rgba(37, 24, 57, 0.78) 100%)"
+        >
+            <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                flexDirection: 'column'
+            }}>
+                {/* Top right control buttons */}
+                <div style={{
+                    width: '100%',
+                    justifyContent: 'flex-end',
+                    padding: '1rem',
+                    display: 'flex',
+                    gap: '0.5rem',
+                    zIndex: 10
+                }}>
+                    {isTextToSpeechEnabled && (
+                        <IconButton
+                            onClick={() => setIsAudioEnabled(prev => !prev)}
+                            onMouseEnter={() => setTooltip(isAudioEnabled ? 'Mute Audio' : 'Enable Audio', isAudioEnabled ? VolumeUp : VolumeOff)}
+                            onMouseLeave={() => clearTooltip()}
                             sx={{
-                                color: "#edf2f2",
-                                fontWeight: "bold",
-                                fontSize: "1.1rem",
-                                letterSpacing: "0.08em",
-                                textTransform: "uppercase",
+                                ...cornerButtonSx,
+                                opacity: isAudioEnabled ? 0.95 : 0.55,
                             }}
                         >
-                            {currentSkit.initialLocationId
-                                ? (stage().getSave().atlas[currentSkit.initialLocationId]?.name || currentSkit.initialLocationId)
-                                : (stage().getConfiguration().title || "Agenda VN")}
-                        </Typography>
-                    </Box>
-
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, opacity: 0.82 }}>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setShowContentManagement(true)}
-                            onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", Settings)}
-                            onMouseLeave={clearTooltip}
-                            style={{ padding: "8px 10px" }}
-                        >
-                            <Settings fontSize="small" />
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setScreenType(ScreenType.MENU)}
-                            onMouseEnter={() => setTooltip("Main menu", MenuRounded)}
-                            onMouseLeave={clearTooltip}
-                            style={{ padding: "8px 10px" }}
-                        >
-                            <MenuRounded fontSize="small" />
-                        </Button>
-                    </Box>
-                </Box>
-
-                <NovelVisualizer
-                    skit={currentSkit}
-                    loading={isGeneratingNextSkit}
-                    renderNameplate={(actor: any) => {
-                        if (!actor || !actor.name) return null;
-                        return <NamePlate actor={actor as Actor} />;
-                    }}
-                    setTooltip={setTooltip}
-                    isVerticalLayout={isVerticalLayout}
-                    actors={stage().getSave().actors}
-                    playerActorId={stage().getPlayerActor().id}
-                    getBackgroundImageUrl={(skit, index) => {
-                        const stageInstance = stage();
-                        const locationId = getCurrentLocation(skit, index);
-                        return getLocationImageUrl(stageInstance.getSave().atlas[locationId], stageInstance);
-                    }}
-                    getPresentActors={(_script, _index) =>
-                        currentSkit.initialActors?.map((id) => stage().getSave().actors[id]).filter(Boolean) || []
-                    }
-                    getActorImageUrl={(actor, _script, index) => {
-                        const emotion = determineEmotion(actor.id, currentSkit, index);
-                        return (
-                            getEmotionImage(actor as Actor, emotion, stage(), (actor as Actor).outfitId) ||
-                            getEmotionImage(actor as Actor, "neutral", stage(), (actor as Actor).outfitId) ||
-                            ""
-                        );
-                    }}
-                    getActorImageColorMultiplier={(_actor, _script, index: number) => {
-                        // Later, use an image analysis library to determine a brightness color from the location's time-of-day image colors.
-                        return "#ffffff";
-                    }}
-                    onSubmitInput={handleSkitSubmit}
-                    getSubmitButtonConfig={(_script, index, inputText) => {
-                        const endScene = index >= 0 ? (currentSkit.script[index]?.endScene || false) : false;
-                        return {
-                            label: inputText.trim().length > 0 ? "Send" : (endScene ? "End" : "Continue"),
-                            enabled: true,
-                            colorScheme: inputText.trim().length > 0 ? "primary" : (endScene ? "error" : "primary"),
-                            icon: inputText.trim().length > 0 ? <Send /> : (endScene ? <LastPage /> : <PlayArrow />),
-                        };
-                    }}
-                    enableAudio={stage().getSave().textToSpeech}
-                    enablePopInSpeakers={true}
-                    enableTalkingAnimation={true}
-                    responsiveOverlay={(_skit, actor) => {
-                        if (!actor || actor.id === stage().getPlayerActor().id) return null;
-                        const typedActor = actor as Actor;
-                        return (
-                            <Box
-                                sx={{
-                                    padding: 2,
-                                    backgroundColor: "rgba(21, 27, 41, 0.9)",
-                                    borderRadius: 2,
-                                    border: `1px solid ${typedActor.themeColor || "#8ab0cc"}`,
-                                    maxWidth: 300,
-                                    boxShadow: "0 12px 28px rgba(0, 0, 0, 0.55)",
+                            {isAudioEnabled ? <VolumeUp /> : <VolumeOff />}
+                        </IconButton>
+                    )}
+                    <IconButton
+                        onClick={() => setShowContentManagement(true)}
+                        onMouseEnter={() => setTooltip('Content Management', EditNote)}
+                        onMouseLeave={() => clearTooltip()}
+                        sx={cornerButtonSx}
+                    >
+                        <EditNote />
+                    </IconButton>
+                    <IconButton
+                        onClick={() => setScreenType(ScreenType.MENU)}
+                        onMouseEnter={() => setTooltip('Main Menu', MenuIcon)}
+                        onMouseLeave={() => clearTooltip()}
+                        sx={cornerButtonSx}
+                    >
+                        <MenuIcon />
+                    </IconButton>
+                    <IconButton
+                        onClick={handleClose}
+                        onMouseEnter={() => setTooltip(isLoading ? 'Cannot close while content is generating' : ((accumulatedOutcomes.length > 0 ? 'Accept Outcomes and ' : '') + (shouldHighlightCloseButton ? 'End Scene Here' : 'End Scene Here (Discard Remaining Entries)')), shouldHighlightCloseButton ? Close : Warning)}
+                        onMouseLeave={() => clearTooltip()}
+                        disabled={isLoading || skit.script.length < 3}
+                        sx={{
+                            ...cornerButtonSx,
+                            ...(!isLoading && shouldHighlightCloseButton ? {
+                                color: 'var(--agenda-warning)',
+                                backgroundColor: 'color-mix(in srgb, var(--agenda-warning) 12%, transparent)',
+                                animation: 'closeButtonPulse 1.6s ease-in-out infinite',
+                                '@keyframes closeButtonPulse': {
+                                    '0%, 100%': {
+                                        transform: 'scale(1)',
+                                        boxShadow: '0 0 0 0 color-mix(in srgb, var(--agenda-text-primary) 35%, transparent)'
+                                    },
+                                    '50%': {
+                                        transform: 'scale(1.08)',
+                                        boxShadow: '0 0 0 8px transparent'
+                                    }
+                                }
+                            } : {}),
+                            '&.Mui-disabled': {
+                                color: 'color-mix(in srgb, var(--agenda-text-primary) 25%, transparent)'
+                            }
+                        }}
+                    >
+                        <Close />
+                    </IconButton>
+                </div>
+                    <NovelVisualizer
+                        skit={skit}
+                        loading={isLoading}
+                        renderNameplate={(actor: any) => {
+                            if (!actor || !actor.name) return null;
+                            return <NamePlate
+                                actor={actor}
+                                style={{
+                                    position: 'absolute',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    zIndex: 5
                                 }}
-                            >
-                                <Box sx={{ marginBottom: 1 }}>
-                                    <NamePlate actor={typedActor} />
-                                </Box>
-                                <Box sx={{ color: "#edf2f2", fontSize: "0.9rem", lineHeight: 1.4 }}>
-                                    {typedActor.profile}
-                                </Box>
-                            </Box>
-                        );
-                    }}
-                />
-                </Box>
-            </BlurredBackground>
+                            />;
+                        }}
+                        typingSpeed={10}
+                        setTooltip={setTooltip}
+                        isVerticalLayout={isVerticalLayout}
+                        actors={actors}
+                        playerActorId={'player'}
+                        getPresentActors={(_script, _index) =>
+                            getActorsAtIndex(_script, _index, stage().getSave().actors, stage().getSave()) || []
+                        }
+                        getActorImageUrl={(actor, _script, index) => {
+                            let emotion = Emotion.neutral;
 
+                            if (skit.script && skit.script.length > 0 && index < skit.script.length) {
+                                for (let j = index; j >= 0; j--) {
+                                    const entry = skit.script[j];
+                                    if (entry.actorEmotions && entry.actorEmotions[actor.name]) {
+                                        emotion = entry.actorEmotions[actor.name];
+                                        break;
+                                    }
+                                }
+                            }
+
+                            const outfitId = getActorOutfitsAtIndex(_script, index, stage().getSave().actors)[actor.id] || actor.outfitId;
+                            return getEmotionImage(actor, emotion, stage(), outfitId);
+                        }}
+                        getActorFilter={(actor, _script, index) => {
+                            return {
+                                filter: undefined,
+                                filterColor: undefined,
+                            };
+                        }}
+                        onSubmitInput={handleSkitSubmit}
+                        onSkitChange={onSkitChange}
+                        getSubmitButtonConfig={(_script, index, inputText) => {
+                            return {
+                                label: inputText.trim().length > 0 ? 'Send' : 'Continue',
+                                enabled: true,
+                                colorScheme: inputText.trim().length > 0 ? 'secondary' : 'primary',
+                                icon: inputText.trim().length > 0 ? <Send /> : <PlayArrow />,
+                            };
+                        }}
+                        enableAudio={isTextToSpeechEnabled && isAudioEnabled}
+                        enablePopInSpeakers={true}
+                        enableTalkingAnimation={true}
+                        enableFontEffects={stage().getSave().enableFontEffects}
+                        responsiveOverlay={(_skit, actor) => {
+                            if (!actor || actor.id === stage().getPlayerActor().id) return null;
+                            const typedActor = actor as Actor;
+                            return (
+                                <Box
+                                    sx={{
+                                        padding: 2,
+                                        backgroundColor: "rgba(21, 27, 41, 0.9)",
+                                        borderRadius: 2,
+                                        border: `1px solid ${typedActor.themeColor || "#8ab0cc"}`,
+                                        maxWidth: 300,
+                                        boxShadow: "0 12px 28px rgba(0, 0, 0, 0.55)",
+                                    }}
+                                >
+                                    <Box sx={{ marginBottom: 1 }}>
+                                        <NamePlate actor={typedActor} />
+                                    </Box>
+                                    <Box sx={{ color: "#edf2f2", fontSize: "0.9rem", lineHeight: 1.4 }}>
+                                        {typedActor.profile}
+                                    </Box>
+                                </Box>
+                            );
+                        }}
+                    />
+            </div>
+
+            {/* Content Management Modal */}
             {showContentManagement && (
                 <ContentManagementScreen
                     stage={stage}
-                    onClose={() => {stage().saveGame(); setShowContentManagement(false);}}
+                    onClose={() => setShowContentManagement(false)}
                 />
             )}
-        </>
+        </BlurredBackground>
     );
-};
+
+}

@@ -18,6 +18,9 @@ export type PlayerStatCondition = {
 
 export type Condition = CalendarCondition | PlayerStatCondition;
 
+// A ConditionCollection is an array of Condition objects, where all conditions must be satisfied for the collection to be considered true.
+export type ConditionCollection = Condition[];
+
 export type ConditionContext = {
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
@@ -86,6 +89,11 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
     return compareValues(actual, condition.value, condition.comparison);
 };
 
-export const evaluateConditions = (conditions: Condition[] | undefined, context: ConditionContext): boolean => {
-    return !conditions?.length || conditions.every((condition) => evaluateCondition(condition, context));
+export const evaluateConditionCollection = (conditionCollection: ConditionCollection, context: ConditionContext): boolean => {
+    return conditionCollection.every((condition) => evaluateCondition(condition, context));
+};
+
+export const evaluateConditionCollections = (conditionCollections: ConditionCollection[] | undefined, context: ConditionContext): boolean => {
+    return !conditionCollections?.length
+        || conditionCollections.some((collection) => evaluateConditionCollection(collection, context));
 };

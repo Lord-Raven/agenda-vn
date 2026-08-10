@@ -1,5 +1,5 @@
 import { v4 as generateUuid } from 'uuid';
-import { Condition } from './Condition';
+import { ConditionCollection } from './Condition';
 import type { Stage } from '../Stage';
 import { AlternativeImage, createAlternativeImage, getMatchingAlternativeImage } from './AlternativeImage';
 import { buildPrompt } from '../utils/PromptBuilder.js';
@@ -149,7 +149,7 @@ export class Map {
             ...link,
             parentId: data?.id || this.id,
             coordinates: { ...link.coordinates },
-            conditions: Array.isArray(link.conditions) ? [...link.conditions] : [],
+            conditionCollections: (link.conditionCollections || []).map((collection) => [...collection]),
         }));
     }
 }
@@ -158,5 +158,5 @@ export interface MapLink {
     parentId: string; // The ID of the parent Map
     childId: string; // The ID of the child map or location
     coordinates: { x: number; y: number }; // Coordinates for the link on the parent Map (x and y are between 0 and 1, representing a percentage of the map's width and height)
-    conditions?: Condition[]; // All conditions must pass for this link to be available.
+    conditionCollections?: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
 }

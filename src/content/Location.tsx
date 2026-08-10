@@ -11,7 +11,7 @@ import {
 	StructuredFieldDefinition,
 } from '../utils/StructuredResponse.js';
 import { CalendarTimeOfDay } from './CalendarEvent';
-import { Condition, ConditionContext, evaluateConditions } from './Condition';
+import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import { AlternativeImage, createAlternativeImage, getMatchingAlternativeImage } from './AlternativeImage';
 
 export type CalendarDayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
@@ -64,7 +64,7 @@ export const getCalendarDayOfWeek = (date: string): CalendarDayOfWeek | null => 
 };
 
 export const isLocationAvailable = (location: Location, context: ConditionContext): boolean => {
-	return location.active !== false && evaluateConditions(location.conditions, context);
+	return location.active !== false && evaluateConditionCollections(location.conditionCollections, context);
 };
 
 
@@ -473,7 +473,7 @@ export class Location {
 	alternativeImages: AlternativeImage[] = [];
     focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
     themeColor: string = ''; // A color associated with this location, used for UI theming.
-	conditions: Condition[] = []; // All conditions must pass for this location to be available.
+	conditionCollections: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
 
     constructor(props: any) {
         Object.assign(this, props);
@@ -483,7 +483,7 @@ export class Location {
         }
 		this.active = this.active !== false;
 		this.alternativeImages = Array.isArray(this.alternativeImages) ? this.alternativeImages.map(createAlternativeImage) : [];
-		this.conditions = Array.isArray(this.conditions) ? [...this.conditions] : [];
+		this.conditionCollections = (this.conditionCollections || []).map((collection) => [...collection]);
         if (!this.themeColor) {
             // Pick from the core game theme palette in index.scss.
             const colors = ['#8ab0cc', '#89cd87', '#7a7b6b', '#b98f6e', '#2e354d'];

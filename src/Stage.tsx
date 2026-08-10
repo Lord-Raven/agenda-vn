@@ -4,7 +4,7 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, findBestNameMatch, loadSupportedActor } from "./content/Actor";
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
-import { generateContext, Skit, SkitType } from "./content/Skit";
+import { generateContext, generateSkitScript, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
@@ -19,7 +19,7 @@ import {
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "./utils/StructuredResponse.js";
-import { evaluateConditions } from './content/Condition';
+import { evaluateConditionCollections } from './content/Condition';
 
 type MessageStateType = any;
 
@@ -42,7 +42,9 @@ export type SaveType = {
     timeline: TimelineEntry[];
     timestamp: number; // Time of last save
     textToSpeech?: boolean;
-    disableImpersonation?: boolean;
+    enableImpersonation?: boolean;
+    enableFontEffects?: boolean;
+    enableTextToSpeech?: boolean;
     language?: string;
     lorebook?: Lore[];
     currentDate?: string;
@@ -444,7 +446,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     outfits: [],
                     outfitId: '',
                     statMap: {},
-                    conditions: [],
+                    conditionCollections: [],
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
                     themeFontFamily: '',
                     voiceId: ''
@@ -563,7 +565,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 .map(actor => actor.id);
 
             const introSkit = new Skit({
-                skitType: SkitType.INTRO,
                 initialLocationId: generatedIntroSeed?.locationId || defaultLocationId,
                 guidance: generatedIntroSeed?.guidance || `${this.getPlayerActor()?.name || 'The player'} is briefly introduced to the concept of the world or setting.`,
                 script: [],
@@ -762,7 +763,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         const skit = new Skit({
-            skitType: SkitType.SOCIAL,
             initialLocationId: selectedLocation.id,
             guidance: selectedEvent.guidance || selectedEvent.description,
             script: [],
@@ -785,6 +785,19 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.rebuildUpcomingEvents(save);
         this.saveGame();
         return skit;
+    }
+
+    async continueSkit(): Promise<void> {
+        const skit = (this.getSave() as any).currentSkit as Skit;
+        if (!skit) return;
+        try {
+            const entries = await generateSkitScript(skit, this);
+            skit.script.push(...entries);
+            this.saveGame();
+        } catch (err) {
+            console.error('Error continuing skit script', err);
+        }
+        return;
     }
 
     getCurrentLocationEvent(locationId: string): CalendarEvent | null {
@@ -828,10 +841,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         /*const initialActors = Object.values(save.actors || {})
             .filter((actor) => actor.id !== save.playerId && actor.active !== false)
-            .filter((actor) => evaluateConditions(actor.conditions, save))
+            .filter((actor) => evaluateConditionCollections(actor.conditionCollections, save))
             .map((actor) => actor.id);*/
         const skit = new Skit({
-            skitType: SkitType.SOCIAL,
             initialLocationId: location.id,
             guidance: '',
             script: [],
@@ -1479,7 +1491,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         let skit: Skit;
 
         skit = new Skit({
-            skitType: SkitType.SOCIAL,
             initialLocationId: selectedLocation.id,
             guidance: calendarEvent.guidance || calendarEvent.description,
             script: [],
@@ -1520,7 +1531,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         updateLoreEntry(loreEntry, this);
                     }
                     break;
-                case 'STAT_CHANGE':
+                case 'ACTOR_STAT':
                     // For stat changes, we expect details to include an actorId and a statMap with the changes.
                     const actorId = outcome.details?.actorId;
                     const statMap = outcome.details?.statMap || {};

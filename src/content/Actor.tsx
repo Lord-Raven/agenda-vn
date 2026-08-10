@@ -11,7 +11,7 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ActorStat } from "../Stage";
-import { Condition } from './Condition';
+import { ConditionCollection } from './Condition';
 
 
 // An outfit represents a set of clothing or physical transformation that can be applied to a specific actor; each outfit comes with a full set of emotions
@@ -37,7 +37,8 @@ export class Actor {
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
     statMap: { [key: string]: number } = {}; // Map of custom stat name to numeric value for this actor
-    conditions: Condition[] = []; // All conditions must pass for this actor to be available.
+    // schedule: { [key: string]: ConditionCollection } = {}; // A map of location ID | 'available' | 'unavailable' to conditions. Will replace the below.
+    conditionCollections: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
 
     /**
      * Rehydrate an Actor from saved data
@@ -47,7 +48,7 @@ export class Actor {
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
-        actor.conditions = Array.isArray(savedActor?.conditions) ? [...savedActor.conditions] : [];
+        actor.conditionCollections = (savedActor?.conditionCollections || []).map((collection: ConditionCollection) => [...collection]);
         return actor;
     }
 
@@ -58,7 +59,7 @@ export class Actor {
         }
         this.active = this.active !== false;
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
-        this.conditions = Array.isArray(this.conditions) ? [...this.conditions] : [];
+        this.conditionCollections = (this.conditionCollections || []).map((collection) => [...collection]);
     }
 }
 
