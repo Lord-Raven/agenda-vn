@@ -5,7 +5,7 @@ import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Button } from '../components/UiComponents';
 import { ActorDetailPanel } from './ActorDetailPanel';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
+import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
 
 interface ActorManagementPanelProps {
     stage: () => Stage;
@@ -14,7 +14,8 @@ interface ActorManagementPanelProps {
 export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) => {
     const UNCATEGORIZED_LABEL = 'Uncategorized';
     const [selectedActorId, setSelectedActorId] = useState<string | null>(null);
-    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+    const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('actor-management');
+    const [actorRevision, setActorRevision] = useState(0);
     const shouldReduceMotion = useReducedMotion();
 
     const shellStyle: React.CSSProperties = {
@@ -44,7 +45,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
             .filter((actor) => actor.id !== save.playerId)
             .filter((actor) => actor.active !== false)
             .sort(sortByName);
-    }, [stage]);
+    }, [stage, actorRevision]);
 
     const actorsByCategory = useMemo<CategorizedEntrySection<Actor>[]>(() => {
         const categoryMap: Record<string, Actor[]> = {};
@@ -105,6 +106,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
 
         save.actors[actor.id] = actor;
         stage().saveGame();
+        setActorRevision((current) => current + 1);
         setSelectedActorId(actor.id);
     };
 
@@ -197,7 +199,9 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                         key={selectedActor.id}
                         actor={selectedActor}
                         stage={stage}
+                        onUpdate={() => setActorRevision((current) => current + 1)}
                         onDeactivate={(actorId) => {
+                            setActorRevision((current) => current + 1);
                             if (selectedActorId === actorId) {
                                 setSelectedActorId(null);
                             }

@@ -5,6 +5,7 @@
  */
 
 import React, { FC, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Actor } from '../content/Actor';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HourglassTop, HourglassBottom } from '@mui/icons-material';
@@ -852,7 +853,11 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = ({
 	onConfirm,
 	onCancel,
 }) => {
-	return (
+	if (typeof document === 'undefined') {
+		return null;
+	}
+
+	return createPortal(
 		<AnimatePresence>
 			{isOpen && (
 				<motion.div
@@ -937,6 +942,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = ({
 					</motion.div>
 				</motion.div>
 			)}
-		</AnimatePresence>
+		</AnimatePresence>,
+		document.body,
 	);
 };

@@ -7,7 +7,7 @@ import { createLoreEntry, Lore } from '../content/Lore';
 import { Button, ConfirmDialog, TextArea, TextInput } from '../components/UiComponents';
 import { findBestNameMatch, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { getLinkedLocationLore, updateLocationDescription } from '../content/Location';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
+import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
 import { ConditionEditor } from '../components/ConditionEditor';
 
 
@@ -102,12 +102,13 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
     const [editingTriggerIndex, setEditingTriggerIndex] = useState<number | 'new' | null>(null);
     const [editingTriggerValue, setEditingTriggerValue] = useState('');
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({
+    const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('lorebook-management', {
         character: false,
         location: false,
         world: false,
         other: true,
     });
+    const [collapsedCharacterCategories, setCollapsedCharacterCategories] = useCachedSidebarCollapseState('lorebook-character-categories');
 
     const categoryOrder = useMemo(() => {
         // Add a category for each Actor name not present in the groups, to allow users to assign lore entries to them
@@ -136,11 +137,42 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             groups[category].push(entry);
         }
 
-        return categoryOrder.map((category) => ({
-            id: category,
-            title: getCategoryLabel(category),
-            entries: sortLoreEntries(groups[category] || []),
-        }));
+        return categoryOrder.map((category) => {
+            const entries = sortLoreEntries(groups[category] || []);
+            if (category !== 'character' || entries.length === 0) {
+                return {
+                    id: category,
+                    title: getCategoryLabel(category),
+                    entries,
+                };
+            }
+
+            const characterGroups = new Map<string, Lore[]>();
+            for (const entry of entries) {
+                const linkedActor = Object.values(stage().getSave().actors || {}).find((actor) => (
+                    actor.active !== false && getLinkedActorLore(actor, stage())?.id === entry.id
+                ));
+                const actorCategory = linkedActor?.category?.trim() || 'Other';
+                characterGroups.set(actorCategory, [...(characterGroups.get(actorCategory) || []), entry]);
+            }
+
+            const characterCategories = [...characterGroups.keys()].sort((left, right) => {
+                if (left === 'Other') return 1;
+                if (right === 'Other') return -1;
+                return left.localeCompare(right);
+            });
+
+            return {
+                id: category,
+                title: getCategoryLabel(category),
+                entries,
+                subsections: characterCategories.map((actorCategory) => ({
+                    id: `character:${actorCategory}`,
+                    title: actorCategory,
+                    entries: sortLoreEntries(characterGroups.get(actorCategory) || []),
+                })),
+            };
+        });
     }, [loreEntries, categoryOrder]);
 
     const selectedLore = useMemo(() => loreEntries.find((entry) => entry.id === selectedLoreId) || null, [loreEntries, selectedLoreId]);
@@ -393,6 +425,13 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                         setCollapsedCategories((current) => ({
                             ...current,
                             [sectionId]: !(current[sectionId] ?? true),
+                        }));
+                    }}
+                    collapsedSubsections={collapsedCharacterCategories}
+                    onToggleSubsection={(subsectionId) => {
+                        setCollapsedCharacterCategories((current) => ({
+                            ...current,
+                            [subsectionId]: !(current[subsectionId] ?? false),
                         }));
                     }}
                     renderEntry={(entry) => {

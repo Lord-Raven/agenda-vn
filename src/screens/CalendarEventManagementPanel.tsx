@@ -3,7 +3,7 @@ import { useReducedMotion } from 'framer-motion';
 import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
+import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
 
 interface CalendarEventManagementPanelProps {
     stage: () => Stage;
@@ -118,7 +118,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
     const [selectedEventId, setSelectedEventId] = useState<string | null>(() => events[0]?.id || null);
     const [draft, setDraft] = useState<CalendarEvent>(() => cloneEvent(events[0] || stageInstance.createCalendarEventDraft()));
     const [isNewDraft, setIsNewDraft] = useState<boolean>(() => events.length === 0);
-    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+    const [collapsedSections, setCollapsedSections] = useCachedSidebarCollapseState('calendar-event-management');
 
     const eventSections = useMemo<CategorizedEntrySection<CalendarEvent>[]>(() => {
         const grouped = new Map<string, { id: string; title: string; sortKey: number; entries: CalendarEvent[] }>();

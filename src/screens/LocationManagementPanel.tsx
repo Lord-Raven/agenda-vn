@@ -6,7 +6,7 @@ import { getLocationImageUrl, Location } from '../content/Location';
 import { Button } from '../components/UiComponents';
 import { LocationDetailPanel } from './LocationDetailPanel';
 import { createLoreEntry } from '../content/Lore';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
+import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
 
 interface LocationManagementPanelProps {
     stage: () => Stage;
@@ -15,7 +15,7 @@ interface LocationManagementPanelProps {
 export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stage }) => {
     const UNCATEGORIZED_LABEL = 'Uncategorized';
     const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
-    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+    const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('location-management');
     const shouldReduceMotion = useReducedMotion();
 
     const shellStyle: React.CSSProperties = {

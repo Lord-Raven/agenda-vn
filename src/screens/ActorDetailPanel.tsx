@@ -14,6 +14,7 @@ interface ActorDetailPanelProps {
     actor: Actor;
     stage: () => Stage;
     onDeactivate?: (actorId: string) => void;
+    onUpdate?: () => void;
 }
 
 const voiceSampleCache = new Map<string, string>();
@@ -82,7 +83,7 @@ const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [ke
     return nextMap;
 };
 
-export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDeactivate }) => {
+export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDeactivate, onUpdate }) => {
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
     const linkedLoreEntry = getLinkedActorLore(actor, stage());
@@ -282,6 +283,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                 delete actor.statMap[statName];
             }
         });
+
+        onUpdate?.();
     };
 
     useEffect(() => {

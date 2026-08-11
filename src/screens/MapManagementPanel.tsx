@@ -3,7 +3,7 @@ import { Map as MapIcon } from '@mui/icons-material';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Map as GameMap } from '../content/Map';
 import { Stage } from '../Stage';
-import { CategorizedEntrySection, CategorizedEntrySidebar } from '../components/CategorizedEntrySidebar';
+import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
 import { MapDetailPanel } from './MapDetailPanel';
 
 interface MapManagementPanelProps {
@@ -14,7 +14,7 @@ const UNCATEGORIZED_LABEL = 'Uncategorized';
 
 export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
     const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
-    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+    const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('map-management');
     const [revision, setRevision] = useState(0);
     const shouldReduceMotion = useReducedMotion();
     const maps = (stage().getSave().maps || []).filter(map => map.active !== false);
