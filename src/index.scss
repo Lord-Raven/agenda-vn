@@ -151,10 +151,12 @@ body {
 }
 
 .btn-danger {
-  color: #ffe3e0;
-  background: linear-gradient(135deg, rgba(122, 34, 34, 0.96), rgba(168, 54, 54, 0.94));
-  border-color: rgba(255, 126, 126, 0.42);
-  box-shadow: 0 10px 24px rgba(46, 7, 7, 0.36);
+  color: color-mix(in srgb, var(--agenda-danger-text) 25%, var(--agenda-text-primary));
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--agenda-danger-text) 42%, var(--agenda-surface-base)),
+    color-mix(in srgb, var(--agenda-danger-text) 62%, var(--agenda-surface-elevated)));
+  border-color: color-mix(in srgb, var(--agenda-danger-text) 42%, transparent);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--agenda-danger-text) 16%, transparent);
 }
 
 .menu-section-header {
@@ -219,8 +221,9 @@ body {
 }
 
 .btn-danger:hover {
-  border-color: rgba(255, 150, 150, 0.58);
-  box-shadow: 0 12px 24px rgba(46, 7, 7, 0.44), 0 0 18px rgba(214, 92, 92, 0.24);
+  border-color: color-mix(in srgb, var(--agenda-danger-text) 58%, transparent);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--agenda-danger-text) 20%, transparent),
+    0 0 18px color-mix(in srgb, var(--agenda-danger-text) 24%, transparent);
 }
 
 .btn-primary:disabled,

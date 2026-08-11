@@ -200,20 +200,20 @@ export const NamePlate: FC<NamePlateProps> = ({
 				position: 'relative',
 				overflow: 'hidden',
 				borderRadius: '10px',
-				background: `linear-gradient(135deg, rgba(27, 33, 51, 0.78) 0%, rgba(34, 42, 64, 0.72) 100%), 
-					radial-gradient(circle at 50% 50%, ${themeColor}15, transparent 70%)`,
+				background: `linear-gradient(135deg, color-mix(in srgb, var(--agenda-panel-surface) 78%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-elevated) 72%, transparent) 100%),
+					radial-gradient(circle at 50% 50%, color-mix(in srgb, ${themeColor} 8%, transparent), transparent 70%)`,
 				backdropFilter: 'blur(12px)',
 				border: '2px solid transparent',
 				backgroundImage: `
-					linear-gradient(135deg, rgba(27, 33, 51, 0.78) 0%, rgba(34, 42, 64, 0.72) 100%),
-					radial-gradient(circle at 50% 50%, ${themeColor}15, transparent 70%),
+					linear-gradient(135deg, color-mix(in srgb, var(--agenda-panel-surface) 78%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-elevated) 72%, transparent) 100%),
+					radial-gradient(circle at 50% 50%, color-mix(in srgb, ${themeColor} 8%, transparent), transparent 70%),
 					linear-gradient(135deg, ${themeColor}, ${themeColor})
 				`,
 				backgroundOrigin: 'border-box',
 				backgroundClip: 'padding-box, padding-box, border-box',
-				boxShadow: `0 6px 16px rgba(0, 0, 0, 0.5), 0 0 15px ${themeColor}33`,
-				color: '#ffffff',
-				textShadow: `0 0 8px ${themeColor}80, 0 2px 4px rgba(0, 0, 0, 0.8)`,
+				boxShadow: `var(--agenda-shadow), 0 0 15px color-mix(in srgb, ${themeColor} 20%, transparent)`,
+				color: 'var(--agenda-text-primary)',
+				textShadow: `0 0 8px color-mix(in srgb, ${themeColor} 50%, transparent), 0 2px 4px color-mix(in srgb, var(--agenda-surface-base) 80%, transparent)`,
 				fontWeight: 700,
 				fontSize: '1.2rem',
 				padding: '2px 6px',
@@ -225,7 +225,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 					content: '""',
 					position: 'absolute',
 					inset: 0,
-					background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 60%)',
+					background: 'linear-gradient(180deg, color-mix(in srgb, var(--agenda-text-primary) 15%, transparent) 0%, transparent 60%)',
 					opacity: 0.5,
 					pointerEvents: 'none'
 				}
@@ -871,7 +871,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = ({
 						left: 0,
 						right: 0,
 						bottom: 0,
-						background: 'rgba(0, 0, 0, 0.75)',
+						background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
 						backdropFilter: 'blur(4px)',
 						display: 'flex',
 						alignItems: 'center',
@@ -888,13 +888,13 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = ({
 						transition={{ duration: 0.2, ease: 'easeOut' }}
 						onClick={(e) => e.stopPropagation()}
 						style={{
-							background: 'linear-gradient(135deg, rgba(31, 37, 58, 0.95) 0%, rgba(24, 29, 45, 0.95) 100%)',
-							border: '2px solid rgba(138, 176, 204, 0.45)',
+							background: 'linear-gradient(135deg, var(--agenda-panel-surface) 0%, color-mix(in srgb, var(--agenda-surface-base) 94%, var(--agenda-panel-surface)) 100%)',
+							border: '2px solid var(--agenda-panel-border)',
 							borderRadius: '12px',
 							padding: '30px',
 							maxWidth: '500px',
 							width: '100%',
-							boxShadow: '0 10px 40px rgba(8, 14, 28, 0.55)',
+							boxShadow: 'var(--agenda-shadow), 0 0 24px color-mix(in srgb, var(--agenda-accent-primary) 18%, transparent)',
 						}}
 					>
 						{/* Title */}
@@ -914,7 +914,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = ({
 						{/* Message */}
 						<Typography
 							sx={{
-								color: 'rgba(255, 255, 255, 0.85)',
+								color: 'color-mix(in srgb, var(--agenda-text-primary) 85%, transparent)',
 								fontSize: '16px',
 								lineHeight: 1.6,
 								marginBottom: '24px',

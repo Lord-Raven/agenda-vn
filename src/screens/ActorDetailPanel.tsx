@@ -1055,14 +1055,20 @@ ${indent}}`;
             label: `Outfit: ${outfit.name}`,
         })),
     ];
+    const hasOutstandingActorGeneration = !!(
+        stage().generationPromises[`actor/${actor.id}`]
+        || stage().generationPromises[`distilling_actor/${actor.id}`]
+    );
 
     return (
         <AnimatePresence>
             <motion.div
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: hasOutstandingActorGeneration ? 0.45 : 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
+                aria-busy={hasOutstandingActorGeneration}
+                {...(hasOutstandingActorGeneration ? { inert: '' } : {})}
                 style={{
                     position: 'relative',
                     background: 'transparent',
