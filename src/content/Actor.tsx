@@ -293,12 +293,20 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         100,
         400,
         distillationFields,
-    );
-        stage.generationPromises[`distilling_actor/${actor.id}`] = generationRequest.finally(() => {
+    ).
+        then((generatedResponse) => {
             console.log('Finished generating distillation for actor:', actor.name);
+        }).catch((error) => {
+            console.error('Error generating distillation for actor:', actor.name, error);
+        }).finally(() => {
             delete stage.generationPromises[`distilling_actor/${actor.id}`];
-    });
+        });
+    stage.generationPromises[`distilling_actor/${actor.id}`] = generationRequest;
     const generatedResponse = await generationRequest;
+    if (generatedResponse === null || generatedResponse === undefined) {
+        console.log(`Failed to generate distillation for actor ${actor.name}. Using existing data.`);
+        return actor;
+    }
     console.log('Generated character distillation:');
     console.log(generatedResponse);
     const parsedData = parseStructuredResponse(generatedResponse, distillationFields);

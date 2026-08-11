@@ -1651,14 +1651,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     async removeBackground(imageUrl: string) {
-    try {
-            console.warn (`Falling back to Chub's background removal.`);
-            const response = await this.generator.removeBackground({image: imageUrl});
-            return response?.url ?? imageUrl;
-        } catch (error) {
-            console.error(`Error removing background`, error);
-            return imageUrl;
-        }
+        try {
+                const response = await this.generator.removeBackground({image: imageUrl});
+                return response?.url ?? imageUrl;
+            } catch (error) {
+                console.error(`Error removing background`, error);
+                return imageUrl;
+            }
     }
 
     async uploadFile(fileName: string, file: File): Promise<string> {
