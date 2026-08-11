@@ -88,7 +88,10 @@ export function getLinkedLocationLore(location: Location, stage: Stage) {
 		}
 		location.loreId = ''; // Clear the loreId if it no longer exists
 	}
-	const bestMatch = findBestNameMatch(location.name, stage.getSave().lorebook?.filter(lore => lore.type === 'location') ?? [], ['title']);
+
+	const unassociatedLoreEntries = stage.getSave().lorebook?.filter(lore => lore.type === 'location' && !Object.values(stage.getSave().atlas).some(a => a.loreId === lore.id)) ?? [];
+
+	const bestMatch = findBestNameMatch(location.name, unassociatedLoreEntries, ['title']);
 	if (bestMatch) {
 		location.loreId = bestMatch.id; // Link the location to the best matching lore entry
 	}

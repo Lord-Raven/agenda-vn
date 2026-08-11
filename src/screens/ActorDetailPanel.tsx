@@ -1,12 +1,12 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { ActorStat, Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, Chip, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ActorStatStars } from '../components/ActorStatStars';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 
@@ -207,9 +207,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         open: boolean;
         title: string;
         message: string;
-        actions?: Array<{ label: string; onClick: () => void; variant?: 'primary' | 'secondary' }>;
-        onConfirm?: () => void;
-    }>({ open: false, title: '', message: '' });
+        confirmText: string;
+        onConfirm: () => void;
+    }>({ open: false, title: '', message: '', confirmText: 'Continue', onConfirm: () => undefined });
     const editedActorRef = useRef(editedActor);
     const editedOutfitsRef = useRef(editedOutfits);
     const editedStatMapRef = useRef(editedStatMap);
@@ -484,21 +484,16 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             open: true,
             title: `Delete Outfit: ${selectedOutfit.name}`,
             message: 'This will remove the selected outfit and all of its emotion images. This cannot be undone. Continue?',
-            actions: [
-                {
-                    label: 'Delete Outfit',
-                    onClick: () => {
-                        setConfirmDialog((prev) => ({ ...prev, open: false }));
-                        setEditedOutfits((prev) => {
-                            const next = prev.filter((outfit) => outfit.id !== selectedOutfit.id);
-                            const replacement = next[0]?.id || '';
-                            setSelectedOutfitId(replacement);
-                            return next;
-                        });
-                    },
-                    variant: 'primary',
-                },
-            ],
+            confirmText: 'Delete Outfit',
+            onConfirm: () => {
+                setConfirmDialog((prev) => ({ ...prev, open: false }));
+                setEditedOutfits((prev) => {
+                    const next = prev.filter((outfit) => outfit.id !== selectedOutfit.id);
+                    const replacement = next[0]?.id || '';
+                    setSelectedOutfitId(replacement);
+                    return next;
+                });
+            },
         });
     };
 
@@ -702,7 +697,10 @@ ${indent}}`;
         const linkedLore = getLinkedActorLore(actor, stage());
         actor.active = false;
 
-        if (linkedLore) {
+        // Want to be certain we aren't deleting a lore entry that has erroneously become shared across actors.
+        const actorsWithLoreId = Object.values(stage().getSave().actors || {}).filter((a) => a !== actor && a.loreId === linkedLore?.id);
+
+        if (linkedLore && actorsWithLoreId.length === 0) {
             const save = stage().getSave();
             save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
         }
@@ -718,6 +716,7 @@ ${indent}}`;
             open: true,
             title: `Regenerate ${emotion} Image`,
             message: `This will regenerate the ${emotion} emotion image and replace the existing one. Continue?`,
+            confirmText: 'Regenerate',
             onConfirm: async () => {
                 setConfirmDialog(prev => ({ ...prev, open: false }));
 
@@ -896,13 +895,8 @@ ${indent}}`;
             open: true,
             title: 'Regenerate original sample',
             message: `This will regenerate the original sample from ${selectedLabel} and may affect all emotion variations. Continue?`,
-            actions: [
-                {
-                    label: 'Regenerate',
-                    onClick: regenerateBase,
-                    variant: 'primary'
-                }
-            ]
+            confirmText: 'Regenerate',
+            onConfirm: regenerateBase,
         });
     };
 
@@ -921,35 +915,26 @@ ${indent}}`;
             open: true,
             title: `Delete ${emotion} Image`,
             message: `This will remove the ${emotion} image for ${selectedOutfit?.name || 'the selected outfit'}. Continue?`,
-            actions: [
-                {
-                    label: 'Delete Image',
-                    onClick: () => {
-                        setConfirmDialog((prev) => ({ ...prev, open: false }));
-                        const nextOutfits = editedOutfits.map((outfit) => (
-                            outfit.id === selectedOutfitId
-                                ? {
-                                    ...outfit,
-                                    prompts: { ...(outfit.prompts || {}) },
-                                    emotionPack: {
-                                        ...(outfit.emotionPack || {}),
-                                        [emotion]: '',
-                                    },
-                                }
-                                : outfit
-                        ));
-
-                        setEditedOutfits(nextOutfits);
-                        actor.outfits = nextOutfits.map((outfit) => ({
+            confirmText: 'Delete Image',
+            onConfirm: () => {
+                setConfirmDialog((prev) => ({ ...prev, open: false }));
+                const nextOutfits = editedOutfits.map((outfit) => (
+                    outfit.id === selectedOutfitId
+                        ? {
                             ...outfit,
                             prompts: { ...(outfit.prompts || {}) },
-                            emotionPack: { ...(outfit.emotionPack || {}) },
-                        }));
-                        forceUpdate({});
-                    },
-                    variant: 'primary',
-                },
-            ],
+                            emotionPack: {
+                                ...(outfit.emotionPack || {}),
+                                [emotion]: '',
+                            },
+                        }
+                        : outfit
+                ));
+
+                setEditedOutfits(nextOutfits);
+                actor.outfits = cloneOutfits(nextOutfits);
+                forceUpdate({});
+            },
         });
     };
 
@@ -1034,6 +1019,23 @@ ${indent}}`;
         } else {
             stage().showPriorityMessage('Failed to generate missing emotion images. Check console for details.');
         }
+    };
+
+    const handleConfirmFillMissingEmotionImages = () => {
+        if (!selectedOutfit || missingEmotionCount === 0 || isFillingMissingEmotions) {
+            return;
+        }
+
+        setConfirmDialog({
+            open: true,
+            title: 'Generate Missing Emotion Images',
+            message: `Generate ${missingEmotionCount} missing emotion image${missingEmotionCount === 1 ? '' : 's'} for ${selectedOutfit.name}? This may take several minutes and use significant generation resources.`,
+            confirmText: `Generate ${missingEmotionCount}`,
+            onConfirm: () => {
+                setConfirmDialog((prev) => ({ ...prev, open: false }));
+                void handleFillMissingEmotionImages();
+            },
+        });
     };
 
     const currentImageUrl = imageDialog.target ? getSelectedOutfitImageUrl(imageDialog.target as Emotion | 'base') : '';
@@ -1652,7 +1654,7 @@ ${indent}}`;
 
                                 <div style={{ marginBottom: '15px', display: 'flex', gap: '10px' }}>
                                     <Button
-                                        onClick={handleFillMissingEmotionImages}
+                                        onClick={handleConfirmFillMissingEmotionImages}
                                         disabled={!selectedOutfit || isFillingMissingEmotions || missingEmotionCount === 0}
                                     >
                                         {isFillingMissingEmotions
@@ -1838,16 +1840,11 @@ ${indent}}`;
                                             open: true,
                                             title: `Delete Actor: ${editedActor.name || actor.name}`,
                                             message: 'This will mark this actor as inactive (soft delete), hide it from management lists, and delete its linked lorebook entry. Existing references remain intact in past content. Continue?',
-                                            actions: [
-                                                {
-                                                    label: 'Delete Actor',
-                                                    onClick: () => {
-                                                        setConfirmDialog((prev) => ({ ...prev, open: false }));
-                                                        handleDeactivateActor();
-                                                    },
-                                                    variant: 'primary',
-                                                },
-                                            ],
+                                            confirmText: 'Delete Actor',
+                                            onConfirm: () => {
+                                                setConfirmDialog((prev) => ({ ...prev, open: false }));
+                                                handleDeactivateActor();
+                                            },
                                         });
                                     }}
                                     variant="secondary"
@@ -1864,16 +1861,11 @@ ${indent}}`;
                                             open: true,
                                             title: 'Generate Actor Details',
                                             message: 'Warning: this will replace existing details for this actor.',
-                                            actions: [
-                                                {
-                                                    label: isGeneratingActorDetails ? 'Generating...' : 'Generate',
-                                                    onClick: async () => {
-                                                        setConfirmDialog((prev) => ({ ...prev, open: false }));
-                                                        await handleGenerateActorDetails();
-                                                    },
-                                                    variant: 'primary',
-                                                },
-                                            ],
+                                            confirmText: isGeneratingActorDetails ? 'Generating...' : 'Generate',
+                                            onConfirm: async () => {
+                                                setConfirmDialog((prev) => ({ ...prev, open: false }));
+                                                await handleGenerateActorDetails();
+                                            },
                                         });
                                     }}
                                     disabled={isGeneratingActorDetails}
@@ -2240,67 +2232,14 @@ ${indent}}`;
                 </DialogContent>
             </Dialog>
 
-            <Dialog
-                open={confirmDialog.open}
-                onClose={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
-                slotProps={{
-                    paper: {
-                        style: {
-                            backgroundColor: 'color-mix(in srgb, var(--agenda-surface-raised) 94%, var(--agenda-surface-base))',
-                            backdropFilter: 'blur(10px)',
-                            border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                            borderRadius: '8px',
-                            color: 'var(--agenda-text-primary)',
-                            minWidth: '400px',
-                        }
-                    }
-                }}
-            >
-                <DialogTitle style={{
-                    color: 'var(--agenda-highlight)',
-                    fontSize: '18px',
-                    fontWeight: 'bold',
-                    borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                    paddingBottom: '10px',
-                }}>
-                    {confirmDialog.title}
-                </DialogTitle>
-                <DialogContent style={{ paddingTop: '20px' }}>
-                    <div style={{
-                        color: 'var(--agenda-text-primary)',
-                        fontSize: '14px',
-                        lineHeight: '1.6',
-                    }}>
-                        {confirmDialog.message}
-                    </div>
-                </DialogContent>
-                <DialogActions style={{ padding: '15px 20px', display: 'flex', gap: '10px' }}>
-                    <Button
-                        onClick={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
-                        variant="secondary"
-                    >
-                        Cancel
-                    </Button>
-                    {confirmDialog.actions ? (
-                        confirmDialog.actions.map((action, index) => (
-                            <Button
-                                key={index}
-                                onClick={action.onClick}
-                                variant={action.variant || 'primary'}
-                            >
-                                {action.label}
-                            </Button>
-                        ))
-                    ) : (
-                        <Button
-                            onClick={confirmDialog.onConfirm}
-                            variant="primary"
-                        >
-                            Regenerate
-                        </Button>
-                    )}
-                </DialogActions>
-            </Dialog>
+            <ConfirmDialog
+                isOpen={confirmDialog.open}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                confirmText={confirmDialog.confirmText}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+            />
         </AnimatePresence>
     );
 };

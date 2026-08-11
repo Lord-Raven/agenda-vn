@@ -361,8 +361,11 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     const handleDeactivateLocation = () => {
         const linkedLore = getLinkedLocationLore(location, stage());
         location.active = false;
+    
+        // Want to be certain we aren't deleting a lore entry that has erroneously become shared across actors.
+        const locationsWithLoreId = Object.values(stage().getSave().atlas || {}).filter((a) => a !== location && a.loreId === linkedLore?.id);
 
-        if (linkedLore) {
+        if (linkedLore && locationsWithLoreId.length === 0) {
             const save = stage().getSave();
             save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
         }
