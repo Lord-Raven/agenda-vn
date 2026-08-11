@@ -352,6 +352,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 }
 
 export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage): void {
+    console.log(`Upserting lore entry for actor ${actor.name} (ID: ${actor.id})`);
     let loreEntry = getLinkedActorLore(actor, stage);
     // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
     if (!loreEntry) {
@@ -598,7 +599,9 @@ export function getLinkedActorLore(actor: Actor, stage: Stage) {
         }
         actor.loreId = ''; // Clear the loreId if it no longer exists
     }
-    const bestMatch = findBestNameMatch(actor.name, stage.getSave().lorebook?.filter(lore => lore.type === 'character') ?? [], ['title']);
+    // Don't pick something that another actor is already linked to; only consider unassociated lore entries.
+    const unassociatedLoreEntries = stage.getSave().lorebook?.filter(lore => lore.type === 'character' && !Object.values(stage.getSave().actors).some(a => a.loreId === lore.id)) ?? [];
+    const bestMatch = findBestNameMatch(actor.name, unassociatedLoreEntries, ['title']);
     if (bestMatch) {
         actor.loreId = bestMatch.id; // Link the actor to the best matching lore entry
     }
