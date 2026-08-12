@@ -305,7 +305,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     const generatedResponse = await generationRequest;
     if (generatedResponse === null || generatedResponse === undefined) {
         console.log(`Failed to generate distillation for actor ${actor.name}. Using existing data.`);
-        return actor;
+        return null;
     }
     console.log('Generated character distillation:');
     console.log(generatedResponse);
