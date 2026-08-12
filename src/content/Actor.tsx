@@ -352,6 +352,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         await generateEmotionImage(actor, Emotion.neutral, stage, false, actor.outfitId);
     }
     delete stage.generationPromises[`distilling_actor/${actor.id}`];
+    console.log('Removed generation promise: distilling_actor/' + actor.id);
     return actor;
 }
 

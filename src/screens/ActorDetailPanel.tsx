@@ -1055,6 +1055,7 @@ ${indent}}`;
             label: `Outfit: ${outfit.name}`,
         })),
     ];
+    console.log(`Promises: ${stage().generationPromises['actor/' + actor.id]}, ${stage().generationPromises['distilling_actor/' + actor.id]}`);
     const hasOutstandingActorGeneration = !!(
         stage().generationPromises[`actor/${actor.id}`]
         || stage().generationPromises[`distilling_actor/${actor.id}`]
