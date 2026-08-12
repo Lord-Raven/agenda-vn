@@ -145,8 +145,8 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
 
 const OUTFIT_PROMPT_FIELDS: StructuredFieldDefinition[] = [
     {
-        key: 'prompt',
-        label: 'PROMPT',
+        key: 'artPrompt',
+        label: 'ART PROMPT',
         description: 'One concise image-edit prompt describing expression, posture, and demeanor changes for the target mood.',
     },
 ];
@@ -431,8 +431,7 @@ export async function generateOutfitEmotionPrompt(actor: Actor, emotion: Emotion
             `Write exactly one concise prompt for an image editing model to revise a base image of this character already in this outfit. ` +
             `The prompt is intended to guide the model in adjusting an image to suit the target mood by visually describing changes to this character's expression, posture, gesture, ` +
             `and demeanor in a way that takes their style, personality, and outfit into account where appropriate. ` +
-            `Only describe elements that are relevant to the target image. ` +
-            `Return the result using the Response Format tags.`)
+            `Only describe elements that are relevant to the target image. Avoid incorporating environmental details, which cannot exist in the final portrait image. `)
         .addBlock('Character Core Appearance', actor.description)
         .addBlock('Current Outfit', outfit.description)
         .addBlock('Personality and Public Persona', actor.profile)
@@ -443,7 +442,7 @@ export async function generateOutfitEmotionPrompt(actor: Actor, emotion: Emotion
             buildStructuredExampleResponse(
                 OUTFIT_PROMPT_FIELDS,
                 {
-                    prompt: 'This woman is now in a flirty, playful mood. She smiles and leans forward slightly, with a glint in her half-lidded eyes. She blushes and plays with her hair.',
+                    artPrompt: 'This woman is now in a flirty, playful mood. She smiles and leans forward slightly, with a glint in her half-lidded eyes. She blushes and plays with her hair.',
                 },
                 { includeEndTag: true },
             ))
@@ -451,7 +450,7 @@ export async function generateOutfitEmotionPrompt(actor: Actor, emotion: Emotion
             buildStructuredExampleResponse(
                 OUTFIT_PROMPT_FIELDS,
                 {
-                    prompt: 'This man is now in a somber, reflective mood. He looks downcast, with slumped shoulders and a frown. His eyes look down and away, and he appears lost in thought.',
+                    artPrompt: 'This man is now in a somber, reflective mood. He looks downcast, with slumped shoulders and a frown. His eyes look down and away, and he appears lost in thought.',
                 },
                 { includeEndTag: true },
             ))
@@ -462,7 +461,7 @@ export async function generateOutfitEmotionPrompt(actor: Actor, emotion: Emotion
     )
     .then((response: any) => {
         const parsedPrompt = parseStructuredResponse(`${response || ''}`, OUTFIT_PROMPT_FIELDS);
-        const generatedPrompt = (parsedPrompt.prompt || '').trim();
+        const generatedPrompt = (parsedPrompt.artPrompt || '').trim();
         if (generatedPrompt) {
             setOutfitPrompt(outfit, emotion, generatedPrompt);
             stage.saveGame();

@@ -100,7 +100,7 @@ export function buildStructuredExampleResponse(
         lines.push(options.endTag || DEFAULT_END_TAG);
     }
 
-    return lines.join('\n');
+    return `System:\n${lines.join('\n')}`;
 }
 
 function parseXmlTagContent(content: string): any {
