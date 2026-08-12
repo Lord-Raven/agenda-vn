@@ -294,17 +294,12 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         400,
         distillationFields,
     );
-    generationRequest.then((generatedResponse) => {
-            console.log('Finished generating distillation for actor:', actor.name);
-        }).catch((error) => {
-            console.error('Error generating distillation for actor:', actor.name, error);
-        }).finally(() => {
-            delete stage.generationPromises[`distilling_actor/${actor.id}`];
-        });
+
     stage.generationPromises[`distilling_actor/${actor.id}`] = generationRequest;
     const generatedResponse = await generationRequest;
     if (generatedResponse === null || generatedResponse === undefined) {
         console.log(`Failed to generate distillation for actor ${actor.name}. Using existing data.`);
+        delete stage.generationPromises[`distilling_actor/${actor.id}`];
         return null;
     }
     console.log('Generated character distillation:');
@@ -356,6 +351,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         // Kick off neutral image generation:
         await generateEmotionImage(actor, Emotion.neutral, stage, false, actor.outfitId);
     }
+    delete stage.generationPromises[`distilling_actor/${actor.id}`];
     return actor;
 }
 
@@ -550,10 +546,11 @@ export async function generateBaseActorImage(
             // Invalidate all other emotions
             getOutfitById(actor, targetOutfitId).emotionPack = {'base': getEmotionImage(actor, 'base', stage, targetOutfitId)};
         }
-    }
-    if (currentBaseImageUrl !== getEmotionImage(actor, 'base', stage, targetOutfitId)) {
-        console.log('Done and base image has changed.');
-        await generateEmotionImage(actor, Emotion.neutral, stage, false, targetOutfitId);
+        if (currentBaseImageUrl !== getEmotionImage(actor, 'base', stage, targetOutfitId)) {
+            console.log('Done and base image has changed.');
+            await generateEmotionImage(actor, Emotion.neutral, stage, false, targetOutfitId);
+        }
+        delete stage.generationPromises[`actor/${actor.id}`];
     }
 }
 
