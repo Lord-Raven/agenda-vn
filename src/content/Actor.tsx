@@ -295,12 +295,11 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         distillationFields,
     );
 
+    try {
     stage.generationPromises[`distilling_actor/${actor.id}`] = generationRequest;
     const generatedResponse = await generationRequest;
     if (generatedResponse === null || generatedResponse === undefined) {
-        console.log(`Failed to generate distillation for actor ${actor.name}. Using existing data.`);
-        delete stage.generationPromises[`distilling_actor/${actor.id}`];
-        return null;
+        throw new Error(`Failed to generate distillation for actor ${actor.name}. Using existing data.`);
     }
     console.log('Generated character distillation:');
     console.log(generatedResponse);
@@ -351,9 +350,13 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         // Kick off neutral image generation:
         await generateEmotionImage(actor, Emotion.neutral, stage, false, actor.outfitId);
     }
-    delete stage.generationPromises[`distilling_actor/${actor.id}`];
-    console.log('Removed generation promise: distilling_actor/' + actor.id);
-    return actor;
+        delete stage.generationPromises[`distilling_actor/${actor.id}`];
+        console.log('Removed generation promise: distilling_actor/' + actor.id);
+        return actor;
+    } catch (error) {
+        delete stage.generationPromises[`distilling_actor/${actor.id}`];
+        return null;
+    }
 }
 
 export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage): void {
