@@ -578,24 +578,28 @@ export async function generateEmotionImage(actor: Actor, emotion: Emotion, stage
     if (getEmotionImage(actor, 'base', stage, targetOutfitId) && (!stage.generationPromises[`actor/${actor.id}`] || force)) {
         console.log(`Generating ${emotion} emotion image for actor ${actor.name}`);
         // Create a dummy promise to prevent duplicate generation while this is in progress; this will be deleted when the generation is complete
-        stage.generationPromises[`actor/${actor.id}`] = new Promise(() => {});
+        try {
+            stage.generationPromises[`actor/${actor.id}`] = new Promise(() => {});
 
-        const outfit = getOutfitById(actor, targetOutfitId);
-        const emotionPrompt = getOutfitPrompt(outfit, emotion) || await generateOutfitEmotionPrompt(actor, emotion, stage, targetOutfitId);
-        console.log(`Using emotion prompt for ${emotion}: ${emotionPrompt}`);
+            const outfit = getOutfitById(actor, targetOutfitId);
+            const emotionPrompt = getOutfitPrompt(outfit, emotion) || await generateOutfitEmotionPrompt(actor, emotion, stage, targetOutfitId);
+            console.log(`Using emotion prompt for ${emotion}: ${emotionPrompt}`);
 
-        let baseImageUrl = await getDataUrl(getEmotionImage(actor, 'base', stage, targetOutfitId));
+            let baseImageUrl = await getDataUrl(getEmotionImage(actor, 'base', stage, targetOutfitId));
 
-        const imageUrl = await stage.makeImageFromImage({
-            image: baseImageUrl || '',
-            prompt: emotionPrompt,
-            remove_background: true,
-            transfer_type: 'edit'
-        }, '');
-        delete stage.generationPromises[`actor/${actor.id}`];
-        console.log(`Generated ${emotion} emotion image for actor ${actor.name}: ${imageUrl || ''}`);
-        getOutfitById(actor, targetOutfitId).emotionPack[emotion] = imageUrl || '';
-        return imageUrl || '';
+            const imageUrl = await stage.makeImageFromImage({
+                image: baseImageUrl || '',
+                prompt: emotionPrompt,
+                remove_background: true,
+                transfer_type: 'edit'
+            }, '');
+            delete stage.generationPromises[`actor/${actor.id}`];
+            console.log(`Generated ${emotion} emotion image for actor ${actor.name}: ${imageUrl || ''}`);
+            getOutfitById(actor, targetOutfitId).emotionPack[emotion] = imageUrl || '';
+            return imageUrl || '';
+        } catch (error) {
+            delete stage.generationPromises[`actor/${actor.id}`];
+        }
     }
     return '';
 }
