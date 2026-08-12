@@ -456,7 +456,7 @@ export async function generateOutfitEmotionPrompt(actor: Actor, emotion: Emotion
             ))
         .format(),
         10,
-        100,
+        250,
         OUTFIT_PROMPT_FIELDS,
     )
     .then((response: any) => {
