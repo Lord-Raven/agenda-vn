@@ -293,8 +293,8 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         100,
         400,
         distillationFields,
-    ).
-        then((generatedResponse) => {
+    );
+    generationRequest.then((generatedResponse) => {
             console.log('Finished generating distillation for actor:', actor.name);
         }).catch((error) => {
             console.error('Error generating distillation for actor:', actor.name, error);

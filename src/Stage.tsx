@@ -1464,6 +1464,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const tries = (expectedFields?.length || 0) > 0 ? 3 : 1;
         for (let attempt = 1; attempt <= tries; attempt += 1) {
             try {
+                console.log(`Attempting text generation (attempt ${attempt} of ${tries})`);
                 const response = await this.generator.textGen({
                     prompt: `{{messages}}${prompt}`,
                     min_tokens: minTokens,
@@ -1479,8 +1480,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         : 'empty response';
                     throw new Error(`Invalid response format: ${errorText}. Response: ${result}`);
                 }
+                console.log('Successful text generation:', result);
                 return result;
             } catch (error) {
+                console.log(`Text generation attempt ${attempt} failed:`, error);
                 if (attempt === tries) {
                     console.log(`Exhausted text gen retries.`);
                     throw error;
