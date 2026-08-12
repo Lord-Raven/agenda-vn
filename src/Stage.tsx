@@ -1461,7 +1461,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         expectedFields?: StructuredFieldDefinition[]
     ): Promise<string> {
 
-        const tries = expectedFields?.length || 0 > 0 ? 3 : 1;
+        const tries = (expectedFields?.length || 0) > 0 ? 3 : 1;
         for (let attempt = 1; attempt <= tries; attempt += 1) {
             try {
                 const response = await this.generator.textGen({
@@ -1482,6 +1482,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 return result;
             } catch (error) {
                 if (attempt === tries) {
+                    console.log(`Exhausted text gen retries.`);
                     throw error;
                 }
             }
