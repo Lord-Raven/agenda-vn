@@ -3,6 +3,8 @@ import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { ActorStat, ActorStatDisplayType, Stage } from '../Stage';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
+import { getEmotionImage } from '../content/Actor';
+import { getLocationImageUrl } from '../content/Location';
 
 interface GameManagementPanelProps {
     stage: () => Stage;
@@ -141,6 +143,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         ...save.playerStatValues,
     }));
     const [isCopyingConfigurationJson, setIsCopyingConfigurationJson] = useState(false);
+    const [isCopyingCreatorNotesHtml, setIsCopyingCreatorNotesHtml] = useState(false);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
     const saveGameConfigurationRef = useRef<() => void>(() => {});
@@ -251,6 +254,90 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         [portableGameConfiguration],
     );
 
+    const escapeHtml = useCallback((value: string) => {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }, []);
+
+    const creatorNotesHtml = useMemo(() => {
+        const titleText = (title || 'Untitled Game').trim() || 'Untitled Game';
+        const gameDescription = artStyle?.trim() || 'A story-driven visual novel where lives, choices, and memory reshape the world.';
+        const castItems = activeActors
+            .slice(0, 12)
+            .filter(actor => actor?.name)
+            .map((actor) => {
+                const actorName = escapeHtml(actor.displayName || actor.name || 'Unnamed Character');
+                const actorBackground = escapeHtml((actor.background || actor.description || 'No background provided.').replace(/\s+/g, ' ').trim());
+                const portraitUrl = getEmotionImage(actor, 'neutral', stageInstance, actor.outfitId) || getEmotionImage(actor, 'base', stageInstance, actor.outfitId) || '';
+                return `
+        <div class="cast-item" tabindex="0">
+          <img src="${escapeHtml(portraitUrl)}" alt="${actorName}" class="cast-portrait" />
+          <span class="cast-name">${actorName}</span>
+          <div class="cast-tooltip">${actorBackground}</div>
+        </div>`;
+            })
+            .join('');
+
+        const firstLocationImages = activeLocations
+            .map((location) => getLocationImageUrl(location, stageInstance))
+            .filter(Boolean)
+            .slice(0, 3);
+        const secondLocationImages = activeLocations
+            .map((location) => getLocationImageUrl(location, stageInstance))
+            .filter(Boolean)
+            .slice(3, 6);
+        const resolvedLocationImages = (images: string[], fallbackIndex: number) => {
+            const base = images.length > 0 ? images : [backgroundImageUrl || titleImageUrl || defaultBackgroundImageUrl];
+            return Array.from({ length: 3 }, (_, index) => base[(index + fallbackIndex) % base.length] || base[0]).filter(Boolean);
+        };
+        const slideshowMarkup = (imageSet: string[], animationKey: string) => {
+            const images = resolvedLocationImages(imageSet, animationKey.length);
+            const slides = images
+                .map((imageUrl, index) => `<img src="${escapeHtml(imageUrl)}" alt="" class="slideshow-slide" style="animation-delay:${index * 5}s;" />`)
+                .join('');
+            return `<div class="panel-img-col"><div class="photo-cycler photo-cycler-${animationKey}">${slides}</div></div>`;
+        };
+
+        const locationSlideshowA = slideshowMarkup(firstLocationImages, 'a');
+        const locationSlideshowB = slideshowMarkup(secondLocationImages, 'b');
+        const creatorNotesStyle = ".creator-notes{--mem-bg-deep:#1a1e30;--mem-bg-mid:#24293f;--mem-bg-soft:#2e354d;--mem-fog:#edf2f2;--mem-mist:#8ab0cc;--mem-verdant:#89cd87;--mem-border:rgba(138,176,204,0.34);--mem-border-strong:rgba(137,205,135,0.44);--mem-shadow:0 14px 34px rgba(2,8,18,0.48);--mem-glow:0 0 20px rgba(138,176,204,0.26);--mem-font-flavor:"Lora",Georgia,serif;--mem-font-ui:"Geologica","Segoe UI",sans-serif;margin:16px auto;max-width:100%;color:var(--mem-fog);font-family:var(--mem-font-ui);line-height:1.55}.creator-notes .panel{position:relative;display:flex;flex-direction:row;align-items:stretch;border:1px solid var(--mem-border);border-radius:14px;margin:20px 0;overflow:hidden;background:linear-gradient(160deg, rgba(36,41,63,0.86) 0%, rgba(26,30,48,0.8) 100%), radial-gradient(circle at 8% 14%, rgba(138,176,204,0.2), transparent 60%);box-shadow:var(--mem-shadow), inset 0 1px 0 rgba(237,242,242,0.05);backdrop-filter:blur(12px)}.creator-notes .panel:hover{border-color:var(--mem-border-strong);box-shadow:var(--mem-shadow), var(--mem-glow), inset 0 1px 0 rgba(237,242,242,0.07)}.creator-notes .panel-content{flex:1 1 auto;padding:16px 22px}.creator-notes .panel-img-col{position:relative;flex:0 0 24%;min-width:130px;background:linear-gradient(180deg, rgba(26,30,48,0.5), rgba(26,30,48,0.15));overflow:hidden}.creator-notes .photo-cycler{position:absolute;inset:0;width:100%;height:100%}.creator-notes .slideshow-slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 15%;opacity:0;animation:creator-notes-fade 15s ease-in-out infinite}.creator-notes .cast-tooltip{position:absolute;left:50%;bottom:100%;transform:translate(-50%, -6px);width:min(220px, 80vw);padding:10px 12px;line-height:1.4;background:rgba(17,22,34,0.95);border:1px solid rgba(138,176,204,0.4);border-radius:10px;box-shadow:0 14px 30px rgba(2,8,18,0.6);font-size:0.76rem;color:#edf2f2;opacity:0;pointer-events:none;transition:opacity 120ms ease, transform 120ms ease;z-index:4}.creator-notes .cast-item:hover .cast-tooltip,.creator-notes .cast-item:focus-within .cast-tooltip{opacity:1;transform:translate(-50%, -10px)}.creator-notes .cast-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-decoration:none;text-align:center;padding:6px 4px;border-radius:10px;color:#dce7f2;background:linear-gradient(180deg, rgba(137,205,135,0.05), rgba(138,176,204,0.06));transition:transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;overflow:visible}.creator-notes .cast-item:hover{transform:translateY(-1px);box-shadow:0 0 0 1px rgba(137,205,135,0.3), 0 4px 12px rgba(2,8,18,0.38);background:linear-gradient(180deg, rgba(137,205,135,0.1), rgba(138,176,204,0.11))}.creator-notes .cast-portrait{width:128px;height:128px;border-radius:999px;object-fit:cover;object-position:50% 16%;margin-bottom:4px;border:1px solid rgba(237,242,242,0.35);box-shadow:0 2px 8px rgba(2,8,18,0.45)}.creator-notes .cast-name{display:block;font-size:1rem;line-height:1.12;font-weight:600;color:#eff5ff;max-width:100%;overflow-wrap:anywhere}.creator-notes .panel h2{margin:0 0 10px;font-size:1.4em;font-family:var(--mem-font-flavor);letter-spacing:0.06em;text-transform:uppercase;color:var(--mem-fog);text-shadow:0 0 18px rgba(138,176,204,0.34), 0 4px 10px rgba(3,7,15,0.66)}.creator-notes .panel p{margin:0.4em 0;color:#d6e4ed}.creator-notes .panel b{color:#edf2f2}.creator-notes .panel i{color:#b9d2e3}.creator-notes .cast-intro{margin-top:0;font-size:0.82rem;opacity:0.9}.creator-notes .cast-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(128px, 1fr));gap:4px;margin-top:4px}.creator-notes .cast-grid > spacer{display:none!important;width:0!important;height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;pointer-events:none!important}@keyframes creator-notes-fade{0%, 20%{opacity:0} 25%, 90%{opacity:1} 100%{opacity:0}}@media (max-width:700px){.creator-notes .panel{flex-direction:column}.creator-notes .panel-img-col{min-height:140px;flex:0 0 140px}.creator-notes .panel-content{padding:14px 16px}.creator-notes .cast-grid{grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px}.creator-notes .cast-portrait{width:128px;height:128px}}";
+
+        return `
+<div class="creator-notes">
+  <section class="panel">
+    ${locationSlideshowA}
+    <div class="panel-content">
+      <h2>${escapeHtml(titleText)}</h2>
+      <p>${escapeHtml(gameDescription)}</p>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="panel-content">
+      <h2>The cast</h2>
+      <p class="cast-intro">Meet the cast:</p>
+      <div class="cast-grid">
+        ${castItems || '<div class="cast-intro">No active actors are configured for this game yet.</div>'}
+      </div>
+    </div>
+    ${locationSlideshowB}
+  </section>
+  <section class="panel">
+    ${locationSlideshowA.replace('photo-cycler-a', 'photo-cycler-c')}
+    <div class="panel-content">
+      <h2>Stage Details</h2>
+      <p>This stage is a visual novel framework built around the world and cast in this game.</p>
+      <p>All story beats are shaped by the current lorebook, active locations, and evolving actor states. The world updates as each skit advances and the cast reacts to new developments.</p>
+      <p><b><i>These notes are generated from the live game data and are intended as a quick overview for creators and players.</i></b></p>
+    </div>
+  </section>
+</div>
+<style>${creatorNotesStyle}</style>`;
+    }, [activeActors, activeLocations, artStyle, backgroundImageUrl, defaultBackgroundImageUrl, escapeHtml, stageInstance, title, titleImageUrl]);
+
     const copyConfigurationJson = useCallback(async () => {
         if (isCopyingConfigurationJson) {
             return;
@@ -267,6 +354,23 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             setIsCopyingConfigurationJson(false);
         }
     }, [isCopyingConfigurationJson, portableGameConfigurationJson, stageInstance]);
+
+    const copyCreatorNotesHtml = useCallback(async () => {
+        if (isCopyingCreatorNotesHtml) {
+            return;
+        }
+
+        setIsCopyingCreatorNotesHtml(true);
+        try {
+            await navigator.clipboard.writeText(creatorNotesHtml);
+            stageInstance.showPriorityMessage('Copied creator notes HTML to clipboard.');
+        } catch (error) {
+            console.error('Failed to copy creator notes HTML:', error);
+            stageInstance.showPriorityMessage('Failed to copy creator notes HTML. Check console for details.');
+        } finally {
+            setIsCopyingCreatorNotesHtml(false);
+        }
+    }, [creatorNotesHtml, isCopyingCreatorNotesHtml, stageInstance]);
 
     const saveGameConfiguration = useCallback(() => {
         stageInstance.updateConfiguration({
@@ -1034,6 +1138,30 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         Add Actor Stat
                     </Button>
                 </div>
+            </GlassPanel>
+
+            <GlassPanel variant="default" style={{ padding: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
+                    <Title variant="glow" style={{ fontSize: '20px', margin: 0 }}>Creator Notes HTML Export</Title>
+                    <Button
+                        variant="secondary"
+                        onClick={copyCreatorNotesHtml}
+                        disabled={isCopyingCreatorNotesHtml}
+                    >
+                        {isCopyingCreatorNotesHtml ? 'Copying...' : 'Copy HTML'}
+                    </Button>
+                </div>
+
+                <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginBottom: '8px' }}>
+                    Generates a creator-notes layout from active actors and location images, using hover tooltips for character backgrounds.
+                </div>
+
+                <TextArea
+                    readOnly
+                    value={creatorNotesHtml}
+                    rows={20}
+                    style={{ width: '100%', resize: 'vertical', fontFamily: 'monospace', fontSize: '12px' }}
+                />
             </GlassPanel>
 
             <GlassPanel variant="default" style={{ padding: '18px' }}>
