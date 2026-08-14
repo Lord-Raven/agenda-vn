@@ -395,7 +395,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                 />
                             </div>
 
-                            {playerStats.filter((stat) => stat.exposed).length > 0 && (
+                            {playerStats.filter((stat) => stat.setByPlayer === true).length > 0 && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     <label
                                         style={{
@@ -410,7 +410,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                     </label>
 
                                     {playerStats
-                                        .filter((stat) => stat.exposed)
+                                        .filter((stat) => stat.setByPlayer === true)
                                         .map((stat) => {
                                         const statName = (stat.name || '').trim();
                                         const selectedValue = normalizePlayerStatValue(playerStatValues[statName], stat);

@@ -25,6 +25,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     })),
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
+    setByPlayer: stat.setByPlayer === true || stat.exposed === true,
     exposed: stat.exposed === true,
 });
 
@@ -69,33 +70,6 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): number | string =>
     }
     return resolved;
 };
-
-const defaultPlayerStat = (): ActorStat => ({
-    name: 'New Setting',
-    description: 'Describe what this player setting controls.',
-    guidance: 'How this setting should influence generated narrative and behavior.',
-    default: 'Default',
-    displayType: 'option',
-    options: [
-        {
-            name: 'Default',
-            description: 'Default option behavior for this setting.',
-        },
-    ],
-    exposed: true,
-});
-
-const defaultActorStat = (): ActorStat => ({
-    name: 'Name',
-    description: 'A user-facing description of this stat.',
-    guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
-    default: 50,
-    displayType: 'percentage',
-    min: 0,
-    max: 100,
-    options: [],
-    exposed: false,
-});
 
 const clampStatValue = (value: number, stat: ActorStat): number => {
     let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;

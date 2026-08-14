@@ -23,6 +23,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     })),
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
+    setByPlayer: stat.setByPlayer === true || stat.exposed === true,
     exposed: stat.exposed === true,
     iconName: stat.iconName || (stat.displayType === 'stars' ? 'star' : undefined),
 });
@@ -79,6 +80,7 @@ const defaultPlayerStat = (): ActorStat => ({
         name: 'Default',
         description: 'Default option behavior for this setting.',
     }],
+    setByPlayer: true,
     exposed: true,
     iconName: 'star',
 });
@@ -92,6 +94,7 @@ const defaultActorStat = (): ActorStat => ({
     min: 0,
     max: 100,
     options: [],
+    setByPlayer: false,
     exposed: false,
     iconName: 'star',
 });
@@ -528,10 +531,10 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
                                                     <input
                                                         type="checkbox"
-                                                        checked={stat.exposed === true}
-                                                        onChange={(e) => updatePlayerStat(statIndex, { exposed: e.target.checked })}
+                                                        checked={stat.setByPlayer === true}
+                                                        onChange={(e) => updatePlayerStat(statIndex, { setByPlayer: e.target.checked })}
                                                     />
-                                                    Exposed
+                                                    Set by Player
                                                 </label>
                                             </div>
 

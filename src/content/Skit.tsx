@@ -195,7 +195,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Exposed settings are conscious choices player's made; present them as settings.
     const playerSettingContext = (agendaConfig?.playerStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
-        if (!statName || !stat.exposed) {
+        if (!statName || !stat.setByPlayer) {
             return '';
         }
 
@@ -223,7 +223,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Unexposed settings are more like stats beyond their control; present them that way.
     const playerStatContext = (agendaConfig?.playerStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
-        if (!statName || stat.exposed) {
+        if (!statName || stat.setByPlayer) {
             return '';
         }
 
