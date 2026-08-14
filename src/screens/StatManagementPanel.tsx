@@ -1,6 +1,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActorStat, ActorStatDisplayType, Stage } from '../Stage';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { STAR_ICON_OPTIONS } from '../components/ActorStatStars';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
@@ -23,6 +24,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     exposed: stat.exposed === true,
+    iconName: stat.iconName || (stat.displayType === 'stars' ? 'star' : undefined),
 });
 
 const resolveStatDefaultValue = (stat: ActorStat): number | string => {
@@ -78,6 +80,7 @@ const defaultPlayerStat = (): ActorStat => ({
         description: 'Default option behavior for this setting.',
     }],
     exposed: true,
+    iconName: 'star',
 });
 
 const defaultActorStat = (): ActorStat => ({
@@ -90,6 +93,7 @@ const defaultActorStat = (): ActorStat => ({
     max: 100,
     options: [],
     exposed: false,
+    iconName: 'star',
 });
 
 const clampStatValue = (value: number, stat: ActorStat): number => {
@@ -115,6 +119,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
             default: defaultValue,
             min: undefined,
             max: undefined,
+            iconName: stat.iconName || 'star',
         };
     }
 
@@ -125,6 +130,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
             options: [],
             min: undefined,
             max: undefined,
+            iconName: stat.iconName || 'star',
         };
     }
 
@@ -132,6 +138,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
         ...stat,
         default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
         options: [],
+        iconName: stat.iconName || 'star',
     };
 };
 
@@ -156,6 +163,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         ...configuration.playerStatValues,
         ...save.playerStatValues,
     }));
+    const [starIconSearch, setStarIconSearch] = useState('');
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
@@ -377,6 +385,58 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
+    const renderStarIconPicker = (stat: ActorStat, onChange: (iconName: string) => void) => {
+        const filteredOptions = STAR_ICON_OPTIONS.filter((option) => {
+            const query = starIconSearch.trim().toLowerCase();
+            if (!query) {
+                return true;
+            }
+            return option.label.toLowerCase().includes(query) || option.key.toLowerCase().includes(query);
+        });
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <TextInput
+                    fullWidth
+                    value={starIconSearch}
+                    onChange={(e) => setStarIconSearch(e.target.value)}
+                    placeholder="Search icon"
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(74px, 1fr))', gap: '8px', maxHeight: '210px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {filteredOptions.map((option) => {
+                        const Icon = option.icon;
+                        const active = (stat.iconName || 'star') === option.key;
+                        return (
+                            <button
+                                key={`icon-${option.key}`}
+                                type="button"
+                                onClick={() => onChange(option.key)}
+                                style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    background: active ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
+                                    border: active ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
+                                    borderRadius: '8px',
+                                    color: 'var(--agenda-text-primary)',
+                                    cursor: 'pointer',
+                                    padding: '10px 8px',
+                                    minHeight: '72px',
+                                    fontSize: '11px',
+                                }}
+                            >
+                                <Icon style={{ fontSize: 24, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
+                                <span>{option.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
     const removeActorStat = (index: number) => {
         setActorStats(prev => prev.filter((_, idx) => idx !== index));
         setCollapsedActorStats(prev => prev.filter((_, idx) => idx !== index));
@@ -535,6 +595,13 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         rows={2}
                                                         style={{ width: '100%', resize: 'vertical' }}
                                                     />
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.displayType === 'stars' && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Icon</label>
+                                                    {renderStarIconPicker(normalizedStat, (iconName) => updatePlayerStat(statIndex, { iconName }))}
                                                 </div>
                                             )}
 

@@ -110,6 +110,7 @@ export type ActorStat = {
     min?: number; // Minimum value of the stat (optional)
     max?: number; // Maximum value of the stat (optional)
     exposed: boolean; // Whether the stat should be exposed to the player in the SettingsScreen (when applied to a player) or visible to the user in outcomes or in Actor cards (when applied to other Actors)
+    iconName?: string; // Optional icon key used for star-style stat displays
 }
 
 // Represents a configuration that is used to initialize new games, but can also influence existing games.
@@ -147,6 +148,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     exposed: stat.exposed === true,
+    iconName: stat.iconName || (stat.displayType === 'stars' ? 'star' : undefined),
 });
 
 const cloneActor = (actor: Actor): Actor => new Actor({
