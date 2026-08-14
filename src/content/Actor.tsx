@@ -13,6 +13,40 @@ import {
 import { ActorStat } from "../Stage";
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
+// A single conditional adjustment to an actor's initial stat value; applied when its conditions evaluate true at game start.
+export type ActorStatModifier = {
+    id: string;
+    amount: number;
+    conditions: ConditionCollection[];
+};
+
+// The initial value and conditional modifiers used to compute an actor's stat value when a new game is initialized.
+export type ActorStatInitial = {
+    value: number;
+    modifiers: ActorStatModifier[];
+};
+
+const cloneStatModifier = (modifier: any): ActorStatModifier => ({
+    id: modifier?.id || generateUuid(),
+    amount: Number.isFinite(modifier?.amount) ? Number(modifier.amount) : 0,
+    conditions: Array.isArray(modifier?.conditions)
+        ? modifier.conditions.map((collection: unknown) => Array.isArray(collection) ? [...collection] : [])
+        : [],
+});
+
+const cloneStatInitialMap = (statInitialMap: unknown): { [key: string]: ActorStatInitial } => {
+    if (!statInitialMap || typeof statInitialMap !== 'object' || Array.isArray(statInitialMap)) {
+        return {};
+    }
+    return Object.fromEntries(Object.entries(statInitialMap as Record<string, any>).map(([statName, initial]) => [
+        statName,
+        {
+            value: Number.isFinite(initial?.value) ? Number(initial.value) : 0,
+            modifiers: Array.isArray(initial?.modifiers) ? initial.modifiers.map(cloneStatModifier) : [],
+        },
+    ]));
+};
+
 export const ACTOR_SCHEDULE_AVAILABLE = 'available';
 export const ACTOR_SCHEDULE_UNAVAILABLE = 'unavailable';
 export type ActorSchedule = Record<string, ConditionCollection[]>;
@@ -56,9 +90,11 @@ export class Actor {
     id: string = ''; // UUID
     loreId: string = ''; // The ID of the lore entry associated with this actor, if any. This is used to link the actor to their description in the lorebook.
     active: boolean = true; // Soft-delete flag. Inactive actors are hidden from management UIs.
-    name: string = ''; // Display name
+    name: string = ''; // Full name (possibly with formatting, like last, first), to be used in content management.
+    displayName: string = ''; // Name as it appears in NamePlate and chats, used everywhere beyond content management. Fall back to name.
     description: string = ''; // Core physical description—not outfit-oriented
-    profile: string = ''; // Personality profile description of character
+    background: string = ''; // Backstory and integral traits of this character (as opposed to "profile"/lore entry, which contains evolving details).
+    profile: string = ''; // Evolving personality profile that will eventually portray their character arc
     category: string = ''; // A category for filtering or organization in the UI. Could be a role ("good guys", "baddies") or could be a type of character ("human", "elf"); it is for organizational and not gameplay purposes.
     outfitId: string = ''; // The ID of the current outfit for this actor; if empty, use the first outfit index
     outfits: Outfit[] = []; // Sets of outfits representing transformations for this actor; each outfit has a full set of emotions
@@ -66,6 +102,7 @@ export class Actor {
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
     statMap: { [key: string]: number } = {}; // Map of custom stat name to numeric value for this actor
+    statInitialMap: { [key: string]: ActorStatInitial } = {}; // Map of custom stat name to its initial value and conditional modifiers, used to seed statMap when a new game starts
     schedule: ActorSchedule = {}; // Destinations are evaluated in insertion order; the first matching collection wins.
 
     /**
@@ -76,6 +113,7 @@ export class Actor {
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
+        actor.statInitialMap = cloneStatInitialMap(savedActor?.statInitialMap);
         actor.schedule = cloneSchedule(savedActor?.schedule);
         if (!Object.keys(actor.schedule).length && savedActor?.conditionCollections?.length) {
             actor.schedule = {
@@ -93,6 +131,7 @@ export class Actor {
         }
         this.active = this.active !== false;
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
+        this.statInitialMap = cloneStatInitialMap(this.statInitialMap);
         this.schedule = cloneSchedule(this.schedule);
         if (!Object.keys(this.schedule).length && props?.conditionCollections?.length) {
             this.schedule = {
@@ -122,9 +161,14 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
         description: 'A one- to two-word name for the character\'s current outfit that matches the description.',
     },
     {
+        key: 'background',
+        label: 'BACKGROUND',
+        description: 'The character\'s fixed foundation: their backstory, origins, defining relationships, and integral traits that will not change over the course of the story.',
+    },
+    {
         key: 'profile',
         label: 'PROFILE',
-        description: 'A summary of the character\'s personality traits, mannerisms, history, and motives.',
+        description: 'The character\'s current, evolving state: present personality traits, mannerisms, mood, goals, and motives as they stand right now. Do not restate the background; focus on what could plausibly shift as the story progresses.',
     },
     {
         key: 'voice',
@@ -175,6 +219,29 @@ function clampActorStatValue(value: number, stat: ActorStat): number {
     return normalized;
 }
 
+const NUMERIC_ACTOR_STAT_DISPLAY_TYPES = ['number', 'percentage', 'stars', 'letter grade'];
+
+// Computes an actor's initial stat value from its configured initial value plus any modifiers whose conditions currently evaluate true.
+export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStatInitial | undefined, context: ConditionContext): number {
+    const baseValue = initial && Number.isFinite(initial.value) ? Number(initial.value) : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
+    const modifierTotal = (initial?.modifiers || []).reduce((total, modifier) => {
+        return evaluateConditionCollections(modifier.conditions, context) ? total + (Number.isFinite(modifier.amount) ? Number(modifier.amount) : 0) : total;
+    }, 0);
+    return clampActorStatValue(baseValue + modifierTotal, stat);
+}
+
+// Seeds an actor's statMap from its statInitialMap (initial value +/- applicable modifiers); used when initializing actors for a new game.
+export function applyActorInitialStats(actor: Actor, actorStats: ActorStat[], context: ConditionContext): void {
+    if (!actor.statMap || typeof actor.statMap !== 'object') {
+        actor.statMap = {};
+    }
+    actorStats
+        .filter(stat => stat?.name?.trim() && NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(stat.displayType))
+        .forEach(stat => {
+            actor.statMap[stat.name] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context);
+        });
+}
+
 // Mapping of voice IDs to a description of the voice, so the AI can choose an ID based on the character profile.
 export const VOICE_MAP: {[key: string]: string} = {
     '751212e5-a871-45c7-b10b-6f42a5785954': 'feminine - posh and catty',
@@ -217,7 +284,7 @@ export async function loadSupportedActor(data: Partial<Actor>, stage: Stage): Pr
     if (!newActor.profile || !newActor.outfits?.length) {
         const fallbackDefinition = {
             name: newActor.name,
-            personality: [newActor.description, newActor.profile].filter(Boolean).join('\n').trim() || newActor.name,
+            personality: [newActor.description, newActor.background, newActor.profile].filter(Boolean).join('\n').trim() || newActor.name,
             voice_id: newActor.voiceId,
         };
         return await distillActor(newActor, fallbackDefinition, stage);
@@ -281,6 +348,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
                         description: 'A tall, athletic woman with short, dark hair and piercing blue eyes. She rarely smiles, but when she does, it lights up her face.',
                         outfit_description: 'She wears a simple, utilitarian outfit made from durable materials in dark colors. Lots of pockets and zippers.',
                         outfit_name: 'Adventurer\'s Gear',
+                        background: 'Raised in a border settlement that was burned out when she was twelve, Jane came up through mercenary companies and learned early that promises are collateral. Her older brother, still missing after the raid, is the reason she keeps taking contracts along the frontier. She is unflinchingly loyal to the handful of people who have earned it, and constitutionally incapable of walking away from someone who cannot defend themselves.',
                         profile: 'Jane is confident and determined, quick-witted, and fiercely independent. Known for her sharp wit and strong presence, she has a commanding aura that draws attention. Deep down, Jane is driven by a need to prove she\'s worthy of love despite her past betrayals. She\'s here looking for someone who will challenge her and see beyond her tough exterior.',
                         voice: '03a438b7-ebfa-4f72-9061-f086d8f1fca6',
                         color: '#666666',
@@ -313,7 +381,9 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     const oldName = actor.name;
     // Fill in actor, but favor any current settings:
     actor.name = parsedData['name'] || actor.name || '';
+    actor.displayName = actor.name;
     actor.description = parsedData['description'] || actor.description || '';
+    actor.background = parsedData['background'] || actor.background || '';
     actor.profile = parsedData['profile'] || actor.profile || '';
     actor.voiceId = parsedData['voice'] || actor.voiceId || '';
     actor.themeColor = themeColor || actor.themeColor;

@@ -239,7 +239,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 					fontSize: 'inherit'
 				}}
 			>
-				{actor.name}
+				{actor.displayName || actor.name}
 			</span>
 		</Box>
 	);
@@ -835,7 +835,7 @@ export const MenuItem: FC<MenuItemProps> = ({
 interface ConfirmDialogProps {
 	isOpen: boolean;
 	title: string;
-	message: string;
+	message: ReactNode;
 	confirmText?: string;
 	cancelText?: string;
 	confirmVariant?: ButtonProps['variant'];

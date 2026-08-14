@@ -1,7 +1,7 @@
 import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
-import { Actor, ACTOR_SCHEDULE_AVAILABLE, findBestNameMatch, loadSupportedActor, resolveActorSchedule } from "./content/Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, applyActorInitialStats, findBestNameMatch, loadSupportedActor, resolveActorSchedule } from "./content/Actor";
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
@@ -109,7 +109,7 @@ export type ActorStat = {
     options?: ActorStatOption[]; // Supported option values for option-based stats
     min?: number; // Minimum value of the stat (optional)
     max?: number; // Maximum value of the stat (optional)
-    exposed: boolean; // Whether the stat should be exposed to the player in the SettingsScreen
+    exposed: boolean; // Whether the stat should be exposed to the player in the SettingsScreen (when applied to a player) or visible to the user in outcomes or in Actor cards (when applied to other Actors)
 }
 
 // Represents a configuration that is used to initialize new games, but can also influence existing games.
@@ -438,12 +438,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     loreId: '',
                     active: true,
                     name: playerData.name,
+                    displayName: playerData.name,
                     description: '',
+                    background: '',
                     profile: playerData.personality,
                     category: '',
                     outfits: [],
                     outfitId: '',
                     statMap: {},
+                    statInitialMap: {},
                     schedule: {},
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
                     themeFontFamily: '',
@@ -1876,6 +1879,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const promise = (async () => {
             const save = this.getSave();
             const configuredActors = this.getConfiguration().actors || [];
+            const configuredActorStats = this.getConfiguration().actorStats || [];
 
             // Seed actors from the game configuration first.
             for (const configuredActor of configuredActors) {
@@ -1887,6 +1891,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 });
 
                 if (!save.actors[seededActor.id]) {
+                    applyActorInitialStats(seededActor, configuredActorStats, save);
                     save.actors[seededActor.id] = seededActor;
                 }
             }
@@ -1902,6 +1907,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 try {
                     const enrichedActor = await loadSupportedActor(seededActor, this);
                     if (enrichedActor) {
+                        applyActorInitialStats(enrichedActor, configuredActorStats, save);
                         save.actors[enrichedActor.id] = enrichedActor;
                         this.syncActorStats(save);
                     }
@@ -1947,6 +1953,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         continue;
                     }
 
+                    applyActorInitialStats(newActor, configuredActorStats, save);
                     save.actors[newActor.id] = newActor;
                     this.syncActorStats(save);
                 } catch (error) {

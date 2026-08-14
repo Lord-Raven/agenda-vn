@@ -1,14 +1,15 @@
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { ActorStat, Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, ActorSchedule, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
+import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
-import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow } from '@mui/icons-material';
+import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ActorStatStars } from '../components/ActorStatStars';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
+import { ConditionEditor } from '../components/ConditionEditor';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -18,6 +19,32 @@ interface ActorDetailPanelProps {
 }
 
 const voiceSampleCache = new Map<string, string>();
+
+const ACTOR_DETAIL_GENERATION_FIELDS = [
+    { key: 'name', label: 'Name', description: 'Replaces both the canonical name and the display name.' },
+    { key: 'description', label: 'Description', description: 'Updates the physical description.' },
+    { key: 'background', label: 'Background', description: 'Updates the backstory and fixed foundation.' },
+    { key: 'profile', label: 'Profile', description: 'Updates the ongoing personality and motives.' },
+    { key: 'voiceId', label: 'Voice', description: 'Updates the assigned voice ID.' },
+    { key: 'themeColor', label: 'Color', description: 'Updates the theme color.' },
+    { key: 'themeFontFamily', label: 'Font', description: 'Updates the theme font family.' },
+    { key: 'outfit', label: 'Outfit', description: 'Updates regenerated outfit details and active outfit assignment.' },
+] as const;
+
+type ActorDetailGenerationField = (typeof ACTOR_DETAIL_GENERATION_FIELDS)[number]['key'];
+
+type ActorDetailGenerationSelection = Record<ActorDetailGenerationField, boolean>;
+
+const DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION: ActorDetailGenerationSelection = {
+    name: true,
+    description: true,
+    background: true,
+    profile: true,
+    voiceId: true,
+    themeColor: true,
+    themeFontFamily: true,
+    outfit: true,
+};
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 
@@ -83,6 +110,25 @@ const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [ke
     return nextMap;
 };
 
+const cloneActorStatModifier = (modifier: ActorStatModifier): ActorStatModifier => ({
+    id: modifier.id,
+    amount: Number.isFinite(modifier.amount) ? Number(modifier.amount) : 0,
+    conditions: (modifier.conditions || []).map((collection) => [...collection]),
+});
+
+const cloneActorStatInitial = (initial: ActorStatInitial | undefined, stat: ActorStat): ActorStatInitial => ({
+    value: Number.isFinite(initial?.value) ? Number(initial!.value) : (Number.isFinite(stat.default) ? Number(stat.default) : 0),
+    modifiers: (initial?.modifiers || []).map(cloneActorStatModifier),
+});
+
+const createInitialActorStatInitialMap = (actor: Actor, actorStats: ActorStat[]): { [key: string]: ActorStatInitial } => {
+    const nextMap: { [key: string]: ActorStatInitial } = {};
+    actorStats.forEach((stat) => {
+        nextMap[stat.name] = cloneActorStatInitial(actor.statInitialMap?.[stat.name], stat);
+    });
+    return nextMap;
+};
+
 export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDeactivate, onUpdate }) => {
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
@@ -126,8 +172,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     // Local state for editable fields
     const [editedActor, setEditedActor] = useState<{
         name: string;
+        displayName: string;
         category: string;
         description: string;
+        background: string;
         profile: string;
         lore: string;
         voiceId: string;
@@ -136,8 +184,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         schedule: ActorSchedule;
     }>({
         name: actor.name,
+        displayName: actor.displayName || '',
         category: actor.category ?? '',
         description: actor.description || '',
+        background: actor.background || '',
         profile: actor.profile || '',
         lore: linkedLoreEntry?.content || '',
         voiceId: actor.voiceId,
@@ -180,6 +230,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: number }>(() =>
         createInitialActorStatMap(actor, actorStats),
     );
+    const [editedStatInitialMap, setEditedStatInitialMap] = useState<{ [key: string]: ActorStatInitial }>(() =>
+        createInitialActorStatInitialMap(actor, actorStats),
+    );
+    const [expandedStatNames, setExpandedStatNames] = useState<Set<string>>(new Set());
     const [selectedOutfitId, setSelectedOutfitId] = useState<string>(() => {
         const outfits = getClonedOutfits();
         if (actor.outfitId && outfits.some((outfit) => outfit.id === actor.outfitId)) {
@@ -188,6 +242,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         return outfits[0]?.id || '';
     });
 
+    const [actorDetailGenerationSelection, setActorDetailGenerationSelection] = useState<ActorDetailGenerationSelection>({
+        ...DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION,
+    });
     const [isGeneratingDemoSpeech, setIsGeneratingDemoSpeech] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [regeneratingImages, setRegeneratingImages] = useState<Set<string>>(new Set());
@@ -207,13 +264,14 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     const [confirmDialog, setConfirmDialog] = useState<{
         open: boolean;
         title: string;
-        message: string;
+        message: ReactNode;
         confirmText: string;
         onConfirm: () => void;
     }>({ open: false, title: '', message: '', confirmText: 'Continue', onConfirm: () => undefined });
     const editedActorRef = useRef(editedActor);
     const editedOutfitsRef = useRef(editedOutfits);
     const editedStatMapRef = useRef(editedStatMap);
+    const editedStatInitialMapRef = useRef(editedStatInitialMap);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
@@ -223,10 +281,71 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         emotionPack: { ...(outfit.emotionPack || {}) },
     }));
 
+    const updateActorDetailGenerationSelection = (field: ActorDetailGenerationField, checked: boolean) => {
+        setActorDetailGenerationSelection((previous) => ({
+            ...previous,
+            [field]: checked,
+        }));
+    };
+
+    const toggleAllActorDetailGenerationFields = (checked: boolean) => {
+        setActorDetailGenerationSelection(() => {
+            const nextSelection: ActorDetailGenerationSelection = { ...DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION };
+            (Object.keys(nextSelection) as ActorDetailGenerationField[]).forEach((field) => {
+                nextSelection[field] = checked;
+            });
+            return nextSelection;
+        });
+    };
+
+    const renderActorDetailGenerationSelection = () => {
+        const allSelected = Object.values(actorDetailGenerationSelection).every(Boolean);
+
+        return (
+            <div style={{ display: 'grid', gap: '10px', textAlign: 'left', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                    <strong style={{ fontSize: '15px' }}>Fields to regenerate</strong>
+                    <Button
+                        variant="secondary"
+                        onClick={() => toggleAllActorDetailGenerationFields(!allSelected)}
+                    >
+                        {allSelected ? 'Clear all' : 'Select all'}
+                    </Button>
+                </div>
+                {ACTOR_DETAIL_GENERATION_FIELDS.map(({ key, label, description }) => (
+                    <label
+                        key={key}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '10px',
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)',
+                            border: '1px solid var(--agenda-line-subtle)',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={actorDetailGenerationSelection[key]}
+                            onChange={(event) => updateActorDetailGenerationSelection(key, event.target.checked)}
+                        />
+                        <span style={{ display: 'grid', gap: '2px' }}>
+                            <span style={{ fontWeight: 600 }}>{label}</span>
+                            <span style={{ fontSize: '12px', opacity: 0.8 }}>{description}</span>
+                        </span>
+                    </label>
+                ))}
+            </div>
+        );
+    };
+
     const persistActor = (
         nextEditedActor: typeof editedActor,
         nextEditedOutfits: Outfit[],
-        nextEditedStatMap: { [key: string]: number }
+        nextEditedStatMap: { [key: string]: number },
+        nextEditedStatInitialMap: { [key: string]: ActorStatInitial }
     ) => {
 
         if (autoSaveTimeoutRef.current) {
@@ -250,8 +369,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
 
         const oldName = actor.name;
         actor.name = nextEditedActor.name;
+        actor.displayName = nextEditedActor.displayName.trim() || nextEditedActor.name;
         actor.category = nextEditedActor.category.trim();
         actor.description = nextEditedActor.description;
+        actor.background = nextEditedActor.background;
         if (isProfileBackedByLore) {
             updateActorLore(actor.id, nextEditedActor.lore, stage());
         } else {
@@ -284,6 +405,11 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             }
         });
 
+        actor.statInitialMap = {};
+        actorStats.forEach((stat) => {
+            actor.statInitialMap[stat.name] = cloneActorStatInitial(nextEditedStatInitialMap[stat.name], stat);
+        });
+
         onUpdate?.();
     };
 
@@ -302,6 +428,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     useEffect(() => {
         editedStatMapRef.current = editedStatMap;
     }, [editedStatMap]);
+
+    useEffect(() => {
+        editedStatInitialMapRef.current = editedStatInitialMap;
+    }, [editedStatInitialMap]);
 
     useEffect(() => {
         setEditedStatMap((prev) => {
@@ -325,6 +455,18 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     }, [actor, actorStats]);
 
     useEffect(() => {
+        setEditedStatInitialMap((prev) => {
+            const next = createInitialActorStatInitialMap(actor, actorStats);
+            actorStats.forEach((stat) => {
+                if (prev[stat.name]) {
+                    next[stat.name] = cloneActorStatInitial(prev[stat.name], stat);
+                }
+            });
+            return next;
+        });
+    }, [actor, actorStats]);
+
+    useEffect(() => {
         if (!didMountRef.current) {
             didMountRef.current = true;
             return;
@@ -335,7 +477,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         }
 
         autoSaveTimeoutRef.current = window.setTimeout(() => {
-            persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current);
+            persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current);
         }, 300);
 
         return () => {
@@ -343,12 +485,12 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                 clearTimeout(autoSaveTimeoutRef.current);
             }
         };
-    }, [editedActor, editedOutfits, editedStatMap]);
+    }, [editedActor, editedOutfits, editedStatMap, editedStatInitialMap]);
 
     useEffect(() => {
         return () => {
             if (autoSaveTimeoutRef.current) {
-                persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current);
+                persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current);
             }
         };
     }, []);
@@ -364,8 +506,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         const latestLinkedLoreEntry = getLinkedActorLore(actor, stage());
         setEditedActor({
             name: actor.name,
+            displayName: actor.displayName || '',
             category: actor.category ?? '',
             description: actor.description || '',
+            background: actor.background || '',
             profile: actor.profile || '',
             lore: latestLinkedLoreEntry?.content || '',
             voiceId: actor.voiceId,
@@ -374,6 +518,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
         });
         setEditedStatMap(createInitialActorStatMap(actor, actorStats));
+        setEditedStatInitialMap(createInitialActorStatInitialMap(actor, actorStats));
         const nextOutfits = cloneOutfits(actor.outfits);
         setEditedOutfits(nextOutfits);
         setSelectedOutfitId(() => {
@@ -432,6 +577,58 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             ...prev,
             [stat.name]: normalized,
         }));
+    };
+
+    const handleActorStatInitialValueChange = (stat: ActorStat, value: number) => {
+        const normalized = clampActorStatValue(value, stat);
+        setEditedStatInitialMap((prev) => ({
+            ...prev,
+            [stat.name]: { ...cloneActorStatInitial(prev[stat.name], stat), value: normalized },
+        }));
+    };
+
+    const toggleStatExpanded = (statName: string) => {
+        setExpandedStatNames((prev) => {
+            const next = new Set(prev);
+            if (next.has(statName)) {
+                next.delete(statName);
+            } else {
+                next.add(statName);
+            }
+            return next;
+        });
+    };
+
+    const addActorStatModifier = (stat: ActorStat) => {
+        setEditedStatInitialMap((prev) => {
+            const current = cloneActorStatInitial(prev[stat.name], stat);
+            current.modifiers = [...current.modifiers, { id: generateUuid(), amount: 0, conditions: [] }];
+            return { ...prev, [stat.name]: current };
+        });
+    };
+
+    const removeActorStatModifier = (stat: ActorStat, modifierId: string) => {
+        setEditedStatInitialMap((prev) => {
+            const current = cloneActorStatInitial(prev[stat.name], stat);
+            current.modifiers = current.modifiers.filter((modifier) => modifier.id !== modifierId);
+            return { ...prev, [stat.name]: current };
+        });
+    };
+
+    const updateActorStatModifierAmount = (stat: ActorStat, modifierId: string, amount: number) => {
+        setEditedStatInitialMap((prev) => {
+            const current = cloneActorStatInitial(prev[stat.name], stat);
+            current.modifiers = current.modifiers.map((modifier) => modifier.id === modifierId ? { ...modifier, amount: Number.isFinite(amount) ? amount : 0 } : modifier);
+            return { ...prev, [stat.name]: current };
+        });
+    };
+
+    const updateActorStatModifierConditions = (stat: ActorStat, modifierId: string, conditions: ActorStatModifier['conditions']) => {
+        setEditedStatInitialMap((prev) => {
+            const current = cloneActorStatInitial(prev[stat.name], stat);
+            current.modifiers = current.modifiers.map((modifier) => modifier.id === modifierId ? { ...modifier, conditions } : modifier);
+            return { ...prev, [stat.name]: current };
+        });
     };
 
     const actorThemeColorSwatches = useMemo(() => {
@@ -618,7 +815,7 @@ ${indent}}`;
         setOutfitsObjectExport(formatAsJavascriptObject(buildOutfitsExport()));
     };
 
-    const handleGenerateActorDetails = async () => {
+    const handleGenerateActorDetails = async (selectedFields: ActorDetailGenerationSelection = actorDetailGenerationSelection) => {
         if (isGeneratingActorDetails) {
             return;
         }
@@ -626,12 +823,14 @@ ${indent}}`;
         const nextEditedActor = editedActorRef.current;
         const nextEditedOutfits = editedOutfitsRef.current;
         const nextEditedStatMap = editedStatMapRef.current;
-        persistActor(nextEditedActor, nextEditedOutfits, nextEditedStatMap);
+        const nextEditedStatInitialMap = editedStatInitialMapRef.current;
+        persistActor(nextEditedActor, nextEditedOutfits, nextEditedStatMap, nextEditedStatInitialMap);
 
         const generationDefinition = {
             name: nextEditedActor.name.trim() || actor.name,
             personality: [
                 nextEditedActor.description,
+                nextEditedActor.background,
                 isProfileBackedByLore ? nextEditedActor.lore : nextEditedActor.profile,
                 nextEditedOutfits.map((outfit) => `${outfit.name}: ${outfit.description}`)
                     .filter((entry) => entry.replace(/^[^:]*:/, '').trim().length > 0)
@@ -644,7 +843,9 @@ ${indent}}`;
 
         const previousGeneratedState = {
             name: actor.name,
+            displayName: actor.displayName,
             description: actor.description,
+            background: actor.background,
             profile: actor.profile,
             voiceId: actor.voiceId,
             themeColor: actor.themeColor,
@@ -656,31 +857,74 @@ ${indent}}`;
 
         try {
             const lore = getLinkedActorLore(actor, stage());
-            actor.description = '';
-            actor.profile = '';
-            actor.voiceId = '';
-            actor.themeColor = '';
-            actor.themeFontFamily = '';
-            actor.outfitId = '';
-            actor.outfits = [];
-            actor.statMap = {};
-            const distilledActor = await distillActor(actor, generationDefinition, stage());
+            const tempActor = new Actor({
+                ...actor,
+                name: actor.name,
+                displayName: actor.displayName,
+                description: actor.description,
+                background: actor.background,
+                profile: actor.profile,
+                voiceId: actor.voiceId,
+                themeColor: actor.themeColor,
+                themeFontFamily: actor.themeFontFamily,
+                outfitId: actor.outfitId,
+                outfits: cloneOutfits(actor.outfits),
+                statMap: { ...(actor.statMap || {}) },
+                schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
+            });
+
+            const distilledActor = await distillActor(tempActor, generationDefinition, stage());
             if (!distilledActor) {
                 throw new Error('Actor distillation returned no actor.');
             }
+
+            if (selectedFields.name) {
+                actor.name = distilledActor.name || actor.name;
+                actor.displayName = distilledActor.displayName || distilledActor.name || actor.name;
+            }
+            if (selectedFields.description) {
+                actor.description = distilledActor.description || actor.description;
+            }
+            if (selectedFields.background) {
+                actor.background = distilledActor.background || actor.background;
+            }
+            if (selectedFields.profile) {
+                actor.profile = distilledActor.profile || actor.profile;
+            }
+            if (selectedFields.voiceId) {
+                actor.voiceId = distilledActor.voiceId || actor.voiceId;
+            }
+            if (selectedFields.themeColor) {
+                actor.themeColor = distilledActor.themeColor || actor.themeColor;
+            }
+            if (selectedFields.themeFontFamily) {
+                actor.themeFontFamily = distilledActor.themeFontFamily || actor.themeFontFamily || 'Arial, sans-serif';
+            }
+            if (selectedFields.outfit) {
+                if (distilledActor.outfits?.length) {
+                    actor.outfits = cloneOutfits(distilledActor.outfits);
+                    actor.outfitId = distilledActor.outfitId || actor.outfits[0]?.id || actor.outfitId;
+                }
+            }
+
             if (lore) {
-                // Update lore properties
-                lore.title = distilledActor.name;
-                lore.content = distilledActor.profile;
-                // Update triggers, removing words that were part of the previous name and adding words from the new name
-                lore.triggers = [...lore.triggers.filter((trigger) => !previousGeneratedState.name.includes(trigger)), ...distilledActor.name.split(' ')];
+                if (selectedFields.name) {
+                    lore.title = actor.name;
+                    lore.triggers = [...lore.triggers.filter((trigger) => !previousGeneratedState.name.includes(trigger)), ...actor.name.split(' ')];
+                }
+                if (selectedFields.profile) {
+                    lore.content = actor.profile;
+                }
             }
 
             syncEditedFieldsFromActor();
             forceUpdate({});
             stage().showPriorityMessage(`Generated new details for ${actor.name}.`);
         } catch (error) {
+            actor.name = previousGeneratedState.name;
+            actor.displayName = previousGeneratedState.displayName;
             actor.description = previousGeneratedState.description;
+            actor.background = previousGeneratedState.background;
             actor.profile = previousGeneratedState.profile;
             actor.voiceId = previousGeneratedState.voiceId;
             actor.themeColor = previousGeneratedState.themeColor;
@@ -1160,6 +1404,27 @@ ${indent}}`;
                                         />
                                     </div>
 
+                                    {/* Display Name */}
+                                    <div>
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Display Name
+                                        </label>
+                                        <TextInput
+                                            fullWidth
+                                            value={editedActor.displayName}
+                                            onChange={(e) => handleInputChange('displayName', e.target.value)}
+                                            placeholder={editedActor.name || 'Name shown in nameplates and dialogue'}
+                                        />
+                                    </div>
+
                                     <div>
                                         <label
                                             style={{
@@ -1214,9 +1479,35 @@ ${indent}}`;
                                         />
                                     </div>
 
+                                    {/* Background */}
+                                    <div>
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Background
+                                        </label>
+                                        <TextArea
+                                            value={editedActor.background}
+                                            onChange={(e) => handleInputChange('background', e.target.value)}
+                                            placeholder="Backstory, origins, and integral traits that will not change over the course of the story"
+                                            style={{
+                                                width: '100%',
+                                                minHeight: '100px',
+                                                borderRadius: '5px',
+                                                resize: 'vertical',
+                                            }}
+                                        />
+                                    </div>
+
                                     {/* Profile/Personality */}
                                     <div>
-                                        <label 
+                                        <label
                                             style={{
                                                 display: 'block',
                                                 color: 'var(--agenda-highlight)',
@@ -1286,6 +1577,8 @@ ${indent}}`;
                                                     const closestDelta = Math.abs(closest.value - displayValue);
                                                     return optionDelta < closestDelta ? option : closest;
                                                 }, letterGradeOptions[0]);
+                                                const statInitial = cloneActorStatInitial(editedStatInitialMap[stat.name], stat);
+                                                const isExpanded = expandedStatNames.has(stat.name);
 
                                                 return (
                                                     <div
@@ -1301,9 +1594,17 @@ ${indent}}`;
                                                         }}
                                                     >
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', height: '40px' }}>
-                                                            <div style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 600 }}>
-                                                                {stat.name}
-                                                            </div>
+                                                            <Button
+                                                                variant="secondary"
+                                                                onClick={() => toggleStatExpanded(stat.name)}
+                                                                aria-label={isExpanded ? `Collapse ${stat.name} details` : `Expand ${stat.name} details`}
+                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', minWidth: 0 }}
+                                                            >
+                                                                {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 600 }}>
+                                                                    {stat.name}
+                                                                </span>
+                                                            </Button>
 
                                                             {stat.displayType === 'stars' && (
                                                                 <ActorStatStars
@@ -1358,13 +1659,89 @@ ${indent}}`;
                                                             )}
                                                         </div>
 
-                                                        {!!stat.description?.trim() && (
-                                                            <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 75%, transparent)', fontSize: '12px' }}>
-                                                                {stat.description}
-                                                            </div>
-                                                        )}
+                                                        {isExpanded && (
+                                                            <>
+                                                                {!!stat.description?.trim() && (
+                                                                    <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 75%, transparent)', fontSize: '12px' }}>
+                                                                        {stat.description}
+                                                                    </div>
+                                                                )}
 
-                                                        
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
+                                                                    <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 600 }}>
+                                                                        Initial Value
+                                                                    </label>
+                                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                                        Used to seed this actor's stat when a new game starts, before modifiers below are applied.
+                                                                    </span>
+                                                                    <TextInput
+                                                                        type="number"
+                                                                        value={statInitial.value}
+                                                                        onChange={(e) => handleActorStatInitialValueChange(stat, Number(e.target.value))}
+                                                                        style={{ maxWidth: '160px' }}
+                                                                    />
+                                                                </div>
+
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                    <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 600 }}>
+                                                                        Initial Modifiers
+                                                                    </label>
+                                                                    {statInitial.modifiers.length === 0 && (
+                                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                                            No modifiers. The initial value above is used as-is.
+                                                                        </span>
+                                                                    )}
+                                                                    {statInitial.modifiers.map((modifier) => (
+                                                                        <div
+                                                                            key={modifier.id}
+                                                                            style={{
+                                                                                display: 'flex',
+                                                                                flexDirection: 'column',
+                                                                                gap: '6px',
+                                                                                padding: '8px',
+                                                                                border: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)',
+                                                                                borderRadius: '5px',
+                                                                            }}
+                                                                        >
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Amount</span>
+                                                                                <TextInput
+                                                                                    type="number"
+                                                                                    value={modifier.amount}
+                                                                                    onChange={(e) => updateActorStatModifierAmount(stat, modifier.id, Number(e.target.value))}
+                                                                                    style={{ maxWidth: '120px' }}
+                                                                                />
+                                                                                <Button
+                                                                                    variant="danger"
+                                                                                    onClick={() => removeActorStatModifier(stat, modifier.id)}
+                                                                                    aria-label="Delete modifier"
+                                                                                    style={{ marginLeft: 'auto' }}
+                                                                                >
+                                                                                    Delete
+                                                                                </Button>
+                                                                            </div>
+                                                                            <ConditionEditor
+                                                                                conditionCollections={modifier.conditions}
+                                                                                playerStats={[...actorStats, ...(stage().getConfiguration().playerStats || [])]}
+                                                                                onChange={(conditions) => updateActorStatModifierConditions(stat, modifier.id, conditions)}
+                                                                            />
+                                                                            {modifier.conditions.length === 0 && (
+                                                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                                                    Always applies.
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                    <Button
+                                                                        variant="secondary"
+                                                                        onClick={() => addActorStatModifier(stat)}
+                                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifySelf: 'start' }}
+                                                                    >
+                                                                        <Add fontSize="small" /> Add modifier
+                                                                    </Button>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -1869,11 +2246,18 @@ ${indent}}`;
                                         setConfirmDialog({
                                             open: true,
                                             title: 'Generate Actor Details',
-                                            message: 'Warning: this will replace existing details for this actor.',
+                                            message: (
+                                                <div style={{ display: 'grid', gap: '12px', textAlign: 'left' }}>
+                                                    <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
+                                                        Warning: this will replace only the selected details for this actor.
+                                                    </div>
+                                                    {renderActorDetailGenerationSelection()}
+                                                </div>
+                                            ),
                                             confirmText: isGeneratingActorDetails ? 'Generating...' : 'Generate',
                                             onConfirm: async () => {
                                                 setConfirmDialog((prev) => ({ ...prev, open: false }));
-                                                await handleGenerateActorDetails();
+                                                await handleGenerateActorDetails(actorDetailGenerationSelection);
                                             },
                                         });
                                     }}

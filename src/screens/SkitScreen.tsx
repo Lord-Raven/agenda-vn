@@ -4,6 +4,7 @@ import { ScreenType } from "./BaseScreen";
 import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer";
 import { Box, Typography } from "@mui/material";
 import { Button, NamePlate } from "../components/UiComponents";
+import { ActorCard } from "../components/ActorCard";
 import { useTooltip } from "../components/TooltipContext";
 import { Actor, getActorLore, getEmotionImage } from "../content/Actor";
 import { accumulateOutcomes, determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
@@ -346,26 +347,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         enableFontEffects={stage().getSave().enableFontEffects}
                         responsiveOverlay={(_skit, actor) => {
                             if (!actor || actor.id === stage().getPlayerActor().id) return null;
-                            const typedActor = actor as Actor;
-                            return (
-                                <Box
-                                    sx={{
-                                        padding: 2,
-                                        backgroundColor: "rgba(21, 27, 41, 0.9)",
-                                        borderRadius: 2,
-                                        border: `1px solid ${typedActor.themeColor || "#8ab0cc"}`,
-                                        maxWidth: 300,
-                                        boxShadow: "0 12px 28px rgba(0, 0, 0, 0.55)",
-                                    }}
-                                >
-                                    <Box sx={{ marginBottom: 1 }}>
-                                        <NamePlate actor={typedActor} />
-                                    </Box>
-                                    <Box sx={{ color: "#edf2f2", fontSize: "0.9rem", lineHeight: 1.4 }}>
-                                        {typedActor.profile}
-                                    </Box>
-                                </Box>
-                            );
+                            return <ActorCard actor={actor as Actor} stage={stage} />;
                         }}
                     />
             </div>
