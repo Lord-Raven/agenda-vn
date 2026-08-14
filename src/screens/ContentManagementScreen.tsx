@@ -10,13 +10,14 @@ import { StyleManagementPanel } from './StyleManagementPanel';
 import { GameManagementPanel } from './GameManagementPanel';
 import { CalendarEventManagementPanel } from './CalendarEventManagementPanel';
 import { MapManagementPanel } from './MapManagementPanel';
+import { StatManagementPanel } from './StatManagementPanel';
 
 interface ContentManagementScreenProps {
     stage: () => Stage;
     onClose: () => void;
 }
 
-type TabType = 'game' | 'style' | 'lorebook' | 'actors' | 'locations' | 'maps' | 'calendarEvents';
+type TabType = 'game' | 'style' | 'stats' | 'lorebook' | 'actors' | 'locations' | 'maps' | 'calendarEvents';
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [activeTab, setActiveTab] = useState<TabType>('style');
@@ -146,6 +147,19 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     Style
                                 </Button>
                                 <Button
+                                    onClick={() => setActiveTab('stats')}
+                                    variant={activeTab === 'stats' ? 'primary' : 'secondary'}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        opacity: activeTab === 'stats' ? 1 : 0.6,
+                                    }}
+                                >
+                                    <Tune />
+                                    Stats
+                                </Button>
+                                <Button
                                     onClick={() => setActiveTab('lorebook')}
                                     variant={activeTab === 'lorebook' ? 'primary' : 'secondary'}
                                     style={{
@@ -203,7 +217,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     }}
                                 >
                                     <CalendarMonth />
-                                    Calendar Events ({stage().getManagedCalendarEvents().length})
+                                    Events ({stage().getManagedCalendarEvents().length})
                                 </Button>
                             </div>
 
@@ -249,6 +263,11 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 {/* Maps Tab */}
                                 {activeTab === 'maps' && (
                                     <MapManagementPanel stage={stage} />
+                                )}
+
+                                {/* Stats Tab */}
+                                {activeTab === 'stats' && (
+                                    <StatManagementPanel stage={stage} />
                                 )}
                             </div>
                         </GlassPanel>
