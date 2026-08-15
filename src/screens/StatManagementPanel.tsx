@@ -201,7 +201,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         ...configuration.playerStatValues,
         ...save.playerStatValues,
     }));
-    const [pipIconSearch, setPipIconSearch] = useState('');
+    const [pipIconSearch, setPipIconSearch] = useState<Record<string, string>>({});
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
@@ -423,9 +423,9 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
-    const renderPipIconPicker = (stat: ActorStat, onChange: (iconName: string) => void) => {
+    const renderPipIconPicker = (stat: ActorStat, onChange: (iconName: string) => void, pickerKey: string) => {
+        const query = (pipIconSearch[pickerKey] || '').trim().toLowerCase();
         const filteredOptions = RATING_ICON_OPTIONS.filter((option) => {
-            const query = pipIconSearch.trim().toLowerCase();
             if (!query) {
                 return true;
             }
@@ -436,8 +436,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <TextInput
                     fullWidth
-                    value={pipIconSearch}
-                    onChange={(e) => setPipIconSearch(e.target.value)}
+                    value={pipIconSearch[pickerKey] || ''}
+                    onChange={(e) => setPipIconSearch(prev => ({ ...prev, [pickerKey]: e.target.value }))}
                     placeholder="Search icon"
                 />
                 <div
@@ -452,7 +452,11 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                         paddingRight: '4px',
                     }}
                 >
-                    {filteredOptions.map((option) => {
+                    {filteredOptions.length === 0 ? (
+                        <div style={{ gridColumn: '1 / -1', color: 'var(--agenda-text-muted)', fontSize: '12px', padding: '8px 0' }}>
+                            No matching icons
+                        </div>
+                    ) : filteredOptions.map((option) => {
                         const Icon = option.icon;
                         const active = (stat.iconName || 'star') === option.key;
                         return (
@@ -651,7 +655,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             {normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Icon</label>
-                                                    {renderPipIconPicker(normalizedStat, (iconName) => updatePlayerStat(statIndex, { iconName }))}
+                                                    {renderPipIconPicker(normalizedStat, (iconName) => updatePlayerStat(statIndex, { iconName }), `player-${statIndex}`)}
                                                 </div>
                                             )}
 
@@ -923,7 +927,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             {normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Icon</label>
-                                                    {renderPipIconPicker(normalizedStat, (iconName) => updateActorStat(statIndex, { iconName }))}
+                                                    {renderPipIconPicker(normalizedStat, (iconName) => updateActorStat(statIndex, { iconName }), `actor-${statIndex}`)}
                                                 </div>
                                             )}
 
