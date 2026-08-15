@@ -144,7 +144,6 @@ const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [
     { key: 'do-not-disturb', labels: ['Do Not Disturb'], icon: DoNotDisturb },
     { key: 'email', labels: ['Email'], icon: Email },
     { key: 'error', labels: ['Error'], icon: Error },
-    { key: 'favorite', labels: ['Favorite'], icon: Favorite },
     { key: 'feedback', labels: ['Feedback'], icon: Feedback },
     { key: 'female', labels: ['Female'], icon: Female },
     { key: 'explore', labels: ['Explore'], icon: Explore },
