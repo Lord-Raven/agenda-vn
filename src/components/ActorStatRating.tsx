@@ -19,7 +19,7 @@ import {
 } from '@mui/icons-material';
 import { ActorStat } from '../Stage';
 
-const STAR_ICON_OPTIONS = [
+const RATING_ICON_OPTIONS = [
     { key: 'star', label: 'Star', icon: Star },
     { key: 'heart', label: 'Heart', icon: Favorite },
     { key: 'favorite', label: 'Favorite', icon: FavoriteBorder },
@@ -38,14 +38,14 @@ const STAR_ICON_OPTIONS = [
     { key: 'world', label: 'World', icon: Public },
 ];
 
-type StarIconKey = (typeof STAR_ICON_OPTIONS)[number]['key'];
+type RatingIconKey = (typeof RATING_ICON_OPTIONS)[number]['key'];
 
 const resolveIcon = (iconName?: string) => {
-    const match = STAR_ICON_OPTIONS.find(option => option.key === iconName);
+    const match = RATING_ICON_OPTIONS.find(option => option.key === iconName);
     return match?.icon || Star;
 };
 
-interface ActorStatStarsProps {
+interface ActorStatRatingProps {
     stat: ActorStat;
     value: number;
     updateScore?: (value: number) => void;
@@ -53,7 +53,7 @@ interface ActorStatStarsProps {
     style?: React.CSSProperties;
 }
 
-const resolveStarCount = (stat: ActorStat): number => {
+const resolvePipCount = (stat: ActorStat): number => {
     if (Number.isFinite(stat.max)) {
         return Math.max(1, Math.round(Number(stat.max)));
     }
@@ -61,15 +61,15 @@ const resolveStarCount = (stat: ActorStat): number => {
     return 5;
 };
 
-const getFilledStarCount = (value: number, maxStars: number): number => {
+const getFilledPipCount = (value: number, maxPips: number): number => {
     if (!Number.isFinite(value)) {
         return 0;
     }
 
-    return Math.max(0, Math.min(maxStars, Math.round(value)));
+    return Math.max(0, Math.min(maxPips, Math.round(value)));
 };
 
-const starShellStyle = (interactive: boolean): React.CSSProperties => ({
+const ratingShellStyle = (interactive: boolean): React.CSSProperties => ({
     position: 'relative',
     width: '100%',
     aspectRatio: '1 / 1',
@@ -95,12 +95,12 @@ const iconStyleBase: React.CSSProperties = {
 
 const renderStatIcon = (
     stat: ActorStat,
-    starValue: number,
+    pipValue: number,
     filled: boolean,
     updateScore?: (value: number) => void,
 ) => {
     const IconComponent = resolveIcon(stat.iconName);
-    const label = `${stat.name} ${starValue} of ${resolveStarCount(stat)}`;
+    const label = `${stat.name} ${pipValue} of ${resolvePipCount(stat)}`;
     const fillColor = filled ? 'var(--agenda-highlight)' : 'rgba(11, 17, 28, 0.9)';
     const shadow = filled
         ? 'drop-shadow(0 0 2px color-mix(in srgb, var(--agenda-highlight) 35%, transparent))'
@@ -108,13 +108,13 @@ const renderStatIcon = (
 
     return (
         <button
-            key={`${stat.name}-star-${starValue}`}
+            key={`${stat.name}-pip-${pipValue}`}
             type="button"
             disabled={!updateScore}
-            onClick={updateScore ? () => updateScore?.(starValue) : undefined}
+            onClick={updateScore ? () => updateScore?.(pipValue) : undefined}
             aria-label={label}
             title={label}
-            style={starShellStyle(!!updateScore)}
+            style={ratingShellStyle(!!updateScore)}
         >
             <IconComponent
                 style={{
@@ -129,44 +129,44 @@ const renderStatIcon = (
     );
 };
 
-export { STAR_ICON_OPTIONS, resolveIcon, type StarIconKey };
+export { RATING_ICON_OPTIONS, resolveIcon, type RatingIconKey };
 
-export const ActorStatStars: FC<ActorStatStarsProps> = ({
+export const ActorStatRating: FC<ActorStatRatingProps> = ({
     stat,
     value,
     updateScore,
     style,
 }) => {
-    const maxStars = resolveStarCount(stat);
-    const filledStars = getFilledStarCount(value, maxStars);
+    const maxPips = resolvePipCount(stat);
+    const filledPips = getFilledPipCount(value, maxPips);
 
-    if (maxStars <= 10) {
+    if (maxPips <= 10) {
         return (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', ...style }}>
                 <div
                     role="img"
-                    aria-label={`${stat.name}: ${filledStars} of ${maxStars}`}
+                    aria-label={`${stat.name}: ${filledPips} of ${maxPips}`}
                     style={{
                         display: 'grid',
-                        gridTemplateColumns: `repeat(${maxStars}, minmax(0, 1fr))`,
+                        gridTemplateColumns: `repeat(${maxPips}, minmax(0, 1fr))`,
                         gap: '4px',
                         height: '100%',
                         maxWidth: '100%',
-                        aspectRatio: `${maxStars} / 1`,
+                        aspectRatio: `${maxPips} / 1`,
                     }}
                 >
-                    {Array.from({ length: maxStars }, (_, index) => {
-                        const starValue = index + 1;
-                        return renderStatIcon(stat, starValue, filledStars >= starValue, updateScore);
+                    {Array.from({ length: maxPips }, (_, index) => {
+                        const pipValue = index + 1;
+                        return renderStatIcon(stat, pipValue, filledPips >= pipValue, updateScore);
                     })}
                 </div>
             </div>
         );
     }
 
-    const groups = Array.from({ length: Math.ceil(maxStars / 5) }, (_, groupIndex) => {
+    const groups = Array.from({ length: Math.ceil(maxPips / 5) }, (_, groupIndex) => {
         const start = groupIndex * 5 + 1;
-        const end = Math.min(start + 4, maxStars);
+        const end = Math.min(start + 4, maxPips);
         return Array.from({ length: end - start + 1 }, (_, index) => start + index);
     });
 
@@ -174,7 +174,7 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-start', ...style }}>
         <div
             role="img"
-            aria-label={`${stat.name}: ${filledStars} of ${maxStars}`}
+            aria-label={`${stat.name}: ${filledPips} of ${maxPips}`}
             style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))`,
@@ -185,8 +185,8 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
             }}
         >
             {groups.map((group, groupIndex) => {
-                const topStars = group.slice(0, 3);
-                const bottomStars = group.slice(3);
+                const topPips = group.slice(0, 3);
+                const bottomPips = group.slice(3);
 
                 return (
                     <div
@@ -201,24 +201,24 @@ export const ActorStatStars: FC<ActorStatStarsProps> = ({
                         <div
                             style={{
                                 display: 'grid',
-                                gridTemplateColumns: `repeat(${Math.max(1, topStars.length)}, minmax(0, 1fr))`,
+                                gridTemplateColumns: `repeat(${Math.max(1, topPips.length)}, minmax(0, 1fr))`,
                                 gap: '3px',
                             }}
                         >
-                            {topStars.map((starValue) => renderStatIcon(stat, starValue, filledStars >= starValue, updateScore))}
+                            {topPips.map((pipValue) => renderStatIcon(stat, pipValue, filledPips >= pipValue, updateScore))}
                         </div>
 
-                        {bottomStars.length > 0 && (
+                        {bottomPips.length > 0 && (
                             <div
                                 style={{
                                     display: 'grid',
-                                    gridTemplateColumns: `repeat(${bottomStars.length}, minmax(0, 1fr))`,
+                                    gridTemplateColumns: `repeat(${bottomPips.length}, minmax(0, 1fr))`,
                                     gap: '3px',
                                     width: '72%',
                                     margin: '-2px auto 0',
                                 }}
                             >
-                                {bottomStars.map((starValue) => renderStatIcon(stat, starValue, filledStars >= starValue, updateScore))}
+                                {bottomPips.map((pipValue) => renderStatIcon(stat, pipValue, filledPips >= pipValue, updateScore))}
                             </div>
                         )}
                     </div>

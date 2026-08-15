@@ -92,7 +92,7 @@ const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
 
 const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
 
-export type ActorStatDisplayType = 'number' | 'percentage' | 'stars' | 'letter grade' | 'option' | 'text';
+export type ActorStatDisplayType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text';
 
 export type ActorStatOption = {
     name: string;
@@ -150,7 +150,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true || stat.exposed === true,
     exposed: stat.exposed === true,
-    iconName: stat.iconName || (stat.displayType === 'stars' ? 'star' : undefined),
+    iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
 });
 
 const cloneActor = (actor: Actor): Actor => new Actor({
@@ -197,7 +197,7 @@ const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({
 });
 
 
-const NUMERIC_STAT_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'stars', 'letter grade'];
+const NUMERIC_STAT_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'rating', 'letter grade'];
 
 const isNumericActorStat = (stat: ActorStat): boolean => NUMERIC_STAT_DISPLAY_TYPES.includes(stat.displayType);
 

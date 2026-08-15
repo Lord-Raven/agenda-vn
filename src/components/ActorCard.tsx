@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { ActorStat, Stage } from '../Stage';
 import { Actor } from '../content/Actor';
 import { NamePlate } from './UiComponents';
-import { ActorStatStars } from './ActorStatStars';
+import { ActorStatRating } from './ActorStatRating';
 
 interface ActorCardProps {
     actor?: Actor;
@@ -39,10 +39,10 @@ const StatValue: FC<{ stat: ActorStat; value: number | string }> = ({ stat, valu
     const numericValue = Number(value);
     const hasNumericValue = Number.isFinite(numericValue);
 
-    if (stat.displayType === 'stars' && hasNumericValue) {
+    if (stat.displayType === 'rating' && hasNumericValue) {
         return (
             <Box sx={{ height: '16px', display: 'flex', justifyContent: 'flex-end' }}>
-                <ActorStatStars stat={stat} value={numericValue} />
+                <ActorStatRating stat={stat} value={numericValue} />
             </Box>
         );
     }

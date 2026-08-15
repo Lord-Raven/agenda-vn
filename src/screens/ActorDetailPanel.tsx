@@ -7,7 +7,7 @@ import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
-import { ActorStatStars } from '../components/ActorStatStars';
+import { ActorStatRating } from '../components/ActorStatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
 
@@ -68,7 +68,7 @@ const resolveActorStatRange = (stat: ActorStat): { min: number; max: number; ste
         return { min: 0, max: 100, step: 1, hasRange: true };
     }
 
-    if (stat.displayType === 'stars') {
+    if (stat.displayType === 'rating') {
         return {
             min: 0,
             max: Number.isFinite(stat.max) ? Math.max(1, Math.round(Number(stat.max))) : 5,
@@ -1606,8 +1606,8 @@ ${indent}}`;
                                                                 </span>
                                                             </Button>
 
-                                                            {stat.displayType === 'stars' && (
-                                                                <ActorStatStars
+                                                            {stat.displayType === 'rating' && (
+                                                                <ActorStatRating
                                                                     stat={stat}
                                                                     value={displayValue}
                                                                     updateScore={(nextValue) => handleActorStatValueChange(stat, nextValue)}

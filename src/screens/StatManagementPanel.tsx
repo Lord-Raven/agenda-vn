@@ -1,13 +1,13 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActorStat, ActorStatDisplayType, Stage } from '../Stage';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
-import { STAR_ICON_OPTIONS } from '../components/ActorStatStars';
+import { RATING_ICON_OPTIONS } from '../components/ActorStatRating';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
 }
 
-const NUMERIC_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'stars', 'letter grade'];
+const NUMERIC_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'rating', 'letter grade'];
 
 const isNumericDisplayType = (displayType: ActorStatDisplayType): boolean => NUMERIC_DISPLAY_TYPES.includes(displayType);
 
@@ -25,7 +25,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true || stat.exposed === true,
     exposed: stat.exposed === true,
-    iconName: stat.iconName || (stat.displayType === 'stars' ? 'star' : undefined),
+    iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
 });
 
 const resolveStatDefaultValue = (stat: ActorStat): number | string => {
@@ -166,7 +166,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         ...configuration.playerStatValues,
         ...save.playerStatValues,
     }));
-    const [starIconSearch, setStarIconSearch] = useState('');
+    const [pipIconSearch, setPipIconSearch] = useState('');
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
@@ -388,9 +388,9 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
-    const renderStarIconPicker = (stat: ActorStat, onChange: (iconName: string) => void) => {
-        const filteredOptions = STAR_ICON_OPTIONS.filter((option) => {
-            const query = starIconSearch.trim().toLowerCase();
+    const renderPipIconPicker = (stat: ActorStat, onChange: (iconName: string) => void) => {
+        const filteredOptions = RATING_ICON_OPTIONS.filter((option) => {
+            const query = pipIconSearch.trim().toLowerCase();
             if (!query) {
                 return true;
             }
@@ -401,8 +401,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <TextInput
                     fullWidth
-                    value={starIconSearch}
-                    onChange={(e) => setStarIconSearch(e.target.value)}
+                    value={pipIconSearch}
+                    onChange={(e) => setPipIconSearch(e.target.value)}
                     placeholder="Search icon"
                 />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(74px, 1fr))', gap: '8px', maxHeight: '210px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -520,7 +520,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     <option value="option">option</option>
                                                     <option value="number">number</option>
                                                     <option value="percentage">percentage</option>
-                                                    <option value="stars">stars</option>
+                                                    <option value="rating">rating</option>
                                                     <option value="letter grade">letter grade</option>
                                                     <option value="text">text</option>
                                                 </select>
@@ -601,10 +601,10 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            {normalizedStat.displayType === 'stars' && (
+                                            {normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Icon</label>
-                                                    {renderStarIconPicker(normalizedStat, (iconName) => updatePlayerStat(statIndex, { iconName }))}
+                                                    {renderPipIconPicker(normalizedStat, (iconName) => updatePlayerStat(statIndex, { iconName }))}
                                                 </div>
                                             )}
 
@@ -759,7 +759,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     >
                                                         <option value="number">number</option>
                                                         <option value="percentage">percentage</option>
-                                                        <option value="stars">stars</option>
+                                                        <option value="rating">rating</option>
                                                         <option value="letter grade">letter grade</option>
                                                     </select>
                                                 </div>

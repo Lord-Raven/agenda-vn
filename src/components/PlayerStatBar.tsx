@@ -62,7 +62,7 @@ const resolveDisplayValue = (stat: ActorStat, value: unknown): string => {
         return `${Number(normalized)}%`;
     }
 
-    if (stat.displayType === "stars") {
+    if (stat.displayType === "rating") {
         return `${Number(normalized)}`;
     }
 
@@ -126,7 +126,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
                     ?? stageInstance.getConfiguration()?.playerStatValues?.[statName]
                     ?? stat.default;
                 const normalizedValue = normalizeStatValue(rawValue, stat);
-                const isNumericStat = ["number", "percentage", "stars", "letter grade"].includes(stat.displayType);
+                const isNumericStat = ["number", "percentage", "rating", "letter grade"].includes(stat.displayType);
                 const progressPct = isNumericStat ? getPercent(stat, normalizedValue) : 0;
 
                 return (

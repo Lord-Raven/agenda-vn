@@ -415,7 +415,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         const statName = (stat.name || '').trim();
                                         const selectedValue = normalizePlayerStatValue(playerStatValues[statName], stat);
                                         const optionEntries = stat.options || [];
-                                        const isNumericDisplay = ['number', 'percentage', 'stars', 'letter grade'].includes(stat.displayType);
+                                        const isNumericDisplay = ['number', 'percentage', 'rating', 'letter grade'].includes(stat.displayType);
 
                                         return (
                                             <div

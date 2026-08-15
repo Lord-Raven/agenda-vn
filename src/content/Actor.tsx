@@ -219,7 +219,7 @@ function clampActorStatValue(value: number, stat: ActorStat): number {
     return normalized;
 }
 
-const NUMERIC_ACTOR_STAT_DISPLAY_TYPES = ['number', 'percentage', 'stars', 'letter grade'];
+const NUMERIC_ACTOR_STAT_DISPLAY_TYPES = ['number', 'percentage', 'rating', 'letter grade'];
 
 // Computes an actor's initial stat value from its configured initial value plus any modifiers whose conditions currently evaluate true.
 export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStatInitial | undefined, context: ConditionContext): number {
