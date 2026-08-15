@@ -178,6 +178,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         name: string;
         displayName: string;
         role: string;
+        generic: boolean;
         birthDate: string;
         category: string;
         description: string;
@@ -192,6 +193,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         name: actor.name,
         displayName: actor.displayName || '',
         role: actor.role || '',
+        generic: actor.generic === true,
         birthDate: actor.birthDate || '',
         category: actor.category ?? '',
         description: actor.description || '',
@@ -434,7 +436,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.name = nextEditedActor.name;
         actor.displayName = nextEditedActor.displayName.trim() || nextEditedActor.name;
         actor.role = nextEditedActor.role.trim();
-        actor.birthDate = nextEditedActor.birthDate.trim();
+        actor.generic = !!nextEditedActor.generic;
+        actor.birthDate = actor.generic ? '' : nextEditedActor.birthDate.trim();
         actor.category = nextEditedActor.category.trim();
         actor.description = nextEditedActor.description;
         actor.background = nextEditedActor.background;
@@ -573,6 +576,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             name: actor.name,
             displayName: actor.displayName || '',
             role: actor.role || '',
+            generic: actor.generic === true,
             birthDate: actor.birthDate || '',
             category: actor.category ?? '',
             description: actor.description || '',
@@ -622,7 +626,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         return trimmedPrompt;
     };
 
-    const handleInputChange = (field: string, value: string | number) => {
+    const handleInputChange = (field: string, value: string | number | boolean) => {
         setEditedActor(prev => ({
             ...prev,
             [field]: value
@@ -1526,25 +1530,41 @@ ${indent}}`;
                                         />
                                     </div>
 
-                                    <div>
-                                        <label
-                                            style={{
-                                                display: 'block',
-                                                color: 'var(--agenda-highlight)',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold',
-                                                marginBottom: '8px',
-                                            }}
-                                        >
-                                            Birth Date
-                                        </label>
-                                        <TextInput
-                                            fullWidth
-                                            value={editedActor.birthDate}
-                                            onChange={(e) => handleInputChange('birthDate', e.target.value)}
-                                            placeholder="YYYY-MM-DD"
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '8px 10px', border: '1px solid color-mix(in srgb, var(--agenda-highlight) 25%, transparent)', borderRadius: '8px', backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 70%, transparent)' }}>
+                                        <div style={{ display: 'grid', gap: '2px' }}>
+                                            <span style={{ color: 'var(--agenda-highlight)', fontSize: '14px', fontWeight: 'bold' }}>Generic Stand-In</span>
+                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: '12px' }}>Treat this actor as a broad role rather than a specific character.</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={!!editedActor.generic}
+                                            onChange={(event) => handleInputChange('generic', event.target.checked)}
+                                            aria-label="Toggle generic actor"
+                                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                                         />
                                     </div>
+
+                                    {!editedActor.generic && (
+                                        <div>
+                                            <label
+                                                style={{
+                                                    display: 'block',
+                                                    color: 'var(--agenda-highlight)',
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    marginBottom: '8px',
+                                                }}
+                                            >
+                                                Birth Date
+                                            </label>
+                                            <TextInput
+                                                fullWidth
+                                                value={editedActor.birthDate}
+                                                onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                                                placeholder="YYYY-MM-DD"
+                                            />
+                                        </div>
+                                    )}
 
                                     <div>
                                         <label
@@ -1664,7 +1684,7 @@ ${indent}}`;
                                         />
                                     </div>
 
-                                    {actorStats.length > 0 && (
+                                    {!editedActor.generic && actorStats.length > 0 && (
                                         <div style={{
                                             display: 'flex',
                                             flexDirection: 'column',

@@ -2,7 +2,7 @@ import { Emotion, EMOTION_MAPPING } from "./Emotion";
 import { v4 as generateUuid } from 'uuid';
 import { Outcome, OutcomeType } from "./Outcome";
 import { Stage } from "../Stage";
-import { Actor, ACTOR_SCHEDULE_AVAILABLE, findBestNameMatch, getActorLore, resolveActorSchedule } from "./Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, findBestNameMatch, getActorLore, resetGenericActorStats, resolveActorSchedule } from "./Actor";
 import { getLocationDescription } from "./Location";
 import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -181,6 +181,11 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     const location = skit ? save.atlas[skit.initialLocationId] : undefined;
     const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e => e.skit !== skit);
     const currentActors = skit ? getCurrentActors(skit, skit.script.length - 1).map(actorId => save.actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[] : [];
+    currentActors.forEach(actor => {
+        if (actor.generic) {
+            resetGenericActorStats(actor, stage.getConfiguration().actorStats || [], save);
+        }
+    });
     const lorebook = save.lorebook || [];
     const agendaConfig = stage.getConfiguration();
     const passedProbabilityLoreIds = new Set(
@@ -329,7 +334,10 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
                 currentActors.forEach(actor => {
                     const currentOutfit = actor.outfits.find(a => a.id === determineOutfit(actor.id, skit, skit.script.length - 1)) ?? actor.outfits[0];
                     const otherOutfits = actor.outfits.filter(o => o.id !== currentOutfit?.id && o.emotionPack['neutral']);
-                    builder.addBlock(`${actor.name}`, `Profile: ${getActorLore(actor.id, stage)}\n  Description: ${actor.description}\n  Current Outfit (${currentOutfit.name}): ${currentOutfit.description}\n` +
+                    const genericNote = actor.generic
+                        ? 'Generic Stand-In: This is a generic role player, not a specific character. Do not assume a personal identity, age, or life history beyond the broad role in this scene.\n  '
+                        : '';
+                    builder.addBlock(`${actor.name}`, `${genericNote}Profile: ${getActorLore(actor.id, stage)}\n  Description: ${actor.description}\n  Current Outfit (${currentOutfit.name}): ${currentOutfit.description}\n` +
                         (otherOutfits.length > 0 ? `  Other Outfits: ${otherOutfits.map(o => o.name).join(', ')}\n` : '')
                     );
                 })
@@ -354,6 +362,12 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             ...actorsAtLocation.map(actor => actor.id),
             ...skit.initialActors.filter(actorId => availableActors.some(actor => actor.id === actorId)),
         ]));
+        skit.initialActors.forEach((actorId) => {
+            const actor = save.actors?.[actorId];
+            if (actor?.generic) {
+                resetGenericActorStats(actor, stage.getConfiguration().actorStats || [], save);
+            }
+        });
         while (attempts > 0) {
             const response = await stage.generateText(
                 buildPrompt()
@@ -396,6 +410,12 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     skit.guidance = guidanceText;
                     const selectedActorIds = participantsText.split(',').map(name => findBestNameMatch(name.trim(), availableActors, ['name'])?.id).filter(id => id !== undefined) as string[];
                     skit.initialActors = Array.from(new Set([...actorsAtLocation.map(actor => actor.id), ...selectedActorIds]));
+                    skit.initialActors.forEach((actorId) => {
+                        const actor = save.actors?.[actorId];
+                        if (actor?.generic) {
+                            resetGenericActorStats(actor, stage.getConfiguration().actorStats || [], save);
+                        }
+                    });
                     break;
                 }
             }

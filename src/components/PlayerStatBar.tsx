@@ -1,6 +1,7 @@
 import { FC, useMemo } from "react";
 import { Box, Typography } from "@mui/material";
 import { ActorStat, Stage } from "../Stage";
+import { resolveIcon } from "./ActorStatRating";
 
 interface PlayerStatBarProps {
     stage: () => Stage;
@@ -128,6 +129,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
                 const normalizedValue = normalizeStatValue(rawValue, stat);
                 const isNumericStat = ["number", "percentage", "rating", "letter grade"].includes(stat.displayType);
                 const progressPct = isNumericStat ? getPercent(stat, normalizedValue) : 0;
+                const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
 
                 return (
                     <Box
@@ -145,17 +147,28 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
                             boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--agenda-text-primary) 4%, transparent)",
                         }}
                     >
-                        <Typography
+                        <Box
                             sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.6,
                                 color: "var(--agenda-text-muted)",
-                                fontSize: "0.66rem",
-                                letterSpacing: "0.1em",
-                                textTransform: "uppercase",
                                 lineHeight: 1.2,
                             }}
                         >
-                            {statName}
-                        </Typography>
+                            {StatIcon && <StatIcon sx={{ fontSize: "0.8rem", color: "var(--agenda-highlight)" }} />}
+                            <Typography
+                                sx={{
+                                    color: "var(--agenda-text-muted)",
+                                    fontSize: "0.66rem",
+                                    letterSpacing: "0.1em",
+                                    textTransform: "uppercase",
+                                    lineHeight: 1.2,
+                                }}
+                            >
+                                {statName}
+                            </Typography>
+                        </Box>
 
                         {isNumericStat ? (
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>

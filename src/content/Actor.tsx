@@ -91,6 +91,7 @@ export class Actor {
     id: string = ''; // UUID
     loreId: string = ''; // The ID of the lore entry associated with this actor, if any. This is used to link the actor to their description in the lorebook.
     active: boolean = true; // Soft-delete flag. Inactive actors are hidden from management UIs.
+    generic: boolean = false; // Whether this actor is a generic stand-in archetype rather than a specific character.
     name: string = ''; // Full name (possibly with formatting, like last, first), to be used in content management.
     displayName: string = ''; // Name as it appears in NamePlate and chats, used everywhere beyond content management. Fall back to name.
     role: string = ''; // Optional role for this actor. This displays beneath the name in the NamePlate and under name in the ActorCard.
@@ -115,6 +116,7 @@ export class Actor {
         const actor = Object.create(Actor.prototype);
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
+        actor.generic = savedActor?.generic === true;
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
         actor.statInitialMap = cloneStatInitialMap(savedActor?.statInitialMap);
         actor.schedule = cloneSchedule(savedActor?.schedule);
@@ -133,6 +135,7 @@ export class Actor {
             this.id = generateUuid();
         }
         this.active = this.active !== false;
+        this.generic = this.generic === true;
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
         this.statInitialMap = cloneStatInitialMap(this.statInitialMap);
         this.schedule = cloneSchedule(this.schedule);
@@ -255,6 +258,20 @@ export function applyActorInitialStats(actor: Actor, actorStats: ActorStat[], co
         });
 }
 
+export function resetGenericActorStats(actor: Actor, actorStats: ActorStat[], context: ConditionContext): void {
+    if (!actor?.generic) {
+        return;
+    }
+    if (!actor.statMap || typeof actor.statMap !== 'object') {
+        actor.statMap = {};
+    }
+    actorStats
+        .filter(stat => stat?.name?.trim() && NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(stat.displayType))
+        .forEach(stat => {
+            actor.statMap[stat.name] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context);
+        });
+}
+
 // Mapping of voice IDs to a description of the voice, so the AI can choose an ID based on the character profile.
 export const VOICE_MAP: {[key: string]: string} = {
     '751212e5-a871-45c7-b10b-6f42a5785954': 'feminine - posh and catty',
@@ -312,7 +329,10 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
     const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
     const actorStatFields = buildActorStatFields(actorStats);
-    const distillationFields = [...DISTILLATION_FIELDS, ...actorStatFields];
+    const distillationFields = (actor.generic
+        ? DISTILLATION_FIELDS.filter(field => field.key !== 'birthDate')
+        : DISTILLATION_FIELDS
+    ).concat(actorStatFields);
 
     // Preserve content while removing JSON-like structures.
     const definitionPersonality = String(definition.personality || actor.profile || actor.description || actor.name || '')
@@ -342,7 +362,8 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
             .addBlock('Instructions',
                 `This is preparatory request for structured and formatted game content. ` +
                 `The world and its rules are described below. ` +
-                `The character details below describe a character of this world (${actor.name}) to convert into a set of defined fields for this game.`)
+                `The character details below describe a character of this world (${actor.name}) to convert into a set of defined fields for this game.` +
+                (actor.generic ? ` This actor is a generic stand-in, not a specific character. Treat them as an archetypal role rather than a named individual. Do not invent a personal identity, age, or birth date; keep their details broad and anonymous.` : ''))
             .addBlock('World Context', worldContext)
             .addBlock('Current Date', formatCurrentDate(stage.getSave().currentDate, stage.getSave().currentTimeOfDay))
             .addBlock('Character Details', definition.personality)
@@ -399,7 +420,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     actor.name = parsedData['name'] || actor.name || '';
     actor.displayName = actor.name;
     actor.role = parsedData['role'] || actor.role || '';
-    actor.birthDate = parsedData['birthDate'] || actor.birthDate || '';
+    actor.birthDate = actor.generic ? '' : (parsedData['birthDate'] || actor.birthDate || '');
     actor.description = parsedData['description'] || actor.description || '';
     actor.background = parsedData['background'] || actor.background || '';
     actor.profile = parsedData['profile'] || actor.profile || '';

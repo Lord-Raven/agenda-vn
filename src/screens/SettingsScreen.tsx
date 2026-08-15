@@ -4,6 +4,7 @@ import { ActorStat, SaveType, Stage } from '../Stage';
 import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
+import { resolveIcon } from '../components/ActorStatRating';
 import { ScreenType } from './BaseScreen';
 
 export const DEFAULT_PLAYER_THEME_COLOR = '#66bbee';
@@ -417,6 +418,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         const optionEntries = stat.options || [];
                                         const isNumericDisplay = ['number', 'percentage', 'rating', 'letter grade'].includes(stat.displayType);
 
+                                        const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
+
                                         return (
                                             <div
                                                 key={statName}
@@ -430,8 +433,9 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     gap: '8px',
                                                 }}
                                             >
-                                                <div style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
-                                                    {statName}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
+                                                    {StatIcon && <StatIcon style={{ fontSize: '0.95rem', color: 'var(--agenda-highlight)' }} />}
+                                                    <span>{statName}</span>
                                                 </div>
                                                 <div style={{ color: 'color-mix(in srgb, var(--agenda-text-muted) 80%, transparent)', fontSize: '13px' }}>
                                                     {stat.description}
