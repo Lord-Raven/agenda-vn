@@ -7,8 +7,8 @@ interface PlayerStatBarProps {
     stage: () => Stage;
 }
 
-const resolveStatDefaultValue = (stat: ActorStat): number | string => {
-    if (stat.displayType === "option") {
+const resolveStatDefaultValue = (stat: ActorStat): number | string | boolean => {
+    if (stat.type === "option") {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === "string" && optionNames.includes(stat.default)) {
             return stat.default;
@@ -16,15 +16,19 @@ const resolveStatDefaultValue = (stat: ActorStat): number | string => {
         return optionNames[0] || "";
     }
 
-    if (stat.displayType === "text") {
+    if (stat.type === "text") {
         return typeof stat.default === "string" ? stat.default : "";
+    }
+
+    if (stat.type === "checkbox") {
+        return typeof stat.default === "boolean" ? stat.default : false;
     }
 
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const normalizeStatValue = (value: unknown, stat: ActorStat): number | string => {
-    if (stat.displayType === "option") {
+const normalizeStatValue = (value: unknown, stat: ActorStat): number | string | boolean => {
+    if (stat.type === "option") {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof value === "string" && optionNames.includes(value)) {
             return value;
@@ -32,7 +36,7 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): number | string =>
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.displayType === "text") {
+    if (stat.type === "text") {
         if (typeof value === "string") {
             return value;
         }
@@ -51,23 +55,27 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): number | string =>
 
 const resolveDisplayValue = (stat: ActorStat, value: unknown): string => {
     const normalized = normalizeStatValue(value, stat);
-    if (stat.displayType === "option") {
+    if (stat.type === "option") {
         return typeof normalized === "string" ? normalized : "";
     }
 
-    if (stat.displayType === "text") {
+    if (stat.type === "text") {
         return typeof normalized === "string" ? normalized : "";
     }
 
-    if (stat.displayType === "percentage") {
+    if (stat.type === "checkbox") {
+        return normalized === true ? "True" : "False";
+    }
+
+    if (stat.type === "percentage") {
         return `${Number(normalized)}%`;
     }
 
-    if (stat.displayType === "rating") {
+    if (stat.type === "rating") {
         return `${Number(normalized)}`;
     }
 
-    if (stat.displayType === "letter grade") {
+    if (stat.type === "letter grade") {
         const numeric = Number(normalized);
         return Number.isFinite(numeric) ? `${numeric}` : "0";
     }
@@ -79,7 +87,7 @@ const resolveNumericRange = (stat: ActorStat): { min: number; max: number } => {
     if (typeof stat.min === "number" && typeof stat.max === "number" && stat.max > stat.min) {
         return { min: stat.min, max: stat.max };
     }
-    if (stat.displayType === "percentage" || stat.displayType === "letter grade") {
+    if (stat.type === "percentage" || stat.type === "letter grade") {
         return { min: 0, max: 100 };
     }
     return { min: 0, max: Number.isFinite(stat.max) ? Number(stat.max) : 100 };
@@ -127,7 +135,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
                     ?? stageInstance.getConfiguration()?.playerStatValues?.[statName]
                     ?? stat.default;
                 const normalizedValue = normalizeStatValue(rawValue, stat);
-                const isNumericStat = ["number", "percentage", "rating", "letter grade"].includes(stat.displayType);
+                const isNumericStat = ["number", "percentage", "rating", "letter grade"].includes(stat.type);
                 const progressPct = isNumericStat ? getPercent(stat, normalizedValue) : 0;
                 const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
 

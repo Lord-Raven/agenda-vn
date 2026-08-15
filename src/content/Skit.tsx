@@ -206,7 +206,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        if (stat.displayType === 'option') {
+        if (stat.type === 'option') {
             const selectedOption = (stat.options || []).find((option) => option.name === valueText);
             const optionDescription = selectedOption?.description?.trim() || '';
             return [
@@ -234,7 +234,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        if (stat.displayType === 'option') {
+        if (stat.type === 'option') {
             const selectedOption = (stat.options || []).find((option) => option.name === valueText);
             const optionDescription = selectedOption?.description?.trim() || '';
             return [

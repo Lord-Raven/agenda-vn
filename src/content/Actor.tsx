@@ -23,7 +23,7 @@ export type ActorStatModifier = {
 
 // The initial value and conditional modifiers used to compute an actor's stat value when a new game is initialized.
 export type ActorStatInitial = {
-    value: number;
+    value: number | boolean;
     modifiers: ActorStatModifier[];
 };
 
@@ -42,7 +42,11 @@ const cloneStatInitialMap = (statInitialMap: unknown): { [key: string]: ActorSta
     return Object.fromEntries(Object.entries(statInitialMap as Record<string, any>).map(([statName, initial]) => [
         statName,
         {
-            value: Number.isFinite(initial?.value) ? Number(initial.value) : 0,
+            value: typeof initial?.value === 'boolean'
+                ? initial.value
+                : Number.isFinite(initial?.value)
+                    ? Number(initial.value)
+                    : 0,
             modifiers: Array.isArray(initial?.modifiers) ? initial.modifiers.map(cloneStatModifier) : [],
         },
     ]));
@@ -104,7 +108,7 @@ export class Actor {
     themeColor: string = ''; // Theme color (hex code)
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
-    statMap: { [key: string]: number } = {}; // Map of custom stat name to numeric value for this actor
+    statMap: { [key: string]: number | string | boolean } = {}; // Map of custom stat name to value for this actor
     statInitialMap: { [key: string]: ActorStatInitial } = {}; // Map of custom stat name to its initial value and conditional modifiers, used to seed statMap when a new game starts
     schedule: ActorSchedule = {}; // Destinations are evaluated in insertion order; the first matching collection wins.
 
@@ -213,11 +217,10 @@ function buildActorStatFields(actorStats: ActorStat[]): StructuredFieldDefinitio
         key: `stat_${index}`,
         label: `STAT ${index + 1}`,
         description:
-            `Numeric value for \"${stat.name}\".` +
+            `${stat.type === 'checkbox' ? 'Boolean value' : 'Numeric value'} for "${stat.name}".` +
             ` Description: ${stat.description || 'N/A'}.` +
             ` Guidance: ${stat.guidance || 'N/A'}.` +
-            ` Range: ${typeof stat.min === 'number' ? stat.min : '-inf'} to ${typeof stat.max === 'number' ? stat.max : '+inf'}.` +
-            ` Default: ${Number.isFinite(stat.default) ? Number(stat.default) : 0}.`,
+            `${stat.type === 'checkbox' ? ` Default: ${stat.default === true}.` : ` Range: ${typeof stat.min === 'number' ? stat.min : '-inf'} to ${typeof stat.max === 'number' ? stat.max : '+inf'}. Default: ${Number.isFinite(stat.default) ? Number(stat.default) : 0}.`}`,
     }));
 }
 
@@ -235,7 +238,16 @@ function clampActorStatValue(value: number, stat: ActorStat): number {
 const NUMERIC_ACTOR_STAT_DISPLAY_TYPES = ['number', 'percentage', 'rating', 'letter grade'];
 
 // Computes an actor's initial stat value from its configured initial value plus any modifiers whose conditions currently evaluate true.
-export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStatInitial | undefined, context: ConditionContext): number {
+export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStatInitial | undefined, context: ConditionContext): number | boolean {
+    if (stat.type === 'checkbox') {
+        const baseValue = typeof initial?.value === 'boolean'
+            ? initial.value
+            : typeof stat.default === 'boolean'
+                ? stat.default
+                : false;
+        return baseValue;
+    }
+
     const baseValue = initial && Number.isFinite(initial.value) ? Number(initial.value) : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
     const modifierTotal = (initial?.modifiers || []).reduce((total, modifier) => {
         return evaluateConditionCollections(modifier.conditions, context) ? total + (Number.isFinite(modifier.amount) ? Number(modifier.amount) : 0) : total;
@@ -249,9 +261,9 @@ export function applyActorInitialStats(actor: Actor, actorStats: ActorStat[], co
         actor.statMap = {};
     }
     actorStats
-        .filter(stat => stat?.name?.trim() && NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(stat.displayType))
+        .filter(stat => stat?.name?.trim() && (NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(stat.type) || stat.type === 'checkbox'))
         .forEach(stat => {
-            actor.statMap[stat.name] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context);
+            actor.statMap[stat.name] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context) as number | string | boolean;
         });
 }
 
@@ -322,6 +334,9 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
     const actorStatContext = actorStats.length > 0
         ? actorStats.map((stat, index) => {
+            if (stat.type === 'checkbox') {
+                return `${index + 1}. ${stat.name}\nDescription: ${stat.description || 'N/A'}\nGuidance: ${stat.guidance || 'N/A'}\nType: checkbox\nDefault: ${stat.default === true}`;
+            }
             const defaultValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
             const minValue = typeof stat.min === 'number' ? `${stat.min}` : '-inf';
             const maxValue = typeof stat.max === 'number' ? `${stat.max}` : '+inf';
@@ -331,8 +346,10 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
     const exampleStatValues = Object.fromEntries(actorStatFields.map((field, index) => {
         const sourceStat = actorStats[index];
-        const fallbackValue = Number.isFinite(sourceStat?.default) ? Number(sourceStat.default) : 0;
-        return [field.key, `${fallbackValue}`];
+        const fallbackValue = sourceStat?.type === 'checkbox'
+            ? `${sourceStat.default === true}`
+            : `${Number.isFinite(sourceStat?.default) ? Number(sourceStat.default) : 0}`;
+        return [field.key, fallbackValue];
     }));
 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.

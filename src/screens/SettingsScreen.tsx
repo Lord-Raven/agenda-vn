@@ -1,6 +1,6 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ActorStat, SaveType, Stage } from '../Stage';
+import { ActorStat, ActorStatValue, SaveType, Stage } from '../Stage';
 import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
@@ -40,8 +40,8 @@ const resolveActivePlayerStats = (stageInstance: Stage): ActorStat[] => {
     return stageInstance.getConfiguration()?.playerStats || [];
 };
 
-const resolveStatDefaultValue = (stat: ActorStat): number | string => {
-    if (stat.displayType === 'option') {
+const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
+    if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
             return stat.default;
@@ -49,15 +49,19 @@ const resolveStatDefaultValue = (stat: ActorStat): number | string => {
         return optionNames[0] || '';
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         return typeof stat.default === 'string' ? stat.default : '';
+    }
+
+    if (stat.type === 'checkbox') {
+        return typeof stat.default === 'boolean' ? stat.default : false;
     }
 
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const normalizePlayerStatValue = (value: unknown, stat: ActorStat): number | string => {
-    if (stat.displayType === 'option') {
+const normalizePlayerStatValue = (value: unknown, stat: ActorStat): ActorStatValue => {
+    if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof value === 'string' && optionNames.includes(value)) {
             return value;
@@ -65,11 +69,21 @@ const normalizePlayerStatValue = (value: unknown, stat: ActorStat): number | str
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         if (typeof value === 'string') {
             return value;
         }
         return resolveStatDefaultValue(stat);
+    }
+
+    if (stat.type === 'checkbox') {
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'string') {
+            const lowered = value.trim().toLowerCase();
+            if (lowered === 'true') return true;
+            if (lowered === 'false') return false;
+        }
+        return resolveStatDefaultValue(stat) as boolean;
     }
 
     let resolved = Number.isFinite(value) ? Number(value) : Number(resolveStatDefaultValue(stat)) || 0;
@@ -84,9 +98,9 @@ const normalizePlayerStatValue = (value: unknown, stat: ActorStat): number | str
 
 const buildPlayerStatValues = (
     stats: ActorStat[],
-    preferredValues: { [key: string]: number | string },
-): { [key: string]: number | string } => {
-    const nextValues: { [key: string]: number | string } = {};
+    preferredValues: { [key: string]: ActorStatValue },
+): { [key: string]: ActorStatValue } => {
+    const nextValues: { [key: string]: ActorStatValue } = {};
 
     stats.forEach((stat) => {
         const statName = (stat.name || '').trim();
@@ -128,9 +142,9 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     });
 
     const [playerStats] = useState<ActorStat[]>(() => resolveActivePlayerStats(stageInstance));
-    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: number | string }>(() => {
+    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: ActorStatValue }>(() => {
         const savePlayerStatValues = stageInstance.getSave()?.playerStatValues || {};
-        return buildPlayerStatValues(resolveActivePlayerStats(stageInstance), savePlayerStatValues);
+        return buildPlayerStatValues(resolveActivePlayerStats(stageInstance), savePlayerStatValues as { [key: string]: ActorStatValue });
     });
 
     const [languageSuggestions, setLanguageSuggestions] = useState<string[]>([]);
@@ -416,7 +430,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         const statName = (stat.name || '').trim();
                                         const selectedValue = normalizePlayerStatValue(playerStatValues[statName], stat);
                                         const optionEntries = stat.options || [];
-                                        const isNumericDisplay = ['number', 'percentage', 'rating', 'letter grade'].includes(stat.displayType);
+                                        const isNumericDisplay = ['number', 'percentage', 'rating', 'letter grade'].includes(stat.type);
 
                                         const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
 
@@ -441,7 +455,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     {stat.description}
                                                 </div>
 
-                                                {stat.displayType === 'option' && optionEntries.length > 0 && (
+                                                {stat.type === 'option' && optionEntries.length > 0 && (
                                                     <select
                                                         className="input-base"
                                                         value={typeof selectedValue === 'string' ? selectedValue : ''}
@@ -456,13 +470,13 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     </select>
                                                 )}
 
-                                                {stat.displayType === 'option' && optionEntries.length === 0 && (
+                                                {stat.type === 'option' && optionEntries.length === 0 && (
                                                     <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)', fontSize: '12px' }}>
                                                         No options configured for this setting.
                                                     </div>
                                                 )}
 
-                                                {stat.displayType === 'text' && (
+                                                {stat.type === 'text' && (
                                                     <TextArea
                                                         value={typeof selectedValue === 'string' ? selectedValue : ''}
                                                         onChange={(e) => handlePlayerStatValueChange(stat, e.target.value)}

@@ -49,7 +49,7 @@ export type SaveType = {
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
     upcomingEvents?: CalendarEvent[];
-    playerStatValues?: {[key: string]: number | string};
+    playerStatValues?: {[key: string]: ActorStatValue};
     uiSettings?: UiSettings;
     betaMode?: boolean;
 }
@@ -92,7 +92,8 @@ const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
 
 const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
 
-export type ActorStatDisplayType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text';
+export type ActorStatType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text' | 'checkbox';
+export type ActorStatValue = number | string | boolean;
 
 export type ActorStatOption = {
     name: string;
@@ -104,8 +105,8 @@ export type ActorStat = {
     name: string; // Display name of the stat
     description: string; // User-facing description of what the stat represents
     guidance: string; // Guidance for how the stat should be used in generative requests
-    default: number | string; // Default value of the stat
-    displayType: ActorStatDisplayType; // How the stat should be displayed in the UI
+    default: ActorStatValue; // Default value of the stat
+    type: ActorStatType; // How the stat should be displayed in the UI
     options?: ActorStatOption[]; // Supported option values for option-based stats
     min?: number; // Minimum value of the stat (optional)
     max?: number; // Maximum value of the stat (optional)
@@ -125,7 +126,7 @@ export type GameConfiguration = {
     calendarEvents: CalendarEvent[], // Calendar event series definitions to seed into new games
     actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
     playerStats: ActorStat[], // Stats that apply to the player only
-    playerStatValues: {[key: string]: number | string}, // Selected/default values for player stats
+    playerStatValues: {[key: string]: ActorStatValue}, // Selected/default values for player stats
     uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
     titleImageUrl: string, // URL of a title image for the game
@@ -141,8 +142,8 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     name: stat.name,
     description: stat.description,
     guidance: stat.guidance,
-    default: typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : 0,
-    displayType: stat.displayType,
+    default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
+    type: stat.type,
     options: (stat.options || []).map((option) => ({
         name: option.name,
         description: option.description,
@@ -151,7 +152,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true || stat.exposed === true,
     exposed: stat.exposed === true,
-    iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
+    iconName: stat.iconName || (stat.type === 'rating' ? 'star' : undefined),
     labelIconName: stat.labelIconName || undefined,
 });
 
@@ -199,12 +200,12 @@ const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({
 });
 
 
-const NUMERIC_STAT_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'rating', 'letter grade'];
+const NUMERIC_STAT_DISPLAY_TYPES: ActorStatType[] = ['number', 'percentage', 'rating', 'letter grade'];
 
-const isNumericActorStat = (stat: ActorStat): boolean => NUMERIC_STAT_DISPLAY_TYPES.includes(stat.displayType);
+const isNumericActorStat = (stat: ActorStat): boolean => NUMERIC_STAT_DISPLAY_TYPES.includes(stat.type);
 
-const resolveActorStatDefault = (stat: ActorStat): number | string => {
-    if (stat.displayType === 'option') {
+const resolveActorStatDefault = (stat: ActorStat): ActorStatValue => {
+    if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
             return stat.default;
@@ -212,15 +213,19 @@ const resolveActorStatDefault = (stat: ActorStat): number | string => {
         return optionNames[0] || '';
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         return typeof stat.default === 'string' ? stat.default : '';
+    }
+
+    if (stat.type === 'checkbox') {
+        return typeof stat.default === 'boolean' ? stat.default : false;
     }
 
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const normalizeActorStatValue = (value: unknown, stat: ActorStat): number | string => {
-    if (stat.displayType === 'option') {
+const normalizeActorStatValue = (value: unknown, stat: ActorStat): ActorStatValue => {
+    if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         const fallback = resolveActorStatDefault(stat);
         if (typeof value === 'string' && optionNames.includes(value)) {
@@ -229,12 +234,24 @@ const normalizeActorStatValue = (value: unknown, stat: ActorStat): number | stri
         return typeof fallback === 'string' ? fallback : '';
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         if (typeof value === 'string') {
             return value;
         }
         const fallback = resolveActorStatDefault(stat);
         return typeof fallback === 'string' ? fallback : '';
+    }
+
+    if (stat.type === 'checkbox') {
+        if (typeof value === 'boolean') {
+            return value;
+        }
+        if (typeof value === 'string') {
+            const lower = value.trim().toLowerCase();
+            if (lower === 'true') return true;
+            if (lower === 'false') return false;
+        }
+        return typeof resolveActorStatDefault(stat) === 'boolean' ? resolveActorStatDefault(stat) : false;
     }
 
     let resolved = Number.isFinite(value) ? Number(value) : Number(resolveActorStatDefault(stat)) || 0;
@@ -1322,7 +1339,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private syncActorStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().actorStats || [])
             .filter(stat => stat?.name?.trim())
-            .filter(isNumericActorStat);
+            .filter(stat => isNumericActorStat(stat) || stat.type === 'checkbox');
         const statNames = new Set(configuredStats.map(stat => stat.name.trim()));
 
         Object.values(save.actors || {}).forEach(actor => {
@@ -1334,7 +1351,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 const statName = stat.name.trim();
                 const existingValue = actor.statMap[statName];
                 const normalized = normalizeActorStatValue(existingValue, stat);
-                actor.statMap[statName] = Number.isFinite(normalized) ? Number(normalized) : 0;
+                actor.statMap[statName] = typeof normalized === 'boolean'
+                    ? normalized
+                    : Number.isFinite(normalized)
+                        ? Number(normalized)
+                        : 0;
             });
 
             Object.keys(actor.statMap).forEach(statName => {
@@ -1351,7 +1372,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             ? save.playerStatValues
             : {};
 
-        const normalizedValues: { [key: string]: number | string } = {};
+        const normalizedValues: { [key: string]: ActorStatValue } = {};
         configuredStats.forEach((stat) => {
             const statName = stat.name.trim();
             normalizedValues[statName] = normalizeActorStatValue(currentValues[statName], stat);
@@ -1702,7 +1723,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             const value = normalizeActorStatValue(save.playerStatValues?.[statName], stat);
             const valueText = typeof value === 'number' ? String(value) : value;
 
-            if (stat.displayType === 'option') {
+            if (stat.type === 'option') {
                 const selectedOption = (stat.options || []).find(option => option.name === valueText);
                 const optionDescription = selectedOption?.description?.trim() || '';
                 const line = [

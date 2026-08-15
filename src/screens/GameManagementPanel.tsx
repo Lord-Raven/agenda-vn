@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
-import { ActorStat, ActorStatDisplayType, Stage } from '../Stage';
+import { ActorStat, ActorStatType, ActorStatValue, Stage } from '../Stage';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { buildCreatorNotesHtml } from './CreatorNotesHtml';
@@ -9,16 +9,16 @@ interface GameManagementPanelProps {
     stage: () => Stage;
 }
 
-const NUMERIC_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'rating', 'letter grade'];
+const NUMERIC_DISPLAY_TYPES: ActorStatType[] = ['number', 'percentage', 'rating', 'letter grade'];
 
-const isNumericDisplayType = (displayType: ActorStatDisplayType): boolean => NUMERIC_DISPLAY_TYPES.includes(displayType);
+const isNumericDisplayType = (displayType: ActorStatType): boolean => NUMERIC_DISPLAY_TYPES.includes(displayType);
 
 const cloneActorStat = (stat: ActorStat): ActorStat => ({
     name: stat.name,
     description: stat.description,
     guidance: stat.guidance,
     default: typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : 0,
-    displayType: stat.displayType,
+    type: stat.type,
     options: (stat.options || []).map((option) => ({
         name: option.name,
         description: option.description,
@@ -29,8 +29,8 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     exposed: stat.exposed === true,
 });
 
-const resolveStatDefaultValue = (stat: ActorStat): number | string => {
-    if (stat.displayType === 'option') {
+const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
+    if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
             return stat.default;
@@ -38,15 +38,19 @@ const resolveStatDefaultValue = (stat: ActorStat): number | string => {
         return optionNames[0] || '';
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         return typeof stat.default === 'string' ? stat.default : '';
+    }
+
+    if (stat.type === 'checkbox') {
+        return typeof stat.default === 'boolean' ? stat.default : false;
     }
 
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const normalizeStatValue = (value: unknown, stat: ActorStat): number | string => {
-    if (stat.displayType === 'option') {
+const normalizeStatValue = (value: unknown, stat: ActorStat): ActorStatValue => {
+    if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof value === 'string' && optionNames.includes(value)) {
             return value;
@@ -54,11 +58,21 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): number | string =>
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         if (typeof value === 'string') {
             return value;
         }
         return resolveStatDefaultValue(stat);
+    }
+
+    if (stat.type === 'checkbox') {
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'string') {
+            const lowered = value.trim().toLowerCase();
+            if (lowered === 'true') return true;
+            if (lowered === 'false') return false;
+        }
+        return (resolveStatDefaultValue(stat) as boolean);
     }
 
     let resolved = Number.isFinite(value) ? Number(value) : Number(resolveStatDefaultValue(stat)) || 0;
@@ -105,7 +119,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [actorStats, setActorStats] = useState<ActorStat[]>(() =>
         (configuration.actorStats || []).map(cloneActorStat),
     );
-    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: number | string }>(() => ({
+    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: ActorStatValue }>(() => ({
         ...configuration.playerStatValues,
         ...save.playerStatValues,
     }));
@@ -143,7 +157,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     };
 
     const validPlayerStatValues = useMemo(() => {
-        const nextValues: { [key: string]: number | string } = {};
+        const nextValues: { [key: string]: ActorStatValue } = {};
 
         playerStats.forEach((stat) => {
             const statName = (stat.name || '').trim();
@@ -292,7 +306,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
         const statNames = new Set(
             actorStats
-                .filter(stat => isNumericDisplayType(stat.displayType))
+                .filter(stat => isNumericDisplayType(stat.type))
                 .map(stat => stat.name.trim())
                 .filter(Boolean),
         );
@@ -301,7 +315,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                 actor.statMap = {};
             }
 
-            actorStats.filter(stat => isNumericDisplayType(stat.displayType)).forEach(stat => {
+            actorStats.filter(stat => isNumericDisplayType(stat.type)).forEach(stat => {
                 const statName = stat.name.trim();
                 if (!statName) {
                     return;

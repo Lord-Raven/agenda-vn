@@ -14,8 +14,8 @@ interface ActorCardProps {
 
 const LETTER_GRADES = ['F', 'D', 'C', 'B', 'A', 'S'];
 
-const resolveStatValue = (actor: Actor, stat: ActorStat): number | string => {
-    const raw = (actor.statMap as { [key: string]: number | string } | undefined)?.[stat.name];
+const resolveStatValue = (actor: Actor, stat: ActorStat): number | string | boolean => {
+    const raw = (actor.statMap as { [key: string]: number | string | boolean } | undefined)?.[stat.name];
     return raw === undefined || raw === null || raw === '' ? stat.default : raw;
 };
 
@@ -23,7 +23,7 @@ const resolveNumericRange = (stat: ActorStat): { min: number; max: number } => {
     if (typeof stat.min === 'number' && typeof stat.max === 'number' && stat.max > stat.min) {
         return { min: stat.min, max: stat.max };
     }
-    if (stat.displayType === 'percentage' || stat.displayType === 'letter grade') {
+    if (stat.type === 'percentage' || stat.type === 'letter grade') {
         return { min: 0, max: 100 };
     }
     return { min: 0, max: Number.isFinite(stat.max) ? Number(stat.max) : 100 };
@@ -35,11 +35,18 @@ const toLetterGrade = (value: number, stat: ActorStat): string => {
     return LETTER_GRADES[Math.round(ratio * (LETTER_GRADES.length - 1))];
 };
 
-const StatValue: FC<{ stat: ActorStat; value: number | string }> = ({ stat, value }) => {
+const StatValue: FC<{ stat: ActorStat; value: number | string | boolean }> = ({ stat, value }) => {
+    if (stat.type === 'checkbox') {
+        return (
+            <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                {value === true ? 'True' : 'False'}
+            </Box>
+        );
+    }
     const numericValue = Number(value);
     const hasNumericValue = Number.isFinite(numericValue);
 
-    if (stat.displayType === 'rating' && hasNumericValue) {
+    if (stat.type === 'rating' && hasNumericValue) {
         return (
             <Box sx={{ height: '16px', display: 'flex', justifyContent: 'flex-end' }}>
                 <ActorStatRating stat={stat} value={numericValue} />
@@ -47,7 +54,7 @@ const StatValue: FC<{ stat: ActorStat; value: number | string }> = ({ stat, valu
         );
     }
 
-    if (stat.displayType === 'percentage' && hasNumericValue) {
+    if (stat.type === 'percentage' && hasNumericValue) {
         const { min, max } = resolveNumericRange(stat);
         const ratio = Math.max(0, Math.min(1, (numericValue - min) / Math.max(1, max - min)));
         return (
@@ -65,7 +72,7 @@ const StatValue: FC<{ stat: ActorStat; value: number | string }> = ({ stat, valu
         );
     }
 
-    const text = stat.displayType === 'letter grade' && hasNumericValue
+    const text = stat.type === 'letter grade' && hasNumericValue
         ? toLetterGrade(numericValue, stat)
         : String(value ?? '');
 

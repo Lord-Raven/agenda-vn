@@ -134,7 +134,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     return '';
                 }
 
-                if (stat.displayType === 'option') {
+                if (stat.type === 'option') {
                     const selectedOption = (stat.options || []).find(option => option.name === valueText);
                     return [
                         `${statName}: ${valueText}`,

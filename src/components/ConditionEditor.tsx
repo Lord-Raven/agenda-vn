@@ -91,18 +91,21 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
     };
 
     const renderValueInput = (condition: Condition, collectionIndex: number, conditionIndex: number) => {
-        const updateValue = (value: string | number) => updateCondition(collectionIndex, conditionIndex, { ...condition, value } as Condition);
+        const updateValue = (value: string | number | boolean) => updateCondition(collectionIndex, conditionIndex, { ...condition, value } as Condition);
         if (condition.type === 'calendar' && condition.field === 'timeOfDay') {
-            return <select style={selectStyle} value={condition.value} onChange={(event) => updateValue(event.target.value)}>{['morning', 'afternoon', 'evening', 'night'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
+            return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['morning', 'afternoon', 'evening', 'night'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
         }
         if (condition.type === 'calendar' && condition.field === 'dayOfWeek') {
-            return <select style={selectStyle} value={condition.value} onChange={(event) => updateValue(event.target.value)}>{['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
+            return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
         }
         const stat = condition.type === 'playerStat' ? playerStats.find(candidate => candidate.name === condition.statName) : undefined;
-        if (stat?.displayType === 'option') {
-            return <select style={selectStyle} value={condition.value} onChange={(event) => updateValue(event.target.value)}>{(stat.options || []).map(option => <option key={option.name} value={option.name}>{option.name}</option>)}</select>;
+        if (stat?.type === 'option') {
+            return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{(stat.options || []).map(option => <option key={option.name} value={option.name}>{option.name}</option>)}</select>;
         }
-        return <TextInput type="number" value={condition.value} onChange={(event) => updateValue(Number(event.target.value))} />;
+        if (stat?.type === 'checkbox') {
+            return <input type="checkbox" checked={Boolean(condition.value === true || condition.value === 'true')} onChange={(event) => updateValue(event.target.checked)} />;
+        }
+        return <TextInput type="number" value={condition.value as number | string} onChange={(event) => updateValue(Number(event.target.value))} />;
     };
 
     let flatIndex = 0;
@@ -128,7 +131,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             value={condition.type}
                             onChange={(event) => updateCondition(collectionIndex, conditionIndex, event.target.value === 'calendar'
                                 ? { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }
-                                : { type: 'playerStat', statName: playerStats[0]?.name || '', comparison: 'equals', value: playerStats[0]?.default ?? 0 })}
+                                : { type: 'playerStat', statName: playerStats[0]?.name || '', comparison: 'equals', value: typeof playerStats[0]?.default === 'boolean' ? playerStats[0].default : (playerStats[0]?.default ?? 0) })}
                         >
                             <option value="calendar">Calendar</option>
                             <option value="playerStat">Player Stat</option>
@@ -140,7 +143,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         ) : (
                             <select style={selectStyle} value={condition.statName} onChange={(event) => {
                                 const stat = playerStats.find(candidate => candidate.name === event.target.value);
-                                updateCondition(collectionIndex, conditionIndex, { ...condition, statName: event.target.value, value: stat?.default ?? 0 });
+                                updateCondition(collectionIndex, conditionIndex, { ...condition, statName: event.target.value, value: typeof stat?.default === 'boolean' ? stat.default : (stat?.default ?? 0) });
                             }}>
                                 {playerStats.map(stat => <option key={stat.name} value={stat.name}>{stat.name}</option>)}
                             </select>

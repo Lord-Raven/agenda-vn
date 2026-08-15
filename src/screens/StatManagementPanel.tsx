@@ -1,5 +1,5 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActorStat, ActorStatDisplayType, Stage } from '../Stage';
+import { ActorStat, ActorStatType, ActorStatValue, Stage } from '../Stage';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/ActorStatRating';
 
@@ -7,16 +7,16 @@ interface StatManagementPanelProps {
     stage: () => Stage;
 }
 
-const NUMERIC_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'rating', 'letter grade'];
+const NUMERIC_DISPLAY_TYPES: ActorStatType[] = ['number', 'percentage', 'rating', 'letter grade'];
 
-const isNumericDisplayType = (displayType: ActorStatDisplayType): boolean => NUMERIC_DISPLAY_TYPES.includes(displayType);
+const isNumericDisplayType = (displayType: ActorStatType): boolean => NUMERIC_DISPLAY_TYPES.includes(displayType);
 
 const cloneActorStat = (stat: ActorStat): ActorStat => ({
     name: stat.name,
     description: stat.description,
     guidance: stat.guidance,
-    default: typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : 0,
-    displayType: stat.displayType,
+    default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
+    type: stat.type,
     options: (stat.options || []).map((option) => ({
         name: option.name,
         description: option.description,
@@ -25,11 +25,11 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true || stat.exposed === true,
     exposed: stat.exposed === true,
-    iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
+    iconName: stat.iconName || (stat.type === 'rating' ? 'star' : undefined),
 });
 
-const resolveStatDefaultValue = (stat: ActorStat): number | string => {
-    if (stat.displayType === 'option') {
+const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
+    if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
             return stat.default;
@@ -37,15 +37,19 @@ const resolveStatDefaultValue = (stat: ActorStat): number | string => {
         return optionNames[0] || '';
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         return typeof stat.default === 'string' ? stat.default : '';
+    }
+
+    if (stat.type === 'checkbox') {
+        return typeof stat.default === 'boolean' ? stat.default : false;
     }
 
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const normalizeStatValue = (value: unknown, stat: ActorStat): number | string => {
-    if (stat.displayType === 'option') {
+const normalizeStatValue = (value: unknown, stat: ActorStat): ActorStatValue => {
+    if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof value === 'string' && optionNames.includes(value)) {
             return value;
@@ -53,11 +57,21 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): number | string =>
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         if (typeof value === 'string') {
             return value;
         }
         return resolveStatDefaultValue(stat);
+    }
+
+    if (stat.type === 'checkbox') {
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'string') {
+            const lowered = value.trim().toLowerCase();
+            if (lowered === 'true') return true;
+            if (lowered === 'false') return false;
+        }
+        return resolveStatDefaultValue(stat) as boolean;
     }
 
     let resolved = Number.isFinite(value) ? Number(value) : Number(resolveStatDefaultValue(stat)) || 0;
@@ -75,7 +89,7 @@ const defaultPlayerStat = (): ActorStat => ({
     description: 'Describe what this player setting controls.',
     guidance: 'How this setting should influence generated narrative and behavior.',
     default: 'Default',
-    displayType: 'option',
+    type: 'option',
     options: [{
         name: 'Default',
         description: 'Default option behavior for this setting.',
@@ -90,7 +104,7 @@ const defaultActorStat = (): ActorStat => ({
     description: 'A user-facing description of this stat.',
     guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
     default: 50,
-    displayType: 'percentage',
+    type: 'percentage',
     min: 0,
     max: 100,
     options: [],
@@ -111,7 +125,7 @@ const clampStatValue = (value: number, stat: ActorStat): number => {
 };
 
 const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
-    if (stat.displayType === 'option') {
+    if (stat.type === 'option') {
         const options = (stat.options || []).filter(option => option.name.trim());
         const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
             ? stat.default
@@ -126,7 +140,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
         };
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         return {
             ...stat,
             default: typeof stat.default === 'string' ? stat.default : '',
@@ -146,7 +160,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
 };
 
 const normalizeActorStatShape = (stat: ActorStat): ActorStat => {
-    if (stat.displayType === 'option') {
+    if (stat.type === 'option') {
         const options = (stat.options || []).filter(option => option.name.trim());
         const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
             ? stat.default
@@ -161,7 +175,7 @@ const normalizeActorStatShape = (stat: ActorStat): ActorStat => {
         };
     }
 
-    if (stat.displayType === 'text') {
+    if (stat.type === 'text') {
         return {
             ...stat,
             default: typeof stat.default === 'string' ? stat.default : '',
@@ -197,7 +211,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
     const [actorStats, setActorStats] = useState<ActorStat[]>(() =>
         (configuration.actorStats || []).map(cloneActorStat),
     );
-    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: number | string }>(() => ({
+    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: ActorStatValue }>(() => ({
         ...configuration.playerStatValues,
         ...save.playerStatValues,
     }));
@@ -232,7 +246,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
     };
 
     const validPlayerStatValues = useMemo(() => {
-        const nextValues: { [key: string]: number | string } = {};
+        const nextValues: { [key: string]: ActorStatValue } = {};
 
         playerStats.forEach((stat) => {
             const statName = (stat.name || '').trim();
@@ -256,7 +270,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         const currentSave = stageInstance.getSave();
         const statNames = new Set(
             actorStats
-                .filter(stat => isNumericDisplayType(stat.displayType))
+                .filter(stat => isNumericDisplayType(stat.type))
                 .map(stat => stat.name.trim())
                 .filter(Boolean),
         );
@@ -266,7 +280,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 actor.statMap = {};
             }
 
-            actorStats.filter(stat => isNumericDisplayType(stat.displayType)).forEach(stat => {
+            actorStats.filter(stat => isNumericDisplayType(stat.type)).forEach(stat => {
                 const statName = stat.name.trim();
                 if (!statName) {
                     return;
@@ -494,12 +508,12 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 <label style={fieldLabelStyle}>Display</label>
                                                 <select
                                                     className="input-base"
-                                                    value={stat.displayType}
+                                                    value={stat.type}
                                                     onChange={(e) => {
-                                                        const nextDisplayType = e.target.value as ActorStat['displayType'];
+                                                        const nextDisplayType = e.target.value as ActorStat['type'];
                                                         updatePlayerStat(statIndex, normalizePlayerStatShape({
                                                             ...stat,
-                                                            displayType: nextDisplayType,
+                                                            type: nextDisplayType,
                                                         }));
                                                     }}
                                                 >
@@ -524,7 +538,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </label>
                                             </div>
 
-                                            {normalizedStat.displayType === 'option' && (
+                                            {normalizedStat.type === 'option' && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
                                                     <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
                                                         <label style={fieldLabelStyle}>Default Option</label>
@@ -575,7 +589,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            {normalizedStat.displayType === 'text' && (
+                                            {normalizedStat.type === 'text' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Default Value</label>
                                                     <TextArea
@@ -587,14 +601,14 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            {normalizedStat.displayType === 'rating' && (
+                                            {normalizedStat.type === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
                                                     {renderIconPicker(normalizedStat.iconName, (iconName) => updatePlayerStat(statIndex, { iconName }))}
                                                 </div>
                                             )}
 
-                                            {isNumericDisplayType(normalizedStat.displayType) && (
+                                            {isNumericDisplayType(normalizedStat.type) && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                                     <label style={fieldLabelStyle}>Properties</label>
                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
@@ -708,12 +722,12 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 <label style={fieldLabelStyle}>Display</label>
                                                 <select
                                                     className="input-base"
-                                                    value={normalizedStat.displayType}
+                                                    value={normalizedStat.type}
                                                     onChange={(e) => {
-                                                        const nextDisplayType = e.target.value as ActorStat['displayType'];
+                                                        const nextDisplayType = e.target.value as ActorStat['type'];
                                                         updateActorStat(statIndex, normalizeActorStatShape({
                                                             ...stat,
-                                                            displayType: nextDisplayType,
+                                                            type: nextDisplayType,
                                                         }));
                                                     }}
                                                 >
@@ -738,7 +752,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </label>
                                             </div>
 
-                                            {normalizedStat.displayType === 'option' && (
+                                            {normalizedStat.type === 'option' && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
                                                     <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
                                                         <label style={fieldLabelStyle}>Default Option</label>
@@ -847,7 +861,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            {normalizedStat.displayType === 'text' && (
+                                            {normalizedStat.type === 'text' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Default Value</label>
                                                     <TextArea
@@ -859,7 +873,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            {normalizedStat.displayType === 'rating' && (
+                                            {normalizedStat.type === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
                                                     {renderIconPicker(normalizedStat.iconName, (iconName) => updateActorStat(statIndex, { iconName }))}
@@ -871,7 +885,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 {renderIconPicker(stat.labelIconName, (iconName) => updateActorStat(statIndex, { labelIconName: iconName || undefined }), true)}
                                             </div>
 
-                                            {isNumericDisplayType(normalizedStat.displayType) && (
+                                            {isNumericDisplayType(normalizedStat.type) && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                                     <label style={fieldLabelStyle}>Properties</label>
                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>

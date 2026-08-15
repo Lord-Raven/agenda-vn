@@ -13,7 +13,7 @@ export type PlayerStatCondition = {
     type: 'playerStat';
     statName: string;
     comparison: ConditionComparison;
-    value: string | number;
+    value: string | number | boolean;
 };
 
 export type Condition = CalendarCondition | PlayerStatCondition;
@@ -24,7 +24,7 @@ export type ConditionCollection = Condition[];
 export type ConditionContext = {
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
-    playerStatValues?: Record<string, string | number>;
+    playerStatValues?: Record<string, string | number | boolean>;
 };
 
 const TIME_OF_DAY_VALUES: Record<CalendarTimeOfDay, number> = {
@@ -34,13 +34,13 @@ const TIME_OF_DAY_VALUES: Record<CalendarTimeOfDay, number> = {
     night: 3,
 };
 
-const compareValues = (actual: string | number | undefined, expected: string | number, comparison: ConditionComparison): boolean => {
+const compareValues = (actual: string | number | boolean | undefined, expected: string | number | boolean, comparison: ConditionComparison): boolean => {
     if (actual === undefined) {
         return false;
     }
 
-    const numericActual = typeof actual === 'number' ? actual : Number(actual);
-    const numericExpected = typeof expected === 'number' ? expected : Number(expected);
+    const numericActual = typeof actual === 'number' || typeof actual === 'boolean' ? Number(actual) : Number(actual);
+    const numericExpected = typeof expected === 'number' || typeof expected === 'boolean' ? Number(expected) : Number(expected);
     const canCompareNumerically = Number.isFinite(numericActual) && Number.isFinite(numericExpected);
     const left = canCompareNumerically ? numericActual : String(actual).toLowerCase();
     const right = canCompareNumerically ? numericExpected : String(expected).toLowerCase();

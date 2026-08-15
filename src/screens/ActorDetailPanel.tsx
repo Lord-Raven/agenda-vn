@@ -1,7 +1,7 @@
 import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
-import { ActorStat, Stage } from '../Stage';
+import { ActorStat, ActorStatValue, Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
@@ -68,11 +68,11 @@ const resolveActorStatRange = (stat: ActorStat): { min: number; max: number; ste
         return { min: stat.min, max: stat.max, step: 1, hasRange: true };
     }
 
-    if (stat.displayType === 'percentage') {
+    if (stat.type === 'percentage') {
         return { min: 0, max: 100, step: 1, hasRange: true };
     }
 
-    if (stat.displayType === 'rating') {
+    if (stat.type === 'rating') {
         return {
             min: 0,
             max: Number.isFinite(stat.max) ? Math.max(1, Math.round(Number(stat.max))) : 5,
@@ -81,7 +81,7 @@ const resolveActorStatRange = (stat: ActorStat): { min: number; max: number; ste
         };
     }
 
-    if (stat.displayType === 'letter grade') {
+    if (stat.type === 'letter grade') {
         return { min: 0, max: 100, step: 1, hasRange: true };
     }
 
@@ -103,9 +103,14 @@ const buildLetterGradeOptions = (stat: ActorStat): Array<{ label: string; value:
     });
 };
 
-const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [key: string]: number } => {
-    const nextMap: { [key: string]: number } = {};
+const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [key: string]: ActorStatValue } => {
+    const nextMap: { [key: string]: ActorStatValue } = {};
     actorStats.forEach((stat) => {
+        if (stat.type === 'checkbox') {
+            const currentValue = actor.statMap?.[stat.name];
+            nextMap[stat.name] = typeof currentValue === 'boolean' ? currentValue : (typeof stat.default === 'boolean' ? stat.default : false);
+            return;
+        }
         const currentValue = Number(actor.statMap?.[stat.name]);
         const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
         const resolved = Number.isFinite(currentValue) ? currentValue : fallback;
@@ -235,7 +240,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         };
     }, [actor.id, stage]);
     const [editedOutfits, setEditedOutfits] = useState<Outfit[]>(() => getClonedOutfits());
-    const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: number }>(() =>
+    const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: ActorStatValue }>(() =>
         createInitialActorStatMap(actor, actorStats),
     );
     const [editedStatInitialMap, setEditedStatInitialMap] = useState<{ [key: string]: ActorStatInitial }>(() =>
@@ -407,7 +412,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     const persistActor = (
         nextEditedActor: typeof editedActor,
         nextEditedOutfits: Outfit[],
-        nextEditedStatMap: { [key: string]: number },
+        nextEditedStatMap: { [key: string]: ActorStatValue },
         nextEditedStatInitialMap: { [key: string]: ActorStatInitial }
     ) => {
 
@@ -458,6 +463,11 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         const activeStatNames = new Set<string>();
         actorStats.forEach((stat) => {
             activeStatNames.add(stat.name);
+            if (stat.type === 'checkbox') {
+                const candidateValue = nextEditedStatMap[stat.name];
+                actor.statMap[stat.name] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
+                return;
+            }
             const candidateValue = Number(nextEditedStatMap[stat.name]);
             const fallbackValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
             const resolvedValue = Number.isFinite(candidateValue) ? candidateValue : fallbackValue;
@@ -639,6 +649,13 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     };
 
     const handleActorStatValueChange = (stat: ActorStat, value: number) => {
+        if (stat.type === 'checkbox') {
+            setEditedStatMap((prev) => ({
+                ...prev,
+                [stat.name]: Boolean(value),
+            }));
+            return;
+        }
         const normalized = clampActorStatValue(value, stat);
         setEditedStatMap((prev) => ({
             ...prev,
@@ -646,8 +663,15 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         }));
     };
 
-    const handleActorStatInitialValueChange = (stat: ActorStat, value: number) => {
-        const normalized = clampActorStatValue(value, stat);
+    const handleActorStatInitialValueChange = (stat: ActorStat, value: number | boolean) => {
+        if (stat.type === 'checkbox') {
+            setEditedStatInitialMap((prev) => ({
+                ...prev,
+                [stat.name]: { ...cloneActorStatInitial(prev[stat.name], stat), value: Boolean(value) },
+            }));
+            return;
+        }
+        const normalized = clampActorStatValue(Number(value), stat);
         setEditedStatInitialMap((prev) => ({
             ...prev,
             [stat.name]: { ...cloneActorStatInitial(prev[stat.name], stat), value: normalized },
@@ -1740,7 +1764,18 @@ ${indent}}`;
                                                                 </span>
                                                             </Button>
 
-                                                            {stat.displayType === 'rating' && (
+                                                            {stat.type === 'checkbox' && (
+                                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={Boolean(editedStatMap[stat.name] === true)}
+                                                                        onChange={(e) => handleActorStatValueChange(stat, e.target.checked ? 1 : 0)}
+                                                                    />
+                                                                    {Boolean(editedStatMap[stat.name] === true) ? 'True' : 'False'}
+                                                                </label>
+                                                            )}
+
+                                                            {stat.type === 'rating' && (
                                                                 <ActorStatRating
                                                                     stat={stat}
                                                                     value={displayValue}
@@ -1748,7 +1783,7 @@ ${indent}}`;
                                                                 />
                                                             )}
 
-                                                            {stat.displayType === 'letter grade' && (
+                                                            {stat.type === 'letter grade' && (
                                                                 <div>
                                                                     <select
                                                                         value={nearestGrade.label}
@@ -1780,7 +1815,7 @@ ${indent}}`;
                                                                 </div>
                                                             )}
 
-                                                            {stat.displayType === 'percentage' || (stat.displayType === 'number' && statRange.hasRange) && (
+                                                            {stat.type === 'percentage' || (stat.type === 'number' && statRange.hasRange) && (
                                                                 <input
                                                                     type="range"
                                                                     min={statRange.min}
@@ -1808,12 +1843,23 @@ ${indent}}`;
                                                                     <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
                                                                         Used to seed this actor's stat when a new game starts, before modifiers below are applied.
                                                                     </span>
-                                                                    <TextInput
-                                                                        type="number"
-                                                                        value={statInitial.value}
-                                                                        onChange={(e) => handleActorStatInitialValueChange(stat, Number(e.target.value))}
-                                                                        style={{ maxWidth: '160px' }}
-                                                                    />
+                                                                    {stat.type === 'checkbox' ? (
+                                                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={Boolean(statInitial.value === true)}
+                                                                                onChange={(e) => handleActorStatInitialValueChange(stat, e.target.checked)}
+                                                                            />
+                                                                            {Boolean(statInitial.value === true) ? 'True' : 'False'}
+                                                                        </label>
+                                                                    ) : (
+                                                                        <TextInput
+                                                                            type="number"
+                                                                            value={typeof statInitial.value === 'number' ? statInitial.value : 0}
+                                                                            onChange={(e) => handleActorStatInitialValueChange(stat, Number(e.target.value))}
+                                                                            style={{ maxWidth: '160px' }}
+                                                                        />
+                                                                    )}
                                                                 </div>
 
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
