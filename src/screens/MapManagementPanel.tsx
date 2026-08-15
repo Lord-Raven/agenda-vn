@@ -3,7 +3,12 @@ import { Map as MapIcon } from '@mui/icons-material';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Map as GameMap } from '../content/Map';
 import { Stage } from '../Stage';
-import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
+import {
+    CategorizedEntrySection,
+    CategorizedEntrySidebar,
+    toggleSidebarCollapseState,
+    useCachedSidebarCollapseState,
+} from '../components/CategorizedEntrySidebar';
 import { MapDetailPanel } from './MapDetailPanel';
 
 interface MapManagementPanelProps {
@@ -54,7 +59,7 @@ export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
             <CategorizedEntrySidebar
                 sections={sections}
                 collapsedSections={collapsedCategories}
-                onToggleSection={sectionId => setCollapsedCategories(current => ({ ...current, [sectionId]: !(current[sectionId] ?? false) }))}
+                onToggleSection={sectionId => setCollapsedCategories(current => toggleSidebarCollapseState(current, sectionId, true))}
                 renderEntry={map => (
                     <motion.button
                         whileHover={{ scale: 1.01 }}

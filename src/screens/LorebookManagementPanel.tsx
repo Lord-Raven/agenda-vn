@@ -7,7 +7,12 @@ import { createLoreEntry, Lore } from '../content/Lore';
 import { Button, ConfirmDialog, TextArea, TextInput } from '../components/UiComponents';
 import { findBestNameMatch, getLinkedActorLore, updateActorLore } from '../content/Actor';
 import { getLinkedLocationLore, updateLocationDescription } from '../content/Location';
-import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
+import {
+    CategorizedEntrySection,
+    CategorizedEntrySidebar,
+    toggleSidebarCollapseState,
+    useCachedSidebarCollapseState,
+} from '../components/CategorizedEntrySidebar';
 import { ConditionEditor } from '../components/ConditionEditor';
 
 
@@ -426,17 +431,11 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                     sections={loreSections}
                     collapsedSections={collapsedCategories}
                     onToggleSection={(sectionId) => {
-                        setCollapsedCategories((current) => ({
-                            ...current,
-                            [sectionId]: !(current[sectionId] ?? true),
-                        }));
+                        setCollapsedCategories((current) => toggleSidebarCollapseState(current, sectionId, true));
                     }}
                     collapsedSubsections={collapsedCharacterCategories}
                     onToggleSubsection={(subsectionId) => {
-                        setCollapsedCharacterCategories((current) => ({
-                            ...current,
-                            [subsectionId]: !(current[subsectionId] ?? false),
-                        }));
+                        setCollapsedCharacterCategories((current) => toggleSidebarCollapseState(current, subsectionId, true));
                     }}
                     renderEntry={(entry) => {
                         const isSelected = selectedLoreId === entry.id;

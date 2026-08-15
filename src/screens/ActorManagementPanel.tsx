@@ -5,7 +5,12 @@ import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Button } from '../components/UiComponents';
 import { ActorDetailPanel } from './ActorDetailPanel';
-import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
+import {
+    CategorizedEntrySection,
+    CategorizedEntrySidebar,
+    toggleSidebarCollapseState,
+    useCachedSidebarCollapseState,
+} from '../components/CategorizedEntrySidebar';
 
 interface ActorManagementPanelProps {
     stage: () => Stage;
@@ -167,10 +172,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                 sections={actorsByCategory}
                 collapsedSections={collapsedCategories}
                 onToggleSection={(sectionId) => {
-                    setCollapsedCategories((current) => ({
-                        ...current,
-                        [sectionId]: !(current[sectionId] ?? false),
-                    }));
+                    setCollapsedCategories((current) => toggleSidebarCollapseState(current, sectionId, true));
                 }}
                 renderEntry={(actor) => renderActorButton(actor)}
                 getEntryKey={(actor) => actor.id}

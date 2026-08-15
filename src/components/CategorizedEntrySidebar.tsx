@@ -18,6 +18,15 @@ export interface CategorizedEntrySubsection<TEntry> {
 
 const collapseStateCache = new Map<string, Record<string, boolean>>();
 
+export const toggleSidebarCollapseState = (
+    current: Record<string, boolean>,
+    itemId: string,
+    defaultCollapsed: boolean,
+): Record<string, boolean> => ({
+    ...current,
+    [itemId]: !(current[itemId] ?? defaultCollapsed),
+});
+
 export const useCachedSidebarCollapseState = (
     cacheKey: string,
 ): [Record<string, boolean>, Dispatch<SetStateAction<Record<string, boolean>>>] => {

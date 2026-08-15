@@ -3,7 +3,12 @@ import { useReducedMotion } from 'framer-motion';
 import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
-import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
+import {
+    CategorizedEntrySection,
+    CategorizedEntrySidebar,
+    toggleSidebarCollapseState,
+    useCachedSidebarCollapseState,
+} from '../components/CategorizedEntrySidebar';
 
 interface CalendarEventManagementPanelProps {
     stage: () => Stage;
@@ -293,10 +298,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                         sections={eventSections}
                         collapsedSections={collapsedSections}
                         onToggleSection={(sectionId) => {
-                            setCollapsedSections((current) => ({
-                                ...current,
-                                [sectionId]: !(current[sectionId] ?? false),
-                            }));
+                            setCollapsedSections((current) => toggleSidebarCollapseState(current, sectionId, true));
                         }}
                         renderEntry={(event) => (
                             <button

@@ -6,7 +6,12 @@ import { getLocationImageUrl, Location } from '../content/Location';
 import { Button } from '../components/UiComponents';
 import { LocationDetailPanel } from './LocationDetailPanel';
 import { createLoreEntry } from '../content/Lore';
-import { CategorizedEntrySection, CategorizedEntrySidebar, useCachedSidebarCollapseState } from '../components/CategorizedEntrySidebar';
+import {
+    CategorizedEntrySection,
+    CategorizedEntrySidebar,
+    toggleSidebarCollapseState,
+    useCachedSidebarCollapseState,
+} from '../components/CategorizedEntrySidebar';
 
 interface LocationManagementPanelProps {
     stage: () => Stage;
@@ -179,10 +184,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                 sections={locationsByCategory}
                 collapsedSections={collapsedCategories}
                 onToggleSection={(sectionId) => {
-                    setCollapsedCategories((current) => ({
-                        ...current,
-                        [sectionId]: !(current[sectionId] ?? false),
-                    }));
+                    setCollapsedCategories((current) => toggleSidebarCollapseState(current, sectionId, true));
                 }}
                 renderEntry={(location) => renderLocationButton(location)}
                 getEntryKey={(location) => location.id}
