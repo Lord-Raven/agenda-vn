@@ -231,16 +231,42 @@ export const NamePlate: FC<NamePlateProps> = ({
 				}
 			}}
 		>
-			<span
+			<div
 				style={{
-					fontFamily: actor.themeFontFamily || 'inherit',
+					display: 'flex',
+					flexDirection: 'column',
+					alignItems: 'center',
+					justifyContent: 'center',
 					position: 'relative',
 					zIndex: 1,
-					fontSize: 'inherit'
+					textAlign: 'center',
+					gap: '2px',
 				}}
 			>
-				{actor.displayName || actor.name}
-			</span>
+				<span
+					style={{
+						fontFamily: actor.themeFontFamily || 'inherit',
+						fontSize: 'inherit',
+						lineHeight: 1.2,
+					}}
+				>
+					{actor.displayName || actor.name}
+				</span>
+				{actor.role && (
+					<span
+						style={{
+							fontSize: '0.72em',
+							fontWeight: 600,
+							opacity: 0.88,
+							lineHeight: 1.2,
+							letterSpacing: '0.04em',
+							textTransform: 'uppercase',
+						}}
+					>
+						{actor.role}
+					</span>
+				)}
+			</div>
 		</Box>
 	);
 };

@@ -443,6 +443,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     active: true,
                     name: playerData.name,
                     displayName: playerData.name,
+                    role: '',
+                    birthDate: '',
                     description: '',
                     background: '',
                     profile: playerData.personality,

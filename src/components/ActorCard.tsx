@@ -82,11 +82,37 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
         return configured.filter(stat => stat?.exposed && stat?.name?.trim());
     }, [stage, actor?.id]);
 
+    const actorAge = useMemo(() => {
+        const birthDate = (actor?.birthDate || '').trim();
+        if (!birthDate) {
+            return '';
+        }
+
+        const birth = new Date(`${birthDate}T00:00:00Z`);
+        const currentDate = (stage().getSave()?.currentDate || stage().getConfiguration()?.startingDate || new Date().toISOString().slice(0, 10)).trim();
+        const current = new Date(`${currentDate}T00:00:00Z`);
+
+        if (Number.isNaN(birth.getTime()) || Number.isNaN(current.getTime())) {
+            return '';
+        }
+
+        let age = current.getUTCFullYear() - birth.getUTCFullYear();
+        const monthDelta = current.getUTCMonth() - birth.getUTCMonth();
+        const dayDelta = current.getUTCDate() - birth.getUTCDate();
+
+        if (monthDelta < 0 || (monthDelta === 0 && dayDelta < 0)) {
+            age -= 1;
+        }
+
+        return age >= 0 ? `${age}` : '';
+    }, [actor?.birthDate, stage, actor?.id]);
+
     if (!actor) {
         return null;
     }
 
     const themeColor = actor.themeColor || 'var(--agenda-accent-primary)';
+    const cardMeta = [actor.role, actorAge ? `Age ${actorAge}` : ''].filter(Boolean).join(' • ');
 
     return (
         <Box
@@ -110,6 +136,12 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
             <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                 <NamePlate actor={actor} />
             </Box>
+
+            {cardMeta && (
+                <Box sx={{ fontSize: '0.8rem', lineHeight: 1.4, color: 'var(--agenda-text-muted)', textAlign: 'center' }}>
+                    {cardMeta}
+                </Box>
+            )}
 
             {actor.background && (
                 <Box sx={{ fontSize: '0.9rem', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>

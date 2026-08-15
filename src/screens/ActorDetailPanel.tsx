@@ -22,6 +22,8 @@ const voiceSampleCache = new Map<string, string>();
 
 const ACTOR_DETAIL_GENERATION_FIELDS = [
     { key: 'name', label: 'Name', description: 'Replaces both the canonical name and the display name.' },
+    { key: 'role', label: 'Role', description: `Updates the actor's social or narrative role.` },
+    { key: 'birthDate', label: 'Birth Date', description: `Updates the actor's birth date for age calculations.` },
     { key: 'description', label: 'Description', description: 'Updates the physical description.' },
     { key: 'background', label: 'Background', description: 'Updates the backstory and fixed foundation.' },
     { key: 'profile', label: 'Profile', description: 'Updates the ongoing personality and motives.' },
@@ -37,6 +39,8 @@ type ActorDetailGenerationSelection = Record<ActorDetailGenerationField, boolean
 
 const DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION: ActorDetailGenerationSelection = {
     name: true,
+    role: true,
+    birthDate: true,
     description: true,
     background: true,
     profile: true,
@@ -173,6 +177,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     const [editedActor, setEditedActor] = useState<{
         name: string;
         displayName: string;
+        role: string;
+        birthDate: string;
         category: string;
         description: string;
         background: string;
@@ -185,6 +191,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     }>({
         name: actor.name,
         displayName: actor.displayName || '',
+        role: actor.role || '',
+        birthDate: actor.birthDate || '',
         category: actor.category ?? '',
         description: actor.description || '',
         background: actor.background || '',
@@ -370,6 +378,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         const oldName = actor.name;
         actor.name = nextEditedActor.name;
         actor.displayName = nextEditedActor.displayName.trim() || nextEditedActor.name;
+        actor.role = nextEditedActor.role.trim();
+        actor.birthDate = nextEditedActor.birthDate.trim();
         actor.category = nextEditedActor.category.trim();
         actor.description = nextEditedActor.description;
         actor.background = nextEditedActor.background;
@@ -507,6 +517,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         setEditedActor({
             name: actor.name,
             displayName: actor.displayName || '',
+            role: actor.role || '',
+            birthDate: actor.birthDate || '',
             category: actor.category ?? '',
             description: actor.description || '',
             background: actor.background || '',
@@ -828,6 +840,8 @@ ${indent}}`;
 
         const generationDefinition = {
             name: nextEditedActor.name.trim() || actor.name,
+            role: nextEditedActor.role,
+            birthDate: nextEditedActor.birthDate,
             personality: [
                 nextEditedActor.description,
                 nextEditedActor.background,
@@ -844,6 +858,8 @@ ${indent}}`;
         const previousGeneratedState = {
             name: actor.name,
             displayName: actor.displayName,
+            role: actor.role,
+            birthDate: actor.birthDate,
             description: actor.description,
             background: actor.background,
             profile: actor.profile,
@@ -861,6 +877,8 @@ ${indent}}`;
                 ...actor,
                 name: actor.name,
                 displayName: actor.displayName,
+                role: actor.role,
+                birthDate: actor.birthDate,
                 description: actor.description,
                 background: actor.background,
                 profile: actor.profile,
@@ -881,6 +899,12 @@ ${indent}}`;
             if (selectedFields.name) {
                 actor.name = distilledActor.name || actor.name;
                 actor.displayName = distilledActor.displayName || distilledActor.name || actor.name;
+            }
+            if (selectedFields.role) {
+                actor.role = distilledActor.role || actor.role;
+            }
+            if (selectedFields.birthDate) {
+                actor.birthDate = distilledActor.birthDate || actor.birthDate;
             }
             if (selectedFields.description) {
                 actor.description = distilledActor.description || actor.description;
@@ -923,6 +947,8 @@ ${indent}}`;
         } catch (error) {
             actor.name = previousGeneratedState.name;
             actor.displayName = previousGeneratedState.displayName;
+            actor.role = previousGeneratedState.role;
+            actor.birthDate = previousGeneratedState.birthDate;
             actor.description = previousGeneratedState.description;
             actor.background = previousGeneratedState.background;
             actor.profile = previousGeneratedState.profile;
@@ -1422,6 +1448,46 @@ ${indent}}`;
                                             value={editedActor.displayName}
                                             onChange={(e) => handleInputChange('displayName', e.target.value)}
                                             placeholder={editedActor.name || 'Name shown in nameplates and dialogue'}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Role
+                                        </label>
+                                        <TextInput
+                                            fullWidth
+                                            value={editedActor.role}
+                                            onChange={(e) => handleInputChange('role', e.target.value)}
+                                            placeholder="e.g. Captain, Scholar, Rival"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Birth Date
+                                        </label>
+                                        <TextInput
+                                            fullWidth
+                                            value={editedActor.birthDate}
+                                            onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                                            placeholder="YYYY-MM-DD"
                                         />
                                     </div>
 

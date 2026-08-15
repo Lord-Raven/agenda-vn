@@ -9,7 +9,7 @@ interface GameManagementPanelProps {
     stage: () => Stage;
 }
 
-const NUMERIC_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'stars', 'letter grade'];
+const NUMERIC_DISPLAY_TYPES: ActorStatDisplayType[] = ['number', 'percentage', 'rating', 'letter grade'];
 
 const isNumericDisplayType = (displayType: ActorStatDisplayType): boolean => NUMERIC_DISPLAY_TYPES.includes(displayType);
 

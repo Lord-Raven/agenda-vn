@@ -92,6 +92,8 @@ export class Actor {
     active: boolean = true; // Soft-delete flag. Inactive actors are hidden from management UIs.
     name: string = ''; // Full name (possibly with formatting, like last, first), to be used in content management.
     displayName: string = ''; // Name as it appears in NamePlate and chats, used everywhere beyond content management. Fall back to name.
+    role: string = ''; // Optional role for this actor. This displays beneath the name in the NamePlate and under name in the ActorCard.
+    birthDate: string = ''; // Optional birth date for this actor, in YYYY-MM-DD format. Used for age calculations and display.
     description: string = ''; // Core physical description—not outfit-oriented
     background: string = ''; // Backstory and integral traits of this character (as opposed to "profile"/lore entry, which contains evolving details).
     profile: string = ''; // Evolving personality profile that will eventually portray their character arc
@@ -144,6 +146,16 @@ export class Actor {
 
 const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
     { key: 'name', label: 'NAME', description: 'Their simple name' },
+    {
+        key: 'role',
+        label: 'ROLE',
+        description: 'Their social or narrative role in the story, such as a warrior, scholar, councilor, or rival. Keep it concise.',
+    },
+    {
+        key: 'birthDate',
+        label: 'BIRTH DATE',
+        description: 'Their birth date in YYYY-MM-DD format if known. If unknown, leave blank and do not invent one.',
+    },
     {
         key: 'description',
         label: 'DESCRIPTION',
@@ -331,6 +343,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
                 `The world and its rules are described below. ` +
                 `The character details below describe a character of this world (${actor.name}) to convert into a set of defined fields for this game.`)
             .addBlock('World Context', worldContext)
+            .addBlock('Current Date', formatCurrentDate(stage.getSave().currentDate, stage.getSave().currentTimeOfDay))
             .addBlock('Character Details', definition.personality)
             .addBlock('Custom Actor Stats', actorStatContext)
             .addBlock('Stat Guidance',
@@ -345,6 +358,8 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
                     distillationFields,
                     {
                         name: 'Jane Doe',
+                        role: 'Frontier Mercenary',
+                        birthDate: '1992-08-14',
                         description: 'A tall, athletic woman with short, dark hair and piercing blue eyes. She rarely smiles, but when she does, it lights up her face.',
                         outfit_description: 'She wears a simple, utilitarian outfit made from durable materials in dark colors. Lots of pockets and zippers.',
                         outfit_name: 'Adventurer\'s Gear',
@@ -382,6 +397,8 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     // Fill in actor, but favor any current settings:
     actor.name = parsedData['name'] || actor.name || '';
     actor.displayName = actor.name;
+    actor.role = parsedData['role'] || actor.role || '';
+    actor.birthDate = parsedData['birthDate'] || actor.birthDate || '';
     actor.description = parsedData['description'] || actor.description || '';
     actor.background = parsedData['background'] || actor.background || '';
     actor.profile = parsedData['profile'] || actor.profile || '';
@@ -822,4 +839,8 @@ export function findBestNameMatch<T extends Record<K, string | string[]>, K exte
     }
 
     return bestMatch;
+}
+
+function formatCurrentDate(currentDate: any, currentTimeOfDay: any): string | object | any[] | (() => string) | ((b: import("../utils/PromptBuilder.js").PromptBuilder) => any) | undefined {
+    throw new Error('Function not implemented.');
 }
