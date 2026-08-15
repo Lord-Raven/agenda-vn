@@ -10,6 +10,7 @@ import { useTooltip } from "../components/TooltipContext";
 import { Button, GlassPanel } from "../components/UiComponents";
 import { DefinedMapView } from "./DefinedMapView";
 import { LocationActorPortraits } from "../components/LocationActorPortraits";
+import { PlayerStatBar } from "../components/PlayerStatBar";
 
 interface MapScreenProps {
     stage: () => Stage;
@@ -175,6 +176,10 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                 <MenuRounded fontSize="small" />
                             </Button>
                         </Box>
+                    </Box>
+
+                    <Box sx={{ mt: 0.5, mb: 1.25 }}>
+                        <PlayerStatBar stage={stage} />
                     </Box>
 
                     <Box
