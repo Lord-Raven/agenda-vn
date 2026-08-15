@@ -201,7 +201,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         ...configuration.playerStatValues,
         ...save.playerStatValues,
     }));
-    const [pipIconSearch, setPipIconSearch] = useState<Record<string, string>>({});
+    const [pipIconSearch, setPipIconSearch] = useState('');
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
@@ -423,43 +423,36 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
-    const renderPipIconPicker = (stat: ActorStat, onChange: (iconName: string) => void, pickerKey: string) => {
-        const query = (pipIconSearch[pickerKey] || '').trim().toLowerCase();
-        const normalizedQuery = query.replace(/[^a-z0-9]/g, '');
+    const renderPipIconPicker = (stat: ActorStat, onChange: (iconName: string) => void) => {
         const filteredOptions = RATING_ICON_OPTIONS.filter((option) => {
-            if (!normalizedQuery) {
+            const query = pipIconSearch.trim().toLowerCase();
+            if (!query) {
                 return true;
             }
-
-            const labels = option.labels.join(' ').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const key = option.key.toLowerCase().replace(/[^a-z0-9]/g, '');
-            return labels.includes(normalizedQuery) || key.includes(normalizedQuery);
+            return option.labels.join(' ').toLowerCase().includes(query) || option.key.toLowerCase().includes(query);
         });
 
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <TextInput
                     fullWidth
-                    value={pipIconSearch[pickerKey] || ''}
-                    onChange={(e) => setPipIconSearch(prev => ({ ...prev, [pickerKey]: e.target.value }))}
+                    value={pipIconSearch}
+                    onChange={(e) => setPipIconSearch(e.target.value)}
                     placeholder="Search icon"
                 />
                 <div
                     style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))',
+                        gridAutoFlow: 'column',
+                        gridAutoColumns: 'minmax(72px, 1fr)',
+                        gridTemplateRows: '1fr',
                         gap: '8px',
-                        maxHeight: '260px',
-                        overflowY: 'auto',
+                        overflowX: 'auto',
                         paddingBottom: '4px',
                         paddingRight: '4px',
                     }}
                 >
-                    {filteredOptions.length === 0 ? (
-                        <div style={{ gridColumn: '1 / -1', color: 'var(--agenda-text-muted)', fontSize: '12px', padding: '8px 0' }}>
-                            No matching icons
-                        </div>
-                    ) : filteredOptions.map((option) => {
+                    {filteredOptions.map((option) => {
                         const Icon = option.icon;
                         const active = (stat.iconName || 'star') === option.key;
                         return (
@@ -658,7 +651,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             {normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Icon</label>
-                                                    {renderPipIconPicker(normalizedStat, (iconName) => updatePlayerStat(statIndex, { iconName }), `player-${statIndex}`)}
+                                                    {renderPipIconPicker(normalizedStat, (iconName) => updatePlayerStat(statIndex, { iconName }))}
                                                 </div>
                                             )}
 
@@ -930,7 +923,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             {normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Icon</label>
-                                                    {renderPipIconPicker(normalizedStat, (iconName) => updateActorStat(statIndex, { iconName }), `actor-${statIndex}`)}
+                                                    {renderPipIconPicker(normalizedStat, (iconName) => updateActorStat(statIndex, { iconName }))}
                                                 </div>
                                             )}
 
