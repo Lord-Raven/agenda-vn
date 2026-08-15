@@ -1,49 +1,59 @@
 import { FC } from 'react';
-import {
-    AttachMoney,
-    Favorite,
-    FavoriteBorder,
-    Gavel,
-    HeartBroken,
-    LabelImportant,
-    LocalFireDepartment,
-    MonetizationOn,
-    Public,
-    Shield,
-    Star,
-    ThumbUp,
-    WbSunny,
-    Whatshot,
-    Build,
-    WorkspacePremium,
-} from '@mui/icons-material';
+import * as Icons from "@mui/icons-material";
+import type { SvgIconComponent } from '@mui/icons-material';
+import { Star } from '@mui/icons-material';
 import { ActorStat } from '../Stage';
 
-const RATING_ICON_OPTIONS = [
-    { key: 'star', label: 'Star', icon: Star },
-    { key: 'heart', label: 'Heart', icon: Favorite },
-    { key: 'favorite', label: 'Favorite', icon: FavoriteBorder },
-    { key: 'wrench', label: 'Wrench', icon: Build },
-    { key: 'coin', label: 'Coin', icon: MonetizationOn },
-    { key: 'money', label: 'Money', icon: AttachMoney },
-    { key: 'shield', label: 'Shield', icon: Shield },
-    { key: 'sun', label: 'Sun', icon: WbSunny },
-    { key: 'fire', label: 'Fire', icon: LocalFireDepartment },
-    { key: 'spark', label: 'Spark', icon: Whatshot },
-    { key: 'award', label: 'Award', icon: WorkspacePremium },
-    { key: 'thumbs-up', label: 'Thumbs Up', icon: ThumbUp },
-    { key: 'gavel', label: 'Gavel', icon: Gavel },
-    { key: 'heart-broken', label: 'Broken Heart', icon: HeartBroken },
-    { key: 'chevron', label: 'Chevron', icon: LabelImportant },
-    { key: 'world', label: 'World', icon: Public },
-];
+const ICON_LOOKUP_EXCLUSIONS = new Set([
+    'default',
+    'SvgIcon',
+    'createSvgIcon',
+    'unstable_createSvgIcon',
+    'Icon',
+    'IconButton',
+    'ThemeProvider',
+    'StylesProvider',
+]);
 
-type RatingIconKey = (typeof RATING_ICON_OPTIONS)[number]['key'];
+const normalizeIconKey = (iconName: string) =>
+    iconName
+        .trim()
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
+
+const MUI_ICON_OPTIONS = Object.entries(Icons)
+    .filter(([name, value]) => {
+        if (typeof value !== 'function') {
+            return false;
+        }
+
+        return !ICON_LOOKUP_EXCLUSIONS.has(name);
+    })
+    .map(([name, icon]) => ({
+        key: name,
+        label: name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' '),
+        icon: icon as SvgIconComponent,
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label));
+
+const RATING_ICON_OPTIONS = MUI_ICON_OPTIONS;
+
+const RESOLVED_ICON_LOOKUP = new Map<string, SvgIconComponent>(
+    RATING_ICON_OPTIONS.map(({ key, icon }) => [normalizeIconKey(key), icon]),
+);
 
 const resolveIcon = (iconName?: string) => {
-    const match = RATING_ICON_OPTIONS.find(option => option.key === iconName);
-    return match?.icon || Star;
+    const rawKey = typeof iconName === 'string' ? iconName.trim() : '';
+    if (!rawKey) {
+        return Star;
+    }
+
+    return RESOLVED_ICON_LOOKUP.get(normalizeIconKey(rawKey)) || Star;
 };
+
+type RatingIconKey = (typeof RATING_ICON_OPTIONS)[number]['key'];
 
 interface ActorStatRatingProps {
     stat: ActorStat;
