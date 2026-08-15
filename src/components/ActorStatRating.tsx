@@ -1,4 +1,5 @@
 import { FC, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
     AttachMoney,
     Favorite,
@@ -192,6 +193,7 @@ interface IconPickerProps {
 
 export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = false, placeholder = 'Search icon' }) => {
     const [search, setSearch] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
 
     const filteredOptions = useMemo(() => {
         const query = search.trim().toLowerCase();
@@ -203,9 +205,16 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
         });
     }, [search]);
 
-    const selectedValue = value || 'star';
+    const selectedValue = value ?? (allowClear ? undefined : 'star');
+    const previewIconName = value ?? (allowClear ? undefined : 'star');
+    const PreviewIcon = previewIconName ? resolveIcon(previewIconName) : DoNotDisturb;
 
-    return (
+    const handleSelect = (nextValue?: string) => {
+        onChange(nextValue);
+        setIsOpen(false);
+    };
+
+    const pickerContent = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <input
                 type="text"
@@ -213,16 +222,15 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={placeholder}
+                autoFocus
             />
             <div
                 style={{
                     display: 'grid',
-                    gridAutoFlow: 'column',
-                    gridAutoColumns: 'minmax(72px, 1fr)',
-                    gridTemplateRows: '1fr',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))',
                     gap: '8px',
-                    overflowX: 'auto',
-                    paddingBottom: '4px',
+                    maxHeight: '320px',
+                    overflowY: 'auto',
                     paddingRight: '4px',
                 }}
             >
@@ -230,15 +238,15 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
                     <button
                         key="icon-clear"
                         type="button"
-                        onClick={() => onChange(undefined)}
+                        onClick={() => handleSelect(undefined)}
                         style={{
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '6px',
-                            background: value ? 'var(--agenda-surface-raised)' : 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)',
-                            border: value ? '1px solid var(--agenda-line-subtle)' : '1px solid var(--agenda-highlight)',
+                            background: selectedValue === undefined ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
+                            border: selectedValue === undefined ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
                             borderRadius: '8px',
                             color: 'var(--agenda-text-primary)',
                             cursor: 'pointer',
@@ -248,7 +256,7 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
                             whiteSpace: 'nowrap',
                         }}
                     >
-                        <Star style={{ fontSize: 24, color: value ? 'var(--agenda-text-muted)' : 'var(--agenda-highlight)' }} />
+                        <DoNotDisturb style={{ fontSize: 24, color: selectedValue === undefined ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
                         <span>None</span>
                     </button>
                 )}
@@ -259,7 +267,7 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
                         <button
                             key={`icon-${option.key}`}
                             type="button"
-                            onClick={() => onChange(option.key)}
+                            onClick={() => handleSelect(option.key)}
                             style={{
                                 display: 'flex',
                                 flexDirection: 'column',
@@ -284,6 +292,87 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
                 })}
             </div>
         </div>
+    );
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={() => setIsOpen(true)}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '52px',
+                    minHeight: '38px',
+                    border: '1px solid var(--agenda-line-subtle)',
+                    borderRadius: '8px',
+                    background: 'var(--agenda-surface-raised)',
+                    color: 'var(--agenda-text-primary)',
+                    cursor: 'pointer',
+                    padding: '6px 10px',
+                }}
+                aria-label={value ? `Selected icon: ${value}` : 'Pick an icon'}
+            >
+                {value ? (
+                    <PreviewIcon style={{ fontSize: 22, color: 'var(--agenda-text-primary)' }} />
+                ) : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-muted)' }}>
+                        <DoNotDisturb style={{ fontSize: 18 }} />
+                        None
+                    </span>
+                )}
+            </button>
+
+            {isOpen && typeof document !== 'undefined' && createPortal(
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'color-mix(in srgb, var(--agenda-surface-base) 72%, transparent)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px',
+                        zIndex: 2000,
+                    }}
+                    onClick={() => setIsOpen(false)}
+                >
+                    <div
+                        onClick={(event) => event.stopPropagation()}
+                        style={{
+                            width: 'min(560px, 100%)',
+                            background: 'linear-gradient(135deg, var(--agenda-panel-surface) 0%, color-mix(in srgb, var(--agenda-surface-base) 92%, var(--agenda-panel-surface)) 100%)',
+                            border: '1px solid var(--agenda-panel-border)',
+                            borderRadius: '12px',
+                            padding: '18px',
+                            boxShadow: 'var(--agenda-shadow)',
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>Choose icon</div>
+                            <button
+                                type="button"
+                                onClick={() => setIsOpen(false)}
+                                style={{
+                                    border: '1px solid var(--agenda-line-subtle)',
+                                    borderRadius: '8px',
+                                    background: 'var(--agenda-surface-raised)',
+                                    color: 'var(--agenda-text-primary)',
+                                    cursor: 'pointer',
+                                    padding: '6px 10px',
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                        {pickerContent}
+                    </div>
+                </div>,
+                document.body,
+            )}
+        </>
     );
 };
 

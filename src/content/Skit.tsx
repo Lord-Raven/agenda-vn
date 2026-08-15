@@ -24,7 +24,7 @@ const getDayDifference = (startDate: string, endDate: string): number => {
     return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
 };
 
-const formatCurrentDate = (currentDate?: string, currentTimeOfDay?: string): string => {
+export const formatCurrentDate = (currentDate?: string, currentTimeOfDay?: string): string => {
     const date = currentDate ? new Date(`${currentDate}T00:00:00Z`) : null;
     if (!date || Number.isNaN(date.getTime())) {
         return 'Unknown Date';

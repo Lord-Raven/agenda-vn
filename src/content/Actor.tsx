@@ -12,6 +12,7 @@ import {
 } from "../utils/StructuredResponse.js";
 import { ActorStat } from "../Stage";
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
+import { formatCurrentDate } from './Skit';
 
 // A single conditional adjustment to an actor's initial stat value; applied when its conditions evaluate true at game start.
 export type ActorStatModifier = {
@@ -839,8 +840,4 @@ export function findBestNameMatch<T extends Record<K, string | string[]>, K exte
     }
 
     return bestMatch;
-}
-
-function formatCurrentDate(currentDate: any, currentTimeOfDay: any): string | object | any[] | (() => string) | ((b: import("../utils/PromptBuilder.js").PromptBuilder) => any) | undefined {
-    throw new Error('Function not implemented.');
 }
