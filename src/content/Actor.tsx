@@ -87,6 +87,23 @@ export type Outfit = {
     emotionPack: EmotionPack;
 }
 
+export const ACTOR_STATUS_VALUES = ['', 'dead', 'missing', 'incapacitated', 'imprisoned', 'away'] as const;
+export type ActorStatus = typeof ACTOR_STATUS_VALUES[number];
+
+export const ACTOR_STATUS_OPTIONS: Array<{ value: ActorStatus; label: string }> = [
+    { value: '', label: 'Active' },
+    { value: 'dead', label: 'Dead' },
+    { value: 'missing', label: 'Missing' },
+    { value: 'incapacitated', label: 'Incapacitated' },
+    { value: 'imprisoned', label: 'Imprisoned' },
+    { value: 'away', label: 'Away' },
+];
+
+export const normalizeActorStatus = (value: unknown): ActorStatus => {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    return ACTOR_STATUS_VALUES.includes(normalizedValue as ActorStatus) ? normalizedValue as ActorStatus : '';
+};
+
 export class Actor {
     id: string = ''; // UUID
     loreId: string = ''; // The ID of the lore entry associated with this actor, if any. This is used to link the actor to their description in the lorebook.
@@ -95,6 +112,7 @@ export class Actor {
     name: string = ''; // Full name (possibly with formatting, like last, first), to be used in content management.
     displayName: string = ''; // Name as it appears in NamePlate and chats, used everywhere beyond content management. Fall back to name.
     role: string = ''; // Optional role for this actor. This displays beneath the name in the NamePlate and under name in the ActorCard.
+    status: ActorStatus = ''; // Optional status for this actor. Blank is default: alive and active. Other statuses could trigger different behaviors in the game.
     birthDate: string = ''; // Optional birth date for this actor, in YYYY-MM-DD format. Used for age calculations and display.
     description: string = ''; // Core physical description—not outfit-oriented
     background: string = ''; // Backstory and integral traits of this character (as opposed to "profile"/lore entry, which contains evolving details).
@@ -117,6 +135,10 @@ export class Actor {
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
         actor.generic = savedActor?.generic === true;
+        actor.status = normalizeActorStatus(savedActor?.status);
+        if (actor.generic) {
+            actor.status = '';
+        }
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
         actor.statInitialMap = cloneStatInitialMap(savedActor?.statInitialMap);
         actor.schedule = cloneSchedule(savedActor?.schedule);
@@ -136,6 +158,10 @@ export class Actor {
         }
         this.active = this.active !== false;
         this.generic = this.generic === true;
+        this.status = normalizeActorStatus(this.status);
+        if (this.generic) {
+            this.status = '';
+        }
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
         this.statInitialMap = cloneStatInitialMap(this.statInitialMap);
         this.schedule = cloneSchedule(this.schedule);

@@ -10,6 +10,8 @@ import { Actor, getActorLore, getEmotionImage } from "../content/Actor";
 import { accumulateOutcomes, determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
 import { getLocationImageUrl } from "../content/Location";
 import { ContentManagementScreen } from "./ContentManagementScreen";
+import { Outcome } from "../content/Outcome";
+import { OutcomeDisplay } from "../components/OutcomeDisplay";
 
 
 import {
@@ -26,7 +28,6 @@ import {
 import { IconButton } from '@mui/material';
 import React from "react";
 import { Emotion } from "../content/Emotion";
-import { Outcome } from "../content/Outcome";
 
 interface SkitScreenProps {
     stage: () => Stage;
@@ -346,8 +347,15 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         enableTalkingAnimation={true}
                         enableFontEffects={stage().getSave().enableFontEffects}
                         responsiveOverlay={(_skit, actor) => {
-                            if (!actor || actor.id === stage().getPlayerActor().id) return null;
-                            return <ActorCard actor={actor as Actor} stage={stage} />;
+                            const overlayContent = actor && actor.id !== stage().getPlayerActor().id
+                                ? <ActorCard actor={actor as Actor} stage={stage} />
+                                : null;
+                            return (
+                                <>
+                                    {overlayContent}
+                                    <OutcomeDisplay outcomes={accumulatedOutcomes} stage={stage} />
+                                </>
+                            );
                         }}
                     />
             </div>

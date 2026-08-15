@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { ActorStat, Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
+import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, ACTOR_STATUS_OPTIONS, ActorStatus, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
@@ -179,6 +179,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         displayName: string;
         role: string;
         generic: boolean;
+        status: ActorStatus;
         birthDate: string;
         category: string;
         description: string;
@@ -194,6 +195,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         displayName: actor.displayName || '',
         role: actor.role || '',
         generic: actor.generic === true,
+        status: actor.status || '',
         birthDate: actor.birthDate || '',
         category: actor.category ?? '',
         description: actor.description || '',
@@ -437,6 +439,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.displayName = nextEditedActor.displayName.trim() || nextEditedActor.name;
         actor.role = nextEditedActor.role.trim();
         actor.generic = !!nextEditedActor.generic;
+        actor.status = actor.generic ? '' : (nextEditedActor.status || '');
         actor.birthDate = actor.generic ? '' : nextEditedActor.birthDate.trim();
         actor.category = nextEditedActor.category.trim();
         actor.description = nextEditedActor.description;
@@ -577,6 +580,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             displayName: actor.displayName || '',
             role: actor.role || '',
             generic: actor.generic === true,
+            status: actor.status || '',
             birthDate: actor.birthDate || '',
             category: actor.category ?? '',
             description: actor.description || '',
@@ -1545,25 +1549,57 @@ ${indent}}`;
                                     </div>
 
                                     {!editedActor.generic && (
-                                        <div>
-                                            <label
-                                                style={{
-                                                    display: 'block',
-                                                    color: 'var(--agenda-highlight)',
-                                                    fontSize: '14px',
-                                                    fontWeight: 'bold',
-                                                    marginBottom: '8px',
-                                                }}
-                                            >
-                                                Birth Date
-                                            </label>
-                                            <TextInput
-                                                fullWidth
-                                                value={editedActor.birthDate}
-                                                onChange={(e) => handleInputChange('birthDate', e.target.value)}
-                                                placeholder="YYYY-MM-DD"
-                                            />
-                                        </div>
+                                        <>
+                                            <div>
+                                                <label
+                                                    style={{
+                                                        display: 'block',
+                                                        color: 'var(--agenda-highlight)',
+                                                        fontSize: '14px',
+                                                        fontWeight: 'bold',
+                                                        marginBottom: '8px',
+                                                    }}
+                                                >
+                                                    Status
+                                                </label>
+                                                <select
+                                                    value={editedActor.status}
+                                                    onChange={(e) => handleInputChange('status', e.target.value as ActorStatus)}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '10px 12px',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid color-mix(in srgb, var(--agenda-highlight) 25%, transparent)',
+                                                        background: 'var(--agenda-surface-base)',
+                                                        color: 'var(--agenda-text-primary)',
+                                                    }}
+                                                >
+                                                    {ACTOR_STATUS_OPTIONS.map((option) => (
+                                                        <option key={option.value || 'active'} value={option.value}>{option.label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label
+                                                    style={{
+                                                        display: 'block',
+                                                        color: 'var(--agenda-highlight)',
+                                                        fontSize: '14px',
+                                                        fontWeight: 'bold',
+                                                        marginBottom: '8px',
+                                                    }}
+                                                >
+                                                    Birth Date
+                                                </label>
+                                                <TextInput
+                                                    fullWidth
+                                                    value={editedActor.birthDate}
+                                                    onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                                                    placeholder="YYYY-MM-DD"
+                                                />
+                                            </div>
+                                        </>
                                     )}
 
                                     <div>

@@ -2,7 +2,7 @@ import { Emotion, EMOTION_MAPPING } from "./Emotion";
 import { v4 as generateUuid } from 'uuid';
 import { Outcome, OutcomeType } from "./Outcome";
 import { Stage } from "../Stage";
-import { Actor, ACTOR_SCHEDULE_AVAILABLE, findBestNameMatch, getActorLore, resetGenericActorStats, resolveActorSchedule } from "./Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorStatus, findBestNameMatch, getActorLore, normalizeActorStatus, resetGenericActorStats, resolveActorSchedule } from "./Actor";
 import { getLocationDescription } from "./Location";
 import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -79,6 +79,7 @@ export class ScriptEntry {
     speechUrl: string = ''; // Optional URL for text-to-speech audio
     actorEmotions: {[key: string]: Emotion} = {}; // Map of emotion changes by actor ID
     actorOutfits: {[key: string]: string} = {}; // Map of outfit changes by actor ID
+    actorStatuses: {[key: string]: ActorStatus} = {}; // Map of actor status updates by actor ID
     updatedActors?: string[]; // List of Actor IDs now in the skit as of this entry; if undefined, assume same as previous entry
     updatedLocationId?: string; // Updated location for this entry, if any; if undefined, assume same as previous entry
     outcomes: Outcome[] = []; // Optional array of outcomes or consequences resulting from this script entry; can be things like finding an item, maybe a stat or relationship change, etc.
@@ -170,7 +171,11 @@ function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage
                 const outfit = actor?.outfits.find(o => o.id === outfitId);
                 return actor && outfit ? `<OutfitChange><Actor>${actor.name}</Actor><Outfit>${outfit.name}</Outfit></OutfitChange>` : '';
             }).join('');
-            return `<Entry><Speaker>${stage?.getSave().actors?.[e.speakerId]?.name.toUpperCase() || e.speakerId || 'NARRATOR'}</Speaker>${emotionText}${wearsText}<Message>${e.message}</Message></Entry>`;
+            const statusText = Object.entries(e.actorStatuses || {}).map(([actorId, status]) => {
+                const actor = stage?.getSave().actors?.[actorId];
+                return actor && status ? `<StatusChange><Actor>${actor.name}</Actor><Status>${status.toUpperCase()}</Status></StatusChange>` : '';
+            }).join('');
+            return `<Entry><Speaker>${stage?.getSave().actors?.[e.speakerId]?.name.toUpperCase() || e.speakerId || 'NARRATOR'}</Speaker>${emotionText}${wearsText}${statusText}<Message>${e.message}</Message></Entry>`;
         }).join('\n')
         : '(None so far)';
 }
@@ -460,6 +465,10 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `When this tag is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
                             `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "HERE" to move to the scene's location, or "AWAY" to leave this area. ` +
                             `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when Present Characters leave or the scene itself relocates.`)
+                        .addBlock('Status Tags',
+                            `Status tags ("<StatusChange><Actor>[Character Name]</Actor><Status>[DEAD|MISSING|INCAPACITATED|IMPRISONED|AWAY|]</Status></StatusChange>") may be used when the scene clearly changes a character's state, especially at a conclusion. ` +
+                            `Use them only when the scene strongly supports the status shift; otherwise leave the character active and without a status. ` +
+                            `The empty value "" may be used to clear a status back to Alive & Active.`)
                         
                 ).addBlock('Example Script',
                     `<Entry><Speaker>NARRATOR</Speaker><Message>The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.</Message></Entry>\n` +
@@ -542,7 +551,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             };
 
             const stripMechanicTags = (input: string): string => input
-                .replace(/<(Expression|OutfitChange|Movement)>[\s\S]*?<\/\1>/gi, '')
+                .replace(/<(Expression|OutfitChange|Movement|StatusChange)>[\s\S]*?<\/\1>/gi, '')
                 .replace(/<[^>]+>/g, '')
                 .trim();
 
@@ -569,6 +578,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
 
                     const actorEmotions = parseExpressionTags(entryBody);
                     const actorOutfits: {[actorId: string]: string} = {};
+                    const actorStatuses: {[actorId: string]: ActorStatus} = {};
                     let updatedActors: string[] | undefined;
                     let updatedLocationId: string | undefined;
 
@@ -584,6 +594,18 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             continue;
                         }
                         actorOutfits[matchedActor.id] = matchedOutfit.id;
+                    }
+
+                    for (const statusMatch of entryBody.matchAll(/<StatusChange>\s*<Actor>([\s\S]*?)<\/Actor>\s*<Status>([\s\S]*?)<\/Status>\s*<\/StatusChange>/gi)) {
+                        const actorName = statusMatch[1].trim();
+                        const statusName = statusMatch[2].trim();
+                        const matchedActor = findBestNameMatch(actorName, allActors, ['name']);
+                        if (!matchedActor) continue;
+
+                        const normalizedStatus = normalizeActorStatus(statusName);
+                        if (normalizedStatus || statusName.trim() === '') {
+                            actorStatuses[matchedActor.id] = normalizedStatus;
+                        }
                     }
 
                     for (const movementMatch of entryBody.matchAll(/<Movement>([\s\S]*?)<\/Movement>/gi)) {
@@ -634,6 +656,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         speechUrl: '',
                         actorEmotions,
                         actorOutfits,
+                        actorStatuses,
                         updatedActors,
                         updatedLocationId,
                         outcomes: [],
@@ -737,6 +760,10 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `Indicate stat changes for any characters affected by the scene.\n` +
                             `<StatChange><Actor>[Character Name]</Actor><Stat>[Stat Name]</Stat><Amount>+/-x</Amount></StatChange>`
                         )
+                        .addBlock('Status Changes',
+                            `Indicate any character status transition that the scene clearly establishes. Use the known status names or blank for alive/active.\n` +
+                            `<StatusChange><Actor>[Character Name]</Actor><Status>[DEAD|MISSING|INCAPACITATED|IMPRISONED|AWAY|]</Status></StatusChange>`
+                        )
                         .addBlock('Lore Updates',
                             `Indicate lore entries that may need to be updated as a result of the skit. Actual updates happen elsewhere; this only flags entries for review.\n` +
                             `<LoreUpdate><Entry>Lore Entry Name</Entry></LoreUpdate>`
@@ -784,22 +811,64 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                                 ? [sceneAnalysis.StatChange]
                                 : [];
 
+                        const statusChanges = Array.isArray(sceneAnalysis?.StatusChange)
+                            ? sceneAnalysis.StatusChange
+                            : sceneAnalysis?.StatusChange
+                                ? [sceneAnalysis.StatusChange]
+                                : [];
+
                         for (const statChange of statChanges) {
                             const actorName = typeof statChange?.Actor === 'string'
                                 ? statChange.Actor
                                 : typeof statChange?.actor === 'string'
                                     ? statChange.actor
                                     : '';
+                            const statName = typeof statChange?.Stat === 'string'
+                                ? statChange.Stat
+                                : typeof statChange?.stat === 'string'
+                                    ? statChange.stat
+                                    : '';
                             const changeValue = parseInt(`${statChange?.Amount ?? statChange?.amount ?? ''}`, 10);
                             const matchedActor = findBestNameMatch(actorName, Object.values(save.actors), ['name']);
-                            if (matchedActor && !isNaN(changeValue) && changeValue !== 0) {
+                            const normalizedStatName = `${statName || ''}`.trim();
+                            if (matchedActor && normalizedStatName && !isNaN(changeValue) && changeValue !== 0) {
                                 outcomes.push(new Outcome({
                                     type: OutcomeType.ACTOR_STAT,
-                                    description: `Stat for ${matchedActor.name} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
+                                    description: `${matchedActor.name}'s ${normalizedStatName} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
                                     details: {
                                         actorId: matchedActor.id,
                                         actorName: matchedActor.name,
+                                        statName: normalizedStatName,
                                         changeValue,
+                                        statMap: {
+                                            [normalizedStatName]: changeValue,
+                                        },
+                                    },
+                                }));
+                            }
+                        }
+
+                        for (const statusChange of statusChanges) {
+                            const actorName = typeof statusChange?.Actor === 'string'
+                                ? statusChange.Actor
+                                : typeof statusChange?.actor === 'string'
+                                    ? statusChange.actor
+                                    : '';
+                            const statusValue = typeof statusChange?.Status === 'string'
+                                ? statusChange.Status
+                                : typeof statusChange?.status === 'string'
+                                    ? statusChange.status
+                                    : '';
+                            const matchedActor = findBestNameMatch(actorName, Object.values(save.actors), ['name']);
+                            const normalizedStatus = normalizeActorStatus(statusValue);
+                            if (matchedActor && (normalizedStatus || statusValue.trim() === '')) {
+                                outcomes.push(new Outcome({
+                                    type: OutcomeType.ACTOR_STATUS,
+                                    description: `Status for ${matchedActor.name} changes to ${normalizedStatus || 'Alive & Active'}.`,
+                                    details: {
+                                        actorId: matchedActor.id,
+                                        actorName: matchedActor.name,
+                                        status: normalizedStatus,
                                     },
                                 }));
                             }
@@ -956,6 +1025,138 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
 
 // This function goes through current outcomes on the provided scriptEntries and produces an accumulated Outcome array that combines like stat changes.
 export function accumulateOutcomes(scriptEntries: ScriptEntry[], stage: Stage): Outcome[] {
-    return [];
+    const flattened = (scriptEntries || [])
+        .flatMap((entry) => Array.isArray(entry?.outcomes) ? entry.outcomes : [])
+        .filter((outcome) => outcome instanceof Outcome || (outcome && typeof outcome === 'object'));
+
+    const accumulator = new Map<string, Outcome>();
+    const order: string[] = [];
+
+    const addOutcome = (key: string, outcome: Outcome) => {
+        if (!accumulator.has(key)) {
+            accumulator.set(key, outcome);
+            order.push(key);
+        }
+    };
+
+    for (const outcome of flattened) {
+        const type = outcome.type;
+
+        if (type === OutcomeType.ACTOR_STAT) {
+            const actorId = `${outcome.details?.actorId || ''}`;
+            const statName = `${outcome.details?.statName || Object.keys(outcome.details?.statMap || {})[0] || ''}`.trim();
+            const delta = Number(outcome.details?.changeValue ?? outcome.details?.statMap?.[statName] ?? 0);
+            if (!actorId || !statName || !Number.isFinite(delta) || delta === 0) {
+                addOutcome(`other:${order.length}:${type}`, outcome);
+                continue;
+            }
+
+            const key = `actor-stat:${actorId}:${statName}`;
+            const existing = accumulator.get(key) as Outcome | undefined;
+            if (existing) {
+                const previousDelta = Number(existing.details?.changeValue ?? existing.details?.statMap?.[statName] ?? 0);
+                const nextDelta = previousDelta + delta;
+                existing.details = {
+                    ...existing.details,
+                    changeValue: nextDelta,
+                    statMap: {
+                        ...(existing.details?.statMap || {}),
+                        [statName]: nextDelta,
+                    },
+                };
+                existing.description = `${existing.details?.actorName || 'Actor'}'s ${statName} changes by ${nextDelta > 0 ? '+' : ''}${nextDelta}.`;
+            } else {
+                addOutcome(key, new Outcome({
+                    ...outcome,
+                    details: {
+                        ...outcome.details,
+                        statName,
+                        changeValue: delta,
+                        statMap: {
+                            ...(outcome.details?.statMap || {}),
+                            [statName]: delta,
+                        },
+                    },
+                }));
+            }
+            continue;
+        }
+
+        if (type === OutcomeType.ACTOR_STATUS) {
+            const actorId = `${outcome.details?.actorId || ''}`;
+            if (!actorId) {
+                addOutcome(`other:${order.length}:${type}`, outcome);
+                continue;
+            }
+
+            const key = `actor-status:${actorId}`;
+            const existing = accumulator.get(key) as Outcome | undefined;
+            const nextStatus = `${outcome.details?.status || outcome.details?.toStatus || ''}`;
+            if (existing) {
+                existing.details = {
+                    ...existing.details,
+                    status: nextStatus,
+                    toStatus: nextStatus,
+                    fromStatus: existing.details?.fromStatus || outcome.details?.fromStatus || stage?.getSave()?.actors?.[actorId]?.status || '',
+                };
+                existing.description = `Status for ${existing.details?.actorName || 'Actor'} changes to ${nextStatus || 'Alive & Active'}.`;
+            } else {
+                const resolvedFromStatus = `${outcome.details?.fromStatus || stage?.getSave()?.actors?.[actorId]?.status || ''}`;
+                addOutcome(key, new Outcome({
+                    ...outcome,
+                    details: {
+                        ...outcome.details,
+                        fromStatus: resolvedFromStatus,
+                        toStatus: nextStatus,
+                        status: nextStatus,
+                    },
+                }));
+            }
+            continue;
+        }
+
+        if (type === OutcomeType.PLAYER_STAT) {
+            const statName = `${outcome.details?.statName || Object.keys(outcome.details?.statMap || {})[0] || ''}`.trim();
+            const value = Number(outcome.details?.changeValue ?? outcome.details?.statMap?.[statName] ?? 0);
+            if (!statName || !Number.isFinite(value) || value === 0) {
+                addOutcome(`other:${order.length}:${type}`, outcome);
+                continue;
+            }
+
+            const key = `player-stat:${statName}`;
+            const existing = accumulator.get(key) as Outcome | undefined;
+            if (existing) {
+                const nextValue = Number(existing.details?.changeValue ?? existing.details?.statMap?.[statName] ?? 0) + value;
+                existing.details = {
+                    ...existing.details,
+                    changeValue: nextValue,
+                    statMap: {
+                        ...(existing.details?.statMap || {}),
+                        [statName]: nextValue,
+                    },
+                };
+                existing.description = `Player stat ${statName} changes by ${nextValue > 0 ? '+' : ''}${nextValue}.`;
+            } else {
+                addOutcome(key, new Outcome({
+                    ...outcome,
+                    details: {
+                        ...outcome.details,
+                        statName,
+                        changeValue: value,
+                        statMap: {
+                            ...(outcome.details?.statMap || {}),
+                            [statName]: value,
+                        },
+                    },
+                }));
+            }
+            continue;
+        }
+
+        const key = `${type}:${order.length}:${JSON.stringify(outcome.details || {})}`;
+        addOutcome(key, outcome);
+    }
+
+    return order.map((key) => accumulator.get(key)).filter((outcome): outcome is Outcome => !!outcome);
 }
 
