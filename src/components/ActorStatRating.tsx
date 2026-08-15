@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useMemo, useState } from 'react';
 import {
     AttachMoney,
     Favorite,
@@ -80,14 +80,15 @@ import {
 } from '@mui/icons-material';
 import { ActorStat } from '../Stage';
 
+const KEEP_FIRST_ICONS = ['star', 'heart', 'favorite', 'wrench', 'coin', 'shield', 'sun', 'moon', 'fire', 'flake', 'bolt', 'happy', 'sad', 'battery'];
 const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [
-    { key: 'star', labels: ['Star'], icon: Star },
-    { key: 'heart', labels: ['Heart'], icon: Favorite },
-    { key: 'favorite', labels: ['Favorite'], icon: FavoriteBorder },
-    { key: 'wrench', labels: ['Wrench'], icon: Build },
-    { key: 'coin', labels: ['Coin'], icon: MonetizationOn },
-    { key: 'money', labels: ['Money'], icon: AttachMoney },
-    { key: 'cash', labels: ['Cash'], icon: Payments },
+    { key: 'star', labels: ['Star', 'Space', 'Rating'], icon: Star },
+    { key: 'heart', labels: ['Heart', 'Health'], icon: Favorite },
+    { key: 'favorite', labels: ['Favorite', 'Heart', 'Health'], icon: FavoriteBorder },
+    { key: 'wrench', labels: ['Wrench', 'Repair', 'Fix', 'Tool'], icon: Build },
+    { key: 'coin', labels: ['Coin', 'Money', 'Wealth'], icon: MonetizationOn },
+    { key: 'money', labels: ['Money', 'Wealth'], icon: AttachMoney },
+    { key: 'cash', labels: ['Cash', 'Money', 'Wealth'], icon: Payments },
     { key: 'shield', labels: ['Shield'], icon: Shield },
     { key: 'sun', labels: ['Sun'], icon: WbSunny },
     { key: 'moon', labels: ['Moon'], icon: Bedtime },
@@ -156,13 +157,134 @@ const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [
     { key: 'fortress', labels: ['Fortress'], icon: Fort },
     { key: 'paint', labels: ['Paint'], icon: FormatPaint },
     { key: 'coffee-cup', labels: ['Coffee Cup'], icon: FreeBreakfast }
-];
+].sort((a, b) => {
+    const aIndex = KEEP_FIRST_ICONS.indexOf(a.key);
+    const bIndex = KEEP_FIRST_ICONS.indexOf(b.key);
+
+    if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+    }
+
+    if (aIndex !== -1) {
+        return -1;
+    }
+
+    if (bIndex !== -1) {
+        return 1;
+    }
+
+    return a.key.localeCompare(b.key);
+});
 
 type RatingIconKey = (typeof RATING_ICON_OPTIONS)[number]['key'];
 
 const resolveIcon = (iconName?: string) => {
     const match = RATING_ICON_OPTIONS.find(option => option.key === iconName);
     return match?.icon || Star;
+};
+
+interface IconPickerProps {
+    value?: string;
+    onChange: (iconName: string | undefined) => void;
+    allowClear?: boolean;
+    placeholder?: string;
+}
+
+export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = false, placeholder = 'Search icon' }) => {
+    const [search, setSearch] = useState('');
+
+    const filteredOptions = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        return RATING_ICON_OPTIONS.filter((option) => {
+            if (!query) {
+                return true;
+            }
+            return option.labels.join(' ').toLowerCase().includes(query) || option.key.toLowerCase().includes(query);
+        });
+    }, [search]);
+
+    const selectedValue = value || 'star';
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+                type="text"
+                className="input-base"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={placeholder}
+            />
+            <div
+                style={{
+                    display: 'grid',
+                    gridAutoFlow: 'column',
+                    gridAutoColumns: 'minmax(72px, 1fr)',
+                    gridTemplateRows: '1fr',
+                    gap: '8px',
+                    overflowX: 'auto',
+                    paddingBottom: '4px',
+                    paddingRight: '4px',
+                }}
+            >
+                {allowClear && (
+                    <button
+                        key="icon-clear"
+                        type="button"
+                        onClick={() => onChange(undefined)}
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            background: value ? 'var(--agenda-surface-raised)' : 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)',
+                            border: value ? '1px solid var(--agenda-line-subtle)' : '1px solid var(--agenda-highlight)',
+                            borderRadius: '8px',
+                            color: 'var(--agenda-text-primary)',
+                            cursor: 'pointer',
+                            padding: '10px 8px',
+                            minHeight: '72px',
+                            fontSize: '11px',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        <Star style={{ fontSize: 24, color: value ? 'var(--agenda-text-muted)' : 'var(--agenda-highlight)' }} />
+                        <span>None</span>
+                    </button>
+                )}
+                {filteredOptions.map((option) => {
+                    const Icon = option.icon;
+                    const active = selectedValue === option.key;
+                    return (
+                        <button
+                            key={`icon-${option.key}`}
+                            type="button"
+                            onClick={() => onChange(option.key)}
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                background: active ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
+                                border: active ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
+                                borderRadius: '8px',
+                                color: 'var(--agenda-text-primary)',
+                                cursor: 'pointer',
+                                padding: '10px 8px',
+                                minHeight: '72px',
+                                fontSize: '11px',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            <Icon style={{ fontSize: 24, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
+                            <span>{option.labels[0]}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
 };
 
 interface ActorStatRatingProps {

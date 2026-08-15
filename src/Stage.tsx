@@ -111,7 +111,8 @@ export type ActorStat = {
     max?: number; // Maximum value of the stat (optional)
     setByPlayer: boolean; // Whether this stat is set by the player in the SettingsScreen
     exposed: boolean; // Whether the stat is visible to the user in outcomes, on the UI, or in Actor cards (when applied to other Actors)
-    iconName?: string; // Optional icon key used for star-style stat displays
+    iconName?: string; // Optional icon key used for rating-style stat displays
+    labelIconName?: string; // Optional icon key displayed before the stat name in ActorCard
 }
 
 // Represents a configuration that is used to initialize new games, but can also influence existing games.
@@ -151,6 +152,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     setByPlayer: stat.setByPlayer === true || stat.exposed === true,
     exposed: stat.exposed === true,
     iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
+    labelIconName: stat.labelIconName || undefined,
 });
 
 const cloneActor = (actor: Actor): Actor => new Actor({

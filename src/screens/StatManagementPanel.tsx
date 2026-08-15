@@ -1,7 +1,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActorStat, ActorStatDisplayType, Stage } from '../Stage';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
-import { RATING_ICON_OPTIONS } from '../components/ActorStatRating';
+import { IconPicker } from '../components/ActorStatRating';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
@@ -201,7 +201,6 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         ...configuration.playerStatValues,
         ...save.playerStatValues,
     }));
-    const [pipIconSearch, setPipIconSearch] = useState('');
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
@@ -423,69 +422,9 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
-    const renderPipIconPicker = (stat: ActorStat, onChange: (iconName: string) => void) => {
-        const filteredOptions = RATING_ICON_OPTIONS.filter((option) => {
-            const query = pipIconSearch.trim().toLowerCase();
-            if (!query) {
-                return true;
-            }
-            return option.labels.join(' ').toLowerCase().includes(query) || option.key.toLowerCase().includes(query);
-        });
-
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <TextInput
-                    fullWidth
-                    value={pipIconSearch}
-                    onChange={(e) => setPipIconSearch(e.target.value)}
-                    placeholder="Search icon"
-                />
-                <div
-                    style={{
-                        display: 'grid',
-                        gridAutoFlow: 'column',
-                        gridAutoColumns: 'minmax(72px, 1fr)',
-                        gridTemplateRows: '1fr',
-                        gap: '8px',
-                        overflowX: 'auto',
-                        paddingBottom: '4px',
-                        paddingRight: '4px',
-                    }}
-                >
-                    {filteredOptions.map((option) => {
-                        const Icon = option.icon;
-                        const active = (stat.iconName || 'star') === option.key;
-                        return (
-                            <button
-                                key={`icon-${option.key}`}
-                                type="button"
-                                onClick={() => onChange(option.key)}
-                                style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px',
-                                    background: active ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
-                                    border: active ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
-                                    borderRadius: '8px',
-                                    color: 'var(--agenda-text-primary)',
-                                    cursor: 'pointer',
-                                    padding: '10px 8px',
-                                    minHeight: '72px',
-                                    fontSize: '11px',
-                                    whiteSpace: 'nowrap',
-                                }}
-                            >
-                                <Icon style={{ fontSize: 24, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
-                                <span>{option.labels[0]}</span>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
+    const renderIconPicker = (value: string | undefined, onChange: (iconName: string | undefined) => void, allowClear = false) => (
+        <IconPicker value={value} onChange={onChange} allowClear={allowClear} />
+    );
 
     const removeActorStat = (index: number) => {
         setActorStats(prev => prev.filter((_, idx) => idx !== index));
@@ -650,8 +589,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
 
                                             {normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Icon</label>
-                                                    {renderPipIconPicker(normalizedStat, (iconName) => updatePlayerStat(statIndex, { iconName }))}
+                                                    <label style={fieldLabelStyle}>Rating Icon</label>
+                                                    {renderIconPicker(normalizedStat.iconName, (iconName) => updatePlayerStat(statIndex, { iconName }))}
                                                 </div>
                                             )}
 
@@ -922,10 +861,15 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
 
                                             {normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Icon</label>
-                                                    {renderPipIconPicker(normalizedStat, (iconName) => updateActorStat(statIndex, { iconName }))}
+                                                    <label style={fieldLabelStyle}>Rating Icon</label>
+                                                    {renderIconPicker(normalizedStat.iconName, (iconName) => updateActorStat(statIndex, { iconName }))}
                                                 </div>
                                             )}
+
+                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Label Icon</label>
+                                                {renderIconPicker(stat.labelIconName, (iconName) => updateActorStat(statIndex, { labelIconName: iconName || undefined }), true)}
+                                            </div>
 
                                             {isNumericDisplayType(normalizedStat.displayType) && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>

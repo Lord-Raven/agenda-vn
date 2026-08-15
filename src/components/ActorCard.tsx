@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { ActorStat, Stage } from '../Stage';
 import { Actor } from '../content/Actor';
 import { NamePlate } from './UiComponents';
-import { ActorStatRating } from './ActorStatRating';
+import { ActorStatRating, resolveIcon } from './ActorStatRating';
 
 interface ActorCardProps {
     actor?: Actor;
@@ -159,22 +159,29 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                         borderTop: `1px solid color-mix(in srgb, ${themeColor} 40%, transparent)`,
                     }}
                 >
-                    {exposedStats.map(stat => (
-                        <Box
-                            key={stat.name}
-                            sx={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr auto',
-                                alignItems: 'center',
-                                gap: 1,
-                                fontSize: '0.85rem',
-                            }}
-                            title={stat.description || undefined}
-                        >
-                            <Box sx={{ color: 'var(--agenda-text-muted)' }}>{stat.name}</Box>
-                            <StatValue stat={stat} value={resolveStatValue(actor, stat)} />
-                        </Box>
-                    ))}
+                    {exposedStats.map(stat => {
+                        const LabelIcon = stat.labelIconName ? resolveIcon(stat.labelIconName) : null;
+
+                        return (
+                            <Box
+                                key={stat.name}
+                                sx={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr auto',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    fontSize: '0.85rem',
+                                }}
+                                title={stat.description || undefined}
+                            >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', minWidth: 0 }}>
+                                    {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
+                                    <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.name}</Box>
+                                </Box>
+                                <StatValue stat={stat} value={resolveStatValue(actor, stat)} />
+                            </Box>
+                        );
+                    })}
                 </Box>
             )}
         </Box>

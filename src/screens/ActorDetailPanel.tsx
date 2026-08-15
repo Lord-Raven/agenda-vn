@@ -289,11 +289,65 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         emotionPack: { ...(outfit.emotionPack || {}) },
     }));
 
+    const syncActorDetailGenerationDialog = (nextSelection: ActorDetailGenerationSelection) => {
+        setConfirmDialog((previous) => {
+            if (!previous.open || previous.title !== 'Generate Actor Details') {
+                return previous;
+            }
+
+            return {
+                ...previous,
+                message: (
+                    <div style={{ display: 'grid', gap: '10px', textAlign: 'left', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                            <strong style={{ fontSize: '15px' }}>Fields to regenerate</strong>
+                            <Button
+                                variant="secondary"
+                                onClick={() => toggleAllActorDetailGenerationFields(!Object.values(nextSelection).every(Boolean))}
+                            >
+                                {Object.values(nextSelection).every(Boolean) ? 'Clear all' : 'Select all'}
+                            </Button>
+                        </div>
+                        {ACTOR_DETAIL_GENERATION_FIELDS.map(({ key, label, description }) => (
+                            <label
+                                key={key}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: '10px',
+                                    padding: '8px 10px',
+                                    borderRadius: '8px',
+                                    background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)',
+                                    border: '1px solid var(--agenda-line-subtle)',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={nextSelection[key]}
+                                    onChange={(event) => updateActorDetailGenerationSelection(key, event.target.checked)}
+                                />
+                                <span style={{ display: 'grid', gap: '2px' }}>
+                                    <span style={{ fontWeight: 600 }}>{label}</span>
+                                    <span style={{ fontSize: '12px', opacity: 0.8 }}>{description}</span>
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                ),
+            };
+        });
+    };
+
     const updateActorDetailGenerationSelection = (field: ActorDetailGenerationField, checked: boolean) => {
-        setActorDetailGenerationSelection((previous) => ({
-            ...previous,
-            [field]: checked,
-        }));
+        setActorDetailGenerationSelection((previous) => {
+            const nextSelection = {
+                ...previous,
+                [field]: checked,
+            };
+            syncActorDetailGenerationDialog(nextSelection);
+            return nextSelection;
+        });
     };
 
     const toggleAllActorDetailGenerationFields = (checked: boolean) => {
@@ -302,6 +356,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             (Object.keys(nextSelection) as ActorDetailGenerationField[]).forEach((field) => {
                 nextSelection[field] = checked;
             });
+            syncActorDetailGenerationDialog(nextSelection);
             return nextSelection;
         });
     };
@@ -2326,6 +2381,7 @@ ${indent}}`;
                                                 await handleGenerateActorDetails(actorDetailGenerationSelection);
                                             },
                                         });
+                                        syncActorDetailGenerationDialog(actorDetailGenerationSelection);
                                     }}
                                     disabled={isGeneratingActorDetails}
                                 >
