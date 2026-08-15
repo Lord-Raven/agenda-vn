@@ -1,15 +1,11 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActorStat, ActorStatType, ActorStatValue, Stage } from '../Stage';
+import { ActorStat, ActorStatType, ActorStatValue, isNumericDisplayType, Stage } from '../Stage';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/ActorStatRating';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
 }
-
-const NUMERIC_DISPLAY_TYPES: ActorStatType[] = ['number', 'percentage', 'rating', 'letter grade'];
-
-const isNumericDisplayType = (displayType: ActorStatType): boolean => NUMERIC_DISPLAY_TYPES.includes(displayType);
 
 const cloneActorStat = (stat: ActorStat): ActorStat => ({
     name: stat.name,
@@ -517,12 +513,13 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         }));
                                                     }}
                                                 >
-                                                    <option value="option">option</option>
-                                                    <option value="number">number</option>
-                                                    <option value="percentage">percentage</option>
-                                                    <option value="rating">rating</option>
-                                                    <option value="letter grade">letter grade</option>
-                                                    <option value="text">text</option>
+                                                    <option value="checkbox">Checkbox</option>
+                                                    <option value="letter grade">Letter Grade</option>
+                                                    <option value="number">Number</option>
+                                                    <option value="option">Option</option>
+                                                    <option value="percentage">Percentage</option>
+                                                    <option value="rating">Rating</option>
+                                                    <option value="text">Text</option>
                                                 </select>
                                             </div>
 

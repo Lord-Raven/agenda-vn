@@ -94,6 +94,8 @@ const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'eveni
 
 export type ActorStatType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text' | 'checkbox';
 export type ActorStatValue = number | string | boolean;
+const NUMERIC_ACTOR_STAT_DISPLAY_TYPES = ['number', 'percentage', 'rating', 'letter grade'];
+export const isNumericDisplayType = (displayType: ActorStatType): boolean => NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(displayType);
 
 export type ActorStatOption = {
     name: string;

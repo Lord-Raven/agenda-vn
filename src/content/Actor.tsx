@@ -1,6 +1,6 @@
 import { v4 as generateUuid } from 'uuid';
 import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emotion';
-import { Stage } from '../Stage';
+import { isNumericDisplayType, Stage } from '../Stage';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import {buildPrompt} from "../utils/PromptBuilder.js";
@@ -235,8 +235,6 @@ function clampActorStatValue(value: number, stat: ActorStat): number {
     return normalized;
 }
 
-const NUMERIC_ACTOR_STAT_DISPLAY_TYPES = ['number', 'percentage', 'rating', 'letter grade'];
-
 // Computes an actor's initial stat value from its configured initial value plus any modifiers whose conditions currently evaluate true.
 export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStatInitial | undefined, context: ConditionContext): number | boolean {
     if (stat.type === 'checkbox') {
@@ -261,7 +259,7 @@ export function applyActorInitialStats(actor: Actor, actorStats: ActorStat[], co
         actor.statMap = {};
     }
     actorStats
-        .filter(stat => stat?.name?.trim() && (NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(stat.type) || stat.type === 'checkbox'))
+        .filter(stat => stat?.name?.trim() && (isNumericDisplayType(stat.type) || stat.type === 'checkbox'))
         .forEach(stat => {
             actor.statMap[stat.name] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context) as number | string | boolean;
         });

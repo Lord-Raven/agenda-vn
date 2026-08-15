@@ -1,6 +1,6 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ActorStat, ActorStatValue, SaveType, Stage } from '../Stage';
+import { ActorStat, ActorStatValue, SaveType, Stage, isNumericDisplayType } from '../Stage';
 import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
@@ -430,7 +430,6 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         const statName = (stat.name || '').trim();
                                         const selectedValue = normalizePlayerStatValue(playerStatValues[statName], stat);
                                         const optionEntries = stat.options || [];
-                                        const isNumericDisplay = ['number', 'percentage', 'rating', 'letter grade'].includes(stat.type);
 
                                         const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
 
@@ -485,7 +484,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     />
                                                 )}
 
-                                                {isNumericDisplay && (
+                                                {isNumericDisplayType(stat.type) && (
                                                     <>
                                                         <TextInput
                                                             fullWidth

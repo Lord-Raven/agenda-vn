@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
-import { ActorStat, ActorStatType, ActorStatValue, Stage } from '../Stage';
+import { ActorStat, ActorStatType, ActorStatValue, Stage, isNumericDisplayType } from '../Stage';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { buildCreatorNotesHtml } from './CreatorNotesHtml';
@@ -8,10 +8,6 @@ import { buildCreatorNotesHtml } from './CreatorNotesHtml';
 interface GameManagementPanelProps {
     stage: () => Stage;
 }
-
-const NUMERIC_DISPLAY_TYPES: ActorStatType[] = ['number', 'percentage', 'rating', 'letter grade'];
-
-const isNumericDisplayType = (displayType: ActorStatType): boolean => NUMERIC_DISPLAY_TYPES.includes(displayType);
 
 const cloneActorStat = (stat: ActorStat): ActorStat => ({
     name: stat.name,
