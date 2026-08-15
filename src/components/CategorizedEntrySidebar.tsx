@@ -20,12 +20,10 @@ const collapseStateCache = new Map<string, Record<string, boolean>>();
 
 export const useCachedSidebarCollapseState = (
     cacheKey: string,
-    initialState: Record<string, boolean> = {},
 ): [Record<string, boolean>, Dispatch<SetStateAction<Record<string, boolean>>>] => {
-    const [collapseState, setCollapseState] = useState<Record<string, boolean>>(() => ({
-        ...initialState,
-        ...collapseStateCache.get(cacheKey),
-    }));
+    const [collapseState, setCollapseState] = useState<Record<string, boolean>>(() => (
+        collapseStateCache.get(cacheKey) ?? {}
+    ));
 
     const setCachedCollapseState: Dispatch<SetStateAction<Record<string, boolean>>> = (value) => {
         setCollapseState((current) => {
@@ -66,10 +64,10 @@ export const CategorizedEntrySidebar = <TEntry,>({
     renderSectionAction,
     sectionEmptyMessage,
     shouldHideSection,
-    defaultCollapsed = false,
+    defaultCollapsed = true,
     collapsedSubsections = {},
     onToggleSubsection,
-    defaultSubsectionCollapsed = false,
+    defaultSubsectionCollapsed = true,
 }: CategorizedEntrySidebarProps<TEntry>) => {
     const renderEntries = (entries: TEntry[], section: CategorizedEntrySection<TEntry>) => (
         <div style={{ display: 'grid', gap: '10px' }}>

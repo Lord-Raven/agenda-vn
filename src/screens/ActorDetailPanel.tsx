@@ -1775,7 +1775,20 @@ ${indent}}`;
                                                                 variant="secondary"
                                                                 onClick={() => toggleStatExpanded(stat.name)}
                                                                 aria-label={isExpanded ? `Collapse ${stat.name} details` : `Expand ${stat.name} details`}
-                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', minWidth: 0 }}
+                                                                style={{
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px',
+                                                                    padding: 0,
+                                                                    minWidth: 0,
+                                                                    background: 'transparent',
+                                                                    border: 'none',
+                                                                    borderRadius: 0,
+                                                                    boxShadow: 'none',
+                                                                    textTransform: 'none',
+                                                                    letterSpacing: 'normal',
+                                                                    justifyContent: 'flex-start',
+                                                                }}
                                                             >
                                                                 {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
                                                                 <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 600 }}>

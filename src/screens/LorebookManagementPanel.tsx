@@ -94,33 +94,45 @@ const NumberStepperInput: FC<NumberStepperInputProps> = ({ value, onChange, aria
 
 export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stage }) => {
     const shouldReduceMotion = useReducedMotion();
-    const [loreEntries, setLoreEntries] = useState<Lore[]>(() => sortLoreEntries(stage().getSave().lorebook || []));
+    const save = stage().getSave();
+    const activeActors = useMemo(() => Object.values(save.actors || {}).filter((actor) => actor.active !== false), [save]);
+    const activeLocations = useMemo(() => Object.values(save.atlas || {}).filter((location) => location.active !== false), [save]);
+    const actorLoreIdToCategory = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const actor of activeActors) {
+            if (actor.loreId) {
+                map.set(actor.loreId, actor.category?.trim() || 'Other');
+            }
+        }
+        return map;
+    }, [activeActors]);
+    const locationLoreIds = useMemo(() => new Set(
+        activeLocations
+            .filter((location) => location.loreId)
+            .map((location) => location.loreId),
+    ), [activeLocations]);
+    const [loreEntries, setLoreEntries] = useState<Lore[]>(() => sortLoreEntries(save.lorebook || []));
     const [selectedLoreId, setSelectedLoreId] = useState<string | null>(() => {
-        const initialEntries = sortLoreEntries(stage().getSave().lorebook || []);
+        const initialEntries = sortLoreEntries(save.lorebook || []);
         return initialEntries[0]?.id || null;
     });
     const [editingTriggerIndex, setEditingTriggerIndex] = useState<number | 'new' | null>(null);
     const [editingTriggerValue, setEditingTriggerValue] = useState('');
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('lorebook-management', {
-        character: false,
-        location: false,
-        world: false,
-        other: true,
-    });
+    const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('lorebook-management');
     const [collapsedCharacterCategories, setCollapsedCharacterCategories] = useCachedSidebarCollapseState('lorebook-character-categories');
 
     const categoryOrder = useMemo(() => {
         // Add a category for each Actor name not present in the groups, to allow users to assign lore entries to them
-        const playerId = stage().getSave().playerId;
-        const extraCategories = Object.values(stage().getSave().actors || {})
+        const playerId = save.playerId;
+        const extraCategories = activeActors
             .filter(actor => actor.id !== playerId)
-            .filter(actor => actor.active !== false)
             .map((actor) => actor.name.trim())
+            .filter(Boolean)
             .sort((a, b) => a.localeCompare(b));
 
         return [...CORE_CATEGORY_ORDER, ...extraCategories];
-    }, [loreEntries]);
+    }, [activeActors, save.playerId]);
 
     const loreSections = useMemo<CategorizedEntrySection<Lore>[]>(() => {
         const groups: Record<string, Lore[]> = {};
@@ -149,10 +161,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
             const characterGroups = new Map<string, Lore[]>();
             for (const entry of entries) {
-                const linkedActor = Object.values(stage().getSave().actors || {}).find((actor) => (
-                    actor.active !== false && getLinkedActorLore(actor, stage())?.id === entry.id
-                ));
-                const actorCategory = linkedActor?.category?.trim() || 'Other';
+                const actorCategory = actorLoreIdToCategory.get(entry.id)?.trim() || 'Other';
                 characterGroups.set(actorCategory, [...(characterGroups.get(actorCategory) || []), entry]);
             }
 
@@ -173,7 +182,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                 })),
             };
         });
-    }, [loreEntries, categoryOrder]);
+    }, [loreEntries, categoryOrder, actorLoreIdToCategory]);
 
     const selectedLore = useMemo(() => loreEntries.find((entry) => entry.id === selectedLoreId) || null, [loreEntries, selectedLoreId]);
 
@@ -189,23 +198,18 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
         return !!findBestNameMatch(
             normalizedTitle,
-            (Object.values(stage().getSave().actors) || []).filter((actor) => actor.active !== false),
+            activeActors,
             ['name'],
         );
-    }, [selectedLore]);
+    }, [selectedLore, activeActors]);
 
     const selectedLoreMatchesExistingLocation = useMemo(() => {
         if (!selectedLore || selectedLore.type !== 'location') {
             return false;
         }
 
-        return Object.values(stage().getSave().atlas || {})
-            .filter((location) => location.active !== false)
-            .some((location) => {
-            const linkedLore = getLinkedLocationLore(location, stage());
-            return linkedLore?.id === selectedLore.id;
-        });
-    }, [selectedLore]);
+        return locationLoreIds.has(selectedLore.id);
+    }, [selectedLore, locationLoreIds]);
 
     const applyLorebookChange = (updater: (entries: Lore[]) => Lore[]) => {
         setLoreEntries((currentEntries) => {

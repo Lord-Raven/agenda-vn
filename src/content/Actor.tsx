@@ -422,7 +422,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
                 ))
         .format(),
         100,
-        400,
+        1000,
         distillationFields,
     );
 
