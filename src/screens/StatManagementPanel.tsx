@@ -145,6 +145,41 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
     };
 };
 
+const normalizeActorStatShape = (stat: ActorStat): ActorStat => {
+    if (stat.displayType === 'option') {
+        const options = (stat.options || []).filter(option => option.name.trim());
+        const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
+            ? stat.default
+            : (options[0]?.name || '');
+        return {
+            ...stat,
+            options,
+            default: defaultValue,
+            min: undefined,
+            max: undefined,
+            iconName: stat.iconName || 'star',
+        };
+    }
+
+    if (stat.displayType === 'text') {
+        return {
+            ...stat,
+            default: typeof stat.default === 'string' ? stat.default : '',
+            options: [],
+            min: undefined,
+            max: undefined,
+            iconName: stat.iconName || 'star',
+        };
+    }
+
+    return {
+        ...stat,
+        default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
+        options: [],
+        iconName: stat.iconName || 'star',
+    };
+};
+
 export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => {
     const stageInstance = stage();
     const save = stageInstance.getSave();
@@ -405,7 +440,18 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     onChange={(e) => setPipIconSearch(e.target.value)}
                     placeholder="Search icon"
                 />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(74px, 1fr))', gap: '8px', maxHeight: '210px', overflowY: 'auto', paddingRight: '4px' }}>
+                <div
+                    style={{
+                        display: 'grid',
+                        gridAutoFlow: 'column',
+                        gridAutoColumns: 'minmax(72px, 1fr)',
+                        gridTemplateRows: '1fr',
+                        gap: '8px',
+                        overflowX: 'auto',
+                        paddingBottom: '4px',
+                        paddingRight: '4px',
+                    }}
+                >
                     {filteredOptions.map((option) => {
                         const Icon = option.icon;
                         const active = (stat.iconName || 'star') === option.key;
@@ -428,6 +474,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                     padding: '10px 8px',
                                     minHeight: '72px',
                                     fontSize: '11px',
+                                    whiteSpace: 'nowrap',
                                 }}
                             >
                                 <Icon style={{ fontSize: 24, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
@@ -668,112 +715,262 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             <GlassPanel variant="default" style={{ padding: '18px' }}>
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Actor Stats</Title>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {actorStats.map((stat, statIndex) => (
-                        <div key={`actor-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
-                                    {stat.name?.trim() || `Actor Stat ${statIndex + 1}`}
+                    {actorStats.map((stat, statIndex) => {
+                        const normalizedStat = normalizeActorStatShape(stat);
+                        const optionEntries = normalizedStat.options || [];
+
+                        return (
+                            <div key={`actor-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                    <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
+                                        {stat.name?.trim() || `Actor Stat ${statIndex + 1}`}
+                                    </div>
+                                    <Button variant="secondary" onClick={() => toggleActorStat(statIndex)}>
+                                        {collapsedActorStats[statIndex] ? 'Expand' : 'Collapse'}
+                                    </Button>
                                 </div>
-                                <Button variant="secondary" onClick={() => toggleActorStat(statIndex)}>
-                                    {collapsedActorStats[statIndex] ? 'Expand' : 'Collapse'}
-                                </Button>
-                            </div>
 
-                            {!collapsedActorStats[statIndex] && (
-                                <>
-                                    <div style={{ marginTop: 10 }}>
-                                        <div style={inlineFieldStyle}>
-                                            <label style={fieldLabelStyle}>Name</label>
-                                            <TextInput
-                                                fullWidth
-                                                value={stat.name}
-                                                onChange={(e) => updateActorStat(statIndex, { name: e.target.value })}
-                                                placeholder="Stat name"
-                                            />
-                                        </div>
-
-                                        <div style={inlineFieldTopStyle}>
-                                            <label style={fieldLabelStyle}>Description</label>
-                                            <TextArea
-                                                value={stat.description}
-                                                onChange={(e) => updateActorStat(statIndex, { description: e.target.value })}
-                                                rows={2}
-                                                placeholder="Describe what this stat represents."
-                                                style={{ width: '100%', resize: 'vertical' }}
-                                            />
-                                        </div>
-
-                                        <div style={inlineFieldTopStyle}>
-                                            <label style={fieldLabelStyle}>Guidance</label>
-                                            <TextArea
-                                                value={stat.guidance}
-                                                onChange={(e) => updateActorStat(statIndex, { guidance: e.target.value })}
-                                                rows={2}
-                                                placeholder="Guidance for using this stat in generated narrative."
-                                                style={{ width: '100%', resize: 'vertical' }}
-                                            />
-                                        </div>
-
-                                        <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                            <label style={fieldLabelStyle}>Properties</label>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-                                                <div>
-                                                    <div style={compactChipLabelStyle}>Default</div>
-                                                    <TextInput
-                                                        fullWidth
-                                                        type="number"
-                                                        value={String(stat.default)}
-                                                        onChange={(e) => updateActorStat(statIndex, { default: Number(e.target.value) || 0 })}
-                                                        placeholder="Default"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <div style={compactChipLabelStyle}>Min</div>
-                                                    <TextInput
-                                                        fullWidth
-                                                        type="number"
-                                                        value={typeof stat.min === 'number' ? String(stat.min) : ''}
-                                                        onChange={(e) => updateActorStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                        placeholder="Min"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <div style={compactChipLabelStyle}>Max</div>
-                                                    <TextInput
-                                                        fullWidth
-                                                        type="number"
-                                                        value={typeof stat.max === 'number' ? String(stat.max) : ''}
-                                                        onChange={(e) => updateActorStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                        placeholder="Max"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <div style={compactChipLabelStyle}>Display</div>
-                                                    <select
-                                                        className="input-base"
-                                                        value={stat.displayType}
-                                                        onChange={(e) => updateActorStat(statIndex, { displayType: e.target.value as ActorStat['displayType'] })}
-                                                    >
-                                                        <option value="number">number</option>
-                                                        <option value="percentage">percentage</option>
-                                                        <option value="rating">rating</option>
-                                                        <option value="letter grade">letter grade</option>
-                                                    </select>
-                                                </div>
+                                {!collapsedActorStats[statIndex] && (
+                                    <>
+                                        <div style={{ marginTop: 10 }}>
+                                            <div style={inlineFieldStyle}>
+                                                <label style={fieldLabelStyle}>Name</label>
+                                                <TextInput
+                                                    fullWidth
+                                                    value={stat.name}
+                                                    onChange={(e) => updateActorStat(statIndex, { name: e.target.value })}
+                                                    placeholder="Stat name"
+                                                />
                                             </div>
-                                        </div>
-                                    </div>
 
-                                    <div style={{ marginTop: 10 }}>
-                                        <Button variant="danger" onClick={() => removeActorStat(statIndex)}>Remove Actor Stat</Button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    ))}
+                                            <div style={inlineFieldTopStyle}>
+                                                <label style={fieldLabelStyle}>Description</label>
+                                                <TextArea
+                                                    value={stat.description}
+                                                    onChange={(e) => updateActorStat(statIndex, { description: e.target.value })}
+                                                    rows={2}
+                                                    placeholder="Describe what this stat represents."
+                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                />
+                                            </div>
+
+                                            <div style={inlineFieldTopStyle}>
+                                                <label style={fieldLabelStyle}>Guidance</label>
+                                                <TextArea
+                                                    value={stat.guidance}
+                                                    onChange={(e) => updateActorStat(statIndex, { guidance: e.target.value })}
+                                                    rows={2}
+                                                    placeholder="Guidance for using this stat in generated narrative."
+                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                />
+                                            </div>
+
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Display</label>
+                                                <select
+                                                    className="input-base"
+                                                    value={normalizedStat.displayType}
+                                                    onChange={(e) => {
+                                                        const nextDisplayType = e.target.value as ActorStat['displayType'];
+                                                        updateActorStat(statIndex, normalizeActorStatShape({
+                                                            ...stat,
+                                                            displayType: nextDisplayType,
+                                                        }));
+                                                    }}
+                                                >
+                                                    <option value="option">option</option>
+                                                    <option value="number">number</option>
+                                                    <option value="percentage">percentage</option>
+                                                    <option value="rating">rating</option>
+                                                    <option value="letter grade">letter grade</option>
+                                                    <option value="text">text</option>
+                                                </select>
+                                            </div>
+
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Visible In UI</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.exposed === true}
+                                                        onChange={(e) => updateActorStat(statIndex, { exposed: e.target.checked })}
+                                                    />
+                                                    Exposed
+                                                </label>
+                                            </div>
+
+                                            {normalizedStat.displayType === 'option' && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
+                                                    <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
+                                                        <label style={fieldLabelStyle}>Default Option</label>
+                                                        <select
+                                                            className="input-base"
+                                                            value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
+                                                            onChange={(e) => updateActorStat(statIndex, { default: e.target.value })}
+                                                        >
+                                                            {optionEntries.map((option, idx) => (
+                                                                <option key={`${statIndex}-actor-default-option-${idx}`} value={option.name}>
+                                                                    {option.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {optionEntries.map((option, optionIndex) => (
+                                                        <div key={`${statIndex}-actor-option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
+                                                            <div style={inlineFieldStyle}>
+                                                                <label style={fieldLabelStyle}>Option Name</label>
+                                                                <TextInput
+                                                                    fullWidth
+                                                                    value={option.name}
+                                                                    onChange={(e) => {
+                                                                        setActorStats(prev => prev.map((item, idx) => {
+                                                                            if (idx !== statIndex) {
+                                                                                return item;
+                                                                            }
+
+                                                                            const currentOptions = [...(item.options || [])];
+                                                                            const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), name: e.target.value };
+                                                                            currentOptions[optionIndex] = nextOption;
+                                                                            return { ...item, options: currentOptions };
+                                                                        }));
+                                                                    }}
+                                                                    placeholder="Option name"
+                                                                />
+                                                            </div>
+                                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                                                <label style={fieldLabelStyle}>Option Description</label>
+                                                                <TextArea
+                                                                    value={option.description}
+                                                                    onChange={(e) => {
+                                                                        setActorStats(prev => prev.map((item, idx) => {
+                                                                            if (idx !== statIndex) {
+                                                                                return item;
+                                                                            }
+
+                                                                            const currentOptions = [...(item.options || [])];
+                                                                            const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), description: e.target.value };
+                                                                            currentOptions[optionIndex] = nextOption;
+                                                                            return { ...item, options: currentOptions };
+                                                                        }));
+                                                                    }}
+                                                                    rows={2}
+                                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                                />
+                                                            </div>
+                                                            <div style={{ marginTop: 8 }}>
+                                                                <Button variant="danger" onClick={() => {
+                                                                    setActorStats(prev => prev.map((item, idx) => {
+                                                                        if (idx !== statIndex) {
+                                                                            return item;
+                                                                        }
+
+                                                                        const options = (item.options || []).filter((_, idx2) => idx2 !== optionIndex);
+                                                                        const defaultValue = typeof item.default === 'string' && options.some(option => option.name === item.default)
+                                                                            ? item.default
+                                                                            : (options[0]?.name || '');
+
+                                                                        return {
+                                                                            ...item,
+                                                                            options,
+                                                                            default: defaultValue,
+                                                                        };
+                                                                    }));
+                                                                }}>
+                                                                    Remove Option
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    <Button variant="secondary" onClick={() => {
+                                                        setActorStats(prev => prev.map((item, idx) => {
+                                                            if (idx !== statIndex) {
+                                                                return item;
+                                                            }
+
+                                                            const options = [...(item.options || [])];
+                                                            const nextLabel = `Option ${options.length + 1}`;
+                                                            options.push({
+                                                                name: nextLabel,
+                                                                description: '',
+                                                            });
+
+                                                            return {
+                                                                ...item,
+                                                                options,
+                                                                default: typeof item.default === 'string' && item.default.trim() ? item.default : nextLabel,
+                                                            };
+                                                        }));
+                                                    }}>
+                                                        Add Option
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.displayType === 'text' && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Value</label>
+                                                    <TextArea
+                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
+                                                        onChange={(e) => updateActorStat(statIndex, { default: e.target.value })}
+                                                        rows={2}
+                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.displayType === 'rating' && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Icon</label>
+                                                    {renderPipIconPicker(normalizedStat, (iconName) => updateActorStat(statIndex, { iconName }))}
+                                                </div>
+                                            )}
+
+                                            {isNumericDisplayType(normalizedStat.displayType) && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                                    <label style={fieldLabelStyle}>Properties</label>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                                                        <div>
+                                                            <div style={compactChipLabelStyle}>Default</div>
+                                                            <TextInput
+                                                                fullWidth
+                                                                type="number"
+                                                                value={String(Number.isFinite(normalizedStat.default) ? Number(normalizedStat.default) : 0)}
+                                                                onChange={(e) => updateActorStat(statIndex, { default: Number(e.target.value) || 0 })}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <div style={compactChipLabelStyle}>Min</div>
+                                                            <TextInput
+                                                                fullWidth
+                                                                type="number"
+                                                                value={typeof normalizedStat.min === 'number' ? String(normalizedStat.min) : ''}
+                                                                onChange={(e) => updateActorStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <div style={compactChipLabelStyle}>Max</div>
+                                                            <TextInput
+                                                                fullWidth
+                                                                type="number"
+                                                                value={typeof normalizedStat.max === 'number' ? String(normalizedStat.max) : ''}
+                                                                onChange={(e) => updateActorStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div style={{ marginTop: 10 }}>
+                                            <Button variant="danger" onClick={() => removeActorStat(statIndex)}>Remove Actor Stat</Button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
 
                     <Button
                         variant="secondary"
