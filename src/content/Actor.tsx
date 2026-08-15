@@ -87,32 +87,13 @@ export type Outfit = {
     emotionPack: EmotionPack;
 }
 
-export const ACTOR_STATUS_VALUES = ['', 'dead', 'missing', 'incapacitated', 'imprisoned', 'away'] as const;
-export type ActorStatus = typeof ACTOR_STATUS_VALUES[number];
-
-export const ACTOR_STATUS_OPTIONS: Array<{ value: ActorStatus; label: string }> = [
-    { value: '', label: 'Active' },
-    { value: 'dead', label: 'Dead' },
-    { value: 'missing', label: 'Missing' },
-    { value: 'incapacitated', label: 'Incapacitated' },
-    { value: 'imprisoned', label: 'Imprisoned' },
-    { value: 'away', label: 'Away' },
-];
-
-export const normalizeActorStatus = (value: unknown): ActorStatus => {
-    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    return ACTOR_STATUS_VALUES.includes(normalizedValue as ActorStatus) ? normalizedValue as ActorStatus : '';
-};
-
 export class Actor {
     id: string = ''; // UUID
     loreId: string = ''; // The ID of the lore entry associated with this actor, if any. This is used to link the actor to their description in the lorebook.
     active: boolean = true; // Soft-delete flag. Inactive actors are hidden from management UIs.
-    generic: boolean = false; // Whether this actor is a generic stand-in archetype rather than a specific character.
     name: string = ''; // Full name (possibly with formatting, like last, first), to be used in content management.
     displayName: string = ''; // Name as it appears in NamePlate and chats, used everywhere beyond content management. Fall back to name.
     role: string = ''; // Optional role for this actor. This displays beneath the name in the NamePlate and under name in the ActorCard.
-    status: ActorStatus = ''; // Optional status for this actor. Blank is default: alive and active. Other statuses could trigger different behaviors in the game.
     birthDate: string = ''; // Optional birth date for this actor, in YYYY-MM-DD format. Used for age calculations and display.
     description: string = ''; // Core physical description—not outfit-oriented
     background: string = ''; // Backstory and integral traits of this character (as opposed to "profile"/lore entry, which contains evolving details).
@@ -134,11 +115,6 @@ export class Actor {
         const actor = Object.create(Actor.prototype);
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
-        actor.generic = savedActor?.generic === true;
-        actor.status = normalizeActorStatus(savedActor?.status);
-        if (actor.generic) {
-            actor.status = '';
-        }
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
         actor.statInitialMap = cloneStatInitialMap(savedActor?.statInitialMap);
         actor.schedule = cloneSchedule(savedActor?.schedule);
@@ -157,11 +133,6 @@ export class Actor {
             this.id = generateUuid();
         }
         this.active = this.active !== false;
-        this.generic = this.generic === true;
-        this.status = normalizeActorStatus(this.status);
-        if (this.generic) {
-            this.status = '';
-        }
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
         this.statInitialMap = cloneStatInitialMap(this.statInitialMap);
         this.schedule = cloneSchedule(this.schedule);
@@ -284,20 +255,6 @@ export function applyActorInitialStats(actor: Actor, actorStats: ActorStat[], co
         });
 }
 
-export function resetGenericActorStats(actor: Actor, actorStats: ActorStat[], context: ConditionContext): void {
-    if (!actor?.generic) {
-        return;
-    }
-    if (!actor.statMap || typeof actor.statMap !== 'object') {
-        actor.statMap = {};
-    }
-    actorStats
-        .filter(stat => stat?.name?.trim() && NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(stat.displayType))
-        .forEach(stat => {
-            actor.statMap[stat.name] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context);
-        });
-}
-
 // Mapping of voice IDs to a description of the voice, so the AI can choose an ID based on the character profile.
 export const VOICE_MAP: {[key: string]: string} = {
     '751212e5-a871-45c7-b10b-6f42a5785954': 'feminine - posh and catty',
@@ -355,10 +312,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
     const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
     const actorStatFields = buildActorStatFields(actorStats);
-    const distillationFields = (actor.generic
-        ? DISTILLATION_FIELDS.filter(field => field.key !== 'birthDate')
-        : DISTILLATION_FIELDS
-    ).concat(actorStatFields);
+    const distillationFields = DISTILLATION_FIELDS.concat(actorStatFields);
 
     // Preserve content while removing JSON-like structures.
     const definitionPersonality = String(definition.personality || actor.profile || actor.description || actor.name || '')
@@ -388,8 +342,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
             .addBlock('Instructions',
                 `This is preparatory request for structured and formatted game content. ` +
                 `The world and its rules are described below. ` +
-                `The character details below describe a character of this world (${actor.name}) to convert into a set of defined fields for this game.` +
-                (actor.generic ? ` This actor is a generic stand-in, not a specific character. Treat them as an archetypal role rather than a named individual. Do not invent a personal identity, age, or birth date; keep their details broad and anonymous.` : ''))
+                `The character details below describe a character of this world (${actor.name}) to convert into a set of defined fields for this game.`)
             .addBlock('World Context', worldContext)
             .addBlock('Current Date', formatCurrentDate(stage.getSave().currentDate, stage.getSave().currentTimeOfDay))
             .addBlock('Character Details', definition.personality)
@@ -446,7 +399,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     actor.name = parsedData['name'] || actor.name || '';
     actor.displayName = actor.name;
     actor.role = parsedData['role'] || actor.role || '';
-    actor.birthDate = actor.generic ? '' : (parsedData['birthDate'] || actor.birthDate || '');
+    actor.birthDate = parsedData['birthDate'] || actor.birthDate || '';
     actor.description = parsedData['description'] || actor.description || '';
     actor.background = parsedData['background'] || actor.background || '';
     actor.profile = parsedData['profile'] || actor.profile || '';

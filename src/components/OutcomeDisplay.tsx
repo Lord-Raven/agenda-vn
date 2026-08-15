@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { Box, Typography } from '@mui/material';
-import { Actor, ACTOR_STATUS_OPTIONS, getEmotionImage } from '../content/Actor';
+import { Actor, getEmotionImage } from '../content/Actor';
 import { Outcome, OutcomeType } from '../content/Outcome';
 import { Stage } from '../Stage';
 
@@ -17,11 +17,6 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
     const resolveActor = (actorId?: string): Actor | undefined => {
         if (!actorId) return undefined;
         return stage().getSave().actors?.[actorId] || undefined;
-    };
-
-    const renderStatusLabel = (status: string): string => {
-        const option = ACTOR_STATUS_OPTIONS.find((candidate) => candidate.value === status);
-        return option?.label || status || 'Active';
     };
 
     return (
@@ -56,11 +51,6 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     const arrow = '→';
                     topLine = `${actor?.name || 'Actor'} · ${statName}`;
                     bottomLine = `${currentValue} ${arrow} ${nextValue + delta}`;
-                } else if (outcome.type === OutcomeType.ACTOR_STATUS) {
-                    const fromStatus = renderStatusLabel(String(outcome.details?.fromStatus || ''));
-                    const toStatus = renderStatusLabel(String(outcome.details?.status || outcome.details?.toStatus || ''));
-                    topLine = `${actor?.name || 'Actor'}'s Status`;
-                    bottomLine = `${fromStatus || 'Active'} → ${toStatus || 'Active'}`;
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Player Stat';
                     const changeValue = Number(outcome.details?.changeValue ?? 0);

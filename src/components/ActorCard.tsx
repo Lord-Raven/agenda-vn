@@ -83,10 +83,6 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
     }, [stage, actor?.id]);
 
     const actorAge = useMemo(() => {
-        if (actor?.generic) {
-            return '';
-        }
-
         const birthDate = (actor?.birthDate || '').trim();
         if (!birthDate) {
             return '';
@@ -116,7 +112,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
     }
 
     const themeColor = actor.themeColor || 'var(--agenda-accent-primary)';
-    const cardMeta = [actor.role, actor.generic ? 'Generic Stand-In' : '', actorAge ? `Age ${actorAge}` : ''].filter(Boolean).join(' • ');
+    const cardMeta = [actor.role, actorAge ? `Age ${actorAge}` : ''].filter(Boolean).join(' • ');
 
     return (
         <Box
@@ -153,7 +149,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                 </Box>
             )}
 
-            {!actor.generic && exposedStats.length > 0 && (
+            {exposedStats.length > 0 && (
                 <Box
                     sx={{
                         display: 'flex',

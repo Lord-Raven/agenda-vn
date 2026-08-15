@@ -1,7 +1,7 @@
 import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
-import { Actor, ACTOR_SCHEDULE_AVAILABLE, applyActorInitialStats, findBestNameMatch, loadSupportedActor, normalizeActorStatus, resolveActorSchedule } from "./content/Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, applyActorInitialStats, findBestNameMatch, loadSupportedActor, resolveActorSchedule } from "./content/Actor";
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
@@ -443,11 +443,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     id: this.primaryUser.anonymizedId,
                     loreId: '',
                     active: true,
-                    generic: false,
                     name: playerData.name,
                     displayName: playerData.name,
                     role: '',
-                    status: '',
                     birthDate: '',
                     description: '',
                     background: '',
@@ -1560,18 +1558,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     const loreEntry = findBestNameMatch(outcome.details?.loreTitle, save.lorebook || [], ['title']);
                     if (loreEntry && loreEntry.updatable) {
                         updateLoreEntry(loreEntry, this);
-                    }
-                    break;
-                case 'ACTOR_STATUS':
-                    const statusActorId = outcome.details?.actorId;
-                    const nextStatusValue = outcome.details?.status;
-                    if (statusActorId && save.actors?.[statusActorId]) {
-                        const targetActor = save.actors[statusActorId];
-                        targetActor.status = normalizeActorStatus(nextStatusValue);
-                        if (targetActor.generic) {
-                            targetActor.status = '';
-                        }
-                        this.saveGame();
                     }
                     break;
                 case 'ACTOR_STAT':
