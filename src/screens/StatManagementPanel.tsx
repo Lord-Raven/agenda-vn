@@ -431,9 +431,9 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 return true;
             }
 
-            const label = option.label.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const labels = option.labels.join(' ').toLowerCase().replace(/[^a-z0-9]/g, '');
             const key = option.key.toLowerCase().replace(/[^a-z0-9]/g, '');
-            return label.includes(normalizedQuery) || key.includes(normalizedQuery);
+            return labels.includes(normalizedQuery) || key.includes(normalizedQuery);
         });
 
         return (
@@ -485,7 +485,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                 }}
                             >
                                 <Icon style={{ fontSize: 24, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
-                                <span>{option.label}</span>
+                                <span>{option.labels[0]}</span>
                             </button>
                         );
                     })}

@@ -1,81 +1,170 @@
 import { FC } from 'react';
-import * as Icons from "@mui/icons-material";
-import type { SvgIconComponent } from '@mui/icons-material';
-import { Star } from '@mui/icons-material';
+import {
+    AttachMoney,
+    Favorite,
+    FavoriteBorder,
+    Gavel,
+    HeartBroken,
+    LabelImportant,
+    LocalFireDepartment,
+    MonetizationOn,
+    Public,
+    Shield,
+    Star,
+    ThumbUp,
+    WbSunny,
+    Whatshot,
+    Build,
+    WorkspacePremium,
+} from '@mui/icons-material';
+import {
+    Payments,
+    Bedtime,
+    AcUnit,
+    Sell,
+    WatchLater,
+    HourglassBottom,
+    SentimentSatisfied,
+    SentimentDissatisfied,
+    Anchor,
+    Bolt,
+    BackHand,
+    Audiotrack,
+    AttachFile,
+    BatteryFull,
+    BatterySaver,
+    BatteryAlert,
+    BatteryChargingFull,
+    Bookmark,
+    BugReport,
+    Cake,
+    CameraAlt,
+    Camera,
+    DirectionsCar,
+    Cloud,
+    Cancel,
+    CameraRoll,
+    CalendarToday,
+    Castle,
+    CatchingPokemon,
+    Chair,
+    CheckCircle,
+    Church,
+    Coffee,
+    ColorLens,
+    Colorize,
+    CompassCalibration,
+    Construction,
+    Cookie,
+    Cottage,
+    Dangerous,
+    Diamond,
+    Directions,
+    Coronavirus,
+    Delete,
+    DoNotDisturb,
+    Email,
+    Error,
+    Feedback,
+    Female,
+    Explore,
+    FilterVintage,
+    FilterAlt,
+    FilterHdr,
+    FlashOn,
+    Flight,
+    Forest,
+    Fort,
+    FormatPaint,
+    FreeBreakfast,
+} from '@mui/icons-material';
 import { ActorStat } from '../Stage';
 
-const ICON_LOOKUP_EXCLUSIONS = new Set([
-    'default',
-    'SvgIcon',
-    'createSvgIcon',
-    'unstable_createSvgIcon',
-    'Icon',
-    'IconButton',
-    'ThemeProvider',
-    'StylesProvider',
-]);
-
-const normalizeIconKey = (iconName: string) =>
-    iconName
-        .trim()
-        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .toLowerCase();
-
-const getMUIIconComponent = (value: unknown): SvgIconComponent | null => {
-    if (typeof value === 'function') {
-        return value as SvgIconComponent;
-    }
-
-    if (value && typeof value === 'object') {
-        const nested = value as { default?: unknown; render?: unknown };
-        if (typeof nested.default === 'function') {
-            return nested.default as SvgIconComponent;
-        }
-        if (typeof nested.render === 'function') {
-            return value as unknown as SvgIconComponent;
-        }
-    }
-
-    return null;
-};
-
-const MUI_ICON_OPTIONS = Object.entries(Icons as Record<string, unknown>)
-    .flatMap(([name, value]) => {
-        if (ICON_LOOKUP_EXCLUSIONS.has(name)) {
-            return [];
-        }
-
-        const icon = getMUIIconComponent(value);
-        if (!icon) {
-            return [];
-        }
-
-        return [{
-            key: name,
-            label: name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' '),
-            icon,
-        }];
-    })
-    .sort((left, right) => left.label.localeCompare(right.label));
-
-const RATING_ICON_OPTIONS = MUI_ICON_OPTIONS;
-
-const RESOLVED_ICON_LOOKUP = new Map<string, SvgIconComponent>(
-    RATING_ICON_OPTIONS.map(({ key, icon }) => [normalizeIconKey(key), icon]),
-);
-
-const resolveIcon = (iconName?: string) => {
-    const rawKey = typeof iconName === 'string' ? iconName.trim() : '';
-    if (!rawKey) {
-        return Star;
-    }
-
-    return RESOLVED_ICON_LOOKUP.get(normalizeIconKey(rawKey)) || Star;
-};
+const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [
+    { key: 'star', labels: ['Star'], icon: Star },
+    { key: 'heart', labels: ['Heart'], icon: Favorite },
+    { key: 'favorite', labels: ['Favorite'], icon: FavoriteBorder },
+    { key: 'wrench', labels: ['Wrench'], icon: Build },
+    { key: 'coin', labels: ['Coin'], icon: MonetizationOn },
+    { key: 'money', labels: ['Money'], icon: AttachMoney },
+    { key: 'cash', labels: ['Cash'], icon: Payments },
+    { key: 'shield', labels: ['Shield'], icon: Shield },
+    { key: 'sun', labels: ['Sun'], icon: WbSunny },
+    { key: 'moon', labels: ['Moon'], icon: Bedtime },
+    { key: 'fire', labels: ['Fire'], icon: LocalFireDepartment },
+    { key: 'flake', labels: ['Flake'], icon: AcUnit },
+    { key: 'spark', labels: ['Spark'], icon: Whatshot },
+    { key: 'award', labels: ['Award'], icon: WorkspacePremium },
+    { key: 'thumbs-up', labels: ['Thumbs Up'], icon: ThumbUp },
+    { key: 'gavel', labels: ['Gavel'], icon: Gavel },
+    { key: 'heart-broken', labels: ['Broken Heart'], icon: HeartBroken },
+    { key: 'chevron', labels: ['Chevron'], icon: LabelImportant },
+    { key: 'world', labels: ['World'], icon: Public },
+    { key: 'tag', labels: ['Tag'], icon: Sell },
+    { key: 'clock', labels: ['Clock'], icon: WatchLater },
+    { key: 'time', labels: ['Time'], icon: HourglassBottom },
+    { key: 'happy', labels: ['Happy'], icon: SentimentSatisfied },
+    { key: 'sad', labels: ['Sad'], icon: SentimentDissatisfied },
+    { key: 'anchor', labels: ['Anchor'], icon: Anchor },
+    { key: 'bolt', labels: ['Bolt'], icon: Bolt },
+    { key: 'hand', labels: ['Hand'], icon: BackHand },
+    { key: 'music', labels: ['Music'], icon: Audiotrack },
+    { key: 'clip', labels: ['Clip'], icon: AttachFile },
+    { key: 'battery', labels: ['Battery'], icon: BatteryFull },
+    { key: 'battery-plus', labels: ['Battery Plus'], icon: BatterySaver },
+    { key: 'battery-alert', labels: ['Battery Alert'], icon: BatteryAlert },
+    { key: 'battery-charging', labels: ['Battery Charging'], icon: BatteryChargingFull },
+    { key: 'bookmark', labels: ['Bookmark'], icon: Bookmark },
+    { key: 'bug', labels: ['Bug'], icon: BugReport },
+    { key: 'cake', labels: ['Cake'], icon: Cake },
+    { key: 'camera', labels: ['Camera'], icon: CameraAlt },
+    { key: 'aperture', labels: ['Aperture'], icon: Camera },
+    { key: 'car', labels: ['Car'], icon: DirectionsCar },
+    { key: 'cloud', labels: ['Cloud'], icon: Cloud },
+    { key: 'cancel', labels: ['Cancel'], icon: Cancel },
+    { key: 'camera-roll', labels: ['Camera Roll'], icon: CameraRoll },
+    { key: 'calendar', labels: ['Calendar'], icon: CalendarToday },
+    { key: 'castle', labels: ['Castle'], icon: Castle },
+    { key: "pokemon", labels: ["Pokemon"], icon: CatchingPokemon },
+    { key: 'chair', labels: ['Chair'], icon: Chair },
+    { key: 'check', labels: ['Check'], icon: CheckCircle },
+    { key: 'church', labels: ['Church'], icon: Church },
+    { key: 'coffee', labels: ['Coffee'], icon: Coffee },
+    { key: 'palette', labels: ['Palette'], icon: ColorLens },
+    { key: 'color-picker', labels: ['Color Picker'], icon: Colorize },
+    { key: 'compass', labels: ['Compass'], icon: CompassCalibration },
+    { key: 'construction', labels: ['Construction'], icon: Construction },
+    { key: 'cookie', labels: ['Cookie'], icon: Cookie },
+    { key: 'cottage', labels: ['Cottage'], icon: Cottage },
+    { key: 'dangerous', labels: ['Dangerous'], icon: Dangerous },
+    { key: 'diamond', labels: ['Diamond'], icon: Diamond },
+    { key: 'directions', labels: ['Directions'], icon: Directions },
+    { key: 'virus', labels: ['Virus'], icon: Coronavirus },
+    { key: 'trash', labels: ['Trash'], icon: Delete },
+    { key: 'do-not-disturb', labels: ['Do Not Disturb'], icon: DoNotDisturb },
+    { key: 'email', labels: ['Email'], icon: Email },
+    { key: 'error', labels: ['Error'], icon: Error },
+    { key: 'favorite', labels: ['Favorite'], icon: Favorite },
+    { key: 'feedback', labels: ['Feedback'], icon: Feedback },
+    { key: 'female', labels: ['Female'], icon: Female },
+    { key: 'explore', labels: ['Explore'], icon: Explore },
+    { key: 'flower', labels: ['Flower'], icon: FilterVintage },
+    { key: 'filter', labels: ['Filter'], icon: FilterAlt },
+    { key: 'mountain', labels: ['Mountain'], icon: FilterHdr },
+    { key: 'lightning', labels: ['Lightning'], icon: FlashOn },
+    { key: 'airplane', labels: ['Airplane'], icon: Flight },
+    { key: 'forest', labels: ['Forest'], icon: Forest },
+    { key: 'fortress', labels: ['Fortress'], icon: Fort },
+    { key: 'paint', labels: ['Paint'], icon: FormatPaint },
+    { key: 'coffee-cup', labels: ['Coffee Cup'], icon: FreeBreakfast }
+];
 
 type RatingIconKey = (typeof RATING_ICON_OPTIONS)[number]['key'];
+
+const resolveIcon = (iconName?: string) => {
+    const match = RATING_ICON_OPTIONS.find(option => option.key === iconName);
+    return match?.icon || Star;
+};
 
 interface ActorStatRatingProps {
     stat: ActorStat;
