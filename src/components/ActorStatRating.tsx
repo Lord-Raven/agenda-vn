@@ -23,19 +23,41 @@ const normalizeIconKey = (iconName: string) =>
         .replace(/\s+/g, ' ')
         .toLowerCase();
 
-const MUI_ICON_OPTIONS = Object.entries(Icons)
-    .filter(([name, value]) => {
-        if (typeof value !== 'function') {
-            return false;
+const getMUIIconComponent = (value: unknown): SvgIconComponent | null => {
+    if (typeof value === 'function') {
+        return value as SvgIconComponent;
+    }
+
+    if (value && typeof value === 'object') {
+        const nested = value as { default?: unknown; render?: unknown };
+        if (typeof nested.default === 'function') {
+            return nested.default as SvgIconComponent;
+        }
+        if (typeof nested.render === 'function') {
+            return value as unknown as SvgIconComponent;
+        }
+    }
+
+    return null;
+};
+
+const MUI_ICON_OPTIONS = Object.entries(Icons as Record<string, unknown>)
+    .flatMap(([name, value]) => {
+        if (ICON_LOOKUP_EXCLUSIONS.has(name)) {
+            return [];
         }
 
-        return !ICON_LOOKUP_EXCLUSIONS.has(name);
+        const icon = getMUIIconComponent(value);
+        if (!icon) {
+            return [];
+        }
+
+        return [{
+            key: name,
+            label: name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' '),
+            icon,
+        }];
     })
-    .map(([name, icon]) => ({
-        key: name,
-        label: name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' '),
-        icon: icon as SvgIconComponent,
-    }))
     .sort((left, right) => left.label.localeCompare(right.label));
 
 const RATING_ICON_OPTIONS = MUI_ICON_OPTIONS;
