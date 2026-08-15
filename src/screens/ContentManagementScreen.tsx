@@ -1,7 +1,7 @@
 import React, { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
-import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon } from '@mui/icons-material';
+import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorManagementPanel } from './ActorManagementPanel';
 import { LocationManagementPanel } from './LocationManagementPanel';
@@ -156,7 +156,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                         opacity: activeTab === 'stats' ? 1 : 0.6,
                                     }}
                                 >
-                                    <Tune />
+                                    <BarChart />
                                     Stats
                                 </Button>
                                 <Button
