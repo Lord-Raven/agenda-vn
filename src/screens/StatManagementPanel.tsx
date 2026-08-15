@@ -425,11 +425,15 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
 
     const renderPipIconPicker = (stat: ActorStat, onChange: (iconName: string) => void, pickerKey: string) => {
         const query = (pipIconSearch[pickerKey] || '').trim().toLowerCase();
+        const normalizedQuery = query.replace(/[^a-z0-9]/g, '');
         const filteredOptions = RATING_ICON_OPTIONS.filter((option) => {
-            if (!query) {
+            if (!normalizedQuery) {
                 return true;
             }
-            return option.label.toLowerCase().includes(query) || option.key.toLowerCase().includes(query);
+
+            const label = option.label.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const key = option.key.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return label.includes(normalizedQuery) || key.includes(normalizedQuery);
         });
 
         return (
@@ -443,11 +447,10 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 <div
                     style={{
                         display: 'grid',
-                        gridAutoFlow: 'column',
-                        gridAutoColumns: 'minmax(72px, 1fr)',
-                        gridTemplateRows: '1fr',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))',
                         gap: '8px',
-                        overflowX: 'auto',
+                        maxHeight: '260px',
+                        overflowY: 'auto',
                         paddingBottom: '4px',
                         paddingRight: '4px',
                     }}
