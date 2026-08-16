@@ -389,7 +389,12 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                             previewUploadHint={isUploadingVariant ? 'Uploading...' : 'Click image to upload'}
                                             onInvalidFile={() => stageInstance.showPriorityMessage('Please select a valid image file.')}
                                         />
-                                        <ConditionEditor conditionCollections={alternative.conditionCollections} playerStats={stageInstance.getConfiguration().playerStats || []} onChange={conditionCollections => updateAlternative(index, { conditionCollections })} />
+                                        <ConditionEditor
+                                            conditionCollections={alternative.conditionCollections}
+                                            playerStats={stageInstance.getConfiguration().playerStats || []}
+                                            actors={Object.values(stageInstance.getSave().actors || {})}
+                                            onChange={conditionCollections => updateAlternative(index, { conditionCollections })}
+                                        />
                                         <Button variant="secondary" onClick={() => generateVariantImage(index)} disabled={isGeneratingVariant} style={{ justifySelf: 'end', display: 'flex', gap: 8, alignItems: 'center' }}>
                                             <AutoAwesome style={{ fontSize: 18 }} /> {isGeneratingVariant ? 'Generating...' : 'Generate'}
                                         </Button>
@@ -421,6 +426,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                             <ConditionEditor
                                 conditionCollections={link.conditionCollections || []}
                                 playerStats={stageInstance.getConfiguration().playerStats || []}
+                                actors={Object.values(stageInstance.getSave().actors || {})}
                                 onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
                             />
                         </div>

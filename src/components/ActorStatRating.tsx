@@ -193,18 +193,22 @@ export type PickerOption = {
 
 interface SearchableOptionPickerProps {
     value?: string;
-    onChange: (value: string | undefined) => void;
+    values?: string[];
+    multiple?: boolean;
+    onChange: (value: string | string[] | undefined) => void;
     options: PickerOption[];
     allowClear?: boolean;
     placeholder?: string;
     defaultOptionKeys?: string[];
     emptyLabel?: string;
     title?: string;
-    renderButton?: (selectedValue: string | undefined) => React.ReactNode;
+    renderButton?: (selectedValue: string | string[] | undefined) => React.ReactNode;
 }
 
 export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     value,
+    values,
+    multiple = false,
     onChange,
     options,
     allowClear = false,
@@ -239,11 +243,28 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         });
     }, [defaultOptionKeys, options, search]);
 
+    const selectedValues = multiple ? (values ?? []) : (value ? [value] : []);
     const selectedValue = value ?? (allowClear ? undefined : defaultOptionKeys[0] || options[0]?.key);
     const selectedOption = options.find((option) => option.key === selectedValue) || options[0];
     const SelectedIcon = selectedOption?.icon || DoNotDisturb;
 
     const handleSelect = (nextValue?: string) => {
+        if (multiple) {
+            const nextSelection = [...(values ?? [])];
+            if (!nextValue) {
+                onChange([]);
+                return;
+            }
+
+            if (nextSelection.includes(nextValue)) {
+                onChange(nextSelection.filter((item) => item !== nextValue));
+                return;
+            }
+
+            onChange([...nextSelection, nextValue]);
+            return;
+        }
+
         onChange(nextValue);
         setIsOpen(false);
     };
@@ -270,8 +291,8 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '6px',
-                            background: selectedValue === undefined ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
-                            border: selectedValue === undefined ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
+                            background: multiple ? (selectedValues.length === 0 ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)') : (selectedValue === undefined ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)'),
+                            border: multiple ? (selectedValues.length === 0 ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)') : (selectedValue === undefined ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)'),
                             borderRadius: '8px',
                             color: 'var(--agenda-text-primary)',
                             cursor: 'pointer',
@@ -281,13 +302,13 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                             whiteSpace: 'nowrap',
                         }}
                     >
-                        <DoNotDisturb style={{ fontSize: 24, color: selectedValue === undefined ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
+                        <DoNotDisturb style={{ fontSize: 24, color: multiple ? (selectedValues.length === 0 ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)') : (selectedValue === undefined ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)') }} />
                         <span>{emptyLabel}</span>
                     </button>
                 )}
                 {orderedOptions.map((option) => {
                     const Icon = option.icon || DoNotDisturb;
-                    const active = selectedValue === option.key;
+                    const active = multiple ? selectedValues.includes(option.key) : selectedValue === option.key;
                     return (
                         <button
                             key={`picker-option-${option.key}`}
@@ -319,7 +340,13 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         </div>
     );
 
-    const buttonContent = renderButton ? renderButton(value) : ((value && selectedOption && selectedOption.icon) ? <SelectedIcon style={{ fontSize: 22, color: 'var(--agenda-text-primary)' }} /> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-muted)' }}><DoNotDisturb style={{ fontSize: 18 }} />{emptyLabel}</span>);
+    const buttonContent = renderButton
+        ? renderButton(multiple ? selectedValues : value)
+        : multiple
+            ? (selectedValues.length > 0
+                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-primary)' }}>{selectedValues.length} selected</span>
+                : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-muted)' }}><DoNotDisturb style={{ fontSize: 18 }} />{emptyLabel}</span>)
+            : ((value && selectedOption && selectedOption.icon) ? <SelectedIcon style={{ fontSize: 22, color: 'var(--agenda-text-primary)' }} /> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-muted)' }}><DoNotDisturb style={{ fontSize: 18 }} />{emptyLabel}</span>);
 
     return (
         <>

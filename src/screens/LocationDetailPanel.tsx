@@ -567,6 +567,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                 <ConditionEditor
                                     conditionCollections={editedLocation.conditionCollections}
                                     playerStats={stage().getConfiguration().playerStats || []}
+                                    actors={Object.values(stage().getSave().actors || {})}
                                     onChange={(conditionCollections) => setEditedLocation(current => ({ ...current, conditionCollections }))}
                                 />
                             </section>
@@ -771,6 +772,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                                 <ConditionEditor
                                                                     conditionCollections={alternative.conditionCollections}
                                                                     playerStats={stage().getConfiguration().playerStats || []}
+                                                                    actors={Object.values(stage().getSave().actors || {})}
                                                                     onChange={(conditionCollections) => updateAlternative(index, { conditionCollections })}
                                                                 />
                                                             </div>

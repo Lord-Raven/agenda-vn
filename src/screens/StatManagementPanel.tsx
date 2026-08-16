@@ -728,12 +728,13 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         }));
                                                     }}
                                                 >
-                                                    <option value="option">option</option>
-                                                    <option value="number">number</option>
-                                                    <option value="percentage">percentage</option>
-                                                    <option value="rating">rating</option>
-                                                    <option value="letter grade">letter grade</option>
-                                                    <option value="text">text</option>
+                                                    <option value="checkbox">Checkbox</option>
+                                                    <option value="letter grade">Letter Grade</option>
+                                                    <option value="number">Number</option>
+                                                    <option value="option">Option</option>
+                                                    <option value="percentage">Percentage</option>
+                                                    <option value="rating">Rating</option>
+                                                    <option value="text">Text</option>
                                                 </select>
                                             </div>
 

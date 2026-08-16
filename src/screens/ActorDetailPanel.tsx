@@ -1684,6 +1684,7 @@ ${indent}}`;
                                             schedule={editedActor.schedule}
                                             locations={Object.values(stage().getSave().atlas || {}).filter(location => location.active !== false)}
                                             playerStats={stage().getConfiguration().playerStats || []}
+                                            actors={Object.values(stage().getSave().actors || {})}
                                             onChange={(schedule) => setEditedActor(current => ({ ...current, schedule }))}
                                         />
                                     </div>
@@ -1903,6 +1904,7 @@ ${indent}}`;
                                                                             <ConditionEditor
                                                                                 conditionCollections={modifier.conditions}
                                                                                 playerStats={[...actorStats, ...(stage().getConfiguration().playerStats || [])]}
+                                                                                actors={Object.values(stage().getSave().actors || {})}
                                                                                 onChange={(conditions) => updateActorStatModifierConditions(stat, modifier.id, conditions)}
                                                                             />
                                                                             {modifier.conditions.length === 0 && (

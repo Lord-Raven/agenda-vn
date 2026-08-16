@@ -1,8 +1,10 @@
 import React, { FC, useMemo, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
+import { DoNotDisturb } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { SearchableOptionPicker } from '../components/ActorStatRating';
 import {
     CategorizedEntrySection,
     CategorizedEntrySidebar,
@@ -229,19 +231,12 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
         });
     };
 
-    const toggleActor = (actorId: string) => {
-        setDraft(prev => {
-            const existing = prev.actorIds || [];
-            const nextActorIds = existing.includes(actorId)
-                ? existing.filter(id => id !== actorId)
-                : [...existing, actorId];
-
-            return {
-                ...prev,
-                actorIds: nextActorIds,
-                participantActorIds: [...nextActorIds],
-            };
-        });
+    const updateActorSelection = (nextActorIds: string[]) => {
+        setDraft(prev => ({
+            ...prev,
+            actorIds: [...nextActorIds],
+            participantActorIds: [...nextActorIds],
+        }));
     };
 
     const setRecurrenceEnabled = (enabled: boolean) => {
@@ -412,25 +407,26 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                     <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Participants</label>
-                        <div style={{
-                            border: '1px solid var(--agenda-line-subtle)',
-                            borderRadius: 8,
-                            padding: 10,
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                            gap: '6px 10px',
-                        }}>
-                            {actors.map(actor => (
-                                <label key={actor.id} style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--agenda-text-primary)' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={(draft.actorIds || []).includes(actor.id)}
-                                        onChange={() => toggleActor(actor.id)}
-                                    />
-                                    {actor.name}
-                                </label>
-                            ))}
-                        </div>
+                        <SearchableOptionPicker
+                            multiple
+                            values={draft.actorIds || []}
+                            onChange={(nextValue) => updateActorSelection(Array.isArray(nextValue) ? nextValue : [])}
+                            options={actors.map((actor) => ({ key: actor.id, label: actor.name }))}
+                            allowClear
+                            emptyLabel="No actors"
+                            title="Choose involved actors"
+                            placeholder="Search actors"
+                            defaultOptionKeys={[]}
+                            renderButton={(selectedValue) => {
+                                const selectedActors = Array.isArray(selectedValue) ? selectedValue : [];
+                                const count = selectedActors.length;
+                                return (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: count > 0 ? 'var(--agenda-text-primary)' : 'var(--agenda-text-muted)' }}>
+                                        {count > 0 ? `${count} selected` : <><DoNotDisturb style={{ fontSize: 18 }} />No actors</>}
+                                    </span>
+                                );
+                            }}
+                        />
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
