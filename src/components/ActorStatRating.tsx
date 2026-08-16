@@ -1,6 +1,7 @@
 import { FC, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+    AllInclusive,
     AttachMoney,
     Favorite,
     FavoriteBorder,
@@ -12,6 +13,7 @@ import {
     Public,
     Shield,
     Star,
+    SwapHoriz,
     ThumbUp,
     WbSunny,
     Whatshot,
@@ -188,6 +190,7 @@ export type PickerOption = {
     key: string;
     label: string;
     icon?: any;
+    imageUrl?: string;
     description?: string;
 };
 
@@ -248,6 +251,33 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     const selectedOption = options.find((option) => option.key === selectedValue) || options[0];
     const SelectedIcon = selectedOption?.icon || DoNotDisturb;
 
+    const renderOptionAvatar = (option: PickerOption, active: boolean, size: number = 30) => {
+        if (option.imageUrl) {
+            return (
+                <img
+                    src={option.imageUrl}
+                    alt={option.label}
+                    style={{
+                        width: size,
+                        height: size,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: active ? '2px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
+                        background: 'var(--agenda-surface-base)',
+                        display: 'block',
+                    }}
+                />
+            );
+        }
+
+        if (option.icon) {
+            const Icon = option.icon;
+            return <Icon style={{ fontSize: size, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />;
+        }
+
+        return <span style={{ fontSize: Math.max(12, size * 0.6), fontWeight: 700, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)' }}>{option.label.slice(0, 2).toUpperCase()}</span>;
+    };
+
     const handleSelect = (nextValue?: string) => {
         if (multiple) {
             const nextSelection = [...(values ?? [])];
@@ -279,7 +309,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 placeholder={placeholder}
                 autoFocus
             />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '8px', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: '8px', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
                 {allowClear && (
                     <button
                         key="picker-clear"
@@ -297,9 +327,12 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                             color: 'var(--agenda-text-primary)',
                             cursor: 'pointer',
                             padding: '10px 8px',
-                            minHeight: '72px',
+                            minHeight: '88px',
                             fontSize: '11px',
-                            whiteSpace: 'nowrap',
+                            lineHeight: 1.2,
+                            whiteSpace: 'normal',
+                            textAlign: 'center',
+                            overflowWrap: 'anywhere',
                         }}
                     >
                         <DoNotDisturb style={{ fontSize: 24, color: multiple ? (selectedValues.length === 0 ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)') : (selectedValue === undefined ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)') }} />
@@ -307,7 +340,6 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                     </button>
                 )}
                 {orderedOptions.map((option) => {
-                    const Icon = option.icon || DoNotDisturb;
                     const active = multiple ? selectedValues.includes(option.key) : selectedValue === option.key;
                     return (
                         <button
@@ -326,13 +358,16 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                                 color: 'var(--agenda-text-primary)',
                                 cursor: 'pointer',
                                 padding: '10px 8px',
-                                minHeight: '72px',
+                                minHeight: '88px',
                                 fontSize: '11px',
-                                whiteSpace: 'nowrap',
+                                lineHeight: 1.2,
+                                whiteSpace: 'normal',
+                                textAlign: 'center',
+                                overflowWrap: 'anywhere',
                             }}
                         >
-                            {option.icon ? <Icon style={{ fontSize: 24, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} /> : <span style={{ fontSize: 18, fontWeight: 700 }}>{option.label.slice(0, 2).toUpperCase()}</span>}
-                            <span>{option.label}</span>
+                            {renderOptionAvatar(option, active, 30)}
+                            <span style={{ maxWidth: '100%' }}>{option.label}</span>
                         </button>
                     );
                 })}
@@ -346,7 +381,11 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
             ? (selectedValues.length > 0
                 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-primary)' }}>{selectedValues.length} selected</span>
                 : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-muted)' }}><DoNotDisturb style={{ fontSize: 18 }} />{emptyLabel}</span>)
-            : ((value && selectedOption && selectedOption.icon) ? <SelectedIcon style={{ fontSize: 22, color: 'var(--agenda-text-primary)' }} /> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-muted)' }}><DoNotDisturb style={{ fontSize: 18 }} />{emptyLabel}</span>);
+            : (selectedOption && (selectedOption.imageUrl || selectedOption.icon)
+                ? (selectedOption.imageUrl
+                    ? <img src={selectedOption.imageUrl} alt={selectedOption.label} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--agenda-line-subtle)' }} />
+                    : <SelectedIcon style={{ fontSize: 22, color: 'var(--agenda-text-primary)' }} />)
+                : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-muted)' }}><DoNotDisturb style={{ fontSize: 18 }} />{emptyLabel}</span>);
 
     return (
         <>

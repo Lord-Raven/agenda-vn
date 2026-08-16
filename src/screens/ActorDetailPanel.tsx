@@ -1427,7 +1427,6 @@ ${indent}}`;
                     zIndex: 'auto',
                     padding: '0',
                     width: '100%',
-                    height: '100%',
                     minHeight: 0,
                 }}
             >
@@ -1437,17 +1436,15 @@ ${indent}}`;
                         width: '100%',
                         maxWidth: 'none',
                         maxHeight: 'none',
-                        height: '100%',
                         minHeight: 0,
                     }}
                 >
                     <GlassPanel 
                         variant="default"
                         style={{
-                            height: '100%',
                             boxSizing: 'border-box',
                             minHeight: 0,
-                            overflow: 'hidden',
+                            overflow: 'visible',
                             position: 'relative',
                             padding: '20px',
                             paddingBottom: '28px',

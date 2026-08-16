@@ -470,7 +470,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                     zIndex: 'auto',
                     padding: '0',
                     width: '100%',
-                    height: '100%',
                     minHeight: 0,
                 }}
             >
@@ -480,15 +479,13 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                         width: '100%',
                         maxWidth: 'none',
                         maxHeight: 'none',
-                        height: '100%',
                         minHeight: 0,
                     }}
                 >
                     <GlassPanel
                         variant="default"
                         style={{
-                            height: '100%',
-                            overflow: 'hidden',
+                            overflow: 'visible',
                             position: 'relative',
                             padding: '20px',
                             display: 'flex',

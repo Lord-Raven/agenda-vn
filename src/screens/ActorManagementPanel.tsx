@@ -35,7 +35,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
         background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
         border: '1px solid var(--agenda-line-subtle)',
         borderRadius: '12px',
-        overflow: 'hidden',
+        overflow: 'visible',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,

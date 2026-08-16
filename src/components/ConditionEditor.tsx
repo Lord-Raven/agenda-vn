@@ -1,6 +1,7 @@
 import { FC } from 'react';
-import { Add, ArrowDownward, ArrowUpward, Delete, LinkOffRounded, LinkRounded } from '@mui/icons-material';
+import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, LinkOffRounded, LinkRounded, PersonOffOutlined, SwapHoriz } from '@mui/icons-material';
 import { ActorStat } from '../Stage';
+import { Actor, getEmotionImage } from '../content/Actor';
 import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
 import { Button, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './ActorStatRating';
@@ -63,13 +64,20 @@ const getDefaultConditionValue = (stat?: ActorStat): string | number | boolean =
     return typeof stat.default === 'number' ? stat.default : 0;
 };
 
-const buildActorTargetOptions = (actors: Array<{ id: string; name: string }>, allowVariableActorTarget: boolean): Array<{ key: string; label: string }> => {
-    const options: Array<{ key: string; label: string }> = [];
+const buildActorTargetOptions = (actors: Array<{ id: string; name: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] }>, allowVariableActorTarget: boolean) => {
+    const options: Array<{ key: string; label: string; icon?: typeof AllInclusive; imageUrl?: string }> = [];
     if (allowVariableActorTarget) {
-        options.push({ key: 'variable', label: 'Variable' });
+        options.push({ key: 'variable', label: 'Variable', icon: SwapHoriz });
     }
-    options.push({ key: 'any', label: 'Any' }, { key: 'none', label: 'None' });
-    options.push(...actors.map((actor) => ({ key: actor.id, label: actor.name })));
+    options.push({ key: 'any', label: 'Any', icon: AllInclusive }, { key: 'none', label: 'None', icon: PersonOffOutlined });
+    options.push(...actors.map((actor) => {
+        const portraitUrl = actor.imageUrl || (
+            actor.outfits && actor.outfits.length > 0
+                ? getEmotionImage(actor as Actor, 'neutral', undefined, actor.outfitId || '') || getEmotionImage(actor as Actor, 'base', undefined, actor.outfitId || '')
+                : ''
+        );
+        return { key: actor.id, label: actor.name, imageUrl: portraitUrl || '' };
+    }));
     return options;
 };
 
