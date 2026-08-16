@@ -489,7 +489,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
 
         if (actor.name !== oldName) {
-            console.log(`Actor name changed from "${oldName}" to "${actor.name}". Updating linked lore entry.`);
             upsertActorLoreEntry(actor, oldName, stage());
         }
 

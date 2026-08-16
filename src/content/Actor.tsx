@@ -353,9 +353,8 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
     const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [], stage.getSave())) || 'None provided.';
     const otherActorsContext = Object.values(stage.getSave().actors || {})
-        .filter(otherActor => otherActor?.id && otherActor.id !== actor.id && otherActor.active !== false)
+        .filter(otherActor => otherActor?.id && otherActor.id !== actor.id && otherActor.active !== false && otherActor !== stage.getPlayerActor())
         .map(otherActor => {
-            const currentOutfit = otherActor.outfits?.[0];
             return `${otherActor.name}\n` +
                 (otherActor.role ? `  Role: ${otherActor.role}\n` : '') +
                 (otherActor.birthDate ? `  Birth Date: ${otherActor.birthDate}\n` : '') +
@@ -407,64 +406,64 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     );
 
     try {
-    stage.generationPromises[`distilling_actor/${actor.id}`] = generationRequest;
-    const generatedResponse = await generationRequest;
-    if (generatedResponse === null || generatedResponse === undefined) {
-        throw new Error(`Failed to generate distillation for actor ${actor.name}. Using existing data.`);
-    }
-    console.log('Generated character distillation:');
-    console.log(generatedResponse);
-    const parsedData = parseStructuredResponse(generatedResponse, distillationFields);
+        stage.generationPromises[`distilling_actor/${actor.id}`] = generationRequest;
+        const generatedResponse = await generationRequest;
+        if (generatedResponse === null || generatedResponse === undefined) {
+            throw new Error(`Failed to generate distillation for actor ${actor.name}. Using existing data.`);
+        }
+        console.log('Generated character distillation:');
+        console.log(generatedResponse);
+        const parsedData = parseStructuredResponse(generatedResponse, distillationFields);
 
-    // Validate that parsedData['color'] is a valid hex color, otherwise assign a random default:
-    const themeColor = /^#([0-9A-F]{6}|[0-9A-F]{8})$/i.test(parsedData['color']) ?
-            parsedData['color'] :
-            ['#788ebdff', '#d3aa68ff', '#75c275ff', '#c28891ff', '#55bbb2ff'][Math.floor(Math.random() * 5)];
+        // Validate that parsedData['color'] is a valid hex color, otherwise assign a random default:
+        const themeColor = /^#([0-9A-F]{6}|[0-9A-F]{8})$/i.test(parsedData['color']) ?
+                parsedData['color'] :
+                ['#788ebdff', '#d3aa68ff', '#75c275ff', '#c28891ff', '#55bbb2ff'][Math.floor(Math.random() * 5)];
 
-    const oldName = actor.name;
-    // Fill in actor, but favor any current settings:
-    actor.name = parsedData['name'] || actor.name || '';
-    actor.displayName = actor.name;
-    actor.role = parsedData['role'] || actor.role || '';
-    actor.birthDate = parsedData['birthDate'] || actor.birthDate || '';
-    actor.description = parsedData['description'] || actor.description || '';
-    actor.background = parsedData['background'] || actor.background || '';
-    actor.profile = parsedData['profile'] || actor.profile || '';
-    actor.voiceId = parsedData['voice'] || actor.voiceId || '';
-    actor.themeColor = themeColor || actor.themeColor;
-    actor.themeFontFamily = parsedData['font'] || actor.themeFontFamily || 'Arial, sans-serif';
-    actor.outfits = actor.outfits.length > 0 ? actor.outfits : [];
-    actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
+        const oldName = actor.name;
+        // Fill in actor, but favor any current settings:
+        actor.name = parsedData['name'] || actor.name || '';
+        actor.displayName = actor.name;
+        actor.role = parsedData['role'] || actor.role || '';
+        actor.birthDate = parsedData['birthDate'] || actor.birthDate || '';
+        actor.description = parsedData['description'] || actor.description || '';
+        actor.background = parsedData['background'] || actor.background || '';
+        actor.profile = parsedData['profile'] || actor.profile || '';
+        actor.voiceId = parsedData['voice'] || actor.voiceId || '';
+        actor.themeColor = themeColor || actor.themeColor;
+        actor.themeFontFamily = parsedData['font'] || actor.themeFontFamily || 'Arial, sans-serif';
+        actor.outfits = actor.outfits.length > 0 ? actor.outfits : [];
+        actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
 
-    actorStats.forEach((stat, index) => {
-        const parsedValue = Number(parsedData[`stat_${index}`]);
-        const currentValue = Number(actor.statMap[stat.name]);
-        const fallbackValue = Number.isFinite(currentValue) ? currentValue : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
-        const resolvedValue = Number.isFinite(parsedValue) ? parsedValue : fallbackValue;
-        actor.statMap[stat.name] = clampActorStatValue(resolvedValue, stat);
-    });
+        actorStats.forEach((stat, index) => {
+            const parsedValue = Number(parsedData[`stat_${index}`]);
+            const currentValue = Number(actor.statMap[stat.name]);
+            const fallbackValue = Number.isFinite(currentValue) ? currentValue : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
+            const resolvedValue = Number.isFinite(parsedValue) ? parsedValue : fallbackValue;
+            actor.statMap[stat.name] = clampActorStatValue(resolvedValue, stat);
+        });
 
-    upsertActorLoreEntry(actor, oldName, stage);
+        upsertActorLoreEntry(actor, oldName, stage);
 
-    if (parsedData['outfit_description'] && parsedData['outfit_name']) {
-        const outfit: Outfit = {
-            id: generateUuid(),
-            name: parsedData['outfit_name'],
-            description: parsedData['outfit_description'],
-            prompts: {},
-            emotionPack: {},
-        };
-        actor.outfits.push(outfit);
-    }
+        if (parsedData['outfit_description'] && parsedData['outfit_name']) {
+            const outfit: Outfit = {
+                id: generateUuid(),
+                name: parsedData['outfit_name'],
+                description: parsedData['outfit_description'],
+                prompts: {},
+                emotionPack: {},
+            };
+            actor.outfits.push(outfit);
+        }
 
-    const currentOutfit = getActiveOutfit(actor);
-    if (!currentOutfit.emotionPack['base']) {
-        // Kick off base image generation:
-        await generateBaseActorImage(actor, stage, false, true, actor.outfitId);
-    } else if (!currentOutfit.emotionPack['neutral']) {
-        // Kick off neutral image generation:
-        await generateEmotionImage(actor, Emotion.neutral, stage, false, actor.outfitId);
-    }
+        const currentOutfit = getActiveOutfit(actor);
+        if (!currentOutfit.emotionPack['base']) {
+            // Kick off base image generation:
+            await generateBaseActorImage(actor, stage, false, true, actor.outfitId);
+        } else if (!currentOutfit.emotionPack['neutral']) {
+            // Kick off neutral image generation:
+            await generateEmotionImage(actor, Emotion.neutral, stage, false, actor.outfitId);
+        }
         delete stage.generationPromises[`distilling_actor/${actor.id}`];
         console.log('Removed generation promise: distilling_actor/' + actor.id);
         return actor;

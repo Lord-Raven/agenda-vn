@@ -29,16 +29,19 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
         gap: '20px',
         flex: 1,
         minHeight: 0,
+        height: '100%',
     };
 
     const detailPaneStyle: React.CSSProperties = {
         background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
         border: '1px solid var(--agenda-line-subtle)',
         borderRadius: '12px',
-        overflow: 'visible',
+        overflowY: 'auto',
+        overflowX: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        maxHeight: '100%',
     };
 
     const sortByName = <T extends { name?: string }>(a: T, b: T) =>

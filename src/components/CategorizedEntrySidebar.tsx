@@ -96,9 +96,12 @@ export const CategorizedEntrySidebar = <TEntry,>({
                 borderRadius: '12px',
                 padding: '14px',
                 overflowY: 'auto',
+                overflowX: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px',
+                minHeight: 0,
+                maxHeight: '100%',
             }}
         >
             {sections.length === 0 ? (
