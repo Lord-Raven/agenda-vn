@@ -283,6 +283,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     const [actorDetailGenerationSelection, setActorDetailGenerationSelection] = useState<ActorDetailGenerationSelection>({
         ...DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION,
     });
+    const actorDetailGenerationSelectionRef = useRef(actorDetailGenerationSelection);
+    useEffect(() => {
+        actorDetailGenerationSelectionRef.current = actorDetailGenerationSelection;
+    }, [actorDetailGenerationSelection]);
     const [isGeneratingDemoSpeech, setIsGeneratingDemoSpeech] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [regeneratingImages, setRegeneratingImages] = useState<Set<string>>(new Set());
@@ -327,6 +331,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
 
             return {
                 ...previous,
+                onConfirm: async () => {
+                    setConfirmDialog((dialogState) => ({ ...dialogState, open: false }));
+                    await handleGenerateActorDetails(nextSelection);
+                },
                 message: (
                     <div style={{ display: 'grid', gap: '10px', textAlign: 'left', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
@@ -931,7 +939,7 @@ ${indent}}`;
         setOutfitsObjectExport(formatAsJavascriptObject(buildOutfitsExport()));
     };
 
-    const handleGenerateActorDetails = async (selectedFields: ActorDetailGenerationSelection = actorDetailGenerationSelection) => {
+    const handleGenerateActorDetails = async (selectedFields: ActorDetailGenerationSelection = actorDetailGenerationSelectionRef.current) => {
         if (isGeneratingActorDetails) {
             return;
         }
