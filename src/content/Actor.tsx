@@ -730,7 +730,17 @@ export function getActorLore(actorId: string, stage: Stage) {
 	}
 
     const lore = getLinkedActorLore(actor, stage);
-	return lore?.content ?? '';
+    const variableLoreText = (stage.getSave().lorebook || [])
+        .filter((entry) => entry?.enabled && entry?.title && entry.conditionCollections?.some((collection) => collection.some((condition) => condition.type === 'actorStat' && condition.actorId === 'variable')))
+        .filter((entry) => evaluateConditionCollections(entry.conditionCollections, {
+            actors: [actor],
+            currentActor: actor,
+            actorStatValues: { [actor.id]: actor.statMap || {} },
+            playerStatValues: stage.getSave().playerStatValues,
+        }))
+        .map((entry) => `Additional Instruction: ${entry.title}\n${entry.content}`)
+        .join('\n\n');
+	return [lore?.content ?? '', variableLoreText].filter(Boolean).join('\n\n');
 }
 
 export function updateActorProfile(actorId: string, profile: string, stage: Stage) {

@@ -1,12 +1,16 @@
 import { FC } from 'react';
 import { Add, ArrowDownward, ArrowUpward, Delete, LinkOffRounded, LinkRounded } from '@mui/icons-material';
 import { ActorStat } from '../Stage';
-import { Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
+import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
 import { Button, TextInput } from './UiComponents';
+import { SearchableOptionPicker } from './ActorStatRating';
 
 interface ConditionEditorProps {
     conditionCollections: ConditionCollection[];
     playerStats: ActorStat[];
+    actorStats?: ActorStat[];
+    actors?: Array<{ id: string; name: string }>;
+    allowVariableActorTarget?: boolean;
     onChange: (conditionCollections: ConditionCollection[]) => void;
 }
 
@@ -44,8 +48,32 @@ const iconButtonStyle = {
     padding: 0,
 };
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, playerStats, onChange }) => {
+const getDefaultConditionValue = (stat?: ActorStat): string | number | boolean => {
+    if (!stat) {
+        return 0;
+    }
+    if (stat.type === 'checkbox') {
+        return typeof stat.default === 'boolean' ? stat.default : false;
+    }
+    if (stat.type === 'option') {
+        return typeof stat.default === 'string' ? stat.default : (stat.options?.[0]?.name || '');
+    }
+    return typeof stat.default === 'number' ? stat.default : 0;
+};
+
+const buildActorTargetOptions = (actors: Array<{ id: string; name: string }>, allowVariableActorTarget: boolean): Array<{ key: string; label: string }> => {
+    const options: Array<{ key: string; label: string }> = [];
+    if (allowVariableActorTarget) {
+        options.push({ key: 'variable', label: 'Variable' });
+    }
+    options.push({ key: 'any', label: 'Any' }, { key: 'none', label: 'None' });
+    options.push(...actors.map((actor) => ({ key: actor.id, label: actor.name })));
+    return options;
+};
+
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, playerStats, actorStats = [], actors = [], allowVariableActorTarget = false, onChange }) => {
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
+    const actorTargetOptions = buildActorTargetOptions(actors, allowVariableActorTarget);
 
     const updateCondition = (collectionIndex: number, conditionIndex: number, condition: Condition) => {
         onChange(conditionCollections.map((collection, currentCollectionIndex) => currentCollectionIndex === collectionIndex
@@ -98,7 +126,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (condition.type === 'calendar' && condition.field === 'dayOfWeek') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
         }
-        const stat = condition.type === 'playerStat' ? playerStats.find(candidate => candidate.name === condition.statName) : undefined;
+        const stat = condition.type === 'playerStat' ? playerStats.find(candidate => candidate.name === condition.statName) : (condition.type === 'actorStat' ? actorStats.find(candidate => candidate.name === condition.statName) : undefined);
         if (stat?.type === 'option') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{(stat.options || []).map(option => <option key={option.name} value={option.name}>{option.name}</option>)}</select>;
         }
@@ -129,28 +157,69 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         <select
                             style={selectStyle}
                             value={condition.type}
-                            onChange={(event) => updateCondition(collectionIndex, conditionIndex, event.target.value === 'calendar'
-                                ? { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }
-                                : { type: 'playerStat', statName: playerStats[0]?.name || '', comparison: 'equals', value: typeof playerStats[0]?.default === 'boolean' ? playerStats[0].default : (playerStats[0]?.default ?? 0) })}
+                            onChange={(event) => {
+                                const nextType = event.target.value as 'calendar' | 'playerStat' | 'actorStat';
+                                if (nextType === 'calendar') {
+                                    updateCondition(collectionIndex, conditionIndex, { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' });
+                                    return;
+                                }
+                                if (nextType === 'playerStat') {
+                                    const stat = playerStats[0];
+                                    updateCondition(collectionIndex, conditionIndex, { type: 'playerStat', statName: stat?.name || '', comparison: 'equals', value: getDefaultConditionValue(stat) });
+                                    return;
+                                }
+                                const actorStat = actorStats[0];
+                                const target = actorTargetOptions[0]?.key || 'any';
+                                updateCondition(collectionIndex, conditionIndex, { type: 'actorStat', actorId: target, statName: actorStat?.name || '', comparison: 'equals', value: getDefaultConditionValue(actorStat) });
+                            }}
                         >
                             <option value="calendar">Calendar</option>
                             <option value="playerStat">Player Stat</option>
+                            <option value="actorStat">Actor Stat</option>
                         </select>
                         {condition.type === 'calendar' ? (
                             <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 })}>
                                 {CALENDAR_FIELDS.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
                             </select>
+                        ) : condition.type === 'actorStat' ? (
+                            <div style={{ display: 'grid', gap: 6 }}>
+                                <SearchableOptionPicker
+                                    value={condition.actorId}
+                                    onChange={(nextValue) => updateCondition(collectionIndex, conditionIndex, { ...condition, actorId: nextValue || (allowVariableActorTarget ? 'variable' : 'any') } as Condition)}
+                                    options={actorTargetOptions.map((option) => ({ key: option.key, label: option.label }))}
+                                    defaultOptionKeys={allowVariableActorTarget ? ['variable', 'any', 'none'] : ['any', 'none']}
+                                    allowClear={false}
+                                    emptyLabel="None"
+                                    title="Choose actor target"
+                                    placeholder="Search actors"
+                                />
+                            </div>
                         ) : (
                             <select style={selectStyle} value={condition.statName} onChange={(event) => {
                                 const stat = playerStats.find(candidate => candidate.name === event.target.value);
-                                updateCondition(collectionIndex, conditionIndex, { ...condition, statName: event.target.value, value: typeof stat?.default === 'boolean' ? stat.default : (stat?.default ?? 0) });
+                                updateCondition(collectionIndex, conditionIndex, { ...condition, statName: event.target.value, value: getDefaultConditionValue(stat) });
                             }}>
                                 {playerStats.map(stat => <option key={stat.name} value={stat.name}>{stat.name}</option>)}
                             </select>
                         )}
-                        <select style={selectStyle} value={condition.comparison} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, comparison: event.target.value as ConditionComparison } as Condition)}>
-                            {COMPARISONS.map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
-                        </select>
+                        {(condition.type === 'playerStat' || condition.type === 'actorStat') && (
+                            <select style={selectStyle} value={condition.statName} onChange={(event) => {
+                                const stat = (condition.type === 'playerStat' ? playerStats : actorStats).find(candidate => candidate.name === event.target.value);
+                                updateCondition(collectionIndex, conditionIndex, { ...condition, statName: event.target.value, value: getDefaultConditionValue(stat) } as Condition);
+                            }}>
+                                {(condition.type === 'playerStat' ? playerStats : actorStats).map(stat => <option key={stat.name} value={stat.name}>{stat.name}</option>)}
+                            </select>
+                        )}
+                        {condition.type === 'calendar' && (
+                            <select style={selectStyle} value={condition.comparison} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, comparison: event.target.value as ConditionComparison } as Condition)}>
+                                {COMPARISONS.map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
+                            </select>
+                        )}
+                        {condition.type !== 'calendar' && (
+                            <select style={selectStyle} value={condition.comparison} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, comparison: event.target.value as ConditionComparison } as Condition)}>
+                                {COMPARISONS.map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
+                            </select>
+                        )}
                         {renderValueInput(condition, collectionIndex, conditionIndex)}
                         <div style={{ display: 'flex', gap: 4 }}>
                             <Button variant="secondary" disabled={currentFlatIndex === 0} onClick={() => moveCondition(collectionIndex, conditionIndex, -1)} style={iconButtonStyle} aria-label="Move condition up"><ArrowUpward fontSize="small" /></Button>

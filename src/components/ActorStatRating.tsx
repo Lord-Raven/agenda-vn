@@ -184,6 +184,182 @@ const resolveIcon = (iconName?: string) => {
     return match?.icon || Star;
 };
 
+export type PickerOption = {
+    key: string;
+    label: string;
+    icon?: any;
+    description?: string;
+};
+
+interface SearchableOptionPickerProps {
+    value?: string;
+    onChange: (value: string | undefined) => void;
+    options: PickerOption[];
+    allowClear?: boolean;
+    placeholder?: string;
+    defaultOptionKeys?: string[];
+    emptyLabel?: string;
+    title?: string;
+    renderButton?: (selectedValue: string | undefined) => React.ReactNode;
+}
+
+export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
+    value,
+    onChange,
+    options,
+    allowClear = false,
+    placeholder = 'Search',
+    defaultOptionKeys = [],
+    emptyLabel = 'None',
+    title = 'Choose option',
+    renderButton,
+}) => {
+    const [search, setSearch] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+
+    const orderedOptions = useMemo(() => {
+        const allOptions = [...options];
+        const preferred = defaultOptionKeys.length > 0
+            ? [...allOptions].sort((a, b) => {
+                const aIndex = defaultOptionKeys.indexOf(a.key);
+                const bIndex = defaultOptionKeys.indexOf(b.key);
+                if (aIndex === -1 && bIndex === -1) return a.label.localeCompare(b.label);
+                if (aIndex === -1) return 1;
+                if (bIndex === -1) return -1;
+                return aIndex - bIndex;
+            })
+            : allOptions;
+        const query = search.trim().toLowerCase();
+        if (!query) {
+            return preferred;
+        }
+        return preferred.filter((option) => {
+            const haystack = `${option.label} ${option.description || ''} ${option.key}`.toLowerCase();
+            return haystack.includes(query);
+        });
+    }, [defaultOptionKeys, options, search]);
+
+    const selectedValue = value ?? (allowClear ? undefined : defaultOptionKeys[0] || options[0]?.key);
+    const selectedOption = options.find((option) => option.key === selectedValue) || options[0];
+    const SelectedIcon = selectedOption?.icon || DoNotDisturb;
+
+    const handleSelect = (nextValue?: string) => {
+        onChange(nextValue);
+        setIsOpen(false);
+    };
+
+    const pickerContent = (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+                type="text"
+                className="input-base"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={placeholder}
+                autoFocus
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '8px', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
+                {allowClear && (
+                    <button
+                        key="picker-clear"
+                        type="button"
+                        onClick={() => handleSelect(undefined)}
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            background: selectedValue === undefined ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
+                            border: selectedValue === undefined ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
+                            borderRadius: '8px',
+                            color: 'var(--agenda-text-primary)',
+                            cursor: 'pointer',
+                            padding: '10px 8px',
+                            minHeight: '72px',
+                            fontSize: '11px',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        <DoNotDisturb style={{ fontSize: 24, color: selectedValue === undefined ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
+                        <span>{emptyLabel}</span>
+                    </button>
+                )}
+                {orderedOptions.map((option) => {
+                    const Icon = option.icon || DoNotDisturb;
+                    const active = selectedValue === option.key;
+                    return (
+                        <button
+                            key={`picker-option-${option.key}`}
+                            type="button"
+                            onClick={() => handleSelect(option.key)}
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                background: active ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
+                                border: active ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
+                                borderRadius: '8px',
+                                color: 'var(--agenda-text-primary)',
+                                cursor: 'pointer',
+                                padding: '10px 8px',
+                                minHeight: '72px',
+                                fontSize: '11px',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            {option.icon ? <Icon style={{ fontSize: 24, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} /> : <span style={{ fontSize: 18, fontWeight: 700 }}>{option.label.slice(0, 2).toUpperCase()}</span>}
+                            <span>{option.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+
+    const buttonContent = renderButton ? renderButton(value) : ((value && selectedOption && selectedOption.icon) ? <SelectedIcon style={{ fontSize: 22, color: 'var(--agenda-text-primary)' }} /> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-muted)' }}><DoNotDisturb style={{ fontSize: 18 }} />{emptyLabel}</span>);
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={() => setIsOpen(true)}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '52px',
+                    minHeight: '38px',
+                    border: '1px solid var(--agenda-line-subtle)',
+                    borderRadius: '8px',
+                    background: 'var(--agenda-surface-raised)',
+                    color: 'var(--agenda-text-primary)',
+                    cursor: 'pointer',
+                    padding: '6px 10px',
+                }}
+                aria-label={value ? `Selected option: ${value}` : title}
+            >
+                {buttonContent}
+            </button>
+
+            {isOpen && typeof document !== 'undefined' && createPortal(
+                <div style={{ position: 'fixed', inset: 0, background: 'color-mix(in srgb, var(--agenda-surface-base) 72%, transparent)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 2000 }} onClick={() => setIsOpen(false)}>
+                    <div onClick={(event) => event.stopPropagation()} style={{ width: 'min(560px, 100%)', background: 'linear-gradient(135deg, var(--agenda-panel-surface) 0%, color-mix(in srgb, var(--agenda-surface-base) 92%, var(--agenda-panel-surface)) 100%)', border: '1px solid var(--agenda-panel-border)', borderRadius: '12px', padding: '18px', boxShadow: 'var(--agenda-shadow)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>{title}</div>
+                            <button type="button" onClick={() => setIsOpen(false)} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: '8px', background: 'var(--agenda-surface-raised)', color: 'var(--agenda-text-primary)', cursor: 'pointer', padding: '6px 10px' }}>Close</button>
+                        </div>
+                        {pickerContent}
+                    </div>
+                </div>,
+                document.body,
+            )}
+        </>
+    );
+};
+
 interface IconPickerProps {
     value?: string;
     onChange: (iconName: string | undefined) => void;

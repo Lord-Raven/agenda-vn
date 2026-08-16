@@ -13,7 +13,7 @@ import {
     parseXmlTagsToObjects,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-import { evaluateConditionCollections } from './Condition';
+import { evaluateConditionCollections, hasVariableActorTarget } from './Condition';
 
 const getDayDifference = (startDate: string, endDate: string): number => {
     const start = new Date(`${startDate}T00:00:00Z`);
@@ -189,6 +189,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     );
     const activeConstantLore = lorebook
         .filter((lore) => lore.enabled && lore.constant && passedProbabilityLoreIds.has(lore.id))
+        .filter((lore) => !hasVariableActorTarget(lore.conditionCollections))
         .filter((lore) => evaluateConditionCollections(lore.conditionCollections, save))
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
     const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
@@ -251,7 +252,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
     // For lorebook context, we go through lorebook entries and add them 
     let triggeredLore = lorebook.filter(lore => {
-            if (!lore.enabled || (!['character', 'location', 'other'].includes(lore.type) && !currentActors.some(actor => actor.name.toLowerCase() === lore.type.toLowerCase()))) {
+            if (!lore.enabled || hasVariableActorTarget(lore.conditionCollections) || (!['character', 'location', 'other'].includes(lore.type) && !currentActors.some(actor => actor.name.toLowerCase() === lore.type.toLowerCase()))) {
                 return false;
             }
 

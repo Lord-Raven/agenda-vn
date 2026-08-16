@@ -4,7 +4,7 @@ import { buildStructuredExampleResponse, buildStructuredResponseFormat, parseStr
 import { Stage } from '../Stage';
 import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
-import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
+import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -78,6 +78,7 @@ export const isLoreProbabilityActive = (entry: Lore): boolean => {
 export const selectConstantLoreEntries = (lorebook: Lore[] = [], context: ConditionContext = {}): Lore[] => {
     return lorebook
         .filter((entry) => entry?.enabled && entry?.constant)
+        .filter((entry) => !hasVariableActorTarget(entry.conditionCollections))
         .filter((entry) => evaluateConditionCollections(entry.conditionCollections, context))
         .filter((entry) => isLoreProbabilityActive(entry));
 };
