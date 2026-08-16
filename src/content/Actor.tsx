@@ -159,7 +159,7 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'birthDate',
         label: 'BIRTH DATE',
-        description: 'Their birth date in YYYY-MM-DD format if known. If unknown, leave blank and do not invent one.',
+        description: 'A birth date for the character in YYYY-MM-DD format, based on age and the current date.',
     },
     {
         key: 'description',
