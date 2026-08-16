@@ -371,7 +371,8 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
             .addBlock('World Context', worldContext)
             .addBlock('Other Actors', otherActorsContext)
             .addBlock('Current Date', formatCurrentDate(stage.getSave().currentDate, stage.getSave().currentTimeOfDay))
-            .addBlock('Character Details', definition.personality)
+            .addBlock('Target Character', actor.name)
+            .addBlock('Source Details', definition.personality)
             .addBlock('Custom Actor Stats', actorStatContext)
             .addBlock('Stat Guidance',
                 actorStats.length > 0
@@ -399,6 +400,9 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
                     },
                     { includeEndTag: true }
                 ))
+            .addBlock('Task',
+                `Output a single structured response that populates the required fields for this character: ${actor.name}.`
+            )
         .format(),
         100,
         1000,

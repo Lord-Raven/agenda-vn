@@ -1692,7 +1692,7 @@ ${indent}}`;
                                                 marginBottom: '8px',
                                             }}
                                         >
-                                            Personality Profile{isProfileBackedByLore ? ' (From Lorebook)' : ''}
+                                            Profile{isProfileBackedByLore ? ' (From Lorebook)' : ''}
                                         </label>
                                         <TextArea
                                             value={isProfileBackedByLore ? editedActor.lore : editedActor.profile}
