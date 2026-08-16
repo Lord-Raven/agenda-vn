@@ -488,7 +488,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                         variant="default"
                         style={{
                             height: '100%',
-                            overflow: 'auto',
+                            overflow: 'hidden',
                             position: 'relative',
                             padding: '20px',
                             display: 'flex',

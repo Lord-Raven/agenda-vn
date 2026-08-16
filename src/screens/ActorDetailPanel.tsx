@@ -1447,7 +1447,7 @@ ${indent}}`;
                             height: '100%',
                             boxSizing: 'border-box',
                             minHeight: 0,
-                            overflow: 'auto',
+                            overflow: 'hidden',
                             position: 'relative',
                             padding: '20px',
                             paddingBottom: '28px',

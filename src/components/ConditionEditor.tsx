@@ -33,6 +33,8 @@ const CALENDAR_FIELDS = [
 
 const selectStyle = {
     minHeight: 38,
+    width: '100%',
+    maxWidth: '100%',
     background: 'var(--agenda-surface-base)',
     color: 'var(--agenda-text-primary)',
     border: '1px solid var(--agenda-line-subtle)',
@@ -138,13 +140,13 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
 
     let flatIndex = 0;
     return (
-        <div style={{ display: 'grid', gap: 8, overflowX: 'auto' }}>
+        <div style={{ display: 'grid', gap: 8, width: '100%', overflowX: 'hidden', minWidth: 0 }}>
             {conditionCollections.flatMap((collection, collectionIndex) => collection.map((condition, conditionIndex) => {
                 const currentFlatIndex = flatIndex++;
                 const isLinked = conditionIndex > 0;
                 const isGrouped = collection.length > 1;
                 return (
-                    <div key={`${collectionIndex}-${conditionIndex}`} style={{ display: 'grid', gridTemplateColumns: '32px 130px minmax(130px, 1fr) 120px minmax(100px, 1fr) auto 8px', gap: 8, alignItems: 'center', minWidth: 740 }}>
+                    <div key={`${collectionIndex}-${conditionIndex}`} style={{ display: 'grid', gridTemplateColumns: '32px minmax(110px, 130px) minmax(120px, 1.2fr) minmax(0, 1.3fr) minmax(110px, 1.2fr) minmax(100px, 1fr) auto 8px', gap: 8, alignItems: 'center', width: '100%', minWidth: 0 }}>
                         <Button
                             variant="secondary"
                             disabled={currentFlatIndex === 0}
