@@ -352,13 +352,25 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
     const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [], stage.getSave())) || 'None provided.';
-    
+    const otherActorsContext = Object.values(stage.getSave().actors || {})
+        .filter(otherActor => otherActor?.id && otherActor.id !== actor.id && otherActor.active !== false)
+        .map(otherActor => {
+            const currentOutfit = otherActor.outfits?.[0];
+            return `${otherActor.name}\n` +
+                (otherActor.role ? `  Role: ${otherActor.role}\n` : '') +
+                (otherActor.birthDate ? `  Birth Date: ${otherActor.birthDate}\n` : '') +
+                `  Background: ${otherActor.background || 'No background available.'}\n` +
+                `  Profile: ${getActorLore(otherActor.id, stage) || 'No profile available.'}`
+        })
+        .join('\n\n') || 'No other active actors are present in the world context.';
+
     const generationRequest = stage.generateText(buildPrompt()
             .addBlock('Instructions',
                 `This is preparatory request for structured and formatted game content. ` +
                 `The world and its rules are described below. ` +
                 `The character details below describe a character of this world (${actor.name}) to convert into a set of defined fields for this game.`)
             .addBlock('World Context', worldContext)
+            .addBlock('Other Actors', otherActorsContext)
             .addBlock('Current Date', formatCurrentDate(stage.getSave().currentDate, stage.getSave().currentTimeOfDay))
             .addBlock('Character Details', definition.personality)
             .addBlock('Custom Actor Stats', actorStatContext)
