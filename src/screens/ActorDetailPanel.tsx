@@ -209,6 +209,31 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
     });
 
+    const birthDateLabel = useMemo(() => {
+        const birthDate = (editedActor.birthDate || '').trim();
+        if (!birthDate) {
+            return 'Birth Date';
+        }
+
+        const birth = new Date(`${birthDate}T00:00:00Z`);
+        const currentDate = (stage().getSave()?.currentDate || stage().getConfiguration()?.startingDate || new Date().toISOString().slice(0, 10)).trim();
+        const current = new Date(`${currentDate}T00:00:00Z`);
+
+        if (Number.isNaN(birth.getTime()) || Number.isNaN(current.getTime())) {
+            return 'Birth Date';
+        }
+
+        let age = current.getUTCFullYear() - birth.getUTCFullYear();
+        const monthDelta = current.getUTCMonth() - birth.getUTCMonth();
+        const dayDelta = current.getUTCDate() - birth.getUTCDate();
+
+        if (monthDelta < 0 || (monthDelta === 0 && dayDelta < 0)) {
+            age -= 1;
+        }
+
+        return age >= 0 ? `Birth Date (${age} years old)` : 'Birth Date';
+    }, [editedActor.birthDate, stage]);
+
     const categoryInputListId = `actor-category-options-${actor.id}`;
     const categorySuggestions = useMemo(() => {
         const seenCategories = new Set<string>();
@@ -1557,7 +1582,7 @@ ${indent}}`;
                                                 marginBottom: '8px',
                                             }}
                                         >
-                                            Birth Date
+                                            {birthDateLabel}
                                         </label>
                                         <TextInput
                                             fullWidth
