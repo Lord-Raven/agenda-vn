@@ -10,7 +10,7 @@ import {
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-import { ActorStat } from "../Stage";
+import { ActorStat, resolveActorStatText } from "../Stage";
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import { formatCurrentDate } from './Skit';
 
@@ -212,14 +212,14 @@ const OUTFIT_PROMPT_FIELDS: StructuredFieldDefinition[] = [
     },
 ];
 
-function buildActorStatFields(actorStats: ActorStat[]): StructuredFieldDefinition[] {
+function buildActorStatFields(actorStats: ActorStat[], stage?: Stage): StructuredFieldDefinition[] {
     return actorStats.map((stat, index) => ({
         key: `stat_${index}`,
         label: `STAT ${index + 1}`,
         description:
             `${stat.type === 'checkbox' ? 'Boolean value' : 'Numeric value'} for "${stat.name}".` +
-            ` Description: ${stat.description || 'N/A'}.` +
-            ` Guidance: ${stat.guidance || 'N/A'}.` +
+            ` Description: ${resolveActorStatText(stat.description, stage) || 'N/A'}.` +
+            ` Guidance: ${resolveActorStatText(stat.guidance, stage) || 'N/A'}.` +
             `${stat.type === 'checkbox' ? ` Default: ${stat.default === true}.` : ` Range: ${typeof stat.min === 'number' ? stat.min : '-inf'} to ${typeof stat.max === 'number' ? stat.max : '+inf'}. Default: ${Number.isFinite(stat.default) ? Number(stat.default) : 0}.`}`,
     }));
 }
@@ -321,7 +321,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     console.log(definition);
 
     const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
-    const actorStatFields = buildActorStatFields(actorStats);
+    const actorStatFields = buildActorStatFields(actorStats, stage);
     const distillationFields = DISTILLATION_FIELDS.concat(actorStatFields);
 
     // Preserve content while removing JSON-like structures.
@@ -333,12 +333,12 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     const actorStatContext = actorStats.length > 0
         ? actorStats.map((stat, index) => {
             if (stat.type === 'checkbox') {
-                return `${index + 1}. ${stat.name}\nDescription: ${stat.description || 'N/A'}\nGuidance: ${stat.guidance || 'N/A'}\nType: checkbox\nDefault: ${stat.default === true}`;
+                return `${index + 1}. ${stat.name}\nDescription: ${resolveActorStatText(stat.description, stage) || 'N/A'}\nGuidance: ${resolveActorStatText(stat.guidance, stage) || 'N/A'}\nType: checkbox\nDefault: ${stat.default === true}`;
             }
             const defaultValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
             const minValue = typeof stat.min === 'number' ? `${stat.min}` : '-inf';
             const maxValue = typeof stat.max === 'number' ? `${stat.max}` : '+inf';
-            return `${index + 1}. ${stat.name}\nDescription: ${stat.description || 'N/A'}\nGuidance: ${stat.guidance || 'N/A'}\nRange: ${minValue} to ${maxValue}\nDefault: ${defaultValue}`;
+            return `${index + 1}. ${stat.name}\nDescription: ${resolveActorStatText(stat.description, stage) || 'N/A'}\nGuidance: ${resolveActorStatText(stat.guidance, stage) || 'N/A'}\nRange: ${minValue} to ${maxValue}\nDefault: ${defaultValue}`;
         }).join('\n\n')
         : 'No custom actor stats are configured.';
 

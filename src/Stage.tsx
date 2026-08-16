@@ -118,6 +118,14 @@ export type ActorStat = {
     labelIconName?: string; // Optional icon key displayed before the stat name in ActorCard
 }
 
+export const resolveActorStatText = (
+    rawText: string | undefined,
+    stage?: Pick<Stage, 'getPlayerActor' | 'primaryUser'> | null,
+): string => {
+    const playerName = stage?.getPlayerActor()?.name || stage?.primaryUser?.name || 'the player';
+    return String(rawText || '').replace(/\{\{\s*user\s*\}\}/gi, playerName);
+};
+
 // Represents a configuration that is used to initialize new games, but can also influence existing games.
 export type GameConfiguration = {
     
@@ -1727,10 +1735,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             if (stat.type === 'option') {
                 const selectedOption = (stat.options || []).find(option => option.name === valueText);
-                const optionDescription = selectedOption?.description?.trim() || '';
+                const optionDescription = resolveActorStatText(selectedOption?.description, this).trim();
                 const line = [
                     `${statName}: ${valueText}`,
-                    stat.description?.trim(),
+                    resolveActorStatText(stat.description, this).trim(),
                     optionDescription,
                 ].filter(Boolean).join('\n');
                 lines.push(line);
@@ -1739,7 +1747,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             const line = [
                 `${statName}: ${valueText}`,
-                stat.description?.trim(),
+                resolveActorStatText(stat.description, this).trim(),
             ].filter(Boolean).join('\n');
             lines.push(line);
         }
