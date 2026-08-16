@@ -1000,7 +1000,9 @@ ${indent}}`;
                 throw new Error('Actor distillation returned no actor.');
             }
 
+            console.log(selectedFields);
             if (selectedFields.name) {
+                console.log(`Updating actor name from "${actor.name}" to "${distilledActor.name || actor.name}".`);
                 actor.name = distilledActor.name || actor.name;
                 actor.displayName = distilledActor.displayName || distilledActor.name || actor.name;
             }
