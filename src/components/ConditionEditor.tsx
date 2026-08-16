@@ -196,7 +196,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                 <SearchableOptionPicker
                                     value={condition.actorId}
                                     onChange={(nextValue) => updateCondition(collectionIndex, conditionIndex, { ...condition, actorId: nextValue || (allowVariableActorTarget ? 'variable' : 'any') } as Condition)}
-                                    options={actorTargetOptions.map((option) => ({ key: option.key, label: option.label }))}
+                                    options={actorTargetOptions.map((option) => ({ key: option.key, label: option.label, imageUrl: option.imageUrl }))}
                                     defaultOptionKeys={allowVariableActorTarget ? ['variable', 'any', 'none'] : ['any', 'none']}
                                     allowClear={false}
                                     emptyLabel="None"

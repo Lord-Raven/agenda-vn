@@ -1,8 +1,9 @@
 import { FC } from 'react';
 import { Box, Typography } from '@mui/material';
-import { Actor, getEmotionImage } from '../content/Actor';
+import { Actor } from '../content/Actor';
 import { Outcome, OutcomeType } from '../content/Outcome';
 import { Stage } from '../Stage';
+import { ActorPortrait } from './ActorPortrait';
 
 interface OutcomeDisplayProps {
     outcomes: Outcome[];
@@ -37,7 +38,6 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
             {outcomes.map((outcome, index) => {
                 const actorId = typeof outcome.details?.actorId === 'string' ? outcome.details.actorId : '';
                 const actor = resolveActor(actorId);
-                const portraitUrl = actor ? getEmotionImage(actor, 'neutral', stage(), actor.outfitId || '') : '';
                 const isActorOutcome = !!actor && outcome.type !== OutcomeType.PLAYER_STAT && outcome.type !== OutcomeType.LORE_UPDATE && outcome.type !== OutcomeType.NEW_EVENT;
 
                 let topLine = outcome.description || '';
@@ -87,18 +87,18 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     >
                         {isActorOutcome && actor && (
                             <Box sx={{ width: 52, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Box
-                                    component="img"
-                                    src={portraitUrl || ''}
-                                    alt={actor.name}
-                                    sx={{
-                                        width: '100%',
+                                <ActorPortrait
+                                    actor={actor}
+                                    stage={stage()}
+                                    size={52}
+                                    borderRadius={12}
+                                    objectPosition="center 18%"
+                                    style={{
+                                        width: 52,
                                         height: 64,
-                                        objectFit: 'cover',
-                                        borderRadius: 1.5,
-                                        border: `1px solid ${actor.themeColor || 'var(--agenda-accent-primary)'}`,
-                                        background: 'rgba(0,0,0,0.2)',
+                                        borderRadius: 12,
                                     }}
+                                    ariaLabel={actor.name}
                                 />
                             </Box>
                         )}

@@ -1,9 +1,9 @@
 import React, { FC, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Person } from '@mui/icons-material';
 import { Stage } from '../Stage';
-import { Actor, getEmotionImage } from '../content/Actor';
+import { Actor } from '../content/Actor';
 import { Button } from '../components/UiComponents';
+import { ActorPortrait } from '../components/ActorPortrait';
 import { ActorDetailPanel } from './ActorDetailPanel';
 import {
     CategorizedEntrySection,
@@ -117,7 +117,6 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
 
     const renderActorButton = (actor: Actor) => {
         const isSelected = actor.id === selectedActorId;
-        const avatarUrl = getEmotionImage(actor, 'neutral') || getEmotionImage(actor, 'base');
         return (
             <motion.button
                 whileHover={{ scale: 1.01 }}
@@ -140,23 +139,17 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                     alignItems: 'center',
                 }}
             >
-                <div
+                <ActorPortrait
+                    actor={actor}
+                    stage={stage}
+                    size={52}
+                    showInitials={false}
                     style={{
-                        width: '52px',
-                        height: '52px',
-                        borderRadius: '50%',
-                        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 86%, transparent)',
                         border: `2px solid ${actor.themeColor || 'var(--agenda-line-strong)'}`,
-                        backgroundImage: avatarUrl ? `url(${avatarUrl})` : 'none',
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'top center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        boxShadow: 'none',
                     }}
-                >
-                    {!avatarUrl && <Person style={{ fontSize: '24px', color: 'var(--agenda-accent-primary)' }} />}
-                </div>
+                    ariaLabel={actor.name}
+                />
                 <div>
                     <div style={{ color: actor.themeColor || 'var(--agenda-highlight)', fontSize: '15px', fontWeight: 700 }}>
                         {actor.name || '(Unnamed Actor)'}

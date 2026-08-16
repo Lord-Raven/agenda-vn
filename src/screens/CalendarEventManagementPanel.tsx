@@ -5,6 +5,7 @@ import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { SearchableOptionPicker } from '../components/ActorStatRating';
+import { ActorPortrait } from '../components/ActorPortrait';
 import {
     CategorizedEntrySection,
     CategorizedEntrySidebar,
@@ -278,6 +279,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
     };
 
     const recurrenceEnabled = Boolean(draft.recurrence);
+    const selectedActors = actors.filter((actor) => (draft.actorIds || []).includes(actor.id));
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '14px', minHeight: 0 }}>
@@ -411,7 +413,11 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                             multiple
                             values={draft.actorIds || []}
                             onChange={(nextValue) => updateActorSelection(Array.isArray(nextValue) ? nextValue : [])}
-                            options={actors.map((actor) => ({ key: actor.id, label: actor.name }))}
+                            options={actors.map((actor) => ({
+                                key: actor.id,
+                                label: actor.name,
+                                imageUrl: actor.outfits?.length ? (stageInstance.getSave()?.actors?.[actor.id]?.outfits?.[0] ? undefined : undefined) : undefined,
+                            }))}
                             allowClear
                             emptyLabel="No actors"
                             title="Choose involved actors"
@@ -427,6 +433,24 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                                 );
                             }}
                         />
+                        {selectedActors.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                                {selectedActors.map((actor) => (
+                                    <ActorPortrait
+                                        key={actor.id}
+                                        actor={actor}
+                                        stage={stage}
+                                        size={34}
+                                        title={actor.name}
+                                        ariaLabel={actor.name}
+                                        style={{
+                                            border: `2px solid ${actor.themeColor || 'var(--agenda-line-strong)'}`,
+                                            boxShadow: '0 3px 8px rgba(0, 0, 0, 0.32)',
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>
