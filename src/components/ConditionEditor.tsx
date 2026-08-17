@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, LinkOffRounded, LinkRounded, PersonOffOutlined, SwapHoriz } from '@mui/icons-material';
-import { ActorStat } from '../Stage';
+import { ActorStat } from '../content/ActorStat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
 import { Button, TextInput } from './UiComponents';

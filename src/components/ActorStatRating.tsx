@@ -81,7 +81,7 @@ import {
     FormatPaint,
     FreeBreakfast,
 } from '@mui/icons-material';
-import { ActorStat } from '../Stage';
+import { ActorStat } from '../content/ActorStat';
 
 const KEEP_FIRST_ICONS = ['star', 'heart', 'favorite', 'wrench', 'coin', 'shield', 'sun', 'moon', 'fire', 'flake', 'bolt', 'happy', 'sad', 'battery'];
 const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [

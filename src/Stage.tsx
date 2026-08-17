@@ -2,6 +2,7 @@ import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, applyActorInitialStats, findBestNameMatch, loadSupportedActor, resolveActorSchedule } from "./content/Actor";
+import { ActorStat, ActorStatType, ActorStatValue, cloneActorStat, isNumericActorStat, normalizeActorStatValue, resolveActorStatText } from './content/ActorStat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
@@ -92,40 +93,6 @@ const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
 
 const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
 
-export type ActorStatType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text' | 'checkbox';
-export type ActorStatValue = number | string | boolean;
-const NUMERIC_ACTOR_STAT_DISPLAY_TYPES = ['number', 'percentage', 'rating', 'letter grade'];
-export const isNumericDisplayType = (displayType: ActorStatType): boolean => NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(displayType);
-
-export type ActorStatOption = {
-    name: string;
-    description: string;
-};
-
-// Represents a custom stat that applies to all actors in the game.
-export type ActorStat = {
-    name: string; // Display name of the stat
-    description: string; // User-facing description of what the stat represents
-    guidance: string; // Guidance for how the stat should be used in generative requests
-    default: ActorStatValue; // Default value of the stat
-    type: ActorStatType; // How the stat should be displayed in the UI
-    options?: ActorStatOption[]; // Supported option values for option-based stats
-    min?: number; // Minimum value of the stat (optional)
-    max?: number; // Maximum value of the stat (optional)
-    setByPlayer: boolean; // Whether this stat is set by the player in the SettingsScreen
-    exposed: boolean; // Whether the stat is visible to the user in outcomes, on the UI, or in Actor cards (when applied to other Actors)
-    iconName?: string; // Optional icon key used for rating-style stat displays
-    labelIconName?: string; // Optional icon key displayed before the stat name in ActorCard
-}
-
-export const resolveActorStatText = (
-    rawText: string | undefined,
-    stage?: Pick<Stage, 'getPlayerActor' | 'primaryUser'> | null,
-): string => {
-    const playerName = stage?.getPlayerActor()?.name || stage?.primaryUser?.name || 'the player';
-    return String(rawText || '').replace(/\{\{\s*user\s*\}\}/gi, playerName);
-};
-
 // Represents a configuration that is used to initialize new games, but can also influence existing games.
 export type GameConfiguration = {
     
@@ -147,24 +114,6 @@ export type GameConfiguration = {
     artStyle: string; // Describes the art style used for image generation
 
 }
-
-const cloneActorStat = (stat: ActorStat): ActorStat => ({
-    name: stat.name,
-    description: stat.description,
-    guidance: stat.guidance,
-    default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
-    type: stat.type,
-    options: (stat.options || []).map((option) => ({
-        name: option.name,
-        description: option.description,
-    })),
-    min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
-    max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
-    setByPlayer: stat.setByPlayer === true || stat.exposed === true,
-    exposed: stat.exposed === true,
-    iconName: stat.iconName || (stat.type === 'rating' ? 'star' : undefined),
-    labelIconName: stat.labelIconName || undefined,
-});
 
 const cloneActor = (actor: Actor): Actor => new Actor({
     ...actor,
@@ -209,70 +158,6 @@ const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({
         : undefined,
 });
 
-
-const NUMERIC_STAT_DISPLAY_TYPES: ActorStatType[] = ['number', 'percentage', 'rating', 'letter grade'];
-
-const isNumericActorStat = (stat: ActorStat): boolean => NUMERIC_STAT_DISPLAY_TYPES.includes(stat.type);
-
-const resolveActorStatDefault = (stat: ActorStat): ActorStatValue => {
-    if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
-            return stat.default;
-        }
-        return optionNames[0] || '';
-    }
-
-    if (stat.type === 'text') {
-        return typeof stat.default === 'string' ? stat.default : '';
-    }
-
-    if (stat.type === 'checkbox') {
-        return typeof stat.default === 'boolean' ? stat.default : false;
-    }
-
-    return Number.isFinite(stat.default) ? Number(stat.default) : 0;
-};
-
-const normalizeActorStatValue = (value: unknown, stat: ActorStat): ActorStatValue => {
-    if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        const fallback = resolveActorStatDefault(stat);
-        if (typeof value === 'string' && optionNames.includes(value)) {
-            return value;
-        }
-        return typeof fallback === 'string' ? fallback : '';
-    }
-
-    if (stat.type === 'text') {
-        if (typeof value === 'string') {
-            return value;
-        }
-        const fallback = resolveActorStatDefault(stat);
-        return typeof fallback === 'string' ? fallback : '';
-    }
-
-    if (stat.type === 'checkbox') {
-        if (typeof value === 'boolean') {
-            return value;
-        }
-        if (typeof value === 'string') {
-            const lower = value.trim().toLowerCase();
-            if (lower === 'true') return true;
-            if (lower === 'false') return false;
-        }
-        return typeof resolveActorStatDefault(stat) === 'boolean' ? resolveActorStatDefault(stat) : false;
-    }
-
-    let resolved = Number.isFinite(value) ? Number(value) : Number(resolveActorStatDefault(stat)) || 0;
-    if (typeof stat.min === 'number') {
-        resolved = Math.max(stat.min, resolved);
-    }
-    if (typeof stat.max === 'number') {
-        resolved = Math.min(stat.max, resolved);
-    }
-    return resolved;
-};
 
 type TimelineEntry = {
     calendarEventId?: string;

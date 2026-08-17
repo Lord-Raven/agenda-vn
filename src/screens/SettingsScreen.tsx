@@ -1,6 +1,7 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ActorStat, ActorStatValue, SaveType, Stage, isNumericDisplayType } from '../Stage';
+import { SaveType, Stage } from '../Stage';
+import { ActorStat, ActorStatValue, isNumericDisplayType } from '../content/ActorStat';
 import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';

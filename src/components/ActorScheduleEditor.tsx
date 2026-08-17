@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { ActorSchedule, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE } from '../content/Actor';
 import { Location } from '../content/Location';
-import { ActorStat } from '../Stage';
+import { ActorStat } from '../content/ActorStat';
 import { Button } from './UiComponents';
 import { ConditionEditor } from './ConditionEditor';
 

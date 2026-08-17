@@ -1,7 +1,8 @@
 import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
-import { ActorStat, ActorStatValue, Stage } from '../Stage';
+import { Stage } from '../Stage';
+import { ActorStat, ActorStatValue } from '../content/ActorStat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { Emotion } from '../content/Emotion';

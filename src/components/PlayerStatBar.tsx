@@ -1,6 +1,7 @@
 import { FC, useMemo } from "react";
 import { Box, Typography } from "@mui/material";
-import { ActorStat, Stage } from "../Stage";
+import { Stage } from "../Stage";
+import { ActorStat } from '../content/ActorStat';
 import { resolveIcon } from "./ActorStatRating";
 
 interface PlayerStatBarProps {

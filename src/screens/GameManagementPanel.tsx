@@ -1,6 +1,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
-import { ActorStat, ActorStatType, ActorStatValue, Stage, isNumericDisplayType } from '../Stage';
+import { Stage } from '../Stage';
+import { ActorStat, ActorStatType, ActorStatValue, isNumericDisplayType } from '../content/ActorStat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { buildCreatorNotesHtml } from './CreatorNotesHtml';

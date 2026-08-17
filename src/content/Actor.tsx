@@ -1,6 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emotion';
-import { isNumericDisplayType, Stage } from '../Stage';
+import { Stage } from '../Stage';
+import { ActorStat, isNumericDisplayType, resolveActorStatText } from './ActorStat';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import {buildPrompt} from "../utils/PromptBuilder.js";
@@ -10,7 +11,6 @@ import {
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-import { ActorStat, resolveActorStatText } from "../Stage";
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import { formatCurrentDate } from './Skit';
 

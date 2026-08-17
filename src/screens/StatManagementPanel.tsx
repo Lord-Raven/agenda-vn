@@ -1,5 +1,6 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActorStat, ActorStatType, ActorStatValue, isNumericDisplayType, Stage } from '../Stage';
+import { Stage } from '../Stage';
+import { ActorStat, ActorStatType, ActorStatValue, isNumericDisplayType } from '../content/ActorStat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/ActorStatRating';
 

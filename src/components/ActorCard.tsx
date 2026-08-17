@@ -1,6 +1,7 @@
 import { FC, useMemo } from 'react';
 import { Box } from '@mui/material';
-import { ActorStat, Stage } from '../Stage';
+import { Stage } from '../Stage';
+import { ActorStat } from '../content/ActorStat';
 import { Actor } from '../content/Actor';
 import { NamePlate } from './UiComponents';
 import { ActorStatRating, resolveIcon } from './ActorStatRating';
