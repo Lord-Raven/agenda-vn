@@ -11,7 +11,7 @@ import {
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
+import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
 import { formatCurrentDate } from './Skit';
 
 // A single conditional adjustment to an actor's initial stat value; applied when its conditions evaluate true at game start.
@@ -806,7 +806,7 @@ export function getActorLore(actorId: string, stage: Stage) {
 
     const lore = getLinkedActorLore(actor, stage);
     const variableLoreText = (stage.getSave().lorebook || [])
-        .filter((entry) => entry?.enabled && entry?.title && entry.conditionCollections?.some((collection) => collection.some((condition) => condition.type === 'actorStat' && condition.actorId === 'variable')))
+        .filter((entry) => entry?.enabled && entry?.title && hasVariableActorTarget(entry.conditionCollections))
         .filter((entry) => evaluateConditionCollections(entry.conditionCollections, {
             actors: [actor],
             currentActor: actor,

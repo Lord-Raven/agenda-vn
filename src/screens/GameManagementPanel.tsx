@@ -303,7 +303,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
         const statNames = new Set(
             actorStats
-                .filter(stat => isNumericDisplayType(stat.type))
+                .filter(stat => isNumericDisplayType(stat.type) && !stat.perActor)
                 .map(stat => stat.name.trim())
                 .filter(Boolean),
         );
@@ -312,7 +312,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                 actor.statMap = {};
             }
 
-            actorStats.filter(stat => isNumericDisplayType(stat.type)).forEach(stat => {
+            actorStats.filter(stat => isNumericDisplayType(stat.type) && !stat.perActor).forEach(stat => {
                 const statName = stat.name.trim();
                 if (!statName) {
                     return;

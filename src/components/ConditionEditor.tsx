@@ -24,6 +24,11 @@ const COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
     { value: 'lessThan', label: 'less than' },
 ];
 
+const IDENTITY_COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
+    { value: 'equals', label: 'is' },
+    { value: 'notEquals', label: 'is not' },
+];
+
 const CALENDAR_FIELDS = [
     { value: 'timeOfDay', label: 'Time of day' },
     { value: 'dayOfWeek', label: 'Day of week' },
@@ -84,6 +89,7 @@ const buildActorTargetOptions = (actors: Array<{ id: string; name: string; image
 export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, playerStats, actorStats = [], actors = [], allowVariableActorTarget = false, onChange }) => {
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
     const actorTargetOptions = buildActorTargetOptions(actors, allowVariableActorTarget);
+    const concreteActorOptions = actorTargetOptions.filter((option) => !['variable', 'any', 'none'].includes(option.key));
 
     const updateCondition = (collectionIndex: number, conditionIndex: number, condition: Condition) => {
         onChange(conditionCollections.map((collection, currentCollectionIndex) => currentCollectionIndex === collectionIndex
@@ -130,6 +136,19 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
 
     const renderValueInput = (condition: Condition, collectionIndex: number, conditionIndex: number) => {
         const updateValue = (value: string | number | boolean) => updateCondition(collectionIndex, conditionIndex, { ...condition, value } as Condition);
+        if (condition.type === 'actorIdentity') {
+            return (
+                <SearchableOptionPicker
+                    value={condition.value}
+                    onChange={(nextValue) => updateValue((Array.isArray(nextValue) ? nextValue[0] : nextValue) || concreteActorOptions[0]?.key || '')}
+                    options={concreteActorOptions.map((option) => ({ key: option.key, label: option.label, imageUrl: option.imageUrl }))}
+                    allowClear={false}
+                    emptyLabel="None"
+                    title="Choose actor"
+                    placeholder="Search actors"
+                />
+            );
+        }
         if (condition.type === 'calendar' && condition.field === 'timeOfDay') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['morning', 'afternoon', 'evening', 'night'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
         }
@@ -168,7 +187,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             style={selectStyle}
                             value={condition.type}
                             onChange={(event) => {
-                                const nextType = event.target.value as 'calendar' | 'playerStat' | 'actorStat';
+                                const nextType = event.target.value as 'calendar' | 'playerStat' | 'actorStat' | 'actorIdentity';
                                 if (nextType === 'calendar') {
                                     updateCondition(collectionIndex, conditionIndex, { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' });
                                     return;
@@ -178,20 +197,25 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                     updateCondition(collectionIndex, conditionIndex, { type: 'playerStat', statName: stat?.name || '', comparison: 'equals', value: getDefaultConditionValue(stat) });
                                     return;
                                 }
-                                const actorStat = actorStats[0];
                                 const target = actorTargetOptions[0]?.key || 'any';
+                                if (nextType === 'actorIdentity') {
+                                    updateCondition(collectionIndex, conditionIndex, { type: 'actorIdentity', actorId: target, comparison: 'equals', value: concreteActorOptions[0]?.key || '' });
+                                    return;
+                                }
+                                const actorStat = actorStats[0];
                                 updateCondition(collectionIndex, conditionIndex, { type: 'actorStat', actorId: target, statName: actorStat?.name || '', comparison: 'equals', value: getDefaultConditionValue(actorStat) });
                             }}
                         >
                             <option value="calendar">Calendar</option>
                             <option value="playerStat">Player Stat</option>
                             <option value="actorStat">Actor Stat</option>
+                            <option value="actorIdentity">Actor Identity</option>
                         </select>
                         {condition.type === 'calendar' ? (
                             <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 })}>
                                 {CALENDAR_FIELDS.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
                             </select>
-                        ) : condition.type === 'actorStat' ? (
+                        ) : (condition.type === 'actorStat' || condition.type === 'actorIdentity') ? (
                             <div style={{ display: 'grid', gap: 6 }}>
                                 <SearchableOptionPicker
                                     value={condition.actorId}
@@ -227,7 +251,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         )}
                         {condition.type !== 'calendar' && (
                             <select style={selectStyle} value={condition.comparison} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, comparison: event.target.value as ConditionComparison } as Condition)}>
-                                {COMPARISONS.map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
+                                {(condition.type === 'actorIdentity' ? IDENTITY_COMPARISONS : COMPARISONS).map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
                             </select>
                         )}
                         {renderValueInput(condition, collectionIndex, conditionIndex)}

@@ -25,7 +25,17 @@ export type ActorStatCondition = {
     value: string | number | boolean;
 };
 
-export type Condition = CalendarCondition | PlayerStatCondition | ActorStatCondition;
+// Checks the identity of a (possibly variable) actor against a specific actor chosen via an actor picker in
+// the UI. `actorId` selects which actor is being checked (any/none/variable/a specific id, same as
+// ActorStatCondition); `value` holds the specific actor id being compared against.
+export type ActorIdentityCondition = {
+    type: 'actorIdentity';
+    actorId: ActorConditionTarget;
+    comparison: 'equals' | 'notEquals';
+    value: string;
+};
+
+export type Condition = CalendarCondition | PlayerStatCondition | ActorStatCondition | ActorIdentityCondition;
 
 // A ConditionCollection is an array of Condition objects, where all conditions must be satisfied for the collection to be considered true.
 export type ConditionCollection = Condition[];
@@ -101,31 +111,53 @@ const getActorStatValue = (actor: { statMap?: Record<string, string | number | b
     return actor.statMap?.[statName];
 };
 
-export const evaluateActorStatCondition = (condition: ActorStatCondition, context: ConditionContext): boolean => {
+type ConditionActor = { id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string };
+
+// Resolves which actor(s) an actorStat/actorIdentity condition's `actorId` target refers to: 'any'/'none'
+// check every actor in context, 'variable' refers to the actor currently under consideration (context.currentActor,
+// e.g. the target of a perActor stat), and any other value is a specific actor id.
+const resolveConditionActorSubjects = (actorId: ActorConditionTarget, context: ConditionContext): { mode: 'any' | 'none' | 'single'; actors: ConditionActor[] } => {
     const actorList = Array.isArray(context.actors)
         ? context.actors
         : context.actors
             ? Object.values(context.actors)
             : [];
 
-    const resolvedCurrentActor = context.currentActor || (context.actors && !Array.isArray(context.actors)
-        ? Object.values(context.actors)[0]
-        : undefined);
-
-    if (condition.actorId === 'any') {
-        return actorList.some((actor) => compareValues(getActorStatValue(actor, condition.statName), condition.value, condition.comparison));
+    if (actorId === 'any') {
+        return { mode: 'any', actors: actorList };
     }
 
-    if (condition.actorId === 'none') {
-        return !actorList.some((actor) => compareValues(getActorStatValue(actor, condition.statName), condition.value, condition.comparison));
+    if (actorId === 'none') {
+        return { mode: 'none', actors: actorList };
     }
 
-    if (condition.actorId === 'variable') {
-        return compareValues(getActorStatValue(resolvedCurrentActor, condition.statName), condition.value, condition.comparison);
+    if (actorId === 'variable') {
+        const resolvedCurrentActor = context.currentActor || (context.actors && !Array.isArray(context.actors)
+            ? Object.values(context.actors)[0]
+            : undefined);
+        return { mode: 'single', actors: resolvedCurrentActor ? [resolvedCurrentActor] : [] };
     }
 
-    const targetActor = actorList.find((actor) => actor?.id === condition.actorId);
-    return compareValues(getActorStatValue(targetActor, condition.statName), condition.value, condition.comparison);
+    const targetActor = actorList.find((actor) => actor?.id === actorId);
+    return { mode: 'single', actors: targetActor ? [targetActor] : [] };
+};
+
+export const evaluateActorStatCondition = (condition: ActorStatCondition, context: ConditionContext): boolean => {
+    const { mode, actors } = resolveConditionActorSubjects(condition.actorId, context);
+    const matches = (actor: ConditionActor) => compareValues(getActorStatValue(actor, condition.statName), condition.value, condition.comparison);
+
+    if (mode === 'any') return actors.some(matches);
+    if (mode === 'none') return !actors.some(matches);
+    return actors.length > 0 && matches(actors[0]);
+};
+
+export const evaluateActorIdentityCondition = (condition: ActorIdentityCondition, context: ConditionContext): boolean => {
+    const { mode, actors } = resolveConditionActorSubjects(condition.actorId, context);
+    const matches = (actor: ConditionActor) => compareValues(actor.id, condition.value, condition.comparison);
+
+    if (mode === 'any') return actors.some(matches);
+    if (mode === 'none') return !actors.some(matches);
+    return actors.length > 0 && matches(actors[0]);
 };
 
 export const evaluateCondition = (condition: Condition, context: ConditionContext): boolean => {
@@ -137,6 +169,10 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
     if (condition.type === 'playerStat') {
         const actual = context.playerStatValues?.[condition.statName];
         return compareValues(actual, condition.value, condition.comparison);
+    }
+
+    if (condition.type === 'actorIdentity') {
+        return evaluateActorIdentityCondition(condition, context);
     }
 
     return evaluateActorStatCondition(condition, context);
@@ -152,5 +188,5 @@ export const evaluateConditionCollections = (conditionCollections: ConditionColl
 };
 
 export const hasVariableActorTarget = (conditionCollections: ConditionCollection[] | undefined): boolean => {
-    return !!conditionCollections?.some((collection) => collection.some((condition) => condition.type === 'actorStat' && condition.actorId === 'variable'));
+    return !!conditionCollections?.some((collection) => collection.some((condition) => (condition.type === 'actorStat' || condition.type === 'actorIdentity') && condition.actorId === 'variable'));
 };

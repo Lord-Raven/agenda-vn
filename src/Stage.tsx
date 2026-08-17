@@ -1526,6 +1526,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
                             const resolvedStat = configuredStatByName.get(incomingStatName)
                                 || configuredStats.find(configured => configured.name.toLowerCase() === incomingStatName.toLowerCase());
+                            if (resolvedStat?.perActor) {
+                                // Per-actor stats require a target actor and aren't supported by this narrative outcome yet.
+                                continue;
+                            }
                             const targetStatName = resolvedStat?.name || incomingStatName;
                             actor.statMap = actor.statMap || {};
                             const existingValue = Number(actor.statMap[targetStatName]);
