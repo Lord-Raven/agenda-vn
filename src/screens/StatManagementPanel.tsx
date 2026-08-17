@@ -1,8 +1,11 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
-import { ActorStat, ActorStatType, ActorStatValue, isNumericDisplayType } from '../content/ActorStat';
+import { ActorStat, ActorStatType, ActorStatValue, ActorStatValueRule, cloneActorStatValueRules, isNumericDisplayType } from '../content/ActorStat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/ActorStatRating';
+import { ConditionEditor } from '../components/ConditionEditor';
+import { Add } from '@mui/icons-material';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
@@ -11,6 +14,8 @@ interface StatManagementPanelProps {
 const cloneActorStat = (stat: ActorStat): ActorStat => ({
     name: stat.name,
     description: stat.description,
+    perActor: stat.perActor === true,
+    perActorDefaultRules: cloneActorStatValueRules(stat.perActorDefaultRules),
     guidance: stat.guidance,
     default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
     type: stat.type,
@@ -99,6 +104,8 @@ const defaultPlayerStat = (): ActorStat => ({
 const defaultActorStat = (): ActorStat => ({
     name: 'Name',
     description: 'A user-facing description of this stat.',
+    perActor: false,
+    perActorDefaultRules: [],
     guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
     default: 50,
     type: 'percentage',
@@ -267,7 +274,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         const currentSave = stageInstance.getSave();
         const statNames = new Set(
             actorStats
-                .filter(stat => isNumericDisplayType(stat.type))
+                .filter(stat => isNumericDisplayType(stat.type) && !stat.perActor)
                 .map(stat => stat.name.trim())
                 .filter(Boolean),
         );
@@ -277,7 +284,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 actor.statMap = {};
             }
 
-            actorStats.filter(stat => isNumericDisplayType(stat.type)).forEach(stat => {
+            actorStats.filter(stat => isNumericDisplayType(stat.type) && !stat.perActor).forEach(stat => {
                 const statName = stat.name.trim();
                 if (!statName) {
                     return;
@@ -433,9 +440,63 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
+    const addActorStatPerActorRule = (index: number) => {
+        setActorStats(prev => prev.map((stat, idx) => {
+            if (idx !== index) {
+                return stat;
+            }
+            const rule: ActorStatValueRule = { id: generateUuid(), value: resolveStatDefaultValue(stat), conditions: [] };
+            return { ...stat, perActorDefaultRules: [...(stat.perActorDefaultRules || []), rule] };
+        }));
+    };
+
+    const removeActorStatPerActorRule = (index: number, ruleId: string) => {
+        setActorStats(prev => prev.map((stat, idx) => (
+            idx === index ? { ...stat, perActorDefaultRules: (stat.perActorDefaultRules || []).filter(rule => rule.id !== ruleId) } : stat
+        )));
+    };
+
+    const updateActorStatPerActorRule = (index: number, ruleId: string, patch: Partial<ActorStatValueRule>) => {
+        setActorStats(prev => prev.map((stat, idx) => (
+            idx === index
+                ? { ...stat, perActorDefaultRules: (stat.perActorDefaultRules || []).map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule) }
+                : stat
+        )));
+    };
+
     const renderIconPicker = (value: string | undefined, onChange: (iconName: string | undefined) => void, allowClear = false) => (
         <IconPicker value={value} onChange={onChange} allowClear={allowClear} />
     );
+
+    const renderRuleValueInput = (stat: ActorStat, rule: ActorStatValueRule, onChange: (value: ActorStatValue) => void) => {
+        if (stat.type === 'checkbox') {
+            return (
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                    <input type="checkbox" checked={rule.value === true} onChange={(e) => onChange(e.target.checked)} />
+                    {rule.value === true ? 'True' : 'False'}
+                </label>
+            );
+        }
+        if (stat.type === 'option') {
+            const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
+            return (
+                <select className="input-base" value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => onChange(e.target.value)}>
+                    {optionNames.map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+            );
+        }
+        if (stat.type === 'text') {
+            return <TextInput fullWidth value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => onChange(e.target.value)} />;
+        }
+        return (
+            <TextInput
+                fullWidth
+                type="number"
+                value={String(Number.isFinite(rule.value) ? Number(rule.value) : 0)}
+                onChange={(e) => onChange(Number(e.target.value) || 0)}
+            />
+        );
+    };
 
     const removeActorStat = (index: number) => {
         setActorStats(prev => prev.filter((_, idx) => idx !== index));
@@ -759,6 +820,77 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     Exposed
                                                 </label>
                                             </div>
+
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Per Actor</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.perActor === true}
+                                                        onChange={(e) => updateActorStat(statIndex, { perActor: e.target.checked })}
+                                                    />
+                                                    Tracks a separate value per target actor (e.g. affinity)
+                                                </label>
+                                            </div>
+
+                                            {stat.perActor && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Value Rules</label>
+                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                        Evaluated in order for the target actor being considered (use "Variable" actor targets to inspect the target's own stats). The first matching rule wins; falls back to Default above if none match. An actor's own rules (configured on its detail page) take precedence over these.
+                                                    </span>
+                                                    {(stat.perActorDefaultRules || []).length === 0 && (
+                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                            No rules. The Default value below is used for every target.
+                                                        </span>
+                                                    )}
+                                                    {(stat.perActorDefaultRules || []).map((rule) => (
+                                                        <div
+                                                            key={rule.id}
+                                                            style={{
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                gap: '6px',
+                                                                padding: '8px',
+                                                                border: '1px solid var(--agenda-line-subtle)',
+                                                                borderRadius: 6,
+                                                            }}
+                                                        >
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Value</span>
+                                                                {renderRuleValueInput(stat, rule, (value) => updateActorStatPerActorRule(statIndex, rule.id, { value }))}
+                                                                <Button
+                                                                    variant="danger"
+                                                                    onClick={() => removeActorStatPerActorRule(statIndex, rule.id)}
+                                                                    style={{ marginLeft: 'auto' }}
+                                                                >
+                                                                    Delete
+                                                                </Button>
+                                                            </div>
+                                                            <ConditionEditor
+                                                                conditionCollections={rule.conditions}
+                                                                playerStats={[...actorStats, ...playerStats]}
+                                                                actorStats={actorStats}
+                                                                actors={Object.values(stageInstance.getSave().actors || {})}
+                                                                allowVariableActorTarget
+                                                                onChange={(conditions) => updateActorStatPerActorRule(statIndex, rule.id, { conditions })}
+                                                            />
+                                                            {rule.conditions.length === 0 && (
+                                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                                    Always matches (should typically be the last rule).
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    <Button
+                                                        variant="secondary"
+                                                        onClick={() => addActorStatPerActorRule(statIndex)}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifySelf: 'start' }}
+                                                    >
+                                                        <Add fontSize="small" /> Add rule
+                                                    </Button>
+                                                </div>
+                                            )}
 
                                             {normalizedStat.type === 'option' && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>

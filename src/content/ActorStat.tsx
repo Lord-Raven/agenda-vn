@@ -1,3 +1,5 @@
+import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
+
 export type ActorStatType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text' | 'checkbox';
 export type ActorStatValue = number | string | boolean;
 
@@ -10,11 +12,25 @@ export type ActorStatOption = {
     description: string;
 };
 
+// A single rule used to resolve a per-actor stat's value for a given target actor; rules are evaluated in
+// order and the first whose conditions are satisfied wins (conditions may reference the target via the
+// 'variable' actor target so they can inspect the target actor's own stats).
+export type ActorStatValueRule = {
+    id: string;
+    value: ActorStatValue;
+    conditions: ConditionCollection[];
+};
+
 // Represents a custom stat that applies to all actors in the game.
 export type ActorStat = {
     name: string;
     description: string;
-    // perActor: boolean; // Implement all related requirements.
+    // When true, this stat's value on a given actor is a mapping of target actorId to a value of `type`
+    // (e.g. the host actor's affinity toward each other actor), rather than a single scalar value.
+    perActor?: boolean;
+    // Rules used to resolve a default value for a given target actor when perActor is true and neither the
+    // host actor's own perActorValueRules nor an explicit override provide a value. Evaluated in order.
+    perActorDefaultRules?: ActorStatValueRule[];
     guidance: string;
     default: ActorStatValue;
     type: ActorStatType;
@@ -40,9 +56,19 @@ export const resolveActorStatText = (
     return String(rawText || '').replace(/\{\{\s*user\s*\}\}/gi, playerName);
 };
 
+export const cloneActorStatValueRule = (rule: ActorStatValueRule): ActorStatValueRule => ({
+    id: rule.id,
+    value: typeof rule.value === 'boolean' || typeof rule.value === 'number' || typeof rule.value === 'string' ? rule.value : 0,
+    conditions: (rule.conditions || []).map((collection) => [...collection]),
+});
+
+export const cloneActorStatValueRules = (rules: ActorStatValueRule[] | undefined): ActorStatValueRule[] => (rules || []).map(cloneActorStatValueRule);
+
 export const cloneActorStat = (stat: ActorStat): ActorStat => ({
     name: stat.name,
     description: stat.description,
+    perActor: stat.perActor === true,
+    perActorDefaultRules: cloneActorStatValueRules(stat.perActorDefaultRules),
     guidance: stat.guidance,
     default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
     type: stat.type,
@@ -118,4 +144,16 @@ export const normalizeActorStatValue = (value: unknown, stat: ActorStat): ActorS
         resolved = Math.min(stat.max, resolved);
     }
     return resolved;
+};
+
+// Finds the first rule in an ordered list whose conditions are satisfied by the given context (e.g. with
+// context.currentActor set to the target actor so 'variable' actor-stat conditions inspect the target).
+// Returns undefined if no rule matches, so callers can continue to the next fallback tier.
+export const resolvePerActorValueRule = (
+    rules: ActorStatValueRule[] | undefined,
+    stat: ActorStat,
+    context: ConditionContext,
+): ActorStatValue | undefined => {
+    const matchedRule = (rules || []).find((rule) => evaluateConditionCollections(rule.conditions, context));
+    return matchedRule ? normalizeActorStatValue(matchedRule.value, stat) : undefined;
 };

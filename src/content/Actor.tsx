@@ -1,7 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emotion';
 import { Stage } from '../Stage';
-import { ActorStat, isNumericDisplayType, resolveActorStatText } from './ActorStat';
+import { ActorStat, ActorStatValue, ActorStatValueRule, cloneActorStatValueRules, isNumericDisplayType, normalizeActorStatValue, resolveActorStatDefault, resolvePerActorValueRule, resolveActorStatText } from './ActorStat';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import {buildPrompt} from "../utils/PromptBuilder.js";
@@ -34,6 +34,60 @@ const cloneStatModifier = (modifier: any): ActorStatModifier => ({
         ? modifier.conditions.map((collection: unknown) => Array.isArray(collection) ? [...collection] : [])
         : [],
 });
+
+// Per-target-actor value overrides/rules for perActor stats, keyed by stat name then target actor id.
+export type PerActorStatValueMap = { [statName: string]: { [targetActorId: string]: ActorStatValue } };
+// Per-actor override rules for perActor stats, keyed by stat name; these take precedence over the stat
+// definition's own perActorDefaultRules.
+export type PerActorValueRuleMap = { [statName: string]: ActorStatValueRule[] };
+
+export const clonePerActorStatValueMap = (map: unknown): PerActorStatValueMap => {
+    if (!map || typeof map !== 'object' || Array.isArray(map)) {
+        return {};
+    }
+    return Object.fromEntries(Object.entries(map as Record<string, any>).map(([statName, targetMap]) => [
+        statName,
+        targetMap && typeof targetMap === 'object' && !Array.isArray(targetMap) ? { ...targetMap } : {},
+    ]));
+};
+
+export const clonePerActorValueRuleMap = (map: unknown): PerActorValueRuleMap => {
+    if (!map || typeof map !== 'object' || Array.isArray(map)) {
+        return {};
+    }
+    return Object.fromEntries(Object.entries(map as Record<string, any>).map(([statName, rules]) => [
+        statName,
+        cloneActorStatValueRules(Array.isArray(rules) ? rules : []),
+    ]));
+};
+
+// Resolves a perActor stat's value for a given target actor: an explicit override on the host actor wins,
+// then the host actor's own perActorValueRules, then the stat definition's perActorDefaultRules, then the
+// stat's plain default. `context` should have `currentActor` set to the target actor so 'variable' actor-stat
+// conditions in rules can inspect the target's own stats.
+export const resolvePerActorStatValue = (
+    hostActor: Pick<Actor, 'perActorStatMap' | 'perActorValueRules'>,
+    stat: ActorStat,
+    targetActorId: string,
+    context: ConditionContext,
+): ActorStatValue => {
+    const explicitValue = hostActor.perActorStatMap?.[stat.name]?.[targetActorId];
+    if (explicitValue !== undefined) {
+        return normalizeActorStatValue(explicitValue, stat);
+    }
+
+    const hostRuleValue = resolvePerActorValueRule(hostActor.perActorValueRules?.[stat.name], stat, context);
+    if (hostRuleValue !== undefined) {
+        return hostRuleValue;
+    }
+
+    const statRuleValue = resolvePerActorValueRule(stat.perActorDefaultRules, stat, context);
+    if (statRuleValue !== undefined) {
+        return statRuleValue;
+    }
+
+    return resolveActorStatDefault(stat);
+};
 
 const cloneStatInitialMap = (statInitialMap: unknown): { [key: string]: ActorStatInitial } => {
     if (!statInitialMap || typeof statInitialMap !== 'object' || Array.isArray(statInitialMap)) {
@@ -110,6 +164,8 @@ export class Actor {
     voiceId: string = ''; // Voice ID for TTS
     statMap: { [key: string]: number | string | boolean } = {}; // Map of custom stat name to value for this actor
     statInitialMap: { [key: string]: ActorStatInitial } = {}; // Map of custom stat name to its initial value and conditional modifiers, used to seed statMap when a new game starts
+    perActorStatMap: PerActorStatValueMap = {}; // For perActor stats: map of stat name to a map of target actorId to explicit value override
+    perActorValueRules: PerActorValueRuleMap = {}; // For perActor stats: map of stat name to this actor's own default-value rules, which take precedence over the stat's perActorDefaultRules
     schedule: ActorSchedule = {}; // Destinations are evaluated in insertion order; the first matching collection wins.
 
     /**
@@ -121,6 +177,8 @@ export class Actor {
         actor.active = savedActor?.active !== false;
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
         actor.statInitialMap = cloneStatInitialMap(savedActor?.statInitialMap);
+        actor.perActorStatMap = clonePerActorStatValueMap(savedActor?.perActorStatMap);
+        actor.perActorValueRules = clonePerActorValueRuleMap(savedActor?.perActorValueRules);
         actor.schedule = cloneSchedule(savedActor?.schedule);
         if (!Object.keys(actor.schedule).length && savedActor?.conditionCollections?.length) {
             actor.schedule = {
@@ -139,6 +197,8 @@ export class Actor {
         this.active = this.active !== false;
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
         this.statInitialMap = cloneStatInitialMap(this.statInitialMap);
+        this.perActorStatMap = clonePerActorStatValueMap(this.perActorStatMap);
+        this.perActorValueRules = clonePerActorValueRuleMap(this.perActorValueRules);
         this.schedule = cloneSchedule(this.schedule);
         if (!Object.keys(this.schedule).length && props?.conditionCollections?.length) {
             this.schedule = {
@@ -259,7 +319,7 @@ export function applyActorInitialStats(actor: Actor, actorStats: ActorStat[], co
         actor.statMap = {};
     }
     actorStats
-        .filter(stat => stat?.name?.trim() && (isNumericDisplayType(stat.type) || stat.type === 'checkbox'))
+        .filter(stat => stat?.name?.trim() && !stat.perActor && (isNumericDisplayType(stat.type) || stat.type === 'checkbox'))
         .forEach(stat => {
             actor.statMap[stat.name] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context) as number | string | boolean;
         });

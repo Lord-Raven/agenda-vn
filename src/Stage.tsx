@@ -367,6 +367,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     outfitId: '',
                     statMap: {},
                     statInitialMap: {},
+                    perActorStatMap: {},
+                    perActorValueRules: {},
                     schedule: {},
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
                     themeFontFamily: '',
@@ -1235,14 +1237,23 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const configuredStats = (this.getConfiguration().actorStats || [])
             .filter(stat => stat?.name?.trim())
             .filter(stat => isNumericActorStat(stat) || stat.type === 'checkbox');
-        const statNames = new Set(configuredStats.map(stat => stat.name.trim()));
+        const scalarStats = configuredStats.filter(stat => !stat.perActor);
+        const perActorStats = configuredStats.filter(stat => stat.perActor);
+        const statNames = new Set(scalarStats.map(stat => stat.name.trim()));
+        const perActorStatNames = new Set(perActorStats.map(stat => stat.name.trim()));
 
         Object.values(save.actors || {}).forEach(actor => {
             if (!actor.statMap || typeof actor.statMap !== 'object') {
                 actor.statMap = {};
             }
+            if (!actor.perActorStatMap || typeof actor.perActorStatMap !== 'object') {
+                actor.perActorStatMap = {};
+            }
+            if (!actor.perActorValueRules || typeof actor.perActorValueRules !== 'object') {
+                actor.perActorValueRules = {};
+            }
 
-            configuredStats.forEach(stat => {
+            scalarStats.forEach(stat => {
                 const statName = stat.name.trim();
                 const existingValue = actor.statMap[statName];
                 const normalized = normalizeActorStatValue(existingValue, stat);
@@ -1256,6 +1267,28 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             Object.keys(actor.statMap).forEach(statName => {
                 if (!statNames.has(statName)) {
                     delete actor.statMap[statName];
+                }
+            });
+
+            perActorStats.forEach(stat => {
+                const statName = stat.name.trim();
+                if (!actor.perActorStatMap[statName] || typeof actor.perActorStatMap[statName] !== 'object') {
+                    actor.perActorStatMap[statName] = {};
+                }
+                if (!Array.isArray(actor.perActorValueRules[statName])) {
+                    actor.perActorValueRules[statName] = [];
+                }
+            });
+
+            Object.keys(actor.perActorStatMap).forEach(statName => {
+                if (!perActorStatNames.has(statName)) {
+                    delete actor.perActorStatMap[statName];
+                }
+            });
+
+            Object.keys(actor.perActorValueRules).forEach(statName => {
+                if (!perActorStatNames.has(statName)) {
+                    delete actor.perActorValueRules[statName];
                 }
             });
         });
@@ -1569,8 +1602,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         /*if (this.getConfiguration().artStyle) {
             imageToImageRequest.prompt = `${imageToImageRequest.prompt || ''}\nArt Style: ${this.getConfiguration().artStyle}`;
         }*/
-        const imageUrl = (await this.generator.imageToImage(imageToImageRequest))?.url ?? defaultUrl;
-        if (imageToImageRequest.remove_background && imageToImageRequest.transfer_type == 'edit' && imageUrl != defaultUrl) {
+        const finalRequest = {
+            remove_background: false,
+            transfer_type: 'edit'
+            ...imageToImageRequest
+        }
+        const imageUrl = (await this.generator.imageToImage(finalRequest))?.url ?? defaultUrl;
+        if (finalRequest.remove_background && finalRequest.transfer_type == 'edit' && imageUrl != defaultUrl) {
             try {
                 return this.removeBackground(imageUrl);
             } catch (exception: any) {
