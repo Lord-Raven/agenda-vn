@@ -829,68 +829,9 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         checked={stat.perActor === true}
                                                         onChange={(e) => updateActorStat(statIndex, { perActor: e.target.checked })}
                                                     />
-                                                    Tracks a separate value per target actor (e.g. affinity)
+                                                    Maps other actors to distinct values
                                                 </label>
                                             </div>
-
-                                            {stat.perActor && (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value Rules</label>
-                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                        Evaluated in order for the target actor being considered (use "Variable" actor targets to inspect the target's own stats). The first matching rule wins; falls back to Default above if none match. An actor's own rules (configured on its detail page) take precedence over these.
-                                                    </span>
-                                                    {(stat.perActorDefaultRules || []).length === 0 && (
-                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                            No rules. The Default value below is used for every target.
-                                                        </span>
-                                                    )}
-                                                    {(stat.perActorDefaultRules || []).map((rule) => (
-                                                        <div
-                                                            key={rule.id}
-                                                            style={{
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                gap: '6px',
-                                                                padding: '8px',
-                                                                border: '1px solid var(--agenda-line-subtle)',
-                                                                borderRadius: 6,
-                                                            }}
-                                                        >
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Value</span>
-                                                                {renderRuleValueInput(stat, rule, (value) => updateActorStatPerActorRule(statIndex, rule.id, { value }))}
-                                                                <Button
-                                                                    variant="danger"
-                                                                    onClick={() => removeActorStatPerActorRule(statIndex, rule.id)}
-                                                                    style={{ marginLeft: 'auto' }}
-                                                                >
-                                                                    Delete
-                                                                </Button>
-                                                            </div>
-                                                            <ConditionEditor
-                                                                conditionCollections={rule.conditions}
-                                                                playerStats={[...actorStats, ...playerStats]}
-                                                                actorStats={actorStats}
-                                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                                allowVariableActorTarget
-                                                                onChange={(conditions) => updateActorStatPerActorRule(statIndex, rule.id, { conditions })}
-                                                            />
-                                                            {rule.conditions.length === 0 && (
-                                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                                    Always matches (should typically be the last rule).
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    <Button
-                                                        variant="secondary"
-                                                        onClick={() => addActorStatPerActorRule(statIndex)}
-                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifySelf: 'start' }}
-                                                    >
-                                                        <Add fontSize="small" /> Add rule
-                                                    </Button>
-                                                </div>
-                                            )}
 
                                             {normalizedStat.type === 'option' && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
@@ -1057,6 +998,65 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                             />
                                                         </div>
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {stat.perActor && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Value Rules</label>
+                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                        Evaluated in order for the target actor being considered (use "Variable" actor targets to inspect the target's own stats). The first matching rule wins; falls back to Default above if none match. An actor's own rules (configured on its detail page) take precedence over these.
+                                                    </span>
+                                                    {(stat.perActorDefaultRules || []).length === 0 && (
+                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                            No rules. The Default value below is used for every target.
+                                                        </span>
+                                                    )}
+                                                    {(stat.perActorDefaultRules || []).map((rule) => (
+                                                        <div
+                                                            key={rule.id}
+                                                            style={{
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                gap: '6px',
+                                                                padding: '8px',
+                                                                border: '1px solid var(--agenda-line-subtle)',
+                                                                borderRadius: 6,
+                                                            }}
+                                                        >
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Value</span>
+                                                                {renderRuleValueInput(stat, rule, (value) => updateActorStatPerActorRule(statIndex, rule.id, { value }))}
+                                                                <Button
+                                                                    variant="danger"
+                                                                    onClick={() => removeActorStatPerActorRule(statIndex, rule.id)}
+                                                                    style={{ marginLeft: 'auto' }}
+                                                                >
+                                                                    Delete
+                                                                </Button>
+                                                            </div>
+                                                            <ConditionEditor
+                                                                conditionCollections={rule.conditions}
+                                                                playerStats={[...actorStats, ...playerStats]}
+                                                                actorStats={actorStats}
+                                                                actors={Object.values(stageInstance.getSave().actors || {})}
+                                                                allowVariableActorTarget
+                                                                onChange={(conditions) => updateActorStatPerActorRule(statIndex, rule.id, { conditions })}
+                                                            />
+                                                            {rule.conditions.length === 0 && (
+                                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                                    Always matches (should typically be the last rule).
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    <Button
+                                                        variant="secondary"
+                                                        onClick={() => addActorStatPerActorRule(statIndex)}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifySelf: 'start' }}
+                                                    >
+                                                        <Add fontSize="small" /> Add rule
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>
