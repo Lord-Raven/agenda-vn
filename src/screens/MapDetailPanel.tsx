@@ -178,7 +178,13 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                 prompt: draft.imagePrompt,
                 aspect_ratio: AspectRatio.WIDESCREEN_HORIZONTAL,
             }, draft.imageUrl);
-            updateDraft('imageUrl', imageUrl);
+
+            const qwenifiedUrl = imageUrl ? await stageInstance.makeImageFromImage({
+                image: imageUrl,
+                prompt: draft.imagePrompt
+            }, imageUrl) : ''
+
+            updateDraft('imageUrl', qwenifiedUrl ?? imageUrl);
             stageInstance.showPriorityMessage('Generated a new map image.');
         } catch (error) {
             console.error('Failed to generate map image:', error);

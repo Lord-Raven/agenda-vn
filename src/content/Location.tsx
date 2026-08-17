@@ -262,10 +262,16 @@ export async function generateBaseLocationImage(location: Location, stage: Stage
 
 		const generatedImage = await stage.makeImage({
 			prompt: basePrompt,
-			aspect_ratio: AspectRatio.PHOTO_VERTICAL,
+			aspect_ratio: AspectRatio.WIDESCREEN_HORIZONTAL,
 		}, '');
 
-		location.imageUrl = generatedImage || '';
+		const qwenifiedImage = generatedImage ? await stage.makeImageFromImage({
+			image: generatedImage,
+			prompt: basePrompt,
+			remove_background: false
+		}, generatedImage) : '';
+
+		location.imageUrl = qwenifiedImage || generatedImage || '';
 		return location.imageUrl;
 	})().finally(() => {
 		delete stage.generationPromises[generationKey];

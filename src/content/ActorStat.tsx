@@ -14,6 +14,7 @@ export type ActorStatOption = {
 export type ActorStat = {
     name: string;
     description: string;
+    perActor: boolean;
     guidance: string;
     default: ActorStatValue;
     type: ActorStatType;
