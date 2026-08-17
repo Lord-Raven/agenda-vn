@@ -644,7 +644,7 @@ export async function generateBaseActorImage(
                 prompt: `Core appearance: ${actor.description}\n` +
                     `Outfit: ${getOutfitById(actor, targetOutfitId).description}.\n` +
                     `Ignore feet details, and create a waist-up portrait of this character with a neutral expression and pose, placed on a light gray background.`,
-                aspect_ratio: AspectRatio.PHOTO_VERTICAL
+                aspect_ratio: AspectRatio.SQUARE
             }, '');
             baseSourceImage = imageUrl || '';
         }
