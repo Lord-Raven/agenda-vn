@@ -1604,7 +1604,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }*/
         const finalRequest = {
             remove_background: false,
-            transfer_type: 'edit'
+            transfer_type: 'edit',
             ...imageToImageRequest
         }
         const imageUrl = (await this.generator.imageToImage(finalRequest))?.url ?? defaultUrl;
