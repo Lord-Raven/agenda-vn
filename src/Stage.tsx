@@ -1,7 +1,8 @@
 import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
+import { ConditionCollection } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
-import { Actor, ACTOR_SCHEDULE_AVAILABLE, applyActorInitialStats, findBestNameMatch, loadSupportedActor, resolveActorSchedule } from "./content/Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, loadSupportedActor, resolveActorSchedule } from "./content/Actor";
 import { ActorStat, ActorStatType, ActorStatValue, cloneActorStat, isNumericActorStat, normalizeActorStatValue, resolveActorStatText } from './content/ActorStat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
@@ -38,6 +39,7 @@ export type SaveType = {
     actors: {[key: string]: Actor};
     atlas: {[key: string]: Location};
     maps: GameMap[];
+    universalSchedule: ActorSchedule;
     inventory: Item[];
     timeline: TimelineEntry[];
     timestamp: number; // Time of last save
@@ -99,6 +101,7 @@ export type GameConfiguration = {
     actors: Actor[], // All defined actors for a new game
     locations: Location[], // All defined locations for a new game
     maps: GameMap[], // All defined maps for a new game
+    universalSchedule: ActorSchedule, // Universal schedule for all actors (applies to current and new games)
     lorebook: Lore[], // Lore entries to seed into new games
     calendarEvents: CalendarEvent[], // Calendar event series definitions to seed into new games
     actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
@@ -215,6 +218,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actors: [],
             locations: [],
             maps: [],
+            universalSchedule: {},
             lorebook: [],
             calendarEvents: [],
             actorStats: [],
@@ -255,6 +259,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 actors: [],
                 locations: [],
                 maps: (activeSave?.maps || []).map(cloneMap),
+                universalSchedule: cloneActorSchedule(activeSave?.universalSchedule),
                 lorebook: (activeSave?.lorebook || []).map(cloneLore),
                 calendarEvents: [],
                 actorStats: (this.getConfiguration()?.actorStats || []).map(cloneActorStat),
@@ -262,6 +267,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 playerStatValues: { ...(activeSave?.playerStatValues || {}) },
                 uiSettings: cloneUiSettings(activeSave?.uiSettings || {}),
             };
+            this.syncUniversalSchedule();
             return;
         }
 
@@ -269,6 +275,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actors: (this.saveData.configuration.actors || defaultConfiguration.actors).map(cloneActor),
             locations: (this.saveData.configuration.locations || defaultConfiguration.locations).map(cloneLocation),
             maps: (this.saveData.configuration.maps || defaultConfiguration.maps).map(cloneMap),
+            universalSchedule: cloneActorSchedule(this.saveData.configuration.universalSchedule),
             lorebook: (this.saveData.configuration.lorebook || defaultConfiguration.lorebook).map(cloneLore),
             calendarEvents: (this.saveData.configuration.calendarEvents || defaultConfiguration.calendarEvents).map(cloneCalendarEvent),
             actorStats: (this.saveData.configuration.actorStats || defaultConfiguration.actorStats).map(cloneActorStat),
@@ -284,6 +291,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             artStyle: this.saveData.configuration.artStyle || defaultConfiguration.artStyle,
         };
 
+        this.syncUniversalSchedule();
+    }
+
+    // The universal schedule lives on the configuration but is mirrored into every save so it can be resolved from save context.
+    private syncUniversalSchedule() {
+        this.saveData.saves.forEach((save) => {
+            if (save) {
+                save.universalSchedule = cloneActorSchedule(this.saveData.configuration.universalSchedule);
+            }
+        });
     }
 
     getConfiguration(): GameConfiguration {
@@ -305,6 +322,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actors: (updates.actors ?? current.actors ?? []).map(cloneActor),
             locations: (updates.locations ?? current.locations ?? []).map(cloneLocation),
             maps: (updates.maps ?? current.maps ?? []).map(cloneMap),
+            universalSchedule: cloneActorSchedule(updates.universalSchedule ?? current.universalSchedule),
             lorebook: (updates.lorebook ?? current.lorebook ?? []).map(cloneLore),
             calendarEvents: (updates.calendarEvents ?? current.calendarEvents ?? []).map(cloneCalendarEvent),
             actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneActorStat),
@@ -320,6 +338,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             this.syncActorStats(currentSave);
             this.syncPlayerStats(currentSave);
         }
+        this.syncUniversalSchedule();
     }
 
     async load(): Promise<Partial<LoadResponse<InitStateType, ChatStateType, MessageStateType>>> {
@@ -398,6 +417,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actors,
             atlas,
             maps: (configuration.maps || []).filter(map => map.active !== false).map(cloneMap),
+            universalSchedule: cloneActorSchedule(configuration.universalSchedule),
             inventory: [],
             timeline: [],
             timestamp: Date.now(),
@@ -411,6 +431,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actors,
             atlas,
             maps: (configuration.maps || []).filter(map => map.active !== false).map(cloneMap),
+            universalSchedule: cloneActorSchedule(configuration.universalSchedule),
             inventory: [],
             timeline: [],
             timestamp: Date.now(),
@@ -1236,7 +1257,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private syncActorStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().actorStats || [])
             .filter(stat => stat?.name?.trim())
-            .filter(stat => isNumericActorStat(stat) || stat.type === 'checkbox');
+            .filter(stat => isNumericActorStat(stat) || stat.type === 'checkbox' || stat.type === 'location');
         const scalarStats = configuredStats.filter(stat => !stat.perActor);
         const perActorStats = configuredStats.filter(stat => stat.perActor);
         const statNames = new Set(scalarStats.map(stat => stat.name.trim()));
@@ -1257,6 +1278,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 const statName = stat.name.trim();
                 const existingValue = actor.statMap[statName];
                 const normalized = normalizeActorStatValue(existingValue, stat);
+                if (stat.type === 'location') {
+                    actor.statMap[statName] = typeof normalized === 'string' ? normalized : '';
+                    return;
+                }
                 actor.statMap[statName] = typeof normalized === 'boolean'
                     ? normalized
                     : Number.isFinite(normalized)
@@ -1658,7 +1683,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
 
             const value = normalizeActorStatValue(save.playerStatValues?.[statName], stat);
-            const valueText = typeof value === 'number' ? String(value) : value;
+            const valueText = stat.type === 'location'
+                ? (save.atlas?.[String(value)]?.name || '')
+                : (typeof value === 'number' ? String(value) : value);
 
             if (stat.type === 'option') {
                 const selectedOption = (stat.options || []).find(option => option.name === valueText);

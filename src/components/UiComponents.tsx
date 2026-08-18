@@ -323,6 +323,43 @@ export const TextArea: FC<TextAreaProps> = ({
 	);
 };
 
+interface LocationSelectProps {
+	value: string;
+	onChange: (locationId: string) => void;
+	locations: Array<{ id: string; name: string }>;
+	emptyLabel?: string;
+	style?: React.CSSProperties;
+	className?: string;
+}
+
+export const LocationSelect: FC<LocationSelectProps> = ({
+	value,
+	onChange,
+	locations,
+	emptyLabel = 'No location',
+	className = '',
+	style,
+}) => {
+	const sortedLocations = [...locations].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+	// Keep dangling ids (e.g. a deleted location) selectable so saving does not silently drop them.
+	const isMissing = Boolean(value) && !sortedLocations.some((location) => location.id === value);
+
+	return (
+		<select
+			className={`input-base ${className}`}
+			value={value || ''}
+			onChange={(event) => onChange(event.target.value)}
+			style={{ width: '100%', ...style }}
+		>
+			<option value="">{emptyLabel}</option>
+			{sortedLocations.map((location) => (
+				<option key={location.id} value={location.id}>{location.name || 'Unnamed location'}</option>
+			))}
+			{isMissing && <option value={value}>Unknown location</option>}
+		</select>
+	);
+};
+
 interface ColorPickerInputProps {
 	value: string;
 	onChange: (value: string) => void;

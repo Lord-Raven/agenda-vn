@@ -1,11 +1,14 @@
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
-export type ActorStatType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text' | 'checkbox';
+// 'location' stats hold a location ID (a key into the save's atlas) rather than a display value.
+export type ActorStatType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text' | 'checkbox' | 'location';
 export type ActorStatValue = number | string | boolean;
 
 const NUMERIC_ACTOR_STAT_DISPLAY_TYPES: ActorStatType[] = ['number', 'percentage', 'rating', 'letter grade'];
 
 export const isNumericDisplayType = (displayType: ActorStatType): boolean => NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(displayType);
+
+export const isLocationDisplayType = (displayType: ActorStatType): boolean => displayType === 'location';
 
 export type ActorStatOption = {
     name: string;
@@ -95,7 +98,7 @@ export const resolveActorStatDefault = (stat: ActorStat): ActorStatValue => {
         return optionNames[0] || '';
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         return typeof stat.default === 'string' ? stat.default : '';
     }
 
@@ -116,7 +119,7 @@ export const normalizeActorStatValue = (value: unknown, stat: ActorStat): ActorS
         return typeof fallback === 'string' ? fallback : '';
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         if (typeof value === 'string') {
             return value;
         }

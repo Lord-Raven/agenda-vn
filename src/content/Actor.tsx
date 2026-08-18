@@ -4,7 +4,7 @@ import { Stage } from '../Stage';
 import { ActorStat, ActorStatValue, ActorStatValueRule, cloneActorStatValueRules, isNumericDisplayType, normalizeActorStatValue, resolveActorStatDefault, resolvePerActorValueRule, resolveActorStatText } from './ActorStat';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
-import {buildPrompt} from "../utils/PromptBuilder.js";
+import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
 import {
     buildStructuredExampleResponse,
     buildStructuredResponseFormat,
@@ -110,7 +110,7 @@ export const ACTOR_SCHEDULE_AVAILABLE = 'available';
 export const ACTOR_SCHEDULE_UNAVAILABLE = 'unavailable';
 export type ActorSchedule = Record<string, ConditionCollection[]>;
 
-const cloneSchedule = (schedule: unknown): ActorSchedule => {
+export const cloneActorSchedule = (schedule: unknown): ActorSchedule => {
     if (!schedule || typeof schedule !== 'object' || Array.isArray(schedule)) {
         return {};
     }
@@ -126,13 +126,31 @@ const cloneSchedule = (schedule: unknown): ActorSchedule => {
     }));
 };
 
-export const resolveActorSchedule = (actor: Pick<Actor, 'schedule'>, context: ConditionContext): string => {
-    for (const [destination, conditionCollections] of Object.entries(actor.schedule || {})) {
-        if (evaluateConditionCollections(conditionCollections, context)) {
-            return destination;
+export type ScheduleContext = ConditionContext & { universalSchedule?: ActorSchedule };
+
+// The actor's own rules are evaluated first, then the universal rules; the first matching destination wins,
+// but any matching "unavailable" rule supersedes a matched location.
+export const resolveActorSchedule = (actor: Pick<Actor, 'schedule'>, context: ScheduleContext): string => {
+    let destination = '';
+    let unavailable = false;
+
+    for (const schedule of [actor.schedule, context?.universalSchedule]) {
+        for (const [target, conditionCollections] of Object.entries(schedule || {})) {
+            if (!evaluateConditionCollections(conditionCollections, context)) {
+                continue;
+            }
+            if (target === ACTOR_SCHEDULE_UNAVAILABLE) {
+                unavailable = true;
+            } else if (!destination) {
+                destination = target;
+            }
         }
     }
-    return ACTOR_SCHEDULE_AVAILABLE;
+
+    if (unavailable) {
+        return ACTOR_SCHEDULE_UNAVAILABLE;
+    }
+    return destination || ACTOR_SCHEDULE_AVAILABLE;
 };
 
 
@@ -179,7 +197,7 @@ export class Actor {
         actor.statInitialMap = cloneStatInitialMap(savedActor?.statInitialMap);
         actor.perActorStatMap = clonePerActorStatValueMap(savedActor?.perActorStatMap);
         actor.perActorValueRules = clonePerActorValueRuleMap(savedActor?.perActorValueRules);
-        actor.schedule = cloneSchedule(savedActor?.schedule);
+        actor.schedule = cloneActorSchedule(savedActor?.schedule);
         if (!Object.keys(actor.schedule).length && savedActor?.conditionCollections?.length) {
             actor.schedule = {
                 [ACTOR_SCHEDULE_AVAILABLE]: savedActor.conditionCollections.map((collection: ConditionCollection) => [...collection]),
@@ -199,7 +217,7 @@ export class Actor {
         this.statInitialMap = cloneStatInitialMap(this.statInitialMap);
         this.perActorStatMap = clonePerActorStatValueMap(this.perActorStatMap);
         this.perActorValueRules = clonePerActorValueRuleMap(this.perActorValueRules);
-        this.schedule = cloneSchedule(this.schedule);
+        this.schedule = cloneActorSchedule(this.schedule);
         if (!Object.keys(this.schedule).length && props?.conditionCollections?.length) {
             this.schedule = {
                 [ACTOR_SCHEDULE_AVAILABLE]: props.conditionCollections.map((collection: ConditionCollection) => [...collection]),
@@ -296,7 +314,13 @@ function clampActorStatValue(value: number, stat: ActorStat): number {
 }
 
 // Computes an actor's initial stat value from its configured initial value plus any modifiers whose conditions currently evaluate true.
-export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStatInitial | undefined, context: ConditionContext): number | boolean {
+export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStatInitial | undefined, context: ConditionContext): number | boolean | string {
+    if (stat.type === 'location') {
+        return typeof initial?.value === 'string' && initial.value
+            ? initial.value
+            : (typeof stat.default === 'string' ? stat.default : '');
+    }
+
     if (stat.type === 'checkbox') {
         const baseValue = typeof initial?.value === 'boolean'
             ? initial.value
@@ -319,7 +343,7 @@ export function applyActorInitialStats(actor: Actor, actorStats: ActorStat[], co
         actor.statMap = {};
     }
     actorStats
-        .filter(stat => stat?.name?.trim() && !stat.perActor && (isNumericDisplayType(stat.type) || stat.type === 'checkbox'))
+        .filter(stat => stat?.name?.trim() && !stat.perActor && (isNumericDisplayType(stat.type) || stat.type === 'checkbox' || stat.type === 'location'))
         .forEach(stat => {
             actor.statMap[stat.name] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context) as number | string | boolean;
         });
@@ -380,7 +404,8 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     console.log('Loading reserve actor:', definition.name);
     console.log(definition);
 
-    const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
+    // Location stats reference atlas IDs, which the distillation model has no way to supply.
+    const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim() && stat.type !== 'location');
     const actorStatFields = buildActorStatFields(actorStats, stage);
     const distillationFields = DISTILLATION_FIELDS.concat(actorStatFields);
 
@@ -838,6 +863,84 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage) {
 		linkedLore.content = lore;
 		return;
 	}
+}
+
+const formatActorStatValue = (value: ActorStatValue, stat: ActorStat, atlas?: { [key: string]: { name: string } }): string => {
+    if (stat.type === 'checkbox') {
+        return value === true ? 'yes' : 'no';
+    }
+    if (stat.type === 'location') {
+        return atlas?.[String(value)]?.name || 'unknown location';
+    }
+    if (isNumericDisplayType(stat.type)) {
+        const min = typeof stat.min === 'number' ? stat.min : undefined;
+        const max = typeof stat.max === 'number' ? stat.max : undefined;
+        const range = min !== undefined || max !== undefined ? ` (of ${min ?? '-inf'} to ${max ?? '+inf'})` : '';
+        return `${value}${range}`;
+    }
+    return String(value ?? '');
+};
+
+// Used to build actor context for LLM requests. The `options` parameter allows specifying which elements of the actor's information should be included, such as outfit details, description, profile, stats, and lore.
+export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, otherActors: Actor[] = [], options: string[] = ['outfit', 'wardrobe', 'description', 'profile', 'stats', 'lore']): PromptBuilder {
+    const builder = buildPrompt(actor.displayName || actor.name);
+    const currentOutfit = actor.outfits.find(a => a.id === outfitId) ?? actor.outfits[0];
+    const wardrobe = actor.outfits.filter(o => o.id !== currentOutfit?.id && o.emotionPack['neutral']);
+    const save = stage.getSave();
+
+    if (options.includes('description') && actor.description) {
+        builder.addBlock('Description', actor.description);
+    }
+
+    if (options.includes('profile')) {
+        const profile = [actor.background, options.includes('lore') ? getActorLore(actor.id, stage) : actor.profile]
+            .map(text => (text || '').trim())
+            .filter(Boolean)
+            .join('\n\n');
+        if (profile) {
+            builder.addBlock('Profile', profile);
+        }
+    }
+
+    if (options.includes('outfit') && currentOutfit) {
+        builder.addBlock('Current Outfit', `${currentOutfit.name}: ${currentOutfit.description}`);
+    }
+
+    if (options.includes('wardrobe') && wardrobe.length > 0) {
+        builder.addBlock('Other Outfits', wardrobe.map(outfit => outfit.name).join(', '));
+    }
+
+    if (options.includes('stats')) {
+        const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
+        const scalarStatLines = actorStats
+            .filter(stat => !stat.perActor && actor.statMap?.[stat.name] !== undefined)
+            .map(stat => `${stat.name}: ${formatActorStatValue(normalizeActorStatValue(actor.statMap[stat.name], stat), stat, save.atlas)}`);
+        if (scalarStatLines.length > 0) {
+            builder.addBlock('Stats', scalarStatLines.join('\n'));
+        }
+
+        // Per-actor stats are mappings toward every other actor; only report entries for the supplied otherActors.
+        const perActorStats = actorStats.filter(stat => stat.perActor);
+        const targetActors = otherActors.filter(other => other && other.id !== actor.id);
+        if (perActorStats.length > 0 && targetActors.length > 0) {
+            const perActorLines = targetActors.map(target => {
+                const context: ConditionContext = {
+                    currentDate: save.currentDate,
+                    currentTimeOfDay: save.currentTimeOfDay,
+                    playerStatValues: save.playerStatValues,
+                    actors: save.actors,
+                    currentActor: { id: target.id, name: target.name, statMap: target.statMap },
+                };
+                const values = perActorStats
+                    .map(stat => `${stat.name}: ${formatActorStatValue(resolvePerActorStatValue(actor, stat, target.id, context), stat, save.atlas)}`)
+                    .join('; ');
+                return `${target.displayName || target.name} - ${values}`;
+            });
+            builder.addBlock('Stats Toward Others', perActorLines.join('\n'));
+        }
+    }
+
+    return builder;
 }
 
 /**

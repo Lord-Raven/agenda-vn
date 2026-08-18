@@ -35,7 +35,7 @@ const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
         return optionNames[0] || '';
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         return typeof stat.default === 'string' ? stat.default : '';
     }
 
@@ -55,7 +55,7 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): ActorStatValue => 
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         if (typeof value === 'string') {
             return value;
         }

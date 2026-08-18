@@ -8,7 +8,7 @@ import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStat
 import { ConditionContext } from '../content/Condition';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ActorStatRating } from '../components/ActorStatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
@@ -108,6 +108,11 @@ const buildLetterGradeOptions = (stat: ActorStat): Array<{ label: string; value:
 const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [key: string]: ActorStatValue } => {
     const nextMap: { [key: string]: ActorStatValue } = {};
     actorStats.forEach((stat) => {
+        if (stat.type === 'location') {
+            const currentValue = actor.statMap?.[stat.name];
+            nextMap[stat.name] = typeof currentValue === 'string' ? currentValue : (typeof stat.default === 'string' ? stat.default : '');
+            return;
+        }
         if (stat.type === 'checkbox') {
             const currentValue = actor.statMap?.[stat.name];
             nextMap[stat.name] = typeof currentValue === 'boolean' ? currentValue : (typeof stat.default === 'boolean' ? stat.default : false);
@@ -156,11 +161,17 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             uniqueStatMap[name] = {
                 ...stat,
                 name,
-                default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
+                default: stat.type === 'location'
+                    ? (typeof stat.default === 'string' ? stat.default : '')
+                    : (Number.isFinite(stat.default) ? Number(stat.default) : 0),
             };
         });
         return Object.values(uniqueStatMap);
     }, [stage]);
+
+    const locationOptions = useMemo(() => Object.values(stage().getSave().atlas || {})
+        .filter((location) => location.active !== false)
+        .map((location) => ({ id: location.id, name: location.name })), [stage]);
 
     const perActorStats = useMemo(() => {
         const configured = stage().getConfiguration().actorStats || [];
@@ -528,6 +539,11 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         const activeStatNames = new Set<string>();
         actorStats.forEach((stat) => {
             activeStatNames.add(stat.name);
+            if (stat.type === 'location') {
+                const candidateValue = nextEditedStatMap[stat.name];
+                actor.statMap[stat.name] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
+                return;
+            }
             if (stat.type === 'checkbox') {
                 const candidateValue = nextEditedStatMap[stat.name];
                 actor.statMap[stat.name] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
@@ -773,6 +789,13 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         }));
     };
 
+    const handleActorStatLocationChange = (stat: ActorStat, locationId: string) => {
+        setEditedStatMap((prev) => ({
+            ...prev,
+            [stat.name]: locationId,
+        }));
+    };
+
     const handleActorStatInitialValueChange = (stat: ActorStat, value: number | boolean) => {
         if (stat.type === 'checkbox') {
             setEditedStatInitialMap((prev) => ({
@@ -917,6 +940,15 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         }
         if (stat.type === 'text') {
             return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
+        }
+        if (stat.type === 'location') {
+            return (
+                <LocationSelect
+                    value={typeof value === 'string' ? value : ''}
+                    onChange={(locationId) => onChange(locationId)}
+                    locations={locationOptions}
+                />
+            );
         }
         if (stat.type === 'rating') {
             return <ActorStatRating stat={stat} value={Number.isFinite(value) ? Number(value) : 0} updateScore={(next) => onChange(next)} />;
@@ -1988,6 +2020,15 @@ ${indent}}`;
                                                                 </label>
                                                             )}
 
+                                                            {stat.type === 'location' && (
+                                                                <LocationSelect
+                                                                    value={typeof editedStatMap[stat.name] === 'string' ? String(editedStatMap[stat.name]) : ''}
+                                                                    onChange={(locationId) => handleActorStatLocationChange(stat, locationId)}
+                                                                    locations={locationOptions}
+                                                                    style={{ maxWidth: '220px' }}
+                                                                />
+                                                            )}
+
                                                             {stat.type === 'rating' && (
                                                                 <ActorStatRating
                                                                     stat={stat}
@@ -2049,6 +2090,8 @@ ${indent}}`;
                                                                     </div>
                                                                 )}
 
+                                                                {stat.type !== 'location' && (
+                                                                <>
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
                                                                     <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 600 }}>
                                                                         Initial Value
@@ -2117,6 +2160,7 @@ ${indent}}`;
                                                                                 conditionCollections={modifier.conditions}
                                                                                 playerStats={[...actorStats, ...(stage().getConfiguration().playerStats || [])]}
                                                                                 actors={Object.values(stage().getSave().actors || {})}
+                                                                                locations={locationOptions}
                                                                                 onChange={(conditions) => updateActorStatModifierConditions(stat, modifier.id, conditions)}
                                                                             />
                                                                             {modifier.conditions.length === 0 && (
@@ -2134,6 +2178,8 @@ ${indent}}`;
                                                                         <Add fontSize="small" /> Add modifier
                                                                     </Button>
                                                                 </div>
+                                                                </>
+                                                                )}
                                                             </>
                                                         )}
                                                     </div>
@@ -2250,6 +2296,7 @@ ${indent}}`;
                                                                             playerStats={[...actorStats, ...(stage().getConfiguration().playerStats || [])]}
                                                                             actorStats={actorStats}
                                                                             actors={Object.values(stage().getSave().actors || {})}
+                                                                            locations={locationOptions}
                                                                             allowVariableActorTarget
                                                                             onChange={(conditions) => updatePerActorValueRule(stat, rule.id, { conditions })}
                                                                         />

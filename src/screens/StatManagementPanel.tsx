@@ -1,9 +1,11 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
+import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
 import { ActorStat, ActorStatType, ActorStatValue, ActorStatValueRule, cloneActorStatValueRules, isNumericDisplayType } from '../content/ActorStat';
-import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { Button, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/ActorStatRating';
+import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { Add } from '@mui/icons-material';
 
@@ -39,7 +41,7 @@ const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
         return optionNames[0] || '';
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         return typeof stat.default === 'string' ? stat.default : '';
     }
 
@@ -59,7 +61,7 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): ActorStatValue => 
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         if (typeof value === 'string') {
             return value;
         }
@@ -144,7 +146,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
         };
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         return {
             ...stat,
             default: typeof stat.default === 'string' ? stat.default : '',
@@ -179,7 +181,7 @@ const normalizeActorStatShape = (stat: ActorStat): ActorStat => {
         };
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         return {
             ...stat,
             default: typeof stat.default === 'string' ? stat.default : '',
@@ -206,6 +208,12 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
     const [playerStats, setPlayerStats] = useState<ActorStat[]>(() =>
         (configuration.playerStats || []).map(cloneActorStat),
     );
+    const locationOptions = useMemo(
+        () => Object.values(save.atlas || {})
+            .filter(location => location.active !== false)
+            .map(location => ({ id: location.id, name: location.name, imageUrl: location.imageUrl })),
+        [save.atlas],
+    );
     const [collapsedPlayerStats, setCollapsedPlayerStats] = useState<boolean[]>(() =>
         (configuration.playerStats || []).map(() => true),
     );
@@ -219,6 +227,9 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         ...configuration.playerStatValues,
         ...save.playerStatValues,
     }));
+    const [universalSchedule, setUniversalSchedule] = useState<ActorSchedule>(() =>
+        cloneActorSchedule(configuration.universalSchedule),
+    );
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
@@ -269,12 +280,13 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             actorStats,
             playerStats,
             playerStatValues: validPlayerStatValues,
+            universalSchedule,
         });
 
         const currentSave = stageInstance.getSave();
         const statNames = new Set(
             actorStats
-                .filter(stat => isNumericDisplayType(stat.type) && !stat.perActor)
+                .filter(stat => !stat.perActor)
                 .map(stat => stat.name.trim())
                 .filter(Boolean),
         );
@@ -284,9 +296,15 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 actor.statMap = {};
             }
 
-            actorStats.filter(stat => isNumericDisplayType(stat.type) && !stat.perActor).forEach(stat => {
+            actorStats.filter(stat => (isNumericDisplayType(stat.type) || stat.type === 'location') && !stat.perActor).forEach(stat => {
                 const statName = stat.name.trim();
                 if (!statName) {
+                    return;
+                }
+
+                if (stat.type === 'location') {
+                    const existing = actor.statMap[statName];
+                    actor.statMap[statName] = typeof existing === 'string' ? existing : (typeof stat.default === 'string' ? stat.default : '');
                     return;
                 }
 
@@ -302,7 +320,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 }
             });
         });
-    }, [actorStats, playerStats, stageInstance, validPlayerStatValues]);
+    }, [actorStats, playerStats, stageInstance, universalSchedule, validPlayerStatValues]);
 
     useEffect(() => {
         if (!didMountRef.current) {
@@ -488,6 +506,15 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         if (stat.type === 'text') {
             return <TextInput fullWidth value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => onChange(e.target.value)} />;
         }
+        if (stat.type === 'location') {
+            return (
+                <LocationSelect
+                    value={typeof rule.value === 'string' ? rule.value : ''}
+                    onChange={(locationId) => onChange(locationId)}
+                    locations={locationOptions}
+                />
+            );
+        }
         return (
             <TextInput
                 fullWidth
@@ -577,6 +604,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 >
                                                     <option value="checkbox">Checkbox</option>
                                                     <option value="letter grade">Letter Grade</option>
+                                                    <option value="location">Location</option>
                                                     <option value="number">Number</option>
                                                     <option value="option">Option</option>
                                                     <option value="percentage">Percentage</option>
@@ -665,6 +693,17 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         onChange={(e) => updatePlayerStat(statIndex, { default: e.target.value })}
                                                         rows={2}
                                                         style={{ width: '100%', resize: 'vertical' }}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.type === 'location' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Location</label>
+                                                    <LocationSelect
+                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
+                                                        onChange={(locationId) => updatePlayerStat(statIndex, { default: locationId })}
+                                                        locations={locationOptions}
                                                     />
                                                 </div>
                                             )}
@@ -801,6 +840,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 >
                                                     <option value="checkbox">Checkbox</option>
                                                     <option value="letter grade">Letter Grade</option>
+                                                    <option value="location">Location</option>
                                                     <option value="number">Number</option>
                                                     <option value="option">Option</option>
                                                     <option value="percentage">Percentage</option>
@@ -954,6 +994,17 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
+                                            {normalizedStat.type === 'location' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Location</label>
+                                                    <LocationSelect
+                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
+                                                        onChange={(locationId) => updateActorStat(statIndex, { default: locationId })}
+                                                        locations={locationOptions}
+                                                    />
+                                                </div>
+                                            )}
+
                                             {normalizedStat.type === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
@@ -1040,6 +1091,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                 playerStats={[...actorStats, ...playerStats]}
                                                                 actorStats={actorStats}
                                                                 actors={Object.values(stageInstance.getSave().actors || {})}
+                                                                locations={locationOptions}
                                                                 allowVariableActorTarget
                                                                 onChange={(conditions) => updateActorStatPerActorRule(statIndex, rule.id, { conditions })}
                                                             />
@@ -1080,6 +1132,21 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                         Add Actor Stat
                     </Button>
                 </div>
+            </GlassPanel>
+
+            <GlassPanel variant="default" style={{ padding: '18px' }}>
+                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Universal Schedule</Title>
+                <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '11px', marginBottom: 10 }}>
+                    Applies to every actor and is evaluated after that actor's own schedule. The first destination to match wins, but any matching "Generally unavailable" entry supersedes a matched location.
+                </span>
+                <ActorScheduleEditor
+                    schedule={universalSchedule}
+                    locations={locationOptions}
+                    playerStats={playerStats}
+                    actors={Object.values(save.actors || {})}
+                    emptyLabel="No universal schedule entries. Every actor falls back to their own schedule."
+                    onChange={setUniversalSchedule}
+                />
             </GlassPanel>
         </div>
     );

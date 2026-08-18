@@ -17,7 +17,7 @@ const resolveStatDefaultValue = (stat: ActorStat): number | string | boolean => 
         return optionNames[0] || "";
     }
 
-    if (stat.type === "text") {
+    if (stat.type === "text" || stat.type === "location") {
         return typeof stat.default === "string" ? stat.default : "";
     }
 
@@ -37,7 +37,7 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): number | string | 
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.type === "text") {
+    if (stat.type === "text" || stat.type === "location") {
         if (typeof value === "string") {
             return value;
         }
@@ -54,8 +54,12 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): number | string | 
     return resolved;
 };
 
-const resolveDisplayValue = (stat: ActorStat, value: unknown): string => {
+const resolveDisplayValue = (stat: ActorStat, value: unknown, atlas?: { [key: string]: { name: string } }): string => {
     const normalized = normalizeStatValue(value, stat);
+    if (stat.type === "location") {
+        return atlas?.[String(normalized)]?.name || "";
+    }
+
     if (stat.type === "option") {
         return typeof normalized === "string" ? normalized : "";
     }
@@ -208,7 +212,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
                                         textAlign: "right",
                                     }}
                                 >
-                                    {resolveDisplayValue(stat, normalizedValue)}
+                                    {resolveDisplayValue(stat, normalizedValue, stageInstance.getSave()?.atlas)}
                                 </Typography>
                             </Box>
                         ) : (
@@ -221,7 +225,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
                                     wordBreak: "break-word",
                                 }}
                             >
-                                {resolveDisplayValue(stat, normalizedValue)}
+                                {resolveDisplayValue(stat, normalizedValue, stageInstance.getSave()?.atlas)}
                             </Typography>
                         )}
                     </Box>

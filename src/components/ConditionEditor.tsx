@@ -3,7 +3,7 @@ import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, LinkOffRounded, 
 import { ActorStat } from '../content/ActorStat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
-import { Button, TextInput } from './UiComponents';
+import { Button, LocationSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './ActorStatRating';
 
 interface ConditionEditorProps {
@@ -11,6 +11,7 @@ interface ConditionEditorProps {
     playerStats: ActorStat[];
     actorStats?: ActorStat[];
     actors?: Array<{ id: string; name: string }>;
+    locations?: Array<{ id: string; name: string }>;
     allowVariableActorTarget?: boolean;
     onChange: (conditionCollections: ConditionCollection[]) => void;
 }
@@ -66,6 +67,9 @@ const getDefaultConditionValue = (stat?: ActorStat): string | number | boolean =
     if (stat.type === 'option') {
         return typeof stat.default === 'string' ? stat.default : (stat.options?.[0]?.name || '');
     }
+    if (stat.type === 'location') {
+        return typeof stat.default === 'string' ? stat.default : '';
+    }
     return typeof stat.default === 'number' ? stat.default : 0;
 };
 
@@ -86,7 +90,7 @@ const buildActorTargetOptions = (actors: Array<{ id: string; name: string; image
     return options;
 };
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, playerStats, actorStats = [], actors = [], allowVariableActorTarget = false, onChange }) => {
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, playerStats, actorStats = [], actors = [], locations = [], allowVariableActorTarget = false, onChange }) => {
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
     const actorTargetOptions = buildActorTargetOptions(actors, allowVariableActorTarget);
     const concreteActorOptions = actorTargetOptions.filter((option) => !['variable', 'any', 'none'].includes(option.key));
@@ -161,6 +165,9 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         }
         if (stat?.type === 'checkbox') {
             return <input type="checkbox" checked={Boolean(condition.value === true || condition.value === 'true')} onChange={(event) => updateValue(event.target.checked)} />;
+        }
+        if (stat?.type === 'location') {
+            return <LocationSelect value={String(condition.value ?? '')} onChange={(locationId) => updateValue(locationId)} locations={locations} style={selectStyle} />;
         }
         return <TextInput type="number" value={condition.value as number | string} onChange={(event) => updateValue(Number(event.target.value))} />;
     };

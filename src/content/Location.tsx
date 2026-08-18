@@ -98,6 +98,13 @@ export function getLinkedLocationLore(location: Location, stage: Stage) {
 	return bestMatch;
 }
 
+export function getLocationName(locationId: unknown, atlas: { [key: string]: Location } | undefined): string {
+	if (typeof locationId !== 'string' || !locationId) {
+		return '';
+	}
+	return atlas?.[locationId]?.name || '';
+}
+
 export function getLocationDescription(locationId: string, stage: Stage) {
 	const location = stage.getSave().atlas[locationId];
 	if (!location) {

@@ -36,7 +36,14 @@ const toLetterGrade = (value: number, stat: ActorStat): string => {
     return LETTER_GRADES[Math.round(ratio * (LETTER_GRADES.length - 1))];
 };
 
-const StatValue: FC<{ stat: ActorStat; value: number | string | boolean }> = ({ stat, value }) => {
+const StatValue: FC<{ stat: ActorStat; value: number | string | boolean; atlas?: { [key: string]: { name: string } } }> = ({ stat, value, atlas }) => {
+    if (stat.type === 'location') {
+        return (
+            <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                {atlas?.[String(value)]?.name || ''}
+            </Box>
+        );
+    }
     if (stat.type === 'checkbox') {
         return (
             <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -186,7 +193,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                                     {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
                                     <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.name}</Box>
                                 </Box>
-                                <StatValue stat={stat} value={resolveStatValue(actor, stat)} />
+                                <StatValue stat={stat} value={resolveStatValue(actor, stat)} atlas={stage().getSave()?.atlas} />
                             </Box>
                         );
                     })}

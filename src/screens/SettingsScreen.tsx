@@ -2,7 +2,7 @@ import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SaveType, Stage } from '../Stage';
 import { ActorStat, ActorStatValue, isNumericDisplayType } from '../content/ActorStat';
-import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
+import { GlassPanel, Title, Button, ColorPickerInput, LocationSelect, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
 import { resolveIcon } from '../components/ActorStatRating';
@@ -50,7 +50,7 @@ const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
         return optionNames[0] || '';
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         return typeof stat.default === 'string' ? stat.default : '';
     }
 
@@ -70,7 +70,7 @@ const normalizePlayerStatValue = (value: unknown, stat: ActorStat): ActorStatVal
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.type === 'text') {
+    if (stat.type === 'text' || stat.type === 'location') {
         if (typeof value === 'string') {
             return value;
         }
@@ -474,6 +474,17 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)', fontSize: '12px' }}>
                                                         No options configured for this setting.
                                                     </div>
+                                                )}
+
+                                                {stat.type === 'location' && (
+                                                    <LocationSelect
+                                                        value={typeof selectedValue === 'string' ? selectedValue : ''}
+                                                        onChange={(locationId) => handlePlayerStatValueChange(stat, locationId)}
+                                                        locations={Object.values(stageInstance.getSave().atlas || {})
+                                                            .filter((location) => location.active !== false)
+                                                            .map((location) => ({ id: location.id, name: location.name }))}
+                                                        style={{ fontSize: '13px' }}
+                                                    />
                                                 )}
 
                                                 {stat.type === 'text' && (

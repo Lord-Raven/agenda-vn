@@ -2,7 +2,7 @@ import { Emotion, EMOTION_MAPPING } from "./Emotion";
 import { v4 as generateUuid } from 'uuid';
 import { Outcome, OutcomeType } from "./Outcome";
 import { Stage } from "../Stage";
-import { Actor, ACTOR_SCHEDULE_AVAILABLE, findBestNameMatch, getActorLore, resolveActorSchedule } from "./Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, buildActorContext, findBestNameMatch, getActorLore, resolveActorSchedule } from "./Actor";
 import { getLocationDescription } from "./Location";
 import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -14,6 +14,7 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { evaluateConditionCollections, hasVariableActorTarget } from './Condition';
+import { build } from "vite";
 
 const getDayDifference = (startDate: string, endDate: string): number => {
     const start = new Date(`${startDate}T00:00:00Z`);
@@ -202,7 +203,9 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         }
 
         const value = agendaConfig?.playerStatValues?.[statName] ?? stat.default;
-        const valueText = typeof value === 'number' ? String(value) : String(value || '');
+        const valueText = stat.type === 'location'
+            ? (save.atlas?.[String(value)]?.name || '')
+            : (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
             return '';
         }
@@ -230,7 +233,9 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         }
 
         const value = agendaConfig?.playerStatValues?.[statName] ?? stat.default;
-        const valueText = typeof value === 'number' ? String(value) : String(value || '');
+        const valueText = stat.type === 'location'
+            ? (save.atlas?.[String(value)]?.name || '')
+            : (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
             return '';
         }
@@ -329,10 +334,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         ).addBlock(`Characters Present`, (builder) => {
             if (skit) {
                 currentActors.forEach(actor => {
-                    const currentOutfit = actor.outfits.find(a => a.id === determineOutfit(actor.id, skit, skit.script.length - 1)) ?? actor.outfits[0];
-                    const otherOutfits = actor.outfits.filter(o => o.id !== currentOutfit?.id && o.emotionPack['neutral']);
-                    builder.addBlock(`${actor.name}`, `Profile: ${getActorLore(actor.id, stage)}\n  Description: ${actor.description}\n  Current Outfit (${currentOutfit.name}): ${currentOutfit.description}\n` +
-                        (otherOutfits.length > 0 ? `  Other Outfits: ${otherOutfits.map(o => o.name).join(', ')}\n` : '')
+                    builder.addBlock(`${actor.name}`, buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id))
                     );
                 })
             }
@@ -366,8 +368,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     .addBlock('Location',
                         `  ${skit.initialLocationId ? (save.atlas?.[skit.initialLocationId]?.name || 'Unknown Location') : 'Unknown Location'}\n` +
                         `    ${getLocationDescription(skit.initialLocationId, stage) || 'No description available.'}`)
-                    .addBlock('Available Characters',
-                        availableActors.map(actor => `  ${actor.name}\n    ${getActorLore(actor.id, stage)}`))
+                    .addBlock('Known Characters',
+                        availableActors.map(actor => {return buildActorContext(actor, '', stage, [], ['profile'])}))
                     .addBlock('Response Format',
                         buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
                     .addBlock('Example Response',
