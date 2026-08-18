@@ -199,7 +199,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                 }
                                 const target = actorTargetOptions[0]?.key || 'any';
                                 if (nextType === 'actorIdentity') {
-                                    updateCondition(collectionIndex, conditionIndex, { type: 'actorIdentity', actorId: target, comparison: 'equals', value: concreteActorOptions[0]?.key || '' });
+                                    updateCondition(collectionIndex, conditionIndex, { type: 'actorIdentity', comparison: 'equals', value: concreteActorOptions[0]?.key || '' });
                                     return;
                                 }
                                 const actorStat = actorStats[0];
@@ -209,13 +209,13 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             <option value="calendar">Calendar</option>
                             <option value="playerStat">Player Stat</option>
                             <option value="actorStat">Actor Stat</option>
-                            <option value="actorIdentity">Actor Identity</option>
+                            {allowVariableActorTarget && <option value="actorIdentity">Actor Identity</option>}
                         </select>
                         {condition.type === 'calendar' ? (
                             <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 })}>
                                 {CALENDAR_FIELDS.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
                             </select>
-                        ) : (condition.type === 'actorStat' || condition.type === 'actorIdentity') ? (
+                        ) : condition.type === 'actorStat' ? (
                             <div style={{ display: 'grid', gap: 6 }}>
                                 <SearchableOptionPicker
                                     value={condition.actorId}
@@ -228,6 +228,8 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                     placeholder="Search actors"
                                 />
                             </div>
+                        ) : condition.type === 'actorIdentity' ? (
+                            <div />
                         ) : (
                             <select style={selectStyle} value={condition.statName} onChange={(event) => {
                                 const stat = playerStats.find(candidate => candidate.name === event.target.value);
