@@ -3,7 +3,7 @@ import { Add, ArrowDownward, ArrowUpward, Delete, EventAvailable, EventBusy } fr
 import { ActorSchedule, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE } from '../content/Actor';
 import { ActorStat } from '../content/ActorStat';
 import { Button } from './UiComponents';
-import { SearchableOptionPicker } from './ActorStatRating';
+import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { ConditionEditor } from './ConditionEditor';
 
 interface ActorScheduleEditorProps {

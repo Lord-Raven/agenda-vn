@@ -4,7 +4,7 @@ import { ActorStat } from '../content/ActorStat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
 import { Button, LocationSelect, TextInput } from './UiComponents';
-import { SearchableOptionPicker } from './ActorStatRating';
+import { SearchableOptionPicker } from './SearchableOptionPicker';
 
 interface ConditionEditorProps {
     conditionCollections: ConditionCollection[];
@@ -145,7 +145,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                 <SearchableOptionPicker
                     value={condition.value}
                     onChange={(nextValue) => updateValue((Array.isArray(nextValue) ? nextValue[0] : nextValue) || concreteActorOptions[0]?.key || '')}
-                    options={concreteActorOptions.map((option) => ({ key: option.key, label: option.label, imageUrl: option.imageUrl }))}
+                    options={concreteActorOptions.map((option) => ({ key: option.key, label: option.label, icon: option.icon, imageUrl: option.imageUrl }))}
                     allowClear={false}
                     emptyLabel="None"
                     title="Choose actor"
@@ -227,7 +227,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                 <SearchableOptionPicker
                                     value={condition.actorId}
                                     onChange={(nextValue) => updateCondition(collectionIndex, conditionIndex, { ...condition, actorId: nextValue || (allowVariableActorTarget ? 'variable' : 'any') } as Condition)}
-                                    options={actorTargetOptions.map((option) => ({ key: option.key, label: option.label, imageUrl: option.imageUrl }))}
+                                    options={actorTargetOptions.map((option) => ({ key: option.key, label: option.label, icon: option.icon, imageUrl: option.imageUrl }))}
                                     defaultOptionKeys={allowVariableActorTarget ? ['variable', 'any', 'none'] : ['any', 'none']}
                                     allowClear={false}
                                     emptyLabel="None"

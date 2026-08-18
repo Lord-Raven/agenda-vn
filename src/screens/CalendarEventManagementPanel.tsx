@@ -4,7 +4,7 @@ import { DoNotDisturb } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
-import { SearchableOptionPicker } from '../components/ActorStatRating';
+import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { ActorPortrait } from '../components/ActorPortrait';
 import {
     CategorizedEntrySection,
