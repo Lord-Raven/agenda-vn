@@ -1928,6 +1928,7 @@ ${indent}}`;
                                             schedule={editedActor.schedule}
                                             locations={Object.values(stage().getSave().atlas || {}).filter(location => location.active !== false)}
                                             playerStats={stage().getConfiguration().playerStats || []}
+                                            actorStats={actorStats}
                                             actors={Object.values(stage().getSave().actors || {})}
                                             onChange={(schedule) => setEditedActor(current => ({ ...current, schedule }))}
                                         />

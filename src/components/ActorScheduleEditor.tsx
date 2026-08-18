@@ -10,6 +10,7 @@ interface ActorScheduleEditorProps {
     schedule: ActorSchedule;
     locations: Array<{ id: string; name: string; imageUrl?: string }>;
     playerStats: ActorStat[];
+    actorStats: ActorStat[];
     actors?: Array<{ id: string; name: string }>;
     emptyLabel?: string;
     onChange: (schedule: ActorSchedule) => void;
@@ -19,7 +20,7 @@ const cloneSchedule = (entries: Array<[string, ActorSchedule[string]]>): ActorSc
     entries.map(([destination, collections]) => [destination, collections.map(collection => [...collection])]),
 );
 
-export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, locations, playerStats, actors = [], emptyLabel = 'No schedule entries. This actor is generally available.', onChange }) => {
+export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, locations, playerStats, actorStats, actors = [], emptyLabel = 'No schedule entries. This actor is generally available.', onChange }) => {
     const entries = Object.entries(schedule);
     const targets = [
         { key: ACTOR_SCHEDULE_AVAILABLE, label: 'Generally available', icon: EventAvailable },
@@ -80,7 +81,15 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
                             <Button variant="secondary" disabled={index === entries.length - 1} onClick={() => moveEntry(index, 1)} aria-label="Move schedule entry down" style={{ minWidth: 34, padding: 6 }}><ArrowDownward fontSize="small" /></Button>
                             <Button variant="danger" onClick={() => onChange(cloneSchedule(entries.filter((_, currentIndex) => currentIndex !== index)))} aria-label="Delete schedule entry" style={{ minWidth: 34, padding: 6 }}><Delete fontSize="small" /></Button>
                         </div>
-                        <ConditionEditor conditionCollections={conditionCollections} playerStats={playerStats} actors={actors} locations={locations} onChange={collections => updateEntry(index, destination, collections)} />
+                        <ConditionEditor
+                            conditionCollections={conditionCollections}
+                            playerStats={playerStats}
+                            actorStats={actorStats}
+                            actors={actors}
+                            locations={locations}
+                            allowVariableActorTarget
+                            onChange={collections => updateEntry(index, destination, collections)}
+                        />
                         {conditionCollections.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Always applies when reached.</span>}
                     </div>
                 );

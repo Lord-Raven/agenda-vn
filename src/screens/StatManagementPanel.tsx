@@ -569,15 +569,29 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 />
                                             </div>
 
-                                            <div style={inlineFieldTopStyle}>
-                                                <label style={fieldLabelStyle}>Description</label>
-                                                <TextArea
-                                                    value={stat.description}
-                                                    onChange={(e) => updatePlayerStat(statIndex, { description: e.target.value })}
-                                                    rows={2}
-                                                    style={{ width: '100%', resize: 'vertical' }}
-                                                />
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Visible In UI</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.exposed === true}
+                                                        onChange={(e) => updatePlayerStat(statIndex, { exposed: e.target.checked })}
+                                                    />
+                                                    Exposed
+                                                </label>
                                             </div>
+
+                                            {stat.exposed === true && (
+                                                <div style={inlineFieldTopStyle}>
+                                                    <label style={fieldLabelStyle}>Description</label>
+                                                    <TextArea
+                                                        value={stat.description}
+                                                        onChange={(e) => updatePlayerStat(statIndex, { description: e.target.value })}
+                                                        rows={2}
+                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                    />
+                                                </div>
+                                            )}
 
                                             <div style={inlineFieldTopStyle}>
                                                 <label style={fieldLabelStyle}>Guidance</label>
@@ -614,15 +628,6 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             </div>
 
                                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Visible In UI</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.exposed === true}
-                                                        onChange={(e) => updatePlayerStat(statIndex, { exposed: e.target.checked })}
-                                                    />
-                                                    Exposed
-                                                </label>
                                                 <label style={fieldLabelStyle}>Editable In Settings</label>
                                                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
                                                     <input
@@ -662,15 +667,17 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                     placeholder="Option name"
                                                                 />
                                                             </div>
-                                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                                <label style={fieldLabelStyle}>Option Description</label>
-                                                                <TextArea
-                                                                    value={option.description}
-                                                                    onChange={(e) => updatePlayerStatOption(statIndex, optionIndex, { description: e.target.value })}
-                                                                    rows={2}
-                                                                    style={{ width: '100%', resize: 'vertical' }}
-                                                                />
-                                                            </div>
+                                                            {stat.exposed === true && (
+                                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                                                    <label style={fieldLabelStyle}>Option Description</label>
+                                                                    <TextArea
+                                                                        value={option.description}
+                                                                        onChange={(e) => updatePlayerStatOption(statIndex, optionIndex, { description: e.target.value })}
+                                                                        rows={2}
+                                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                                    />
+                                                                </div>
+                                                            )}
                                                             <div style={{ marginTop: 8 }}>
                                                                 <Button variant="danger" onClick={() => removePlayerStatOption(statIndex, optionIndex)}>
                                                                     Remove Option
@@ -1143,6 +1150,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     schedule={universalSchedule}
                     locations={locationOptions}
                     playerStats={playerStats}
+                    actorStats={actorStats}
                     actors={Object.values(save.actors || {})}
                     emptyLabel="No universal schedule entries. Every actor falls back to their own schedule."
                     onChange={setUniversalSchedule}

@@ -398,7 +398,9 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                         <ConditionEditor
                                             conditionCollections={alternative.conditionCollections}
                                             playerStats={stageInstance.getConfiguration().playerStats || []}
+                                            actorStats={stageInstance.getConfiguration().actorStats || []}
                                             actors={Object.values(stageInstance.getSave().actors || {})}
+                                            allowVariableActorTarget
                                             onChange={conditionCollections => updateAlternative(index, { conditionCollections })}
                                         />
                                         <Button variant="secondary" onClick={() => generateVariantImage(index)} disabled={isGeneratingVariant} style={{ justifySelf: 'end', display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -432,7 +434,9 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                             <ConditionEditor
                                 conditionCollections={link.conditionCollections || []}
                                 playerStats={stageInstance.getConfiguration().playerStats || []}
+                                actorStats={stageInstance.getConfiguration().actorStats || []}
                                 actors={Object.values(stageInstance.getSave().actors || {})}
+                                allowVariableActorTarget
                                 onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
                             />
                         </div>

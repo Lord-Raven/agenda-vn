@@ -130,13 +130,14 @@ export type ScheduleContext = ConditionContext & { universalSchedule?: ActorSche
 
 // The actor's own rules are evaluated first, then the universal rules; the first matching destination wins,
 // but any matching "unavailable" rule supersedes a matched location.
-export const resolveActorSchedule = (actor: Pick<Actor, 'schedule'>, context: ScheduleContext): string => {
+export const resolveActorSchedule = (actor: Pick<Actor, 'id' | 'name' | 'statMap' | 'schedule'>, context: ScheduleContext): string => {
     let destination = '';
     let unavailable = false;
+    const evaluationContext: ScheduleContext = { ...context, currentActor: actor };
 
     for (const schedule of [actor.schedule, context?.universalSchedule]) {
         for (const [target, conditionCollections] of Object.entries(schedule || {})) {
-            if (!evaluateConditionCollections(conditionCollections, context)) {
+            if (!evaluateConditionCollections(conditionCollections, evaluationContext)) {
                 continue;
             }
             if (target === ACTOR_SCHEDULE_UNAVAILABLE) {
