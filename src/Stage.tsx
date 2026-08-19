@@ -756,6 +756,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         try {
             const entries = await generateSkitScript(skit, this);
             skit.script.push(...entries);
+            console.log('continueSkit: Updated skit.script length:', skit.script.length);
             this.saveGame();
         } catch (err) {
             console.error('Error continuing skit script', err);

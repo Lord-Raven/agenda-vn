@@ -154,6 +154,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
             script: skit.script.slice(0, clampedCurrentIndex + 1)
         };
 
+        console.log('handleClose called. Ended early:', endedEarly, 'Finalized skit length:', finalizedSkit.script.length);
         setSkit(finalizedSkit);
         stage().endSkit();
         setScreenType(ScreenType.MAP);
@@ -165,6 +166,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
         const nextEntries = await generateSkitScript(skitArg, stage());
         setIsLoading(false);
         skitArg.script.push(...nextEntries);
+        console.log('handleSkitSubmit: Updated skitArg.script length:', skitArg.script.length);
         stage().saveGame();
 
         return skitArg;
@@ -172,8 +174,10 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
 
     useEffect(() => {
         if (skit.script.length == 0 && !isLoading) {
+            console.log('Initial skit script is empty. Triggering continueSkit.');
             setIsLoading(true);
             stage().continueSkit().then(() => {
+                console.log('continueSkit resolved.');
                 setIsLoading(false);
                 stage().saveGame();
             });
