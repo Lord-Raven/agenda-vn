@@ -8,6 +8,7 @@ export type PickerOption = {
     icon?: any;
     imageUrl?: string;
     description?: string;
+    renderAvatar?: (size: number, active: boolean) => ReactNode;
 };
 
 export interface SearchableOptionPickerProps {
@@ -67,6 +68,10 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     const selectedOption = options.find((option) => option.key === selectedValue);
 
     const renderOptionAvatar = (option: PickerOption, active: boolean, size: number = 30) => {
+        if (option.renderAvatar) {
+            return option.renderAvatar(size, active);
+        }
+
         if (option.imageUrl) {
             return (
                 <img

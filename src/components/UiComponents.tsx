@@ -8,9 +8,12 @@ import React, { FC, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Actor } from '../content/Actor';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HourglassTop, HourglassBottom } from '@mui/icons-material';
+import { HourglassTop, HourglassBottom, Place } from '@mui/icons-material';
 import { Box, lighten, Chip as MuiChip, Popover, Typography } from '@mui/material';
 import { useTooltip } from './TooltipContext';
+import { LocationPortrait, LocationLike } from './LocationPortrait';
+import { PickerOption, SearchableOptionPicker } from './SearchableOptionPicker';
+import { Stage } from '../Stage';
 
 /* ===============================================
    PANEL COMPONENTS (Using MUI Paper with custom styling)
@@ -326,8 +329,11 @@ export const TextArea: FC<TextAreaProps> = ({
 interface LocationSelectProps {
 	value: string;
 	onChange: (locationId: string) => void;
-	locations: Array<{ id: string; name: string }>;
+	locations: LocationLike[];
+	stage?: Stage | (() => Stage);
+	allowClear?: boolean;
 	emptyLabel?: string;
+	title?: string;
 	style?: React.CSSProperties;
 	className?: string;
 }
@@ -336,27 +342,45 @@ export const LocationSelect: FC<LocationSelectProps> = ({
 	value,
 	onChange,
 	locations,
+	stage,
+	allowClear = true,
 	emptyLabel = 'No location',
-	className = '',
+	title = 'Choose location',
 	style,
 }) => {
 	const sortedLocations = [...locations].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 	// Keep dangling ids (e.g. a deleted location) selectable so saving does not silently drop them.
 	const isMissing = Boolean(value) && !sortedLocations.some((location) => location.id === value);
 
+	const options: PickerOption[] = sortedLocations.map((location) => ({
+		key: location.id,
+		label: location.name || 'Unnamed location',
+		renderAvatar: (size, active) => (
+			<LocationPortrait
+				location={location}
+				stage={stage}
+				width={Math.round(size * 1.34)}
+				height={size}
+				highlighted={active}
+			/>
+		),
+	}));
+	if (isMissing) {
+		options.push({ key: value, label: 'Unknown location', icon: Place });
+	}
+
 	return (
-		<select
-			className={`input-base ${className}`}
-			value={value || ''}
-			onChange={(event) => onChange(event.target.value)}
-			style={{ width: '100%', ...style }}
-		>
-			<option value="">{emptyLabel}</option>
-			{sortedLocations.map((location) => (
-				<option key={location.id} value={location.id}>{location.name || 'Unnamed location'}</option>
-			))}
-			{isMissing && <option value={value}>Unknown location</option>}
-		</select>
+		<div style={{ width: '100%', ...style }}>
+			<SearchableOptionPicker
+				value={value || undefined}
+				onChange={(nextValue) => onChange((Array.isArray(nextValue) ? nextValue[0] : nextValue) || '')}
+				options={options}
+				allowClear={allowClear}
+				emptyLabel={emptyLabel}
+				title={title}
+				placeholder="Search locations"
+			/>
+		</div>
 	);
 };
 

@@ -4,11 +4,12 @@ import { ActorSchedule, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE } f
 import { ActorStat } from '../content/ActorStat';
 import { Button } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
+import { LocationPortrait, LocationLike } from './LocationPortrait';
 import { ConditionEditor } from './ConditionEditor';
 
 interface ActorScheduleEditorProps {
     schedule: ActorSchedule;
-    locations: Array<{ id: string; name: string; imageUrl?: string }>;
+    locations: LocationLike[];
     playerStats: ActorStat[];
     actorStats: ActorStat[];
     actors?: Array<{ id: string; name: string }>;
@@ -25,7 +26,13 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
     const targets = [
         { key: ACTOR_SCHEDULE_AVAILABLE, label: 'Generally available', icon: EventAvailable },
         { key: ACTOR_SCHEDULE_UNAVAILABLE, label: 'Generally unavailable', icon: EventBusy },
-        ...locations.map(location => ({ key: location.id, label: location.name || 'Unnamed location', imageUrl: location.imageUrl || '' })),
+        ...locations.map(location => ({
+            key: location.id,
+            label: location.name || 'Unnamed location',
+            renderAvatar: (size: number, active: boolean) => (
+                <LocationPortrait location={location} width={Math.round(size * 1.34)} height={size} highlighted={active} />
+            ),
+        })),
     ];
 
     const updateEntry = (index: number, destination: string, collections: ActorSchedule[string]) => {

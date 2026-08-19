@@ -3,7 +3,7 @@ import { useReducedMotion } from 'framer-motion';
 import { DoNotDisturb } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
-import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { Button, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { ActorPortrait } from '../components/ActorPortrait';
 import {
@@ -351,15 +351,13 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Location</label>
-                        <select
-                            className="input-base"
+                        <LocationSelect
                             value={draft.locationId}
-                            onChange={(e) => updateDraft({ locationId: e.target.value })}
-                        >
-                            {locations.map(location => (
-                                <option key={location.id} value={location.id}>{location.name}</option>
-                            ))}
-                        </select>
+                            onChange={(locationId) => updateDraft({ locationId })}
+                            locations={locations}
+                            stage={stage}
+                            allowClear={false}
+                        />
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>

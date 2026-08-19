@@ -481,8 +481,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                         value={typeof selectedValue === 'string' ? selectedValue : ''}
                                                         onChange={(locationId) => handlePlayerStatValueChange(stat, locationId)}
                                                         locations={Object.values(stageInstance.getSave().atlas || {})
-                                                            .filter((location) => location.active !== false)
-                                                            .map((location) => ({ id: location.id, name: location.name }))}
+                                                            .filter((location) => location.active !== false)}
+                                                        stage={stage}
                                                         style={{ fontSize: '13px' }}
                                                     />
                                                 )}

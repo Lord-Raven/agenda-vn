@@ -210,8 +210,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
     );
     const locationOptions = useMemo(
         () => Object.values(save.atlas || {})
-            .filter(location => location.active !== false)
-            .map(location => ({ id: location.id, name: location.name, imageUrl: location.imageUrl })),
+            .filter(location => location.active !== false),
         [save.atlas],
     );
     const [collapsedPlayerStats, setCollapsedPlayerStats] = useState<boolean[]>(() =>
@@ -512,6 +511,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     value={typeof rule.value === 'string' ? rule.value : ''}
                     onChange={(locationId) => onChange(locationId)}
                     locations={locationOptions}
+                    stage={stage}
                 />
             );
         }
@@ -711,6 +711,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
                                                         onChange={(locationId) => updatePlayerStat(statIndex, { default: locationId })}
                                                         locations={locationOptions}
+                                                        stage={stage}
                                                     />
                                                 </div>
                                             )}
@@ -1008,6 +1009,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
                                                         onChange={(locationId) => updateActorStat(statIndex, { default: locationId })}
                                                         locations={locationOptions}
+                                                        stage={stage}
                                                     />
                                                 </div>
                                             )}

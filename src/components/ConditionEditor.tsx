@@ -5,13 +5,14 @@ import { Actor, getEmotionImage } from '../content/Actor';
 import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
 import { Button, LocationSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
+import { LocationLike } from './LocationPortrait';
 
 interface ConditionEditorProps {
     conditionCollections: ConditionCollection[];
     playerStats: ActorStat[];
     actorStats?: ActorStat[];
     actors?: Array<{ id: string; name: string }>;
-    locations?: Array<{ id: string; name: string }>;
+    locations?: LocationLike[];
     allowVariableActorTarget?: boolean;
     onChange: (conditionCollections: ConditionCollection[]) => void;
 }
@@ -167,7 +168,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             return <input type="checkbox" checked={Boolean(condition.value === true || condition.value === 'true')} onChange={(event) => updateValue(event.target.checked)} />;
         }
         if (stat?.type === 'location') {
-            return <LocationSelect value={String(condition.value ?? '')} onChange={(locationId) => updateValue(locationId)} locations={locations} style={selectStyle} />;
+            return <LocationSelect value={String(condition.value ?? '')} onChange={(locationId) => updateValue(locationId)} locations={locations} style={{ width: '100%', minWidth: 0 }} />;
         }
         return <TextInput type="number" value={condition.value as number | string} onChange={(event) => updateValue(Number(event.target.value))} />;
     };

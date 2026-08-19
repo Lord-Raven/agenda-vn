@@ -170,8 +170,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     }, [stage]);
 
     const locationOptions = useMemo(() => Object.values(stage().getSave().atlas || {})
-        .filter((location) => location.active !== false)
-        .map((location) => ({ id: location.id, name: location.name })), [stage]);
+        .filter((location) => location.active !== false), [stage]);
 
     const perActorStats = useMemo(() => {
         const configured = stage().getConfiguration().actorStats || [];
@@ -947,6 +946,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                     value={typeof value === 'string' ? value : ''}
                     onChange={(locationId) => onChange(locationId)}
                     locations={locationOptions}
+                    stage={stage}
                 />
             );
         }
@@ -2026,6 +2026,7 @@ ${indent}}`;
                                                                     value={typeof editedStatMap[stat.name] === 'string' ? String(editedStatMap[stat.name]) : ''}
                                                                     onChange={(locationId) => handleActorStatLocationChange(stat, locationId)}
                                                                     locations={locationOptions}
+                                                                    stage={stage}
                                                                     style={{ maxWidth: '220px' }}
                                                                 />
                                                             )}
