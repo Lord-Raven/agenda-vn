@@ -409,7 +409,9 @@ export async function distillLocation(location: Location, definition: any, stage
 		return existingGeneration as Promise<Location | null>;
 	}
 
-	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [], stage.getSave())) || 'None provided.';
+	const save = stage.getSave();
+	const configuration = stage.getConfiguration();
+	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, playerStats: configuration.playerStats, actorStats: configuration.actorStats })) || 'None provided.';
 
 	const locationDetails = [
 		`Name: ${String(definition?.name || location.name || '').trim()}`,

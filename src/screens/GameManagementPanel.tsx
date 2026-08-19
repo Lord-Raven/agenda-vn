@@ -1,6 +1,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { Stage } from '../Stage';
+import { v4 as generateUuid } from 'uuid';
 import { ActorStat, ActorStatType, ActorStatValue, isNumericDisplayType } from '../content/ActorStat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
@@ -11,6 +12,7 @@ interface GameManagementPanelProps {
 }
 
 const cloneActorStat = (stat: ActorStat): ActorStat => ({
+    id: stat.id || generateUuid(),
     name: stat.name,
     description: stat.description,
     guidance: stat.guidance,
@@ -157,12 +159,11 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         const nextValues: { [key: string]: ActorStatValue } = {};
 
         playerStats.forEach((stat) => {
-            const statName = (stat.name || '').trim();
-            if (!statName) {
+            if (!stat.id || !(stat.name || '').trim()) {
                 return;
             }
 
-            nextValues[statName] = normalizeStatValue(playerStatValues[statName], stat);
+            nextValues[stat.id] = normalizeStatValue(playerStatValues[stat.id], stat);
         });
 
         return nextValues;
@@ -301,11 +302,10 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
         const currentSave = stageInstance.getSave();
 
-        const statNames = new Set(
+        const statIds = new Set(
             actorStats
                 .filter(stat => isNumericDisplayType(stat.type) && !stat.perActor)
-                .map(stat => stat.name.trim())
-                .filter(Boolean),
+                .map(stat => stat.id),
         );
         Object.values(currentSave.actors || {}).forEach(actor => {
             if (!actor.statMap || typeof actor.statMap !== 'object') {
@@ -313,19 +313,18 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             }
 
             actorStats.filter(stat => isNumericDisplayType(stat.type) && !stat.perActor).forEach(stat => {
-                const statName = stat.name.trim();
-                if (!statName) {
+                if (!stat.id || !stat.name.trim()) {
                     return;
                 }
-                const existing = actor.statMap[statName];
+                const existing = actor.statMap[stat.id];
                 const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
                 const value = Number.isFinite(existing) ? Number(existing) : fallback;
-                actor.statMap[statName] = clampStatValue(value, stat);
+                actor.statMap[stat.id] = clampStatValue(value, stat);
             });
 
-            Object.keys(actor.statMap).forEach(statName => {
-                if (!statNames.has(statName)) {
-                    delete actor.statMap[statName];
+            Object.keys(actor.statMap).forEach(statId => {
+                if (!statIds.has(statId)) {
+                    delete actor.statMap[statId];
                 }
             });
         });

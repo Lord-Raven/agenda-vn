@@ -1,4 +1,5 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
+import type { ActorStat } from './ActorStat';
 
 export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual';
 export type ActorConditionTarget = 'any' | 'none' | 'variable' | string;
@@ -12,7 +13,7 @@ export type CalendarCondition = {
 
 export type PlayerStatCondition = {
     type: 'playerStat';
-    statName: string;
+    statId: string;
     comparison: ConditionComparison;
     value: string | number | boolean;
 };
@@ -20,7 +21,7 @@ export type PlayerStatCondition = {
 export type ActorStatCondition = {
     type: 'actorStat';
     actorId: ActorConditionTarget;
-    statName: string;
+    statId: string;
     comparison: ConditionComparison;
     value: string | number | boolean;
 };
@@ -43,6 +44,8 @@ export type ConditionContext = {
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
     playerStatValues?: Record<string, string | number | boolean>;
+    playerStats?: ActorStat[];
+    actorStats?: ActorStat[];
     actors?: Array<{ id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string }> | Record<string, { id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string }>;
     currentActor?: { id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string };
     actorStatValues?: Record<string, Record<string, string | number | boolean>>;
@@ -103,11 +106,11 @@ const getCalendarValue = (condition: CalendarCondition, context: ConditionContex
     }
 };
 
-const getActorStatValue = (actor: { statMap?: Record<string, string | number | boolean> } | undefined, statName: string): string | number | boolean | undefined => {
+const getActorStatValue = (actor: { statMap?: Record<string, string | number | boolean> } | undefined, statId: string): string | number | boolean | undefined => {
     if (!actor) {
         return undefined;
     }
-    return actor.statMap?.[statName];
+    return actor.statMap?.[statId];
 };
 
 type ConditionActor = { id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string };
@@ -143,7 +146,8 @@ const resolveConditionActorSubjects = (actorId: ActorConditionTarget, context: C
 
 export const evaluateActorStatCondition = (condition: ActorStatCondition, context: ConditionContext): boolean => {
     const { mode, actors } = resolveConditionActorSubjects(condition.actorId, context);
-    const matches = (actor: ConditionActor) => compareValues(getActorStatValue(actor, condition.statName), condition.value, condition.comparison);
+    const stat = context.actorStats?.find(candidate => candidate.id === condition.statId);
+    const matches = (actor: ConditionActor) => compareValues(getActorStatValue(actor, stat?.id || ''), condition.value, condition.comparison);
 
     if (mode === 'any') return actors.some(matches);
     if (mode === 'none') return !actors.some(matches);
@@ -164,7 +168,8 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
     }
 
     if (condition.type === 'playerStat') {
-        const actual = context.playerStatValues?.[condition.statName];
+        const stat = context.playerStats?.find(candidate => candidate.id === condition.statId);
+            const actual = stat ? context.playerStatValues?.[condition.statId] : undefined;
         return compareValues(actual, condition.value, condition.comparison);
     }
 

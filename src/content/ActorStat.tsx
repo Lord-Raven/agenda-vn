@@ -1,3 +1,4 @@
+import { v4 as generateUuid } from 'uuid';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
 // 'location' stats hold a location ID (a key into the save's atlas) rather than a display value.
@@ -26,6 +27,7 @@ export type ActorStatValueRule = {
 
 // Represents a custom stat that applies to all actors in the game.
 export type ActorStat = {
+    id: string;
     name: string;
     description: string;
     // When true, this stat's value on a given actor is a mapping of target actorId to a value of `type`
@@ -68,6 +70,7 @@ export const cloneActorStatValueRule = (rule: ActorStatValueRule): ActorStatValu
 export const cloneActorStatValueRules = (rules: ActorStatValueRule[] | undefined): ActorStatValueRule[] => (rules || []).map(cloneActorStatValueRule);
 
 export const cloneActorStat = (stat: ActorStat): ActorStat => ({
+    id: stat.id || generateUuid(),
     name: stat.name,
     description: stat.description,
     perActor: stat.perActor === true,

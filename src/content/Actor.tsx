@@ -108,6 +108,10 @@ const cloneStatInitialMap = (statInitialMap: unknown): { [key: string]: ActorSta
 
 export const ACTOR_SCHEDULE_AVAILABLE = 'available';
 export const ACTOR_SCHEDULE_UNAVAILABLE = 'unavailable';
+// Destination prefixes for schedule entries that resolve to a location dynamically via an ActorStat of type
+// 'location', rather than a fixed location id; the suffix is the referenced ActorStat's id.
+export const ACTOR_SCHEDULE_PLAYER_STAT_PREFIX = 'playerStat:';
+export const ACTOR_SCHEDULE_ACTOR_STAT_PREFIX = 'actorStat:';
 export type ActorSchedule = Record<string, ConditionCollection[]>;
 
 export const cloneActorSchedule = (schedule: unknown): ActorSchedule => {
@@ -126,7 +130,30 @@ export const cloneActorSchedule = (schedule: unknown): ActorSchedule => {
     }));
 };
 
-export type ScheduleContext = ConditionContext & { universalSchedule?: ActorSchedule };
+export type ScheduleContext = ConditionContext & {
+    universalSchedule?: ActorSchedule;
+    playerStats?: ActorStat[];
+    actorStats?: ActorStat[];
+};
+
+// Resolves a destination that references an ActorStat of type 'location' (see ACTOR_SCHEDULE_*_STAT_PREFIX)
+// down to the actual location id it currently points to; a player stat reads from context.playerStatValues,
+// while an actor stat reads from the scheduled actor's own statMap. Returns '' if unresolved.
+const resolveScheduleStatDestination = (destination: string, actor: Pick<Actor, 'statMap'>, context: ScheduleContext): string => {
+    if (destination.startsWith(ACTOR_SCHEDULE_PLAYER_STAT_PREFIX)) {
+        const statId = destination.slice(ACTOR_SCHEDULE_PLAYER_STAT_PREFIX.length);
+        const stat = (context.playerStats || []).find(candidate => candidate.id === statId);
+        const value = stat ? context.playerStatValues?.[stat.id] : undefined;
+        return typeof value === 'string' ? value : '';
+    }
+    if (destination.startsWith(ACTOR_SCHEDULE_ACTOR_STAT_PREFIX)) {
+        const statId = destination.slice(ACTOR_SCHEDULE_ACTOR_STAT_PREFIX.length);
+        const stat = (context.actorStats || []).find(candidate => candidate.id === statId);
+        const value = stat ? actor.statMap?.[stat.id] : undefined;
+        return typeof value === 'string' ? value : '';
+    }
+    return destination;
+};
 
 // The actor's own rules are evaluated first, then the universal rules; the first matching destination wins,
 // but any matching "unavailable" rule supersedes a matched location.
@@ -151,7 +178,10 @@ export const resolveActorSchedule = (actor: Pick<Actor, 'id' | 'name' | 'statMap
     if (unavailable) {
         return ACTOR_SCHEDULE_UNAVAILABLE;
     }
-    return destination || ACTOR_SCHEDULE_AVAILABLE;
+    if (!destination) {
+        return ACTOR_SCHEDULE_AVAILABLE;
+    }
+    return resolveScheduleStatDestination(destination, actor, context) || ACTOR_SCHEDULE_AVAILABLE;
 };
 
 
@@ -346,7 +376,7 @@ export function applyActorInitialStats(actor: Actor, actorStats: ActorStat[], co
     actorStats
         .filter(stat => stat?.name?.trim() && !stat.perActor && (isNumericDisplayType(stat.type) || stat.type === 'checkbox' || stat.type === 'location'))
         .forEach(stat => {
-            actor.statMap[stat.name] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context) as number | string | boolean;
+            actor.statMap[stat.id] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context) as number | string | boolean;
         });
 }
 
@@ -437,7 +467,9 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     }));
 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
-    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(stage.getSave().lorebook || [], stage.getSave())) || 'None provided.';
+    const save = stage.getSave();
+    const configuration = stage.getConfiguration();
+    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, playerStats: configuration.playerStats, actorStats: configuration.actorStats })) || 'None provided.';
     const otherActorsContext = Object.values(stage.getSave().actors || {})
         .filter(otherActor => otherActor?.id && otherActor.id !== actor.id && otherActor.active !== false && otherActor !== stage.getPlayerActor())
         .map(otherActor => {
@@ -527,10 +559,10 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
 
         actorStats.forEach((stat, index) => {
             const parsedValue = Number(parsedData[`stat_${index}`]);
-            const currentValue = Number(actor.statMap[stat.name]);
+            const currentValue = Number(actor.statMap[stat.id]);
             const fallbackValue = Number.isFinite(currentValue) ? currentValue : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
             const resolvedValue = Number.isFinite(parsedValue) ? parsedValue : fallbackValue;
-            actor.statMap[stat.name] = clampActorStatValue(resolvedValue, stat);
+            actor.statMap[stat.id] = clampActorStatValue(resolvedValue, stat);
         });
 
         upsertActorLoreEntry(actor, oldName, stage);
@@ -830,14 +862,18 @@ export function getActorLore(actorId: string, stage: Stage) {
 		return '';
 	}
 
-    const lore = getLinkedActorLore(actor, stage);
+	const lore = getLinkedActorLore(actor, stage);
+    const save = stage.getSave();
+    const configuration = stage.getConfiguration();
     const variableLoreText = (stage.getSave().lorebook || [])
         .filter((entry) => entry?.enabled && entry?.title && hasVariableActorTarget(entry.conditionCollections))
         .filter((entry) => evaluateConditionCollections(entry.conditionCollections, {
             actors: [actor],
             currentActor: actor,
             actorStatValues: { [actor.id]: actor.statMap || {} },
-            playerStatValues: stage.getSave().playerStatValues,
+            playerStatValues: save.playerStatValues,
+            playerStats: configuration.playerStats,
+            actorStats: configuration.actorStats,
         }))
         .map((entry) => `Additional Instruction: ${entry.title}\n${entry.content}`)
         .join('\n\n');
@@ -914,8 +950,8 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
     if (options.includes('stats')) {
         const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
         const scalarStatLines = actorStats
-            .filter(stat => !stat.perActor && actor.statMap?.[stat.name] !== undefined)
-            .map(stat => `${stat.name}: ${formatActorStatValue(normalizeActorStatValue(actor.statMap[stat.name], stat), stat, save.atlas)}`);
+            .filter(stat => !stat.perActor && actor.statMap?.[stat.id] !== undefined)
+            .map(stat => `${stat.name}: ${formatActorStatValue(normalizeActorStatValue(actor.statMap[stat.id], stat), stat, save.atlas)}`);
         if (scalarStatLines.length > 0) {
             builder.addBlock('Stats', scalarStatLines.join('\n'));
         }
@@ -929,6 +965,8 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
                     currentDate: save.currentDate,
                     currentTimeOfDay: save.currentTimeOfDay,
                     playerStatValues: save.playerStatValues,
+                    playerStats: stage.getConfiguration().playerStats,
+                    actorStats: stage.getConfiguration().actorStats,
                     actors: save.actors,
                     currentActor: { id: target.id, name: target.name, statMap: target.statMap },
                 };

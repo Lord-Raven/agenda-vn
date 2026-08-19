@@ -11,9 +11,10 @@ interface LocationActorPortraitsProps {
 
 export const LocationActorPortraits: FC<LocationActorPortraitsProps> = ({ locationId, stage, size = 36 }) => {
     const save = stage.getSave();
+    const scheduleContext = stage.getScheduleContext(save);
     const actors = Object.values(save.actors || {})
         .filter(actor => actor.id !== save.playerId && actor.active !== false)
-        .filter(actor => resolveActorSchedule(actor, save) === locationId);
+        .filter(actor => resolveActorSchedule(actor, scheduleContext) === locationId);
 
     if (actors.length === 0) {
         return null;

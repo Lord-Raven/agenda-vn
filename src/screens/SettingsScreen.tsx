@@ -104,12 +104,11 @@ const buildPlayerStatValues = (
     const nextValues: { [key: string]: ActorStatValue } = {};
 
     stats.forEach((stat) => {
-        const statName = (stat.name || '').trim();
-        if (!statName) {
+        if (!stat.id || !(stat.name || '').trim()) {
             return;
         }
 
-        nextValues[statName] = normalizePlayerStatValue(preferredValues[statName], stat);
+        nextValues[stat.id] = normalizePlayerStatValue(preferredValues[stat.id], stat);
     });
 
     return nextValues;
@@ -234,15 +233,14 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     };
 
     const handlePlayerStatValueChange = (stat: ActorStat, nextValue: string | number) => {
-        const statName = (stat.name || '').trim();
-        if (!statName) {
+        if (!stat.id || !(stat.name || '').trim()) {
             return;
         }
 
         const normalized = normalizePlayerStatValue(nextValue, stat);
         setPlayerStatValues(prev => ({
             ...prev,
-            [statName]: normalized,
+            [stat.id]: normalized,
         }));
     };
 
@@ -429,7 +427,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         .filter((stat) => stat.setByPlayer === true)
                                         .map((stat) => {
                                         const statName = (stat.name || '').trim();
-                                        const selectedValue = normalizePlayerStatValue(playerStatValues[statName], stat);
+                                        const selectedValue = normalizePlayerStatValue(playerStatValues[stat.id], stat);
                                         const optionEntries = stat.options || [];
 
                                         const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;

@@ -136,8 +136,8 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
                 }
 
                 const stageInstance = stage();
-                const rawValue = stageInstance.getSave()?.playerStatValues?.[statName]
-                    ?? stageInstance.getConfiguration()?.playerStatValues?.[statName]
+                const rawValue = stageInstance.getSave()?.playerStatValues?.[stat.id]
+                    ?? stageInstance.getConfiguration()?.playerStatValues?.[stat.id]
                     ?? stat.default;
                 const normalizedValue = normalizeStatValue(rawValue, stat);
                 const isNumericStat = ["number", "percentage", "rating", "letter grade"].includes(stat.type);

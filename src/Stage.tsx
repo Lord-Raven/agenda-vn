@@ -2,7 +2,7 @@ import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import { ConditionCollection } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
-import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, loadSupportedActor, resolveActorSchedule } from "./content/Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, loadSupportedActor, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { ActorStat, ActorStatType, ActorStatValue, cloneActorStat, isNumericActorStat, normalizeActorStatValue, resolveActorStatText } from './content/ActorStat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
@@ -306,6 +306,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     getConfiguration(): GameConfiguration {
         this.ensureChatState();
         return this.saveData.configuration;
+    }
+
+    // Builds a ScheduleContext from a save, adding the stat definitions needed to resolve schedule entries
+    // that point at a location-type ActorStat rather than a fixed location id.
+    getScheduleContext(save: SaveType): ScheduleContext {
+        const configuration = this.getConfiguration();
+        return { ...save, playerStats: configuration.playerStats, actorStats: configuration.actorStats };
     }
 
     updateConfiguration(updates: Partial<GameConfiguration>) {
@@ -706,14 +713,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return null;
         }
 
+        const scheduleContext = this.getScheduleContext(save);
         const requestedActorIds = selectedEvent.actorIds || selectedEvent.participantActorIds || [];
         const scheduledActorIds = Object.values(save.actors || {})
             .filter(actor => actor.id !== save.playerId && actor.active !== false)
-            .filter(actor => resolveActorSchedule(actor, save) === selectedLocation.id)
+            .filter(actor => resolveActorSchedule(actor, scheduleContext) === selectedLocation.id)
             .map(actor => actor.id);
         const eligibleRequestedActorIds = requestedActorIds.filter(actorId => {
             const actor = save.actors?.[actorId];
-            const destination = actor ? resolveActorSchedule(actor, save) : '';
+            const destination = actor ? resolveActorSchedule(actor, scheduleContext) : '';
             return actor?.active !== false && (destination === ACTOR_SCHEDULE_AVAILABLE || destination === selectedLocation.id);
         });
 
@@ -775,7 +783,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return false;
         }
 
-        return Boolean(this.getCurrentLocationEvent(locationId)) || isLocationAvailable(location, save);
+        return Boolean(this.getCurrentLocationEvent(locationId)) || isLocationAvailable(location, this.getScheduleContext(save));
     }
 
     startLocationVisit(locationId: string): Skit | null {
@@ -796,7 +804,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const initialActors = Object.values(save.actors || {})
             .filter((actor) => actor.id !== save.playerId && actor.active !== false)
-            .filter((actor) => resolveActorSchedule(actor, save) === location.id)
+            .filter((actor) => resolveActorSchedule(actor, this.getScheduleContext(save)) === location.id)
             .map((actor) => actor.id);
         const skit = new Skit({
             initialLocationId: location.id,
@@ -1260,7 +1268,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .filter(stat => isNumericActorStat(stat) || stat.type === 'checkbox' || stat.type === 'location');
         const scalarStats = configuredStats.filter(stat => !stat.perActor);
         const perActorStats = configuredStats.filter(stat => stat.perActor);
-        const statNames = new Set(scalarStats.map(stat => stat.name.trim()));
+        const statIds = new Set(scalarStats.map(stat => stat.id));
         const perActorStatNames = new Set(perActorStats.map(stat => stat.name.trim()));
 
         Object.values(save.actors || {}).forEach(actor => {
@@ -1275,23 +1283,22 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
 
             scalarStats.forEach(stat => {
-                const statName = stat.name.trim();
-                const existingValue = actor.statMap[statName];
+                const existingValue = actor.statMap[stat.id];
                 const normalized = normalizeActorStatValue(existingValue, stat);
                 if (stat.type === 'location') {
-                    actor.statMap[statName] = typeof normalized === 'string' ? normalized : '';
+                    actor.statMap[stat.id] = typeof normalized === 'string' ? normalized : '';
                     return;
                 }
-                actor.statMap[statName] = typeof normalized === 'boolean'
+                actor.statMap[stat.id] = typeof normalized === 'boolean'
                     ? normalized
                     : Number.isFinite(normalized)
                         ? Number(normalized)
                         : 0;
             });
 
-            Object.keys(actor.statMap).forEach(statName => {
-                if (!statNames.has(statName)) {
-                    delete actor.statMap[statName];
+            Object.keys(actor.statMap).forEach(statId => {
+                if (!statIds.has(statId)) {
+                    delete actor.statMap[statId];
                 }
             });
 
@@ -1328,7 +1335,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const normalizedValues: { [key: string]: ActorStatValue } = {};
         configuredStats.forEach((stat) => {
             const statName = stat.name.trim();
-            normalizedValues[statName] = normalizeActorStatValue(currentValues[statName], stat);
+            normalizedValues[stat.id] = normalizeActorStatValue(currentValues[stat.id], stat);
         });
 
         save.playerStatValues = normalizedValues;
@@ -1490,7 +1497,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const initialActors = Object.values(save.actors || {})
             .filter(actor => actor.id !== save.playerId && actor.active !== false)
-            .filter(actor => resolveActorSchedule(actor, save) === selectedLocation.id)
+            .filter(actor => resolveActorSchedule(actor, this.getScheduleContext(save)) === selectedLocation.id)
             .map(actor => actor.id);
 
         skit = new Skit({
@@ -1555,16 +1562,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                                 // Per-actor stats require a target actor and aren't supported by this narrative outcome yet.
                                 continue;
                             }
-                            const targetStatName = resolvedStat?.name || incomingStatName;
+                            const targetStatId = resolvedStat?.id || incomingStatName;
                             actor.statMap = actor.statMap || {};
-                            const existingValue = Number(actor.statMap[targetStatName]);
+                            const existingValue = Number(actor.statMap[targetStatId]);
                             const currentValue = Number.isFinite(existingValue)
                                 ? existingValue
                                 : (resolvedStat
                                     ? Number(normalizeActorStatValue(Number(resolvedStat.default) || 0, resolvedStat))
                                     : 0);
                             const nextValue = currentValue + changeValue;
-                            actor.statMap[targetStatName] = resolvedStat
+                            actor.statMap[targetStatId] = resolvedStat
                                 ? Number(normalizeActorStatValue(nextValue, resolvedStat))
                                 : nextValue;
                         }
@@ -1682,7 +1689,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 continue;
             }
 
-            const value = normalizeActorStatValue(save.playerStatValues?.[statName], stat);
+            const value = normalizeActorStatValue(save.playerStatValues?.[stat.id], stat);
             const valueText = stat.type === 'location'
                 ? (save.atlas?.[String(value)]?.name || '')
                 : (typeof value === 'number' ? String(value) : value);
@@ -1884,7 +1891,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 });
 
                 if (!save.actors[seededActor.id]) {
-                    applyActorInitialStats(seededActor, configuredActorStats, save);
+                    applyActorInitialStats(seededActor, configuredActorStats, this.getScheduleContext(save));
                     save.actors[seededActor.id] = seededActor;
                 }
             }
@@ -1900,7 +1907,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 try {
                     const enrichedActor = await loadSupportedActor(seededActor, this);
                     if (enrichedActor) {
-                        applyActorInitialStats(enrichedActor, configuredActorStats, save);
+                        applyActorInitialStats(enrichedActor, configuredActorStats, this.getScheduleContext(save));
                         save.actors[enrichedActor.id] = enrichedActor;
                         this.syncActorStats(save);
                     }
@@ -1946,7 +1953,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         continue;
                     }
 
-                    applyActorInitialStats(newActor, configuredActorStats, save);
+                    applyActorInitialStats(newActor, configuredActorStats, this.getScheduleContext(save));
                     save.actors[newActor.id] = newActor;
                     this.syncActorStats(save);
                 } catch (error) {

@@ -120,7 +120,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             const save = stageInstance.getSave();
             const activeActors = Object.values(save.actors || {}).filter(actor => actor.active !== false && actor.id !== save.playerId);
             const activeLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
-            const contextText = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], save)) || 'None provided.';
+            const contextText = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, playerStats: configuration.playerStats, actorStats: configuration.actorStats })) || 'None provided.';
 
             const selectedSettingContext = (configuration.playerStats || []).map((stat) => {
                 const statName = (stat.name || '').trim();
@@ -128,7 +128,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     return '';
                 }
 
-                const selectedValue = save.playerStatValues?.[statName] ?? stat.default;
+                const selectedValue = save.playerStatValues?.[stat.id] ?? stat.default;
                 const valueText = typeof selectedValue === 'number' ? String(selectedValue) : String(selectedValue || '');
                 if (!valueText) {
                     return '';

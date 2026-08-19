@@ -16,7 +16,7 @@ interface ActorCardProps {
 const LETTER_GRADES = ['F', 'D', 'C', 'B', 'A', 'S'];
 
 const resolveStatValue = (actor: Actor, stat: ActorStat): number | string | boolean => {
-    const raw = (actor.statMap as { [key: string]: number | string | boolean } | undefined)?.[stat.name];
+    const raw = (actor.statMap as { [key: string]: number | string | boolean } | undefined)?.[stat.id];
     return raw === undefined || raw === null || raw === '' ? stat.default : raw;
 };
 

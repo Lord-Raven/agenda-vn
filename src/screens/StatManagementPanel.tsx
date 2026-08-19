@@ -14,6 +14,7 @@ interface StatManagementPanelProps {
 }
 
 const cloneActorStat = (stat: ActorStat): ActorStat => ({
+    id: stat.id || generateUuid(),
     name: stat.name,
     description: stat.description,
     perActor: stat.perActor === true,
@@ -89,6 +90,7 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): ActorStatValue => 
 };
 
 const defaultPlayerStat = (): ActorStat => ({
+    id: generateUuid(),
     name: 'New Setting',
     description: 'Describe what this player setting controls.',
     guidance: 'How this setting should influence generated narrative and behavior.',
@@ -104,6 +106,7 @@ const defaultPlayerStat = (): ActorStat => ({
 });
 
 const defaultActorStat = (): ActorStat => ({
+    id: generateUuid(),
     name: 'Name',
     description: 'A user-facing description of this stat.',
     perActor: false,
@@ -263,12 +266,11 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         const nextValues: { [key: string]: ActorStatValue } = {};
 
         playerStats.forEach((stat) => {
-            const statName = (stat.name || '').trim();
-            if (!statName) {
+            if (!stat.id || !(stat.name || '').trim()) {
                 return;
             }
 
-            nextValues[statName] = normalizeStatValue(playerStatValues[statName], stat);
+            nextValues[stat.id] = normalizeStatValue(playerStatValues[stat.id], stat);
         });
 
         return nextValues;
@@ -283,11 +285,10 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         });
 
         const currentSave = stageInstance.getSave();
-        const statNames = new Set(
+        const statIds = new Set(
             actorStats
                 .filter(stat => !stat.perActor)
-                .map(stat => stat.name.trim())
-                .filter(Boolean),
+                .map(stat => stat.id),
         );
 
         Object.values(currentSave.actors || {}).forEach(actor => {
@@ -296,26 +297,25 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             }
 
             actorStats.filter(stat => (isNumericDisplayType(stat.type) || stat.type === 'location') && !stat.perActor).forEach(stat => {
-                const statName = stat.name.trim();
-                if (!statName) {
+                if (!stat.id || !stat.name.trim()) {
                     return;
                 }
 
                 if (stat.type === 'location') {
-                    const existing = actor.statMap[statName];
-                    actor.statMap[statName] = typeof existing === 'string' ? existing : (typeof stat.default === 'string' ? stat.default : '');
+                    const existing = actor.statMap[stat.id];
+                    actor.statMap[stat.id] = typeof existing === 'string' ? existing : (typeof stat.default === 'string' ? stat.default : '');
                     return;
                 }
 
-                const existing = actor.statMap[statName];
+                const existing = actor.statMap[stat.id];
                 const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
                 const value = Number.isFinite(existing) ? Number(existing) : fallback;
-                actor.statMap[statName] = clampStatValue(value, stat);
+                actor.statMap[stat.id] = clampStatValue(value, stat);
             });
 
-            Object.keys(actor.statMap).forEach(statName => {
-                if (!statNames.has(statName)) {
-                    delete actor.statMap[statName];
+            Object.keys(actor.statMap).forEach(statId => {
+                if (!statIds.has(statId)) {
+                    delete actor.statMap[statId];
                 }
             });
         });

@@ -46,7 +46,8 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                 if (outcome.type === OutcomeType.ACTOR_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Stat';
                     const delta = Number(outcome.details?.changeValue ?? 0);
-                    const currentValue = Number(actor?.statMap?.[statName] ?? 0);
+                    const stat = stage().getConfiguration().actorStats.find(candidate => candidate.name === statName);
+                    const currentValue = Number(actor?.statMap?.[stat?.id || ''] ?? 0);
                     const nextValue = Number.isFinite(currentValue) ? currentValue : 0;
                     const arrow = '→';
                     topLine = `${actor?.name || 'Actor'} · ${statName}`;

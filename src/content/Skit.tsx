@@ -13,7 +13,7 @@ import {
     parseXmlTagsToObjects,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-import { evaluateConditionCollections, hasVariableActorTarget } from './Condition';
+import { ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
 import { build } from "vite";
 
 const getDayDifference = (startDate: string, endDate: string): number => {
@@ -185,13 +185,14 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     currentActors.forEach(() => {});
     const lorebook = save.lorebook || [];
     const agendaConfig = stage.getConfiguration();
+    const conditionContext: ConditionContext = { ...save, playerStats: agendaConfig.playerStats, actorStats: agendaConfig.actorStats };
     const passedProbabilityLoreIds = new Set(
         lorebook.filter((lore) => isLoreProbabilityActive(lore)).map((lore) => lore.id),
     );
     const activeConstantLore = lorebook
         .filter((lore) => lore.enabled && lore.constant && passedProbabilityLoreIds.has(lore.id))
         .filter((lore) => !hasVariableActorTarget(lore.conditionCollections))
-        .filter((lore) => evaluateConditionCollections(lore.conditionCollections, save))
+        .filter((lore) => evaluateConditionCollections(lore.conditionCollections, conditionContext))
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
     const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
 
@@ -202,7 +203,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        const value = agendaConfig?.playerStatValues?.[statName] ?? stat.default;
+        const value = agendaConfig?.playerStatValues?.[stat.id] ?? stat.default;
         const valueText = stat.type === 'location'
             ? (save.atlas?.[String(value)]?.name || '')
             : (typeof value === 'number' ? String(value) : String(value || ''));
@@ -232,7 +233,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        const value = agendaConfig?.playerStatValues?.[statName] ?? stat.default;
+        const value = agendaConfig?.playerStatValues?.[stat.id] ?? stat.default;
         const valueText = stat.type === 'location'
             ? (save.atlas?.[String(value)]?.name || '')
             : (typeof value === 'number' ? String(value) : String(value || ''));
@@ -261,7 +262,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
                 return false;
             }
 
-            if (!evaluateConditionCollections(lore.conditionCollections, save)) {
+            if (!evaluateConditionCollections(lore.conditionCollections, conditionContext)) {
                 return false;
             }
 
@@ -351,8 +352,9 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
         let attempts = 3;
         const activeActors = Object.values(stage.getSave().actors)
             .filter(actor => actor.id !== stage.getSave().playerId && actor.active !== false);
-        const actorsAtLocation = activeActors.filter(actor => resolveActorSchedule(actor, save) === skit.initialLocationId);
-        const generallyAvailableActors = activeActors.filter(actor => resolveActorSchedule(actor, save) === ACTOR_SCHEDULE_AVAILABLE);
+        const scheduleContext = stage.getScheduleContext(save);
+        const actorsAtLocation = activeActors.filter(actor => resolveActorSchedule(actor, scheduleContext) === skit.initialLocationId);
+        const generallyAvailableActors = activeActors.filter(actor => resolveActorSchedule(actor, scheduleContext) === ACTOR_SCHEDULE_AVAILABLE);
         const availableActors = Array.from(new Map([...actorsAtLocation, ...generallyAvailableActors].map(actor => [actor.id, actor])).values());
         skit.initialActors = Array.from(new Set([
             ...actorsAtLocation.map(actor => actor.id),

@@ -160,7 +160,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (condition.type === 'calendar' && condition.field === 'dayOfWeek') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
         }
-        const stat = condition.type === 'playerStat' ? playerStats.find(candidate => candidate.name === condition.statName) : (condition.type === 'actorStat' ? actorStats.find(candidate => candidate.name === condition.statName) : undefined);
+        const stat = condition.type === 'playerStat' ? playerStats.find(candidate => candidate.id === condition.statId) : (condition.type === 'actorStat' ? actorStats.find(candidate => candidate.id === condition.statId) : undefined);
         if (stat?.type === 'option') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{(stat.options || []).map(option => <option key={option.name} value={option.name}>{option.name}</option>)}</select>;
         }
@@ -202,7 +202,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                 }
                                 if (nextType === 'playerStat') {
                                     const stat = playerStats[0];
-                                    updateCondition(collectionIndex, conditionIndex, { type: 'playerStat', statName: stat?.name || '', comparison: 'equals', value: getDefaultConditionValue(stat) });
+                                    updateCondition(collectionIndex, conditionIndex, { type: 'playerStat', statId: stat?.id || '', comparison: 'equals', value: getDefaultConditionValue(stat) });
                                     return;
                                 }
                                 const target = actorTargetOptions[0]?.key || 'any';
@@ -211,7 +211,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                     return;
                                 }
                                 const actorStat = actorStats[0];
-                                updateCondition(collectionIndex, conditionIndex, { type: 'actorStat', actorId: target, statName: actorStat?.name || '', comparison: 'equals', value: getDefaultConditionValue(actorStat) });
+                                updateCondition(collectionIndex, conditionIndex, { type: 'actorStat', actorId: target, statId: actorStat?.id || '', comparison: 'equals', value: getDefaultConditionValue(actorStat) });
                             }}
                         >
                             <option value="calendar">Calendar</option>
@@ -239,19 +239,14 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         ) : condition.type === 'actorIdentity' ? (
                             <div />
                         ) : (
-                            <select style={selectStyle} value={condition.statName} onChange={(event) => {
-                                const stat = playerStats.find(candidate => candidate.name === event.target.value);
-                                updateCondition(collectionIndex, conditionIndex, { ...condition, statName: event.target.value, value: getDefaultConditionValue(stat) });
-                            }}>
-                                {playerStats.map(stat => <option key={stat.name} value={stat.name}>{stat.name}</option>)}
-                            </select>
+                            <div />
                         )}
                         {(condition.type === 'playerStat' || condition.type === 'actorStat') && (
-                            <select style={selectStyle} value={condition.statName} onChange={(event) => {
-                                const stat = (condition.type === 'playerStat' ? playerStats : actorStats).find(candidate => candidate.name === event.target.value);
-                                updateCondition(collectionIndex, conditionIndex, { ...condition, statName: event.target.value, value: getDefaultConditionValue(stat) } as Condition);
+                            <select style={selectStyle} value={condition.statId} onChange={(event) => {
+                                const stat = (condition.type === 'playerStat' ? playerStats : actorStats).find(candidate => candidate.id === event.target.value);
+                                updateCondition(collectionIndex, conditionIndex, { ...condition, statId: event.target.value, value: getDefaultConditionValue(stat) } as Condition);
                             }}>
-                                {(condition.type === 'playerStat' ? playerStats : actorStats).map(stat => <option key={stat.name} value={stat.name}>{stat.name}</option>)}
+                                {(condition.type === 'playerStat' ? playerStats : actorStats).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
                             </select>
                         )}
                         {condition.type === 'calendar' && (

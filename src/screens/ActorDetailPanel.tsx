@@ -109,19 +109,19 @@ const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [ke
     const nextMap: { [key: string]: ActorStatValue } = {};
     actorStats.forEach((stat) => {
         if (stat.type === 'location') {
-            const currentValue = actor.statMap?.[stat.name];
-            nextMap[stat.name] = typeof currentValue === 'string' ? currentValue : (typeof stat.default === 'string' ? stat.default : '');
+            const currentValue = actor.statMap?.[stat.id];
+            nextMap[stat.id] = typeof currentValue === 'string' ? currentValue : (typeof stat.default === 'string' ? stat.default : '');
             return;
         }
         if (stat.type === 'checkbox') {
-            const currentValue = actor.statMap?.[stat.name];
-            nextMap[stat.name] = typeof currentValue === 'boolean' ? currentValue : (typeof stat.default === 'boolean' ? stat.default : false);
+            const currentValue = actor.statMap?.[stat.id];
+            nextMap[stat.id] = typeof currentValue === 'boolean' ? currentValue : (typeof stat.default === 'boolean' ? stat.default : false);
             return;
         }
-        const currentValue = Number(actor.statMap?.[stat.name]);
+        const currentValue = Number(actor.statMap?.[stat.id]);
         const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
         const resolved = Number.isFinite(currentValue) ? currentValue : fallback;
-        nextMap[stat.name] = clampActorStatValue(resolved, stat);
+        nextMap[stat.id] = clampActorStatValue(resolved, stat);
     });
     return nextMap;
 };
@@ -535,28 +535,28 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             upsertActorLoreEntry(actor, oldName, stage());
         }
 
-        const activeStatNames = new Set<string>();
+        const activeStatIds = new Set<string>();
         actorStats.forEach((stat) => {
-            activeStatNames.add(stat.name);
+            activeStatIds.add(stat.id);
             if (stat.type === 'location') {
-                const candidateValue = nextEditedStatMap[stat.name];
-                actor.statMap[stat.name] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
+                const candidateValue = nextEditedStatMap[stat.id];
+                actor.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
                 return;
             }
             if (stat.type === 'checkbox') {
-                const candidateValue = nextEditedStatMap[stat.name];
-                actor.statMap[stat.name] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
+                const candidateValue = nextEditedStatMap[stat.id];
+                actor.statMap[stat.id] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
                 return;
             }
-            const candidateValue = Number(nextEditedStatMap[stat.name]);
+            const candidateValue = Number(nextEditedStatMap[stat.id]);
             const fallbackValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
             const resolvedValue = Number.isFinite(candidateValue) ? candidateValue : fallbackValue;
-            actor.statMap[stat.name] = clampActorStatValue(resolvedValue, stat);
+            actor.statMap[stat.id] = clampActorStatValue(resolvedValue, stat);
         });
 
-        Object.keys(actor.statMap).forEach((statName) => {
-            if (!activeStatNames.has(statName)) {
-                delete actor.statMap[statName];
+        Object.keys(actor.statMap).forEach((statId) => {
+            if (!activeStatIds.has(statId)) {
+                delete actor.statMap[statId];
             }
         });
 
@@ -872,6 +872,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             currentDate: save.currentDate,
             currentTimeOfDay: save.currentTimeOfDay,
             playerStatValues: save.playerStatValues as Record<string, ActorStatValue>,
+            playerStats: stage().getConfiguration().playerStats,
+            actorStats: stage().getConfiguration().actorStats,
             actors: save.actors,
             currentActor: { id: targetActor.id, name: targetActor.name, statMap: targetActor.statMap },
         };
@@ -1957,7 +1959,7 @@ ${indent}}`;
                                             </label>
 
                                             {actorStats.map((stat) => {
-                                                const value = Number(editedStatMap[stat.name]);
+                                                const value = Number(editedStatMap[stat.id]);
                                                 const displayValue = Number.isFinite(value)
                                                     ? value
                                                     : clampActorStatValue(Number(stat.default) || 0, stat);
@@ -2014,16 +2016,16 @@ ${indent}}`;
                                                                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
                                                                     <input
                                                                         type="checkbox"
-                                                                        checked={Boolean(editedStatMap[stat.name] === true)}
+                                                                        checked={Boolean(editedStatMap[stat.id] === true)}
                                                                         onChange={(e) => handleActorStatValueChange(stat, e.target.checked ? 1 : 0)}
                                                                     />
-                                                                    {Boolean(editedStatMap[stat.name] === true) ? 'True' : 'False'}
+                                                                    {Boolean(editedStatMap[stat.id] === true) ? 'True' : 'False'}
                                                                 </label>
                                                             )}
 
                                                             {stat.type === 'location' && (
                                                                 <LocationSelect
-                                                                    value={typeof editedStatMap[stat.name] === 'string' ? String(editedStatMap[stat.name]) : ''}
+                                                                    value={typeof editedStatMap[stat.id] === 'string' ? String(editedStatMap[stat.id]) : ''}
                                                                     onChange={(locationId) => handleActorStatLocationChange(stat, locationId)}
                                                                     locations={locationOptions}
                                                                     stage={stage}

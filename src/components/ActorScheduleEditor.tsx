@@ -1,7 +1,7 @@
 import { FC } from 'react';
-import { Add, ArrowDownward, ArrowUpward, Delete, EventAvailable, EventBusy } from '@mui/icons-material';
-import { ActorSchedule, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE } from '../content/Actor';
-import { ActorStat } from '../content/ActorStat';
+import { Add, ArrowDownward, ArrowUpward, Delete, EventAvailable, EventBusy, NotListedLocation } from '@mui/icons-material';
+import { ActorSchedule, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, ACTOR_SCHEDULE_PLAYER_STAT_PREFIX, ACTOR_SCHEDULE_ACTOR_STAT_PREFIX } from '../content/Actor';
+import { ActorStat, isLocationDisplayType } from '../content/ActorStat';
 import { Button } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationPortrait, LocationLike } from './LocationPortrait';
@@ -32,6 +32,16 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
             renderAvatar: (size: number, active: boolean) => (
                 <LocationPortrait location={location} width={Math.round(size * 1.34)} height={size} highlighted={active} />
             ),
+        })),
+        ...playerStats.filter(stat => isLocationDisplayType(stat.type)).map(stat => ({
+            key: ACTOR_SCHEDULE_PLAYER_STAT_PREFIX + stat.id,
+            label: stat.name,
+            icon: NotListedLocation,
+        })),
+        ...actorStats.filter(stat => isLocationDisplayType(stat.type)).map(stat => ({
+            key: ACTOR_SCHEDULE_ACTOR_STAT_PREFIX + stat.id,
+            label: stat.name,
+            icon: NotListedLocation,
         })),
     ];
 
