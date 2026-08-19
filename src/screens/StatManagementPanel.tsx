@@ -811,16 +811,42 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 />
                                             </div>
 
-                                            <div style={inlineFieldTopStyle}>
-                                                <label style={fieldLabelStyle}>Description</label>
-                                                <TextArea
-                                                    value={stat.description}
-                                                    onChange={(e) => updateActorStat(statIndex, { description: e.target.value })}
-                                                    rows={2}
-                                                    placeholder="Describe what this stat represents."
-                                                    style={{ width: '100%', resize: 'vertical' }}
-                                                />
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Visible In UI</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.exposed === true}
+                                                        onChange={(e) => updateActorStat(statIndex, { exposed: e.target.checked })}
+                                                    />
+                                                    Exposed
+                                                </label>
                                             </div>
+
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Per Actor</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.perActor === true}
+                                                        onChange={(e) => updateActorStat(statIndex, { perActor: e.target.checked })}
+                                                    />
+                                                    Maps other actors to distinct values
+                                                </label>
+                                            </div>
+
+                                            {stat.exposed === true && (
+                                                <div style={inlineFieldTopStyle}>
+                                                    <label style={fieldLabelStyle}>Description</label>
+                                                    <TextArea
+                                                        value={stat.description}
+                                                        onChange={(e) => updateActorStat(statIndex, { description: e.target.value })}
+                                                        rows={2}
+                                                        placeholder="Describe what this stat represents."
+                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                    />
+                                                </div>
+                                            )}
 
                                             <div style={inlineFieldTopStyle}>
                                                 <label style={fieldLabelStyle}>Guidance</label>
@@ -855,30 +881,6 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     <option value="rating">Rating</option>
                                                     <option value="text">Text</option>
                                                 </select>
-                                            </div>
-
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Visible In UI</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.exposed === true}
-                                                        onChange={(e) => updateActorStat(statIndex, { exposed: e.target.checked })}
-                                                    />
-                                                    Exposed
-                                                </label>
-                                            </div>
-
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Per Actor</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.perActor === true}
-                                                        onChange={(e) => updateActorStat(statIndex, { perActor: e.target.checked })}
-                                                    />
-                                                    Maps other actors to distinct values
-                                                </label>
                                             </div>
 
                                             {normalizedStat.type === 'option' && (
@@ -920,26 +922,28 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                     placeholder="Option name"
                                                                 />
                                                             </div>
-                                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                                <label style={fieldLabelStyle}>Option Description</label>
-                                                                <TextArea
-                                                                    value={option.description}
-                                                                    onChange={(e) => {
-                                                                        setActorStats(prev => prev.map((item, idx) => {
-                                                                            if (idx !== statIndex) {
-                                                                                return item;
-                                                                            }
+                                                            {stat.exposed === true && (
+                                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                                                    <label style={fieldLabelStyle}>Option Description</label>
+                                                                    <TextArea
+                                                                        value={option.description}
+                                                                        onChange={(e) => {
+                                                                            setActorStats(prev => prev.map((item, idx) => {
+                                                                                if (idx !== statIndex) {
+                                                                                    return item;
+                                                                                }
 
-                                                                            const currentOptions = [...(item.options || [])];
-                                                                            const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), description: e.target.value };
-                                                                            currentOptions[optionIndex] = nextOption;
-                                                                            return { ...item, options: currentOptions };
-                                                                        }));
-                                                                    }}
-                                                                    rows={2}
-                                                                    style={{ width: '100%', resize: 'vertical' }}
-                                                                />
-                                                            </div>
+                                                                                const currentOptions = [...(item.options || [])];
+                                                                                const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), description: e.target.value };
+                                                                                currentOptions[optionIndex] = nextOption;
+                                                                                return { ...item, options: currentOptions };
+                                                                            }));
+                                                                        }}
+                                                                        rows={2}
+                                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                                    />
+                                                                </div>
+                                                            )}
                                                             <div style={{ marginTop: 8 }}>
                                                                 <Button variant="danger" onClick={() => {
                                                                     setActorStats(prev => prev.map((item, idx) => {

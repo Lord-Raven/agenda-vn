@@ -230,7 +230,7 @@ export async function generateLocationImagePrompt(location: Location, stage: Sta
 		))
 		.format(),
 		10,
-		100,
+		300,
 		LOCATION_BASE_IMAGE_PROMPT_FIELDS,
 	)
 		.then((response: any) => {
@@ -324,7 +324,7 @@ export async function generateLocationAlternativeImagePrompt(location: Location,
 		))
 		.format(),
 		10,
-		100,
+		500,
 		LOCATION_ALTERNATIVE_IMAGE_PROMPT_FIELDS,
 	)
 		.then((response: any) => {

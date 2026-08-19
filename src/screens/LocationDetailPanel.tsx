@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import { Stage } from '../Stage';
@@ -103,6 +103,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     const editedLocationRef = useRef(editedLocation);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
+    const focalPreviewRef = useRef<HTMLDivElement>(null);
 
     const persistLocation = (
         nextLocation: typeof editedLocation
@@ -380,6 +381,17 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         return Math.min(1, Math.max(0, n));
     };
 
+    const updateFocalFromPointer = (event: PointerEvent<HTMLElement>) => {
+        const previewBounds = focalPreviewRef.current?.getBoundingClientRect();
+        if (!previewBounds) {
+            return;
+        }
+
+        const x = Math.min(1, Math.max(0, (event.clientX - previewBounds.left) / previewBounds.width));
+        const y = Math.min(1, Math.max(0, (event.clientY - previewBounds.top) / previewBounds.height));
+        setEditedLocation((current) => ({ ...current, focalX: x, focalY: y }));
+    };
+
     const labelStyle: React.CSSProperties = {
         display: 'block',
         color: 'var(--agenda-highlight)',
@@ -590,6 +602,66 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             {/* Positioning */}
                             <section>
                                 <h2 style={sectionHeadingStyle}>Positioning</h2>
+                                <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
+                                    Drag the marker to set the focal point used when cropping this location's image.
+                                </p>
+                                <div
+                                    ref={focalPreviewRef}
+                                    style={{
+                                        position: 'relative',
+                                        width: '100%',
+                                        aspectRatio: '16 / 9',
+                                        background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)',
+                                        backgroundImage: editedLocation.imageUrl ? `url(${editedLocation.imageUrl})` : 'none',
+                                        backgroundSize: 'cover',
+                                        backgroundPosition: 'center',
+                                        border: `2px solid ${editedLocation.themeColor || 'var(--agenda-line-strong)'}`,
+                                        borderRadius: 8,
+                                        overflow: 'hidden',
+                                        touchAction: 'none',
+                                        marginBottom: '15px',
+                                    }}
+                                >
+                                    {!editedLocation.imageUrl && (
+                                        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
+                                            <ImageIcon style={{ fontSize: 48, color: 'var(--agenda-text-muted)' }} />
+                                        </div>
+                                    )}
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label="Drag to set focal point"
+                                        title="Drag to set focal point"
+                                        onPointerDown={event => {
+                                            event.currentTarget.setPointerCapture(event.pointerId);
+                                            updateFocalFromPointer(event);
+                                        }}
+                                        onPointerMove={event => {
+                                            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                                                updateFocalFromPointer(event);
+                                            }
+                                        }}
+                                        style={{
+                                            position: 'absolute',
+                                            left: `${editedLocation.focalX * 100}%`,
+                                            top: `${editedLocation.focalY * 100}%`,
+                                            transform: 'translate(-50%, -50%)',
+                                            display: 'grid',
+                                            placeItems: 'center',
+                                            width: 36,
+                                            height: 36,
+                                            borderRadius: '50%',
+                                            color: 'var(--agenda-text-primary)',
+                                            backgroundColor: 'var(--agenda-active)',
+                                            border: '2px solid var(--agenda-text-primary)',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,.65)',
+                                            cursor: 'grab',
+                                            userSelect: 'none',
+                                        }}
+                                    >
+                                        <Place style={{ fontSize: 18 }} />
+                                    </div>
+                                </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                     <div>
                                         <label style={labelStyle}>Focal Point X <span style={{ fontWeight: 'normal', opacity: 0.7 }}>(0–1)</span></label>
