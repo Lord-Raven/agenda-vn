@@ -274,8 +274,7 @@ export async function generateBaseLocationImage(location: Location, stage: Stage
 
 		const qwenifiedImage = generatedImage ? await stage.makeImageFromImage({
 			image: generatedImage,
-			prompt: basePrompt,
-			remove_background: false
+			prompt: ''
 		}, generatedImage) : '';
 
 		location.imageUrl = qwenifiedImage || generatedImage || '';
@@ -375,7 +374,7 @@ export async function generateLocationAlternativeImage(
 
 		const imageUrl = await stage.makeImageFromImage({
 			image: await getDataUrl(baseImageUrl),
-			prompt: `Using the provided base image for ${location.name || 'this location'}, adapt the scene for ${alternative.description || 'the requested alternative'}: ${prompt}`,
+			prompt: prompt,
 			remove_background: false,
 			transfer_type: 'edit',
 		}, '');

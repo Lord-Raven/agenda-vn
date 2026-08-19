@@ -387,7 +387,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         generateContext(skit, stage, 5))
                     .format(),
                 10,
-                400,
+                500,
                 SKIT_GUIDANCE_FIELDS,
             ).catch(err => {
                 console.error('Error generating skit guidance: ', err);
@@ -460,7 +460,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     generateContext(skit, stage, 7 - retry * 2))
                 .format();
         console.log(prompt);
-        const response = await stage.generateText(prompt, 10, 600)
+        const response = await stage.generateText(prompt, 10, 2000)
 
         if (response && response.trim().length > 0) {
             // Strip all double asterisks; this is a temporary measure due to current model behavior.
@@ -741,7 +741,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         .addBlock('Additional Context',
                             generateContext(skit, stage, 0))
                         .format(),
-                    1, 1000
+                    1, 2000
                 );
 
                 if (endResponse) {
