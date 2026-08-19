@@ -21,6 +21,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
     const UNCATEGORIZED_LABEL = 'Uncategorized';
     const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
     const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('location-management');
+    const [locationRevision, setLocationRevision] = useState(0);
     const shouldReduceMotion = useReducedMotion();
 
     const shellStyle: React.CSSProperties = {
@@ -51,7 +52,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         return Object.values(stage().getSave().atlas || {})
             .filter((location) => location.active !== false)
             .sort(sortByName);
-    }, [stage]);
+    }, [stage, locationRevision]);
 
     // Create a map of locations by their category property. locationsByCategory[category] = array of locations in that category.
     const locationsByCategory = useMemo<CategorizedEntrySection<Location>[]>(() => {
@@ -128,6 +129,8 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
             save.lorebook.push(newLore);
         }
 
+        stage().saveGame();
+        setLocationRevision((current) => current + 1);
         setSelectedLocationId(location.id);
     };
 
@@ -198,7 +201,9 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                         key={selectedLocation.id}
                         location={selectedLocation}
                         stage={stage}
+                        onUpdate={() => setLocationRevision((current) => current + 1)}
                         onDeactivate={(locationId) => {
+                            setLocationRevision((current) => current + 1);
                             if (selectedLocationId === locationId) {
                                 setSelectedLocationId(null);
                             }

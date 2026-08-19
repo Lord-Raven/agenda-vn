@@ -170,7 +170,11 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (stat?.type === 'location') {
             return <LocationSelect value={String(condition.value ?? '')} onChange={(locationId) => updateValue(locationId)} locations={locations} style={{ width: '100%', minWidth: 0 }} />;
         }
-        return <TextInput type="number" value={condition.value as number | string} onChange={(event) => updateValue(Number(event.target.value))} />;
+        return <TextInput type="text" value={condition.value as number | string} placeholder="e.g. 3 or 1d6+1" onChange={(event) => {
+            const raw = event.target.value;
+            const numeric = Number(raw);
+            updateValue(raw.trim() !== '' && Number.isFinite(numeric) ? numeric : raw);
+        }} />;
     };
 
     let flatIndex = 0;

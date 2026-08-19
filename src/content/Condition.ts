@@ -58,6 +58,66 @@ const TIME_OF_DAY_VALUES: Record<CalendarTimeOfDay, number> = {
     night: 3,
 };
 
+// Dice notation support (e.g. "1d6+1") for condition target values. Rolls must be deterministic for a given
+// condition at a given point in the in-game calendar, so the same condition evaluated repeatedly at the same
+// date/time/actor yields the same result, while distinct conditions (even sharing the same notation) roll
+// independently. This is achieved by seeding a PRNG off a hash of the condition's own definition plus the
+// relevant context (date, time of day, and - for 'variable' actor targets - the current actor's id).
+const DICE_NOTATION_PATTERN = /^(\d*)d(\d+)([+-]\d+)?$/i;
+
+export const isDiceNotation = (value: unknown): value is string => typeof value === 'string' && DICE_NOTATION_PATTERN.test(value.trim());
+
+// FNV-1a string hash, used only to derive a numeric seed for the dice PRNG - not for anything security-sensitive.
+const hashString = (value: string): number => {
+    let hash = 2166136261;
+    for (let index = 0; index < value.length; index++) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+};
+
+// mulberry32 PRNG - small, fast, and deterministic for a given 32-bit seed.
+const createSeededRandom = (seed: number) => {
+    let state = seed;
+    return () => {
+        state |= 0;
+        state = (state + 0x6D2B79F5) | 0;
+        let t = Math.imul(state ^ (state >>> 15), 1 | state);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+};
+
+const rollDiceNotation = (notation: string, seed: string): number => {
+    const match = notation.trim().match(DICE_NOTATION_PATTERN);
+    if (!match) {
+        return NaN;
+    }
+    const count = match[1] ? parseInt(match[1], 10) : 1;
+    const sides = parseInt(match[2], 10);
+    const modifier = match[3] ? parseInt(match[3], 10) : 0;
+    const random = createSeededRandom(hashString(seed));
+    let total = modifier;
+    for (let roll = 0; roll < count; roll++) {
+        total += Math.floor(random() * sides) + 1;
+    }
+    return total;
+};
+
+// Builds a seed identifying "this condition, at this point in the game" - the condition's own definition
+// (which includes its dice notation value) plus the parts of context that could vary its meaning.
+const buildDiceSeed = (condition: Condition, context: ConditionContext): string => {
+    const variableActorId = condition.type === 'actorStat' && condition.actorId === 'variable' ? (context.currentActor?.id || '') : '';
+    return `${JSON.stringify(condition)}|${context.currentDate || ''}|${context.currentTimeOfDay || ''}|${variableActorId}`;
+};
+
+// Resolves a condition's target value, rolling dice notation deterministically if present.
+const resolveConditionValue = (condition: Condition, context: ConditionContext): string | number | boolean => {
+    const value = (condition as PlayerStatCondition | ActorStatCondition | CalendarCondition).value;
+    return isDiceNotation(value) ? rollDiceNotation(value, buildDiceSeed(condition, context)) : value;
+};
+
 const compareValues = (actual: string | number | boolean | undefined, expected: string | number | boolean, comparison: ConditionComparison): boolean => {
     if (actual === undefined) {
         return false;
@@ -147,7 +207,8 @@ const resolveConditionActorSubjects = (actorId: ActorConditionTarget, context: C
 export const evaluateActorStatCondition = (condition: ActorStatCondition, context: ConditionContext): boolean => {
     const { mode, actors } = resolveConditionActorSubjects(condition.actorId, context);
     const stat = context.actorStats?.find(candidate => candidate.id === condition.statId);
-    const matches = (actor: ConditionActor) => compareValues(getActorStatValue(actor, stat?.id || ''), condition.value, condition.comparison);
+    const resolvedValue = resolveConditionValue(condition, context);
+    const matches = (actor: ConditionActor) => compareValues(getActorStatValue(actor, stat?.id || ''), resolvedValue, condition.comparison);
 
     if (mode === 'any') return actors.some(matches);
     if (mode === 'none') return !actors.some(matches);
@@ -164,13 +225,13 @@ export const evaluateActorIdentityCondition = (condition: ActorIdentityCondition
 export const evaluateCondition = (condition: Condition, context: ConditionContext): boolean => {
     if (condition.type === 'calendar') {
         const actual = getCalendarValue(condition, context);
-        return compareValues(actual, condition.value, condition.comparison);
+        return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
     }
 
     if (condition.type === 'playerStat') {
         const stat = context.playerStats?.find(candidate => candidate.id === condition.statId);
             const actual = stat ? context.playerStatValues?.[condition.statId] : undefined;
-        return compareValues(actual, condition.value, condition.comparison);
+        return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
     }
 
     if (condition.type === 'actorIdentity') {

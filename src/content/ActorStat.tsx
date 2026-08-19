@@ -16,6 +16,59 @@ export type ActorStatOption = {
     description: string;
 };
 
+type ActorStatValueOptions = {
+    evaluateDiceNotation?: boolean;
+};
+
+const DICE_EXPRESSION_PATTERN = /^\s*[+-]?\s*(?:\d*d\d+|\d+)(?:\s*[+-]\s*(?:\d*d\d+|\d+))*\s*$/i;
+
+const rollDie = (sides: number): number => Math.floor(Math.random() * sides) + 1;
+
+export const evaluateNumericStatExpression = (value: unknown): number | undefined => {
+    if (Number.isFinite(value)) {
+        return Number(value);
+    }
+
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const expression = value.trim();
+    if (!expression || !DICE_EXPRESSION_PATTERN.test(expression)) {
+        return undefined;
+    }
+
+    const terms = expression.match(/[+-]?\s*(?:\d*d\d+|\d+)/gi) || [];
+    let total = 0;
+
+    for (const rawTerm of terms) {
+        const compactTerm = rawTerm.replace(/\s+/g, '').toLowerCase();
+        const sign = compactTerm.startsWith('-') ? -1 : 1;
+        const unsignedTerm = compactTerm.replace(/^[+-]/, '');
+
+        if (unsignedTerm.includes('d')) {
+            const [countText, sidesText] = unsignedTerm.split('d');
+            const count = countText === '' ? 1 : Number(countText);
+            const sides = Number(sidesText);
+            if (!Number.isInteger(count) || !Number.isInteger(sides) || count < 1 || sides < 1 || count > 100 || sides > 10000) {
+                return undefined;
+            }
+            for (let rollIndex = 0; rollIndex < count; rollIndex += 1) {
+                total += sign * rollDie(sides);
+            }
+            continue;
+        }
+
+        const numericValue = Number(unsignedTerm);
+        if (!Number.isFinite(numericValue)) {
+            return undefined;
+        }
+        total += sign * numericValue;
+    }
+
+    return total;
+};
+
 // A single rule used to resolve a per-actor stat's value for a given target actor; rules are evaluated in
 // order and the first whose conditions are satisfied wins (conditions may reference the target via the
 // 'variable' actor target so they can inspect the target actor's own stats).
@@ -92,7 +145,7 @@ export const cloneActorStat = (stat: ActorStat): ActorStat => ({
 
 export const isNumericActorStat = (stat: ActorStat): boolean => isNumericDisplayType(stat.type);
 
-export const resolveActorStatDefault = (stat: ActorStat): ActorStatValue => {
+export const resolveActorStatDefault = (stat: ActorStat, options: ActorStatValueOptions = {}): ActorStatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
@@ -109,13 +162,17 @@ export const resolveActorStatDefault = (stat: ActorStat): ActorStatValue => {
         return typeof stat.default === 'boolean' ? stat.default : false;
     }
 
+    if (options.evaluateDiceNotation) {
+        return evaluateNumericStatExpression(stat.default) ?? 0;
+    }
+
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-export const normalizeActorStatValue = (value: unknown, stat: ActorStat): ActorStatValue => {
+export const normalizeActorStatValue = (value: unknown, stat: ActorStat, options: ActorStatValueOptions = {}): ActorStatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        const fallback = resolveActorStatDefault(stat);
+        const fallback = resolveActorStatDefault(stat, options);
         if (typeof value === 'string' && optionNames.includes(value)) {
             return value;
         }
@@ -126,7 +183,7 @@ export const normalizeActorStatValue = (value: unknown, stat: ActorStat): ActorS
         if (typeof value === 'string') {
             return value;
         }
-        const fallback = resolveActorStatDefault(stat);
+        const fallback = resolveActorStatDefault(stat, options);
         return typeof fallback === 'string' ? fallback : '';
     }
 
@@ -139,10 +196,15 @@ export const normalizeActorStatValue = (value: unknown, stat: ActorStat): ActorS
             if (lower === 'true') return true;
             if (lower === 'false') return false;
         }
-        return typeof resolveActorStatDefault(stat) === 'boolean' ? resolveActorStatDefault(stat) : false;
+        return typeof resolveActorStatDefault(stat, options) === 'boolean' ? resolveActorStatDefault(stat, options) : false;
     }
 
-    let resolved = Number.isFinite(value) ? Number(value) : Number(resolveActorStatDefault(stat)) || 0;
+    const expressionValue = options.evaluateDiceNotation ? evaluateNumericStatExpression(value) : undefined;
+    let resolved = Number.isFinite(value)
+        ? Number(value)
+        : expressionValue !== undefined
+            ? expressionValue
+            : Number(resolveActorStatDefault(stat, options)) || 0;
     if (typeof stat.min === 'number') {
         resolved = Math.max(stat.min, resolved);
     }

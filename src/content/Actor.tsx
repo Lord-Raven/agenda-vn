@@ -23,7 +23,7 @@ export type ActorStatModifier = {
 
 // The initial value and conditional modifiers used to compute an actor's stat value when a new game is initialized.
 export type ActorStatInitial = {
-    value: number | boolean;
+    value: ActorStatValue;
     modifiers: ActorStatModifier[];
 };
 
@@ -98,6 +98,8 @@ const cloneStatInitialMap = (statInitialMap: unknown): { [key: string]: ActorSta
         {
             value: typeof initial?.value === 'boolean'
                 ? initial.value
+                : typeof initial?.value === 'string'
+                    ? initial.value
                 : Number.isFinite(initial?.value)
                     ? Number(initial.value)
                     : 0,
@@ -361,7 +363,8 @@ export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStat
         return baseValue;
     }
 
-    const baseValue = initial && Number.isFinite(initial.value) ? Number(initial.value) : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
+    const normalizedBaseValue = normalizeActorStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
+    const baseValue = Number.isFinite(normalizedBaseValue) ? Number(normalizedBaseValue) : 0;
     const modifierTotal = (initial?.modifiers || []).reduce((total, modifier) => {
         return evaluateConditionCollections(modifier.conditions, context) ? total + (Number.isFinite(modifier.amount) ? Number(modifier.amount) : 0) : total;
     }, 0);

@@ -23,10 +23,11 @@ import { AlternativeImage, createAlternativeImage } from '../content/Alternative
 interface LocationDetailPanelProps {
     location: Location;
     stage: () => Stage;
+    onUpdate?: () => void;
     onDeactivate?: (locationId: string) => void;
 }
 
-export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onDeactivate }) => {
+export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onUpdate, onDeactivate }) => {
     const linkedLoreEntry = getLinkedLocationLore(location, stage());
     const isDescriptionBackedByLore = !!linkedLoreEntry;
 
@@ -128,6 +129,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.alternativeImages = nextLocation.alternativeImages.map(createAlternativeImage);
         location.conditionCollections = nextLocation.conditionCollections.map(collection => [...collection]);
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
+        onUpdate?.();
     };
 
     const syncEditedLocationFromSource = () => {

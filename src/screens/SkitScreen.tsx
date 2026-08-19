@@ -156,6 +156,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
 
         setSkit(finalizedSkit);
         stage().endSkit();
+        setScreenType(ScreenType.MAP);
     }, [stage, setScreenType]);
 
 	const handleSkitSubmit = useCallback(async (input: string, skitArg: Skit, index: number) => {
