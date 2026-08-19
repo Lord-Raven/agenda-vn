@@ -174,6 +174,10 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
 
     useEffect(() => {
         if (skit.script.length == 0 && !isLoading) {
+            if (stage().getCurrentSkit() === null) {
+                setScreenType(ScreenType.MAP);
+                return;
+            }
             console.log('Initial skit script is empty. Triggering continueSkit.');
             setIsLoading(true);
             stage().continueSkit().then(() => {
