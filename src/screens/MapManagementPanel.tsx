@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from 'react';
+import React, { FC, useMemo, useState } from 'react';
 import { Map as MapIcon } from '@mui/icons-material';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Map as GameMap } from '../content/Map';
@@ -23,6 +23,27 @@ export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
     const [revision, setRevision] = useState(0);
     const shouldReduceMotion = useReducedMotion();
     const maps = (stage().getSave().maps || []).filter(map => map.active !== false);
+
+    const shellStyle: React.CSSProperties = {
+        display: 'grid',
+        gridTemplateColumns: 'minmax(280px, 360px) 1fr',
+        gap: 20,
+        flex: 1,
+        minHeight: 0,
+        height: '100%',
+    };
+
+    const detailPaneStyle: React.CSSProperties = {
+        background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
+        border: '1px solid var(--agenda-line-subtle)',
+        borderRadius: 12,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        maxHeight: '100%',
+    };
 
     const sections = useMemo<CategorizedEntrySection<GameMap>[]>(() => {
         const grouped: Record<string, GameMap[]> = { [UNCATEGORIZED_LABEL]: [] };
@@ -55,7 +76,7 @@ export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
     };
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) 1fr', gap: 20, flex: 1, minHeight: 0 }}>
+        <div style={shellStyle}>
             <CategorizedEntrySidebar
                 sections={sections}
                 collapsedSections={collapsedCategories}
@@ -77,7 +98,7 @@ export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
                 sectionEmptyMessage="No maps."
                 renderSectionAction={section => createMap(section.title)}
             />
-            <div style={{ background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)', border: '1px solid var(--agenda-line-subtle)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
+            <div style={detailPaneStyle}>
                 {selectedMap ? (
                     <MapDetailPanel key={selectedMap.id} map={selectedMap} stage={stage} onChange={() => setRevision(current => current + 1)} onDeactivate={() => setSelectedMapId(null)} />
                 ) : (

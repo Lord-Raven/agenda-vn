@@ -1,7 +1,7 @@
 import { FC, PointerEvent, useEffect, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, ArrowDownward, ArrowUpward, AutoAwesome, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
-import { generateMapAlternativeImage, getMapImageUrl, Map as GameMap, MapLink } from '../content/Map';
+import { generateMapAlternativeImage, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
 import { Button, TextArea, TextInput } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
@@ -37,6 +37,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
     );
     const [isUploadingVariants, setIsUploadingVariants] = useState<Record<number, boolean>>({});
     const [isGeneratingVariants, setIsGeneratingVariants] = useState<Record<number, boolean>>({});
+    const [previewSelection, setPreviewSelection] = useState<'base' | number>('base');
     const [draft, setDraft] = useState<MapDraft>(() => createMapDraft(map));
     const draftRef = useRef(draft);
     const previewRef = useRef<HTMLDivElement>(null);
@@ -122,6 +123,12 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
             structuralSyncRef.current();
         }
     }, []);
+
+    useEffect(() => {
+        if (previewSelection !== 'base' && previewSelection >= draft.alternativeImages.length) {
+            setPreviewSelection('base');
+        }
+    }, [draft.alternativeImages.length, previewSelection]);
 
     const updateDraft = <K extends keyof MapDraft>(field: K, value: MapDraft[K]) => {
         setDraft(current => ({ ...current, [field]: value }));
@@ -280,8 +287,22 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
         });
     };
 
+    const previewTabStyle = (isActive: boolean): React.CSSProperties => ({
+        padding: '6px 12px',
+        fontSize: '13px',
+        borderRadius: '999px',
+        border: `1px solid ${isActive ? 'var(--agenda-highlight)' : 'var(--agenda-line-subtle)'}`,
+        background: isActive ? 'var(--agenda-active)' : 'color-mix(in srgb, var(--agenda-surface-base) 86%, transparent)',
+        color: 'var(--agenda-text-primary)',
+        cursor: 'pointer',
+    });
+
+    const previewImageUrl = previewSelection === 'base'
+        ? draft.imageUrl
+        : draft.alternativeImages[previewSelection]?.imageUrl || draft.imageUrl;
+
     return (
-        <div style={{ padding: '20px', overflowY: 'auto', display: 'grid', gap: '16px', flex: 1, minHeight: 0 }}>
+        <div style={{ padding: '20px', display: 'grid', gap: '16px', flex: 1, minHeight: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px', gap: '12px' }}>
                 <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
                     Name
@@ -300,6 +321,56 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                 Description
                 <TextArea fullWidth rows={3} value={draft.description} onChange={event => updateDraft('description', event.target.value)} />
             </label>
+
+            <div>
+                <strong style={{ display: 'block', color: 'var(--agenda-text-primary)', marginBottom: 8 }}>Preview</strong>
+                <div ref={previewRef} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: previewImageUrl ? `url(${previewImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden', touchAction: 'none', marginBottom: 10 }}>
+                    {map.links.map((link, index) => {
+                        const locationImageUrl = activeLocations.find(location => location.id === link.childId)?.imageUrl;
+                        return (
+                            <div
+                                key={`${link.childId}-marker-${index}`}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Drag ${resolveTargetName(link.childId)} marker`}
+                                title={`Drag to position ${resolveTargetName(link.childId)}`}
+                                onPointerDown={event => {
+                                    event.currentTarget.setPointerCapture(event.pointerId);
+                                    updateLinkFromPointer(index, event);
+                                }}
+                                onPointerMove={event => {
+                                    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                                        updateLinkFromPointer(index, event);
+                                    }
+                                }}
+                                style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: '50%', color: 'var(--agenda-text-primary)', backgroundColor: 'var(--agenda-active)', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '2px solid var(--agenda-text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,.65)', cursor: 'grab', userSelect: 'none' }}
+                            >
+                                {!locationImageUrl && <Place style={{ fontSize: 18 }} />}
+                            </div>
+                        );
+                    })}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                        type="button"
+                        onClick={() => setPreviewSelection('base')}
+                        style={previewTabStyle(previewSelection === 'base')}
+                    >
+                        Base
+                    </button>
+                    {draft.alternativeImages.map((alternative, index) => (
+                        <button
+                            key={index}
+                            type="button"
+                            onClick={() => setPreviewSelection(index)}
+                            style={previewTabStyle(previewSelection === index)}
+                        >
+                            {alternative.description || `Alternative ${index + 1}`}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             <div>
                 <label style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '13px', marginBottom: 6 }}>Map Image Prompt</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'start' }}>
@@ -441,36 +512,6 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                             />
                         </div>
                     ))}
-                </div>
-            </div>
-
-            <div>
-                <strong style={{ display: 'block', color: 'var(--agenda-text-primary)', marginBottom: 8 }}>Preview</strong>
-                <div ref={previewRef} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: getMapImageUrl({ ...map, ...draft } as GameMap, stageInstance) ? `url(${getMapImageUrl({ ...map, ...draft } as GameMap, stageInstance)})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden', touchAction: 'none' }}>
-                    {map.links.map((link, index) => {
-                        const locationImageUrl = activeLocations.find(location => location.id === link.childId)?.imageUrl;
-                        return (
-                            <div
-                                key={`${link.childId}-marker-${index}`}
-                                role="button"
-                                tabIndex={0}
-                                aria-label={`Drag ${resolveTargetName(link.childId)} marker`}
-                                title={`Drag to position ${resolveTargetName(link.childId)}`}
-                                onPointerDown={event => {
-                                    event.currentTarget.setPointerCapture(event.pointerId);
-                                    updateLinkFromPointer(index, event);
-                                }}
-                                onPointerMove={event => {
-                                    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                                        updateLinkFromPointer(index, event);
-                                    }
-                                }}
-                                style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: '50%', color: 'var(--agenda-text-primary)', backgroundColor: 'var(--agenda-active)', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '2px solid var(--agenda-text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,.65)', cursor: 'grab', userSelect: 'none' }}
-                            >
-                                {!locationImageUrl && <Place style={{ fontSize: 18 }} />}
-                            </div>
-                        );
-                    })}
                 </div>
             </div>
 

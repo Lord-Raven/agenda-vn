@@ -407,7 +407,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                                     onChange={(event) => updateActorDetailGenerationSelection(key, event.target.checked)}
                                 />
                                 <span style={{ display: 'grid', gap: '2px' }}>
-                                    <span style={{ fontWeight: 600 }}>{label}</span>
+                                    <span style={{ fontWeight: 700 }}>{label}</span>
                                     <span style={{ fontSize: '12px', opacity: 0.8 }}>{description}</span>
                                 </span>
                             </label>
@@ -474,7 +474,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                             onChange={(event) => updateActorDetailGenerationSelection(key, event.target.checked)}
                         />
                         <span style={{ display: 'grid', gap: '2px' }}>
-                            <span style={{ fontWeight: 600 }}>{label}</span>
+                            <span style={{ fontWeight: 700 }}>{label}</span>
                             <span style={{ fontSize: '12px', opacity: 0.8 }}>{description}</span>
                         </span>
                     </label>
@@ -2007,7 +2007,7 @@ ${indent}}`;
                                                                 }}
                                                             >
                                                                 {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 600 }}>
+                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
                                                                     {stat.name}
                                                                 </span>
                                                             </Button>
@@ -2097,7 +2097,7 @@ ${indent}}`;
                                                                 {stat.type !== 'location' && (
                                                                 <>
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
-                                                                    <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 600 }}>
+                                                                    <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
                                                                         Initial Value
                                                                     </label>
                                                                     <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
@@ -2123,7 +2123,7 @@ ${indent}}`;
                                                                 </div>
 
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                                    <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 600 }}>
+                                                                    <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
                                                                         Initial Modifiers
                                                                     </label>
                                                                     {statInitial.modifiers.length === 0 && (
@@ -2246,7 +2246,7 @@ ${indent}}`;
                                                         }}
                                                     >
                                                         {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                                                        <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 600 }}>
+                                                        <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
                                                             {stat.name} (toward each other actor)
                                                         </span>
                                                     </Button>
@@ -2260,7 +2260,7 @@ ${indent}}`;
                                                             )}
 
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
-                                                                <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 600 }}>
+                                                                <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
                                                                     This Actor's Default Value Rules
                                                                 </label>
                                                                 <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
@@ -2321,7 +2321,7 @@ ${indent}}`;
                                                             </div>
 
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
-                                                                <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 600 }}>
+                                                                <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
                                                                     Values Toward Other Actors
                                                                 </label>
                                                                 {otherActiveActors.length === 0 && (
@@ -2867,7 +2867,7 @@ ${indent}}`;
                                             title: 'Generate Actor Details',
                                             message: (
                                                 <div style={{ display: 'grid', gap: '12px', textAlign: 'left' }}>
-                                                    <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
+                                                    <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
                                                         Warning: this will replace only the selected details for this actor.
                                                     </div>
                                                     {renderActorDetailGenerationSelection()}

@@ -82,7 +82,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                             Calendar
                         </Button>
                         <Box sx={{ minWidth: 0, textAlign: 'center' }}>
-                            <Typography sx={{ color: 'var(--agenda-text-primary)', fontFamily: 'var(--agenda-font-display)', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.8rem' }, lineHeight: 1.1 }}>
+                            <Typography sx={{ color: 'var(--agenda-text-primary)', fontFamily: 'var(--agenda-font-flavor)', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.8rem' }, lineHeight: 1.1 }}>
                                 {displayedMap.name || 'Unnamed Map'}
                             </Typography>
                             {displayedMap.description && (
@@ -152,7 +152,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             </span>
                                             <span style={{ padding: '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700 }}>
                                                 {markerName}
-                                                {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 500 }}>{linkedLocation?.name}</span>}
+                                                {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 400 }}>{linkedLocation?.name}</span>}
                                             </span>
                                         </motion.button>
                                         {linkedLocation && (

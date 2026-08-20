@@ -6,8 +6,9 @@ import {
 } from '../utils/StructuredResponse.js';
 
 export type UiSettings = {
-    interfaceFontFamily: string;
-    displayFontFamily: string;
+    primaryFontFamily: string;
+    secondaryFontFamily: string;
+    flavorFontFamily: string;
     textPrimaryColor: string;
     highlightColor: string;
     warningColor: string;
@@ -16,8 +17,7 @@ export type UiSettings = {
     accentColor: string;
     surfaceBaseColor: string;
     surfaceElevatedColor: string;
-    lineSubtleColor: string;
-    lineStrongColor: string;
+    lineColor: string;
     atmosphereStartColor: string;
     atmosphereEndColor: string;
     panelSurfaceColor: string;
@@ -25,8 +25,9 @@ export type UiSettings = {
 };
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
-    interfaceFontFamily: '"Geologica", sans-serif',
-    displayFontFamily: '"Lora", Georgia, serif',
+    primaryFontFamily: '"Geologica", sans-serif',
+    secondaryFontFamily: '"Geologica", sans-serif',
+    flavorFontFamily: '"Lora", Georgia, serif',
     accentColor: '#8ab0cc',
     highlightColor: '#89cd87',
     warningColor: '#cda959',
@@ -35,8 +36,7 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
     textMutedColor: '#b9d2e3',
     surfaceBaseColor: '#1a1e30',
     surfaceElevatedColor: '#2e354d',
-    lineSubtleColor: 'rgba(138, 176, 204, 0.34)',
-    lineStrongColor: 'rgba(137, 205, 135, 0.44)',
+    lineColor: 'rgba(138, 176, 204, 0.34)',
     atmosphereStartColor: 'rgba(10, 28, 37, 0.79)',
     atmosphereEndColor: 'rgba(35, 24, 56, 0.78)',
     panelSurfaceColor: 'rgba(28, 34, 52, 0.92)',
@@ -44,8 +44,9 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
 };
 
 export const UI_SETTINGS_GENERATION_FIELDS: StructuredFieldDefinition[] = [
-    { key: 'interface_font_family', label: 'INTERFACE FONT FAMILY', description: 'Primary UI font stack for controls and interface text.' },
-    { key: 'display_font_family', label: 'DISPLAY FONT FAMILY', description: 'Secondary flavor font stack for decorative or narrative-forward headings/body copy.' },
+    { key: 'primary_font_family', label: 'PRIMARY FONT FAMILY', description: 'Primary font stack for controls and interface text, typically stylish.' },
+    { key: 'secondary_font_family', label: 'SECONDARY FONT FAMILY', description: 'Secondary font stack for contrasting UI elements, typically cleaner.' },
+    { key: 'flavor_font_family', label: 'FLAVOR FONT FAMILY', description: 'Flavor font stack for decorative or narrative-forward content.' },
     { key: 'text_primary_color', label: 'TEXT PRIMARY COLOR', description: 'Main readable UI text color for high-emphasis content.' },
     { key: 'text_muted_color', label: 'TEXT MUTED COLOR', description: 'Muted text color for secondary or de-emphasized UI text.' },
     { key: 'highlight_color', label: 'HIGHLIGHT COLOR', description: 'Highlight color for selected, active, or currently focused states.' },
@@ -54,8 +55,7 @@ export const UI_SETTINGS_GENERATION_FIELDS: StructuredFieldDefinition[] = [
     { key: 'accent_color', label: 'ACCENT COLOR', description: 'Accent color for icons, special labels, and differentiation points.' },
     { key: 'surface_base_color', label: 'SURFACE BASE COLOR', description: 'Deepest background layer color for base canvas and depth.' },
     { key: 'surface_elevated_color', label: 'SURFACE ELEVATED COLOR', description: 'Soft background layer color for elevated sections and gentle contrast.' },
-    { key: 'line_subtle_color', label: 'LINE SUBTLE COLOR', description: 'Standard border color for panels and common framing.' },
-    { key: 'line_strong_color', label: 'LINE STRONG COLOR', description: 'Stronger border color for key callouts and emphasized framing.' },
+    { key: 'border_color', label: 'BORDER COLOR', description: 'Standard border color for panels and common framing.' },
     { key: 'atmosphere_start_color', label: 'ATMOSPHERE START COLOR', description: 'Gradient overlay start color for full-screen atmosphere.' },
     { key: 'atmosphere_end_color', label: 'ATMOSPHERE END COLOR', description: 'Gradient overlay end color for mood and finish.' },
     { key: 'panel_surface_color', label: 'PANEL SURFACE COLOR', description: 'Background color for shared card and panel surfaces.' },
@@ -63,8 +63,9 @@ export const UI_SETTINGS_GENERATION_FIELDS: StructuredFieldDefinition[] = [
 ];
 
 export const UI_STYLE_FIELD_LABELS: Record<keyof UiSettings, string> = {
-    interfaceFontFamily: 'UI Font Family',
-    displayFontFamily: 'Flavor Font Family',
+    primaryFontFamily: 'Primary Font Family',
+    secondaryFontFamily: 'Secondary Font Family',
+    flavorFontFamily: 'Flavor Font Family',
     textPrimaryColor: 'Primary Text',
     textMutedColor: 'Secondary Text',
     highlightColor: 'Interactive Highlight',
@@ -73,8 +74,7 @@ export const UI_STYLE_FIELD_LABELS: Record<keyof UiSettings, string> = {
     accentColor: 'Accent',
     surfaceBaseColor: 'Surface Base',
     surfaceElevatedColor: 'Surface Elevated',
-    lineSubtleColor: 'Line / Border',
-    lineStrongColor: 'Line / Border Emphasis',
+    lineColor: 'Line / Border',
     atmosphereStartColor: 'Atmosphere Overlay A',
     atmosphereEndColor: 'Atmosphere Overlay B',
     panelSurfaceColor: 'Panel / Card Surface',
@@ -98,10 +98,11 @@ export const applyUiSettingsToRoot = (uiSettings: UiSettings) => {
     rootStyle.setProperty('--agenda-surface-base', uiSettings.surfaceBaseColor);
     rootStyle.setProperty('--agenda-surface-raised', `color-mix(in srgb, ${uiSettings.surfaceBaseColor} 50%, ${uiSettings.surfaceElevatedColor})`);
     rootStyle.setProperty('--agenda-surface-elevated', uiSettings.surfaceElevatedColor);
-    rootStyle.setProperty('--agenda-line-subtle', uiSettings.lineSubtleColor);
-    rootStyle.setProperty('--agenda-line-strong', uiSettings.lineStrongColor);
-    rootStyle.setProperty('--agenda-font-base', uiSettings.interfaceFontFamily);
-    rootStyle.setProperty('--agenda-font-display', uiSettings.displayFontFamily);
+    rootStyle.setProperty('--agenda-line-subtle', uiSettings.lineColor);
+    rootStyle.setProperty('--agenda-line-strong', `color-mix(in srgb, ${uiSettings.lineColor} 50%, ${uiSettings.highlightColor})`);
+    rootStyle.setProperty('--agenda-font-primary', uiSettings.primaryFontFamily);
+    rootStyle.setProperty('--agenda-font-secondary', uiSettings.secondaryFontFamily);
+    rootStyle.setProperty('--agenda-font-flavor', uiSettings.flavorFontFamily);
     rootStyle.setProperty('--agenda-atmosphere-start', uiSettings.atmosphereStartColor);
     rootStyle.setProperty('--agenda-atmosphere-mid', `color-mix(in srgb, ${uiSettings.atmosphereStartColor} 50%, ${uiSettings.atmosphereEndColor})`);
     rootStyle.setProperty('--agenda-atmosphere-end', uiSettings.atmosphereEndColor);
@@ -129,8 +130,7 @@ const buildStyleUsageGuide = () => [
     'accentColor: Accent color for icons and visual differentiation.',
     'surfaceBaseColor: Deepest layer of the background palette.',
     'surfaceElevatedColor: Soft elevated background tone for nearby surfaces.',
-    'lineSubtleColor: Regular border stroke color.',
-    'lineStrongColor: Strong border stroke color for emphasis.',
+    'lineColor: Regular line/border stroke color.',
     'atmosphereStartColor: Atmosphere overlay gradient start (calendar and other full-screen overlays).',
     'atmosphereEndColor: Atmosphere overlay gradient end (calendar and other full-screen overlays).',
     'panelSurfaceColor: Shared panel/card fill color (used beyond the calendar where suitable).',
@@ -166,8 +166,9 @@ export const buildUiSettingsGenerationPrompt = (input: UiStyleGenerationInput): 
         .addBlock('Current Style Values', JSON.stringify(input.currentUiSettings, null, 2))
         .addBlock('Response Format', buildStructuredResponseFormat(UI_SETTINGS_GENERATION_FIELDS, { includeEndTag: true }))
         .addBlock('Example Response', buildStructuredExampleResponse(UI_SETTINGS_GENERATION_FIELDS, {
-            interface_font_family: '"Nunito Sans", "Segoe UI", sans-serif',
-            display_font_family: '"Cormorant Garamond", "Times New Roman", serif',
+            primary_font_family: '"Nunito Sans", "Segoe UI", sans-serif',
+            secondary_font_family: '"Nunito Sans", "Segoe UI", sans-serif',
+            flavor_font_family: '"Cormorant Garamond", "Times New Roman", serif',
             text_primary_color: '#f0f5f9',
             text_muted_color: '#adc2d3',
             highlight_color: '#8dd1a2',
@@ -176,8 +177,7 @@ export const buildUiSettingsGenerationPrompt = (input: UiStyleGenerationInput): 
             accent_color: '#9abed9',
             surface_base_color: '#141c2a',
             surface_elevated_color: '#28344a',
-            line_subtle_color: 'rgba(154, 190, 217, 0.35)',
-            line_strong_color: 'rgba(141, 209, 162, 0.5)',
+            line_color: 'rgba(154, 190, 217, 0.35)',
             atmosphere_start_color: 'rgba(11, 22, 37, 0.82)',
             atmosphere_end_color: 'rgba(35, 27, 59, 0.79)',
             panel_surface_color: 'rgba(25, 33, 50, 0.92)',
@@ -188,8 +188,9 @@ export const buildUiSettingsGenerationPrompt = (input: UiStyleGenerationInput): 
 
 export const mergeGeneratedUiSettings = (current: UiSettings, parsed: { [key: string]: string }): UiSettings => ({
     ...current,
-    interfaceFontFamily: (parsed.interface_font_family || current.interfaceFontFamily).trim() || current.interfaceFontFamily,
-    displayFontFamily: (parsed.display_font_family || current.displayFontFamily).trim() || current.displayFontFamily,
+    primaryFontFamily: (parsed.primary_font_family || current.primaryFontFamily).trim() || current.primaryFontFamily,
+    secondaryFontFamily: (parsed.secondary_font_family || current.secondaryFontFamily).trim() || current.secondaryFontFamily,
+    flavorFontFamily: (parsed.flavor_font_family || current.flavorFontFamily).trim() || current.flavorFontFamily,
     textPrimaryColor: isValidHexColor(parsed.text_primary_color || '') ? parsed.text_primary_color.trim() : current.textPrimaryColor,
     textMutedColor: isValidHexColor(parsed.text_muted_color || '') ? parsed.text_muted_color.trim() : current.textMutedColor,
     highlightColor: isValidHexColor(parsed.highlight_color || '') ? parsed.highlight_color.trim() : current.highlightColor,
@@ -198,8 +199,7 @@ export const mergeGeneratedUiSettings = (current: UiSettings, parsed: { [key: st
     accentColor: isValidHexColor(parsed.accent_color || '') ? parsed.accent_color.trim() : current.accentColor,
     surfaceBaseColor: isValidHexColor(parsed.surface_base_color || '') ? parsed.surface_base_color.trim() : current.surfaceBaseColor,
     surfaceElevatedColor: isValidHexColor(parsed.surface_elevated_color || '') ? parsed.surface_elevated_color.trim() : current.surfaceElevatedColor,
-    lineSubtleColor: isValidCssColor(parsed.line_subtle_color || '') ? parsed.line_subtle_color.trim() : current.lineSubtleColor,
-    lineStrongColor: isValidCssColor(parsed.line_strong_color || '') ? parsed.line_strong_color.trim() : current.lineStrongColor,
+    lineColor: isValidCssColor(parsed.line_color || '') ? parsed.line_color.trim() : current.lineColor,
     atmosphereStartColor: isValidCssColor(parsed.atmosphere_start_color || '') ? parsed.atmosphere_start_color.trim() : current.atmosphereStartColor,
     atmosphereEndColor: isValidCssColor(parsed.atmosphere_end_color || '') ? parsed.atmosphere_end_color.trim() : current.atmosphereEndColor,
     panelSurfaceColor: isValidCssColor(parsed.panel_surface_color || '') ? parsed.panel_surface_color.trim() : current.panelSurfaceColor,

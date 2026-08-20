@@ -518,7 +518,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                         return (
                             <div key={`player-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                    <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
+                                    <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
                                         {stat.name?.trim() || `Player Stat ${statIndex + 1}`}
                                     </div>
                                     <Button variant="secondary" onClick={() => togglePlayerStat(statIndex)}>
@@ -760,7 +760,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                         return (
                             <div key={`actor-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                    <div style={{ fontWeight: 600, color: 'var(--agenda-text-primary)' }}>
+                                    <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
                                         {stat.name?.trim() || `Actor Stat ${statIndex + 1}`}
                                     </div>
                                     <Button variant="secondary" onClick={() => toggleActorStat(statIndex)}>

@@ -59,9 +59,9 @@ export const theme = createTheme({
     text: colors.text,
   },
   typography: {
-    fontFamily: 'var(--agenda-font-base)',
+    fontFamily: 'var(--agenda-font-primary)',
     h1: {
-      fontFamily: 'var(--agenda-font-display)',
+      fontFamily: 'var(--agenda-font-flavor)',
       fontSize: '2.5rem',
       fontWeight: 700,
       letterSpacing: '0.12em',
@@ -69,34 +69,34 @@ export const theme = createTheme({
       textShadow: '0 0 24px color-mix(in srgb, var(--agenda-accent-primary) 26%, transparent)',
     },
     h2: {
-      fontFamily: 'var(--agenda-font-display)',
+      fontFamily: 'var(--agenda-font-flavor)',
       fontSize: '2rem',
       fontWeight: 700,
       letterSpacing: '0.08em',
       textShadow: '0 0 18px color-mix(in srgb, var(--agenda-highlight) 20%, transparent)',
     },
     h3: {
-      fontFamily: 'var(--agenda-font-display)',
+      fontFamily: 'var(--agenda-font-flavor)',
       fontSize: '1.75rem',
-      fontWeight: 600,
+      fontWeight: 700,
       letterSpacing: '0.05em',
     },
     h4: {
-      fontFamily: 'var(--agenda-font-display)',
+      fontFamily: 'var(--agenda-font-flavor)',
       fontSize: '1.5rem',
-      fontWeight: 600,
+      fontWeight: 700,
     },
     h5: {
-      fontFamily: 'var(--agenda-font-display)',
+      fontFamily: 'var(--agenda-font-flavor)',
       fontSize: '1.25rem',
-      fontWeight: 500,
+      fontWeight: 400,
     },
     body1: {
       fontSize: '1rem',
       lineHeight: 1.6,
     },
     button: {
-      fontFamily: 'var(--agenda-font-base)',
+      fontFamily: 'var(--agenda-font-primary)',
       textTransform: 'uppercase',
       fontWeight: 700,
       letterSpacing: '0.08em',
@@ -137,7 +137,7 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: '8px',
-          fontFamily: 'var(--agenda-font-base)',
+          fontFamily: 'var(--agenda-font-primary)',
           padding: '10px 24px',
           transition: 'all 0.3s ease',
           boxShadow: '0 0 14px color-mix(in srgb, var(--agenda-accent-primary) 24%, transparent)',
@@ -179,7 +179,7 @@ export const theme = createTheme({
     MuiTextField: {
       styleOverrides: {
         root: {
-          fontFamily: 'var(--agenda-font-base)',
+          fontFamily: 'var(--agenda-font-primary)',
           '& .MuiOutlinedInput-root': {
             '& fieldset': {
               borderColor: 'color-mix(in srgb, var(--agenda-accent-primary) 40%, transparent)',
@@ -221,8 +221,8 @@ export const theme = createTheme({
           backgroundColor: colors.background.glass,
           border: `1px solid ${colors.primary.main}`,
           color: colors.text.primary,
-          fontFamily: 'var(--agenda-font-base)',
-          fontWeight: 600,
+          fontFamily: 'var(--agenda-font-primary)',
+          fontWeight: 700,
           '&:hover': {
             backgroundColor: 'color-mix(in srgb, var(--agenda-accent-primary) 16%, transparent)',
           },

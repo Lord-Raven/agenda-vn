@@ -161,7 +161,7 @@ export const AffinityPopIn: FC<AffinityPopInProps> = ({
                                         backdropFilter: 'blur(4px)',
                                         color: '#fff',
                                         fontSize: 12,
-                                        fontWeight: 600,
+                                        fontWeight: 700,
                                         letterSpacing: '0.03em',
                                         textShadow: '0 1px 4px rgba(0,0,0,0.8)',
                                         whiteSpace: 'nowrap',

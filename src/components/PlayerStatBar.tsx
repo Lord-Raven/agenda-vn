@@ -220,7 +220,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
                                 sx={{
                                     color: "var(--agenda-text-primary)",
                                     fontSize: "0.8rem",
-                                    fontWeight: 600,
+                                    fontWeight: 700,
                                     lineHeight: 1.2,
                                     wordBreak: "break-word",
                                 }}

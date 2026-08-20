@@ -132,7 +132,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, pla
                 return (
                     <div key={rule.id} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 6, background: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <div style={{ flex: '1 1 220px', minWidth: 0, color: 'var(--agenda-text-primary)', fontWeight: 600 }}>
+                            <div style={{ flex: '1 1 220px', minWidth: 0, color: 'var(--agenda-text-primary)', fontWeight: 700 }}>
                                 {describeTrigger(rule)}
                                 <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: 12, fontWeight: 400 }}>
                                     {rule.updates.length === 0

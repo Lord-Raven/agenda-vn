@@ -182,7 +182,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                         </Title>
                         <Typography
                             sx={{
-                                fontFamily: 'var(--agenda-font-display)',
+                                fontFamily: 'var(--agenda-font-flavor)',
                                 fontSize: '0.85rem',
                                 color: 'var(--agenda-text-muted)',
                                 opacity: 0.8,
@@ -208,7 +208,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                                 sx={{
                                     textAlign: 'center',
                                     fontSize: '0.65rem',
-                                    fontFamily: 'var(--agenda-font-base)',
+                                    fontFamily: 'var(--agenda-font-primary)',
                                     letterSpacing: '0.08em',
                                     color: 'var(--agenda-text-muted)',
                                     pb: '2px',
@@ -251,7 +251,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                                             top: '3px',
                                             left: '4px',
                                             fontSize: 'clamp(0.5rem, 1.5vw, 0.7rem)',
-                                            fontFamily: 'var(--agenda-font-display)',
+                                            fontFamily: 'var(--agenda-font-flavor)',
                                             color: isMarked
                                                 ? 'rgba(185, 143, 110, 0.55)'
                                                 : isLoadableDay

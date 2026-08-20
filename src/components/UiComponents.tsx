@@ -259,7 +259,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 					<span
 						style={{
 							fontSize: '0.72em',
-							fontWeight: 600,
+							fontWeight: 700,
 							opacity: 0.88,
 							lineHeight: 1.2,
 							letterSpacing: '0.04em',

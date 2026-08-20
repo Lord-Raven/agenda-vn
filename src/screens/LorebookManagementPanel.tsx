@@ -491,7 +491,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         padding: 0,
                                         flex: 1,
                                         alignSelf: 'stretch',
-                                        fontWeight: 600,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     {entry.title || '(Untitled)'}

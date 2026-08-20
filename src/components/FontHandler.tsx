@@ -104,23 +104,12 @@ export const extractFontFamiliesFromStack = (fontStack: string): string[] => {
 		.filter(shouldImportFontFamily);
 };
 
-const buildGoogleFontHref = (fontFamily: string): string => {
+export const buildGoogleFontHref = (fontFamily: string): string => {
 	const encodedFamily = encodeURIComponent(fontFamily).replace(/%20/g, '+');
 	return `https://fonts.googleapis.com/css2?family=${encodedFamily}${GOOGLE_FONT_VARIANTS}&display=swap`;
 };
 
-const collectStageFontFamilies = (stageInstance: Stage): string[] => {
-	const uiSettings = stageInstance.getUiSettings();
-	const save = stageInstance.getSave();
-	const configuration = stageInstance.getConfiguration();
-	const fontStacks = [
-		uiSettings.interfaceFontFamily,
-		uiSettings.displayFontFamily,
-		configuration.uiSettings?.interfaceFontFamily,
-		configuration.uiSettings?.displayFontFamily,
-		...Object.values(save.actors || {}).map(actor => actor.themeFontFamily),
-		...(configuration.actors || []).map(actor => actor.themeFontFamily),
-	];
+export const collectFontFamilies = (fontStacks: Array<string | undefined>): string[] => {
 	const fontFamilies = new Map<string, string>();
 
 	fontStacks.forEach((fontStack) => {
@@ -133,6 +122,34 @@ const collectStageFontFamilies = (stageInstance: Stage): string[] => {
 	});
 
 	return Array.from(fontFamilies.values()).sort((left, right) => left.localeCompare(right));
+};
+
+export const buildGoogleFontLinkTags = (fontStacks: Array<string | undefined>): string => {
+	const fontFamilies = collectFontFamilies(fontStacks);
+	if (fontFamilies.length === 0) {
+		return '';
+	}
+
+	const preconnectTags = '<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />';
+	const stylesheetTags = fontFamilies
+		.map(fontFamily => `<link rel="stylesheet" href="${buildGoogleFontHref(fontFamily)}" />`)
+		.join('');
+
+	return `${preconnectTags}${stylesheetTags}`;
+};
+
+const collectStageFontFamilies = (stageInstance: Stage): string[] => {
+	const uiSettings = stageInstance.getUiSettings();
+	const save = stageInstance.getSave();
+	const configuration = stageInstance.getConfiguration();
+	const fontStacks = [
+		uiSettings.primaryFontFamily,
+		uiSettings.secondaryFontFamily,
+		uiSettings.flavorFontFamily,
+		...Object.values(save.actors || {}).map(actor => actor.themeFontFamily),
+		...(configuration.actors || []).map(actor => actor.themeFontFamily),
+	];
+	return collectFontFamilies(fontStacks);
 };
 
 const ensureGoogleFontPreconnects = () => {

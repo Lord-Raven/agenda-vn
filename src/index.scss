@@ -11,8 +11,9 @@
   --agenda-line-subtle: rgba(138, 176, 204, 0.34);
   --agenda-line-strong: rgba(137, 205, 135, 0.44);
   --agenda-shadow: 0 14px 34px rgba(2, 8, 18, 0.48);
-  --agenda-font-display: "Lora", Georgia, serif;
-  --agenda-font-base: "Geologica", sans-serif;
+  --agenda-font-flavor: "Lora", Georgia, serif;
+  --agenda-font-primary: "Geologica", sans-serif;
+  --agenda-font-secondary: "Geologica", sans-serif;
   --agenda-atmosphere-start: rgba(10, 28, 37, 0.79);
   --agenda-atmosphere-mid: color-mix(in srgb, var(--agenda-atmosphere-start) 50%, var(--agenda-atmosphere-end));
   --agenda-atmosphere-end: rgba(35, 24, 56, 0.78);
@@ -34,7 +35,7 @@ html, body, #root {
 
 body {
   color: var(--agenda-text-primary);
-  font-family: var(--agenda-font-base);
+  font-family: var(--agenda-font-primary);
   background:
     radial-gradient(1200px 700px at 12% 10%, color-mix(in srgb, var(--agenda-accent-primary) 20%, transparent), transparent 56%),
     radial-gradient(950px 560px at 88% 90%, color-mix(in srgb, var(--agenda-highlight) 16%, transparent), transparent 62%),
@@ -79,14 +80,14 @@ body {
 
 .text-glow-primary {
   color: var(--agenda-text-primary);
-  font-family: var(--agenda-font-display);
+  font-family: var(--agenda-font-flavor);
   letter-spacing: 0.1em;
   text-shadow: 0 0 18px color-mix(in srgb, var(--agenda-accent-primary) 34%, transparent), 0 4px 10px rgba(3, 7, 15, 0.66);
 }
 
 .text-gradient {
   color: transparent;
-  font-family: var(--agenda-font-display);
+  font-family: var(--agenda-font-flavor);
   background: linear-gradient(95deg, var(--agenda-accent-primary) 0%, var(--agenda-highlight) 52%, var(--agenda-text-primary) 100%);
   background-clip: text;
   -webkit-background-clip: text;
@@ -100,7 +101,7 @@ body {
   border: 1px solid transparent;
   border-radius: 10px;
   color: var(--agenda-text-primary);
-  font-family: var(--agenda-font-base);
+  font-family: var(--agenda-font-primary);
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -150,7 +151,7 @@ body {
   border-radius: 0;
   min-height: 34px;
   text-transform: none;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--agenda-text-muted);
   background: transparent;
@@ -233,7 +234,7 @@ body {
     color-mix(in srgb, var(--agenda-surface-raised) 92%, transparent),
     color-mix(in srgb, var(--agenda-surface-base) 92%, transparent));
   padding: 12px 14px;
-  font-family: var(--agenda-font-base);
+  font-family: var(--agenda-font-primary);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 

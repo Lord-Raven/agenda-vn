@@ -224,21 +224,31 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.interfaceFontFamily}</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.primaryFontFamily}</label>
                         <TextInput
                             fullWidth
-                            value={uiSettings.interfaceFontFamily}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, interfaceFontFamily: e.target.value }))}
+                            value={uiSettings.primaryFontFamily}
+                            onChange={(e) => setUiSettings(prev => ({ ...prev, primaryFontFamily: e.target.value }))}
                             placeholder='"Geologica", sans-serif'
                         />
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.displayFontFamily}</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.secondaryFontFamily}</label>
                         <TextInput
                             fullWidth
-                            value={uiSettings.displayFontFamily}
-                            onChange={(e) => setUiSettings(prev => ({ ...prev, displayFontFamily: e.target.value }))}
+                            value={uiSettings.secondaryFontFamily}
+                            onChange={(e) => setUiSettings(prev => ({ ...prev, secondaryFontFamily: e.target.value }))}
+                            placeholder='"Geologica", sans-serif'
+                        />
+                    </div>
+
+                    <div>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.flavorFontFamily}</label>
+                        <TextInput
+                            fullWidth
+                            value={uiSettings.flavorFontFamily}
+                            onChange={(e) => setUiSettings(prev => ({ ...prev, flavorFontFamily: e.target.value }))}
                             placeholder='"Lora", Georgia, serif'
                         />
                     </div>
@@ -257,22 +267,11 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     ))}
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.lineSubtleColor}</label>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.lineColor}</label>
                         <AlphaColorPickerInput
-                            value={uiSettings.lineSubtleColor}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, lineSubtleColor: value }))}
+                            value={uiSettings.lineColor}
+                            onChange={(value) => setUiSettings(prev => ({ ...prev, lineColor: value }))}
                             popoverTitle="Choose Border Color"
-                            swatches={groupedStyleSwatches.all}
-                            inputStyle={{ width: '100%' }}
-                        />
-                    </div>
-
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{UI_STYLE_FIELD_LABELS.lineStrongColor}</label>
-                        <AlphaColorPickerInput
-                            value={uiSettings.lineStrongColor}
-                            onChange={(value) => setUiSettings(prev => ({ ...prev, lineStrongColor: value }))}
-                            popoverTitle="Choose Border Strong Color"
                             swatches={groupedStyleSwatches.all}
                             inputStyle={{ width: '100%' }}
                         />

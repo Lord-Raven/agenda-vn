@@ -130,7 +130,7 @@ export const TooltipBar: FC<TooltipBarProps> = ({
                             sx={{
                                 color: 'var(--agenda-text-primary)',
                                 fontSize: '16px',
-                                fontWeight: 600,
+                                fontWeight: 700,
                                 textShadow: '0 0 10px rgba(138, 176, 204, 0.35)',
                                 textAlign: 'center',
                             }}

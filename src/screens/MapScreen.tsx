@@ -219,7 +219,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                             <Typography
                                 sx={{
                                     color: "var(--agenda-text-primary)",
-                                    fontFamily: "var(--agenda-font-display)",
+                                    fontFamily: "var(--agenda-font-flavor)",
                                     fontWeight: 700,
                                     fontSize: { xs: "1.7rem", md: "2.5rem" },
                                     letterSpacing: "0.04em",
@@ -358,7 +358,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                                 <Typography
                                                     sx={{
                                                         color: "var(--agenda-text-primary)",
-                                                        fontFamily: "var(--agenda-font-display)",
+                                                        fontFamily: "var(--agenda-font-flavor)",
                                                         fontWeight: 700,
                                                         fontSize: { xs: "1.15rem", md: "1.45rem" },
                                                         lineHeight: 1.15,

@@ -332,7 +332,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             <Typography
                                 sx={{
                                     color: isViewingCurrentMonth ? "var(--agenda-text-primary)" : "var(--agenda-text-muted)",
-                                    fontFamily: "var(--agenda-font-display)",
+                                    fontFamily: "var(--agenda-font-flavor)",
                                     fontWeight: 700,
                                     fontSize: { xs: "2rem", md: "3rem" },
                                     letterSpacing: "0.04em",

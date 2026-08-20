@@ -39,14 +39,14 @@ const toLetterGrade = (value: number, stat: ActorStat): string => {
 const StatValue: FC<{ stat: ActorStat; value: number | string | boolean; atlas?: { [key: string]: { name: string } } }> = ({ stat, value, atlas }) => {
     if (stat.type === 'location') {
         return (
-            <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 700, whiteSpace: 'nowrap' }}>
                 {atlas?.[String(value)]?.name || ''}
             </Box>
         );
     }
     if (stat.type === 'checkbox') {
         return (
-            <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 700, whiteSpace: 'nowrap' }}>
                 {value === true ? 'True' : 'False'}
             </Box>
         );
@@ -85,7 +85,7 @@ const StatValue: FC<{ stat: ActorStat; value: number | string | boolean; atlas?:
         : String(value ?? '');
 
     return (
-        <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+        <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 700, whiteSpace: 'nowrap' }}>
             {text}
         </Box>
     );
@@ -144,7 +144,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                 backgroundColor: 'var(--agenda-panel-surface)',
                 boxShadow: 'var(--agenda-shadow)',
                 color: 'var(--agenda-text-primary)',
-                fontFamily: 'var(--agenda-font-base)',
+                fontFamily: 'var(--agenda-font-primary)',
                 ...style,
             }}
         >
