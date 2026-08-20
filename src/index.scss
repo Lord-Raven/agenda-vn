@@ -42,6 +42,10 @@ body {
     linear-gradient(160deg, color-mix(in srgb, var(--agenda-surface-base) 88%, #000) 0%, var(--agenda-surface-raised) 44%, color-mix(in srgb, var(--agenda-surface-base) 92%, #000) 100%);
 }
 
+button {
+  font-family: var(--agenda-font-secondary);
+}
+
 .agenda-screen-root {
   position: relative;
   width: 100vw;
