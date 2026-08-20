@@ -105,6 +105,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
     const focalPreviewRef = useRef<HTMLDivElement>(null);
+    const [previewSelection, setPreviewSelection] = useState<'base' | number>('base');
 
     const persistLocation = (
         nextLocation: typeof editedLocation
@@ -171,6 +172,12 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             }
         };
     }, [editedLocation]);
+
+    useEffect(() => {
+        if (previewSelection !== 'base' && previewSelection >= editedLocation.alternativeImages.length) {
+            setPreviewSelection('base');
+        }
+    }, [editedLocation.alternativeImages.length, previewSelection]);
 
     useEffect(() => {
         return () => {
@@ -377,12 +384,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         onDeactivate?.(location.id);
     };
 
-    const clampedCoord = (value: string): number => {
-        const n = parseFloat(value);
-        if (isNaN(n)) return 0;
-        return Math.min(1, Math.max(0, n));
-    };
-
     const updateFocalFromPointer = (event: PointerEvent<HTMLElement>) => {
         const previewBounds = focalPreviewRef.current?.getBoundingClientRect();
         if (!previewBounds) {
@@ -424,27 +425,19 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         resize: 'vertical',
     };
 
-    const sliderRowStyle: React.CSSProperties = {
-        display: 'grid',
-        gridTemplateColumns: '1fr auto',
-        alignItems: 'center',
-        gap: '12px',
-    };
-
-    const sliderStyle: React.CSSProperties = {
-        width: '100%',
-        accentColor: 'var(--agenda-highlight)',
-        cursor: 'pointer',
-    };
-
-    const sliderValueStyle: React.CSSProperties = {
-        minWidth: '56px',
-        textAlign: 'right',
-        color: 'var(--agenda-text-primary)',
+    const previewTabStyle = (isActive: boolean): React.CSSProperties => ({
+        padding: '6px 12px',
         fontSize: '13px',
-        fontVariantNumeric: 'tabular-nums',
-        opacity: 0.9,
-    };
+        borderRadius: '999px',
+        border: `1px solid ${isActive ? 'var(--agenda-highlight)' : 'var(--agenda-line-subtle)'}`,
+        background: isActive ? 'var(--agenda-active)' : 'color-mix(in srgb, var(--agenda-surface-base) 86%, transparent)',
+        color: 'var(--agenda-text-primary)',
+        cursor: 'pointer',
+    });
+
+    const previewImageUrl = previewSelection === 'base'
+        ? editedLocation.imageUrl
+        : editedLocation.alternativeImages[previewSelection]?.imageUrl || editedLocation.imageUrl;
 
     const locationThemeColorSwatches = useMemo(() => {
         const locations = Object.values(stage().getSave().atlas || {});
@@ -601,11 +594,11 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                 </div>
                             </section>
 
-                            {/* Positioning */}
+                            {/* Preview */}
                             <section>
-                                <h2 style={sectionHeadingStyle}>Positioning</h2>
+                                <h2 style={sectionHeadingStyle}>Preview</h2>
                                 <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', marginTop: '-8px', marginBottom: '14px' }}>
-                                    Drag the marker to set the focal point used when cropping this location's image.
+                                    Drag the marker to set the focal point used when cropping this location's image. Use the tabs below to preview alternative images.
                                 </p>
                                 <div
                                     ref={focalPreviewRef}
@@ -614,17 +607,17 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                         width: '100%',
                                         aspectRatio: '16 / 9',
                                         background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)',
-                                        backgroundImage: editedLocation.imageUrl ? `url(${editedLocation.imageUrl})` : 'none',
+                                        backgroundImage: previewImageUrl ? `url(${previewImageUrl})` : 'none',
                                         backgroundSize: 'cover',
                                         backgroundPosition: 'center',
                                         border: `2px solid ${editedLocation.themeColor || 'var(--agenda-line-strong)'}`,
                                         borderRadius: 8,
                                         overflow: 'hidden',
                                         touchAction: 'none',
-                                        marginBottom: '15px',
+                                        marginBottom: '10px',
                                     }}
                                 >
-                                    {!editedLocation.imageUrl && (
+                                    {!previewImageUrl && (
                                         <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
                                             <ImageIcon style={{ fontSize: 48, color: 'var(--agenda-text-muted)' }} />
                                         </div>
@@ -664,37 +657,24 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                         <Place style={{ fontSize: 18 }} />
                                     </div>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                                    <div>
-                                        <label style={labelStyle}>Focal Point X <span style={{ fontWeight: 'normal', opacity: 0.7 }}>(0–1)</span></label>
-                                        <div style={sliderRowStyle}>
-                                            <input
-                                                type="range"
-                                                value={editedLocation.focalX}
-                                                min={0}
-                                                max={1}
-                                                step={0.01}
-                                                onChange={(e) => handleInputChange('focalX', clampedCoord(e.target.value))}
-                                                style={sliderStyle}
-                                            />
-                                            <span style={sliderValueStyle}>{editedLocation.focalX.toFixed(2)}</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>Focal Point Y <span style={{ fontWeight: 'normal', opacity: 0.7 }}>(0–1)</span></label>
-                                        <div style={sliderRowStyle}>
-                                            <input
-                                                type="range"
-                                                value={editedLocation.focalY}
-                                                min={0}
-                                                max={1}
-                                                step={0.01}
-                                                onChange={(e) => handleInputChange('focalY', clampedCoord(e.target.value))}
-                                                style={sliderStyle}
-                                            />
-                                            <span style={sliderValueStyle}>{editedLocation.focalY.toFixed(2)}</span>
-                                        </div>
-                                    </div>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPreviewSelection('base')}
+                                        style={previewTabStyle(previewSelection === 'base')}
+                                    >
+                                        Base
+                                    </button>
+                                    {editedLocation.alternativeImages.map((alternative, index) => (
+                                        <button
+                                            key={index}
+                                            type="button"
+                                            onClick={() => setPreviewSelection(index)}
+                                            style={previewTabStyle(previewSelection === index)}
+                                        >
+                                            {alternative.description || `Alternative ${index + 1}`}
+                                        </button>
+                                    ))}
                                 </div>
                             </section>
 

@@ -1,5 +1,5 @@
 import { v4 as generateUuid } from 'uuid';
-import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
+import { ActorConditionTarget, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
 // 'location' stats hold a location ID (a key into the save's atlas) rather than a display value.
 export type ActorStatType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text' | 'checkbox' | 'location';
@@ -224,4 +224,67 @@ export const resolvePerActorValueRule = (
 ): ActorStatValue | undefined => {
     const matchedRule = (rules || []).find((rule) => evaluateConditionCollections(rule.conditions, context));
     return matchedRule ? normalizeActorStatValue(matchedRule.value, stat) : undefined;
+};
+
+export type StatUpdateTargetType = 'player' | 'actor';
+export type StatUpdateOperation = 'set' | 'adjust';
+
+// A single stat write performed by a StatUpdateRule. Shares ActorStatValue (and, for numeric stats, the same
+// dice/relative expression support) with ActorStatValueRule so both rule flavors can use the same editors.
+export type StatUpdate = {
+    id: string;
+    targetType: StatUpdateTargetType;
+    // Only meaningful for 'actor' updates: 'any' targets every active actor, otherwise a specific actor id.
+    actorId: ActorConditionTarget;
+    statId: string;
+    operation: StatUpdateOperation;
+    value: ActorStatValue;
+};
+
+// A recurring "every <calendar condition> do these things" rule; conditions are the same ConditionCollections
+// used by schedules and per-actor default rules, and are re-evaluated for each in-game period entered.
+export type StatUpdateRule = {
+    id: string;
+    conditions: ConditionCollection[];
+    updates: StatUpdate[];
+};
+
+export const cloneStatUpdate = (update: any): StatUpdate => ({
+    id: update?.id || generateUuid(),
+    targetType: update?.targetType === 'player' ? 'player' : 'actor',
+    actorId: `${update?.actorId || 'any'}`,
+    statId: `${update?.statId || ''}`,
+    operation: update?.operation === 'set' ? 'set' : 'adjust',
+    value: typeof update?.value === 'boolean' || typeof update?.value === 'number' || typeof update?.value === 'string' ? update.value : 0,
+});
+
+export const cloneStatUpdateRule = (rule: any): StatUpdateRule => ({
+    id: rule?.id || generateUuid(),
+    conditions: Array.isArray(rule?.conditions)
+        ? rule.conditions.map((collection: unknown) => Array.isArray(collection) ? [...collection] : [])
+        : [],
+    updates: Array.isArray(rule?.updates) ? rule.updates.map(cloneStatUpdate) : [],
+});
+
+export const cloneStatUpdateRules = (rules: unknown): StatUpdateRule[] => (Array.isArray(rules) ? rules : []).map(cloneStatUpdateRule);
+
+// Resolves the value a stat update writes, given the target's current value. Numeric stats evaluate the
+// update's value as a dice/relative expression, so 'adjust' adds the rolled amount while 'set' replaces with
+// it; non-numeric stats always write a literal value.
+export const applyStatUpdateValue = (currentValue: ActorStatValue | undefined, update: StatUpdate, stat: ActorStat): ActorStatValue => {
+    if (!isNumericDisplayType(stat.type)) {
+        return normalizeActorStatValue(update.value, stat);
+    }
+
+    const amount = evaluateNumericStatExpression(update.value);
+    if (amount === undefined) {
+        return normalizeActorStatValue(currentValue, stat);
+    }
+
+    if (update.operation === 'set') {
+        return normalizeActorStatValue(amount, stat);
+    }
+
+    const base = Number.isFinite(currentValue) ? Number(currentValue) : Number(resolveActorStatDefault(stat)) || 0;
+    return normalizeActorStatValue(base + amount, stat);
 };

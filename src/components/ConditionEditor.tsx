@@ -74,7 +74,7 @@ const getDefaultConditionValue = (stat?: ActorStat): string | number | boolean =
     return typeof stat.default === 'number' ? stat.default : 0;
 };
 
-const buildActorTargetOptions = (actors: Array<{ id: string; name: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] }>, allowVariableActorTarget: boolean) => {
+export const buildActorTargetOptions = (actors: Array<{ id: string; name: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] }>, allowVariableActorTarget: boolean) => {
     const options: Array<{ key: string; label: string; icon?: typeof AllInclusive; imageUrl?: string }> = [];
     if (allowVariableActorTarget) {
         options.push({ key: 'variable', label: 'Variable', icon: SwapHoriz });

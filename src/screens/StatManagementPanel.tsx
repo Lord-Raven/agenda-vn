@@ -2,11 +2,13 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { ActorStat, ActorStatType, ActorStatValue, ActorStatValueRule, cloneActorStatValueRules, isNumericDisplayType } from '../content/ActorStat';
+import { ActorStat, ActorStatType, ActorStatValue, ActorStatValueRule, StatUpdateRule, cloneActorStatValueRules, cloneStatUpdateRules, isNumericDisplayType } from '../content/ActorStat';
 import { Button, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/ActorStatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
+import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
+import { StatValueInput } from '../components/StatValueInput';
 import { Add } from '@mui/icons-material';
 
 interface StatManagementPanelProps {
@@ -232,6 +234,9 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
     const [universalSchedule, setUniversalSchedule] = useState<ActorSchedule>(() =>
         cloneActorSchedule(configuration.universalSchedule),
     );
+    const [statUpdateRules, setStatUpdateRules] = useState<StatUpdateRule[]>(() =>
+        cloneStatUpdateRules(configuration.statUpdateRules),
+    );
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
@@ -282,6 +287,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             playerStats,
             playerStatValues: validPlayerStatValues,
             universalSchedule,
+            statUpdateRules,
         });
 
         const currentSave = stageInstance.getSave();
@@ -319,7 +325,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 }
             });
         });
-    }, [actorStats, playerStats, stageInstance, universalSchedule, validPlayerStatValues]);
+    }, [actorStats, playerStats, stageInstance, statUpdateRules, universalSchedule, validPlayerStatValues]);
 
     useEffect(() => {
         if (!didMountRef.current) {
@@ -485,45 +491,9 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         <IconPicker value={value} onChange={onChange} allowClear={allowClear} />
     );
 
-    const renderRuleValueInput = (stat: ActorStat, rule: ActorStatValueRule, onChange: (value: ActorStatValue) => void) => {
-        if (stat.type === 'checkbox') {
-            return (
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                    <input type="checkbox" checked={rule.value === true} onChange={(e) => onChange(e.target.checked)} />
-                    {rule.value === true ? 'True' : 'False'}
-                </label>
-            );
-        }
-        if (stat.type === 'option') {
-            const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-            return (
-                <select className="input-base" value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => onChange(e.target.value)}>
-                    {optionNames.map(name => <option key={name} value={name}>{name}</option>)}
-                </select>
-            );
-        }
-        if (stat.type === 'text') {
-            return <TextInput fullWidth value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => onChange(e.target.value)} />;
-        }
-        if (stat.type === 'location') {
-            return (
-                <LocationSelect
-                    value={typeof rule.value === 'string' ? rule.value : ''}
-                    onChange={(locationId) => onChange(locationId)}
-                    locations={locationOptions}
-                    stage={stage}
-                />
-            );
-        }
-        return (
-            <TextInput
-                fullWidth
-                type="number"
-                value={String(Number.isFinite(rule.value) ? Number(rule.value) : 0)}
-                onChange={(e) => onChange(Number(e.target.value) || 0)}
-            />
-        );
-    };
+    const renderRuleValueInput = (stat: ActorStat, rule: ActorStatValueRule, onChange: (value: ActorStatValue) => void) => (
+        <StatValueInput stat={stat} value={rule.value} onChange={onChange} locations={locationOptions} stage={stage} />
+    );
 
     const removeActorStat = (index: number) => {
         setActorStats(prev => prev.filter((_, idx) => idx !== index));
@@ -1160,6 +1130,22 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     actors={Object.values(save.actors || {})}
                     emptyLabel="No universal schedule entries. Every actor falls back to their own schedule."
                     onChange={setUniversalSchedule}
+                />
+            </GlassPanel>
+
+            <GlassPanel variant="default" style={{ padding: '18px' }}>
+                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Stat Update Events</Title>
+                <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '11px', marginBottom: 10 }}>
+                    Recurring stat changes applied at the start of every in-game time period whose conditions match. Numeric stats accept dice or relative notation (e.g. "1d6+1" or "-2").
+                </span>
+                <StatUpdateRuleEditor
+                    rules={statUpdateRules}
+                    playerStats={playerStats}
+                    actorStats={actorStats}
+                    actors={Object.values(save.actors || {})}
+                    locations={locationOptions}
+                    stage={stage}
+                    onChange={setStatUpdateRules}
                 />
             </GlassPanel>
         </div>

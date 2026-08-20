@@ -1,9 +1,9 @@
 import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
-import { ConditionCollection } from "./content/Condition";
+import { ConditionCollection, ConditionContext, evaluateConditionCollections } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, loadSupportedActor, resolveActorSchedule, ScheduleContext } from "./content/Actor";
-import { ActorStat, ActorStatType, ActorStatValue, cloneActorStat, isNumericActorStat, normalizeActorStatValue, resolveActorStatText } from './content/ActorStat';
+import { ActorStat, ActorStatType, ActorStatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneActorStat, cloneStatUpdateRules, isNumericActorStat, normalizeActorStatValue, resolveActorStatText } from './content/ActorStat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
@@ -95,6 +95,10 @@ const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
 
 const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
 
+// Upper bound on how many in-game periods a single calendar advance will replay stat update rules for, so a
+// large jump (or malformed dates) cannot spin indefinitely.
+const MAX_STAT_UPDATE_PERIODS = 128;
+
 // Represents a configuration that is used to initialize new games, but can also influence existing games.
 export type GameConfiguration = {
     
@@ -107,6 +111,7 @@ export type GameConfiguration = {
     actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
     playerStats: ActorStat[], // Stats that apply to the player only
     playerStatValues: {[key: string]: ActorStatValue}, // Selected/default values for player stats
+    statUpdateRules: StatUpdateRule[], // Recurring stat changes applied as in-game time advances
     uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
     titleImageUrl: string, // URL of a title image for the game
@@ -224,6 +229,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actorStats: [],
             playerStats: [],
             playerStatValues: {},
+            statUpdateRules: [],
             uiSettings: cloneUiSettings(DEFAULT_UI_SETTINGS),
             title: 'Agenda VN',
             titleImageUrl: '',
@@ -265,6 +271,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 actorStats: (this.getConfiguration()?.actorStats || []).map(cloneActorStat),
                 playerStats: (this.getConfiguration()?.playerStats || []).map(cloneActorStat),
                 playerStatValues: { ...(activeSave?.playerStatValues || {}) },
+                statUpdateRules: cloneStatUpdateRules(this.getConfiguration()?.statUpdateRules),
                 uiSettings: cloneUiSettings(activeSave?.uiSettings || {}),
             };
             this.syncUniversalSchedule();
@@ -281,6 +288,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actorStats: (this.saveData.configuration.actorStats || defaultConfiguration.actorStats).map(cloneActorStat),
             playerStats: (this.saveData.configuration.playerStats || defaultConfiguration.playerStats).map(cloneActorStat),
             playerStatValues: { ...(this.saveData.configuration.playerStatValues || defaultConfiguration.playerStatValues) },
+            statUpdateRules: cloneStatUpdateRules(this.saveData.configuration.statUpdateRules),
             uiSettings: cloneUiSettings(this.saveData.configuration.uiSettings || defaultConfiguration.uiSettings),
             startingDate: this.saveData.configuration.startingDate || defaultConfiguration.startingDate,
             title: this.saveData.configuration.title || defaultConfiguration.title,
@@ -335,6 +343,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneActorStat),
             playerStats: (updates.playerStats ?? current.playerStats ?? []).map(cloneActorStat),
             playerStatValues: { ...(updates.playerStatValues ?? current.playerStatValues ?? {}) },
+            statUpdateRules: cloneStatUpdateRules(updates.statUpdateRules ?? current.statUpdateRules),
             uiSettings: cloneUiSettings(updates.uiSettings ?? current.uiSettings ?? DEFAULT_UI_SETTINGS),
             startingDate: updates.startingDate ?? current.startingDate,
         };
@@ -997,15 +1006,83 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private advanceCalendarAfterEvent(save: SaveType, event: CalendarEvent) {
         const eventDate = `${event.date || ''}`.trim() || save.currentDate || this.getStartingDate(save);
         const endingTimeOfDay = this.getEventEndTimeOfDay(event);
+        const previousDate = save.currentDate || this.getStartingDate(save);
+        const previousTimeOfDay = save.currentTimeOfDay || 'morning';
 
         if (endingTimeOfDay === 'night') {
             save.currentDate = this.addDays(eventDate, 1);
             save.currentTimeOfDay = 'morning';
+        } else {
+            save.currentDate = eventDate;
+            save.currentTimeOfDay = this.getNextTimeOfDay(endingTimeOfDay);
+        }
+
+        this.applyStatUpdateRules(save, previousDate, previousTimeOfDay);
+    }
+
+    // Replays the configured stat update rules for every in-game period entered between the previous calendar
+    // position (exclusive) and the save's current one (inclusive), so recurring rules such as "every morning"
+    // still fire for periods skipped by a multi-day jump.
+    private applyStatUpdateRules(save: SaveType, previousDate: string, previousTimeOfDay: CalendarTimeOfDay) {
+        const rules = this.getConfiguration().statUpdateRules || [];
+        if (rules.length === 0) {
             return;
         }
 
-        save.currentDate = eventDate;
-        save.currentTimeOfDay = this.getNextTimeOfDay(endingTimeOfDay);
+        const targetDate = save.currentDate || previousDate;
+        const targetTimeOfDay = save.currentTimeOfDay || previousTimeOfDay;
+        let date = previousDate;
+        let timeOfDay = previousTimeOfDay;
+
+        for (let step = 0; step < MAX_STAT_UPDATE_PERIODS; step++) {
+            if (date === targetDate && timeOfDay === targetTimeOfDay) {
+                return;
+            }
+
+            if (timeOfDay === 'night') {
+                date = this.addDays(date, 1);
+                timeOfDay = 'morning';
+            } else {
+                timeOfDay = this.getNextTimeOfDay(timeOfDay);
+            }
+
+            if (date > targetDate) {
+                return;
+            }
+
+            const context: ConditionContext = { ...this.getScheduleContext(save), currentDate: date, currentTimeOfDay: timeOfDay };
+            rules
+                .filter(rule => evaluateConditionCollections(rule.conditions, context))
+                .forEach(rule => (rule.updates || []).forEach(update => this.applyStatUpdate(save, update)));
+        }
+    }
+
+    private applyStatUpdate(save: SaveType, update: StatUpdate) {
+        const configuration = this.getConfiguration();
+
+        if (update.targetType === 'player') {
+            const stat = (configuration.playerStats || []).find(candidate => candidate.id === update.statId);
+            if (!stat) {
+                return;
+            }
+            save.playerStatValues = save.playerStatValues || {};
+            save.playerStatValues[stat.id] = applyStatUpdateValue(save.playerStatValues[stat.id], update, stat);
+            return;
+        }
+
+        const stat = (configuration.actorStats || []).find(candidate => candidate.id === update.statId);
+        // perActor stats have no single target value, so they cannot be written by a rule.
+        if (!stat || stat.perActor) {
+            return;
+        }
+
+        Object.values(save.actors || {})
+            .filter(actor => actor.active !== false)
+            .filter(actor => update.actorId === 'any' || actor.id === update.actorId)
+            .forEach(actor => {
+                actor.statMap = actor.statMap || {};
+                actor.statMap[stat.id] = applyStatUpdateValue(actor.statMap[stat.id], update, stat);
+            });
     }
 
     private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType): CalendarEvent {

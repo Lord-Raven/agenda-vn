@@ -175,6 +175,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
     useEffect(() => {
         if (skit.script.length == 0 && !isLoading) {
             if (stage().getCurrentSkit() === null) {
+                console.log('No current skit. Returning to map.');
                 setScreenType(ScreenType.MAP);
                 return;
             }
