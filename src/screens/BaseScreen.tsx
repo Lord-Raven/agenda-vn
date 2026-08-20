@@ -11,6 +11,7 @@ import { MapScreen } from './MapScreen';
 import { SkitScreen } from './SkitScreen';
 import { LoadingScreen } from './LoadingScreen';
 import { applyUiSettingsToRoot } from '../content/Style';
+import { FontHandler } from '../components/FontHandler';
 
 /*
  * Base screen management; the Stage class will display this, and this will track the current screen being displayed.
@@ -59,6 +60,7 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
 
     return (
         <div className="agenda-screen-root">
+            <FontHandler stage={stage} />
             <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                     key={screenType}
