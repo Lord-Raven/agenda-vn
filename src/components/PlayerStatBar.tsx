@@ -2,7 +2,7 @@ import { FC, ReactNode, useMemo } from "react";
 import { Box, Typography } from "@mui/material";
 import { Bed, Bedtime, EventAvailable, WbSunny, WbTwilight } from "@mui/icons-material";
 import { Stage } from "../Stage";
-import { formatCurrentDate } from "../content/Skit";
+import { formatCurrentDate, formatDateLabel } from "../content/Skit";
 import { ActorStat } from '../content/ActorStat';
 import { resolveIcon } from "./ActorStatRating";
 import { ActorStatValueDisplay } from "./ActorStatDisplay";
@@ -127,12 +127,14 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                 }}
             >
                 <Box
+                    title={`Current Date: ${formatCurrentDate(currentDate, currentTimeOfDay)}`}
                     sx={{
                         flex: "1 1 190px",
                         minWidth: 0,
                         display: "flex",
-                        flexDirection: "column",
-                        gap: 0.6,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 0.8,
                         padding: "8px 10px",
                         borderRadius: "12px",
                         border: "1px solid var(--agenda-panel-border)",
@@ -140,40 +142,19 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                         boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--agenda-text-primary) 4%, transparent)",
                     }}
                 >
-                    <Box
-                        sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.6,
-                            color: "var(--agenda-text-muted)",
-                            lineHeight: 1.2,
-                        }}
-                    >
-                        <DateTimeIcon sx={{ fontSize: "0.8rem", color: "var(--agenda-highlight)" }} />
-                        <Typography
-                            sx={{
-                                color: "var(--agenda-text-muted)",
-                                fontSize: "0.66rem",
-                                letterSpacing: "0.1em",
-                                textTransform: "uppercase",
-                                lineHeight: 1.2,
-                            }}
-                        >
-                            Date
-                        </Typography>
-                    </Box>
-
                     <Typography
                         sx={{
                             color: "var(--agenda-text-primary)",
-                            fontSize: "0.8rem",
+                            fontFamily: "var(--agenda-font-flavor)",
+                            fontSize: "1.1rem",
                             fontWeight: 700,
                             lineHeight: 1.2,
                             wordBreak: "break-word",
                         }}
                     >
-                        {formatCurrentDate(currentDate, currentTimeOfDay)}
+                        {formatDateLabel(currentDate)}
                     </Typography>
+                    <DateTimeIcon sx={{ fontSize: "1.1rem", color: "var(--agenda-highlight)" }} />
                 </Box>
                 {stats.map((stat) => {
                 const statName = (stat.name || "").trim();
