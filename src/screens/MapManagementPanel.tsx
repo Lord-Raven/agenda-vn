@@ -88,7 +88,7 @@ export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
                         onClick={() => setSelectedMapId(map.id)}
                         style={{ width: '100%', minHeight: 58, display: 'grid', gridTemplateColumns: '44px 1fr', gap: 10, alignItems: 'center', textAlign: 'left', padding: 9, cursor: 'pointer', color: 'var(--agenda-text-primary)', background: map.id === selectedMapId ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)' : 'color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)', border: `1px solid ${map.id === selectedMapId ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)'}`, borderRadius: 8 }}
                     >
-                        <span style={{ width: 44, height: 40, display: 'grid', placeItems: 'center', borderRadius: 6, backgroundImage: map.imageUrl ? `url(${map.imageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'var(--agenda-surface-base)' }}><MapIcon fontSize="small" /></span>
+                        <span style={{ width: 44, height: 40, display: 'grid', placeItems: 'center', borderRadius: 6, backgroundImage: map.imageUrl ? `url(${map.imageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'var(--agenda-surface-base)' }}>{!map.imageUrl && <MapIcon fontSize="small" />}</span>
                         <span><strong style={{ display: 'block' }}>{map.name || '(Unnamed Map)'}</strong><small style={{ color: 'var(--agenda-text-muted)' }}>Priority {map.priority}</small></span>
                     </motion.button>
                 )}

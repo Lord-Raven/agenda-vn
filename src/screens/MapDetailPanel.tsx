@@ -1,11 +1,12 @@
 import { FC, PointerEvent, useEffect, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
-import { Add, ArrowDownward, ArrowUpward, AutoAwesome, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
+import { Add, ArrowDownward, ArrowUpward, AutoAwesome, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place } from '@mui/icons-material';
 import { generateMapAlternativeImage, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
 import { Button, TextArea, TextInput } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
+import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 
 interface MapDetailPanelProps {
@@ -38,6 +39,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
     const [isUploadingVariants, setIsUploadingVariants] = useState<Record<number, boolean>>({});
     const [isGeneratingVariants, setIsGeneratingVariants] = useState<Record<number, boolean>>({});
     const [previewSelection, setPreviewSelection] = useState<'base' | number>('base');
+    const [isLinksCollapsed, setIsLinksCollapsed] = useState(true);
     const [draft, setDraft] = useState<MapDraft>(() => createMapDraft(map));
     const draftRef = useRef(draft);
     const previewRef = useRef<HTMLDivElement>(null);
@@ -323,6 +325,53 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
             </label>
 
             <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <button
+                        type="button"
+                        aria-label={`${isLinksCollapsed ? 'Expand' : 'Collapse'} Links`}
+                        aria-expanded={!isLinksCollapsed}
+                        onClick={() => setIsLinksCollapsed(current => !current)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer' }}
+                    >
+                        <ExpandMore style={{ transform: isLinksCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
+                        <strong>Links</strong>
+                    </button>
+                    <Button variant="secondary" onClick={addLink} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add</Button>
+                </div>
+                {!isLinksCollapsed && (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                        {map.links.map((link, index) => (
+                            <div key={`${link.childId}-${index}`} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto', gap: 8, alignItems: 'center' }}>
+                                    <SearchableOptionPicker
+                                        value={link.childId}
+                                        onChange={nextValue => updateLink(index, { childId: (nextValue as string) || link.childId })}
+                                        options={[
+                                            ...activeLocations.map(location => ({ key: location.id, label: location.name, imageUrl: location.imageUrl, icon: Place, description: 'Location' })),
+                                            ...activeMaps.map(candidate => ({ key: candidate.id, label: candidate.name, imageUrl: candidate.imageUrl, icon: MapIcon, description: 'Map' })),
+                                        ]}
+                                        title="Choose link target"
+                                        placeholder="Search locations and maps"
+                                    />
+                                    <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
+                                    <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
+                                    <Button variant="danger" onClick={() => persist(() => map.links.splice(index, 1))} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
+                                </div>
+                                <ConditionEditor
+                                    conditionCollections={link.conditionCollections || []}
+                                    playerStats={stageInstance.getConfiguration().playerStats || []}
+                                    actorStats={stageInstance.getConfiguration().actorStats || []}
+                                    actors={Object.values(stageInstance.getSave().actors || {})}
+                                    allowVariableActorTarget
+                                    onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div>
                 <strong style={{ display: 'block', color: 'var(--agenda-text-primary)', marginBottom: 8 }}>Preview</strong>
                 <div ref={previewRef} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: previewImageUrl ? `url(${previewImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden', touchAction: 'none', marginBottom: 10 }}>
                     {map.links.map((link, index) => {
@@ -482,36 +531,6 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                             </div>
                         );
                     })}
-                </div>
-            </div>
-
-            <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <strong style={{ color: 'var(--agenda-text-primary)' }}>Links</strong>
-                    <Button variant="secondary" onClick={addLink} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add</Button>
-                </div>
-                <div style={{ display: 'grid', gap: 8 }}>
-                    {map.links.map((link, index) => (
-                        <div key={`${link.childId}-${index}`} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto', gap: 8, alignItems: 'center' }}>
-                                <select value={link.childId} onChange={event => updateLink(index, { childId: event.target.value })} style={{ minHeight: 38, background: 'var(--agenda-surface-base)', color: 'var(--agenda-text-primary)', border: '1px solid var(--agenda-line-subtle)', borderRadius: 6, padding: '0 8px' }}>
-                                    <optgroup label="Locations">{activeLocations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}</optgroup>
-                                    <optgroup label="Maps">{activeMaps.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</optgroup>
-                                </select>
-                                <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
-                                <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
-                                <Button variant="danger" onClick={() => persist(() => map.links.splice(index, 1))} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
-                            </div>
-                            <ConditionEditor
-                                conditionCollections={link.conditionCollections || []}
-                                playerStats={stageInstance.getConfiguration().playerStats || []}
-                                actorStats={stageInstance.getConfiguration().actorStats || []}
-                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                allowVariableActorTarget
-                                onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
-                            />
-                        </div>
-                    ))}
                 </div>
             </div>
 

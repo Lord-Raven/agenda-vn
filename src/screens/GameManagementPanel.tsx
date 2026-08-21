@@ -110,6 +110,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [backgroundImagePrompt, setBackgroundImagePrompt] = useState<string>(() => configuration.backgroundImagePrompt || '');
     const [isUploadingBackgroundImage, setIsUploadingBackgroundImage] = useState(false);
     const [isGeneratingBackgroundImage, setIsGeneratingBackgroundImage] = useState(false);
+    const [creatorNotes, setCreatorNotes] = useState<string>(() => configuration.creatorNotes || '');
+    const [versionNotes, setVersionNotes] = useState<string>(() => configuration.versionNotes || '');
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
     const [artStyle, setArtStyle] = useState<string>(() => configuration.artStyle || '');
     const [playerStats, setPlayerStats] = useState<ActorStat[]>(() =>
@@ -127,33 +129,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
     const saveGameConfigurationRef = useRef<() => void>(() => {});
-
-    const fieldLabelStyle: React.CSSProperties = {
-        display: 'block',
-        color: 'var(--agenda-text-muted)',
-        marginBottom: 0,
-        fontSize: '13px',
-        lineHeight: 1.1,
-    };
-
-    const inlineFieldStyle: React.CSSProperties = {
-        display: 'grid',
-        gridTemplateColumns: '120px minmax(0, 1fr)',
-        gap: '10px',
-        alignItems: 'center',
-        marginBottom: 8,
-    };
-
-    const inlineFieldTopStyle: React.CSSProperties = {
-        ...inlineFieldStyle,
-        alignItems: 'start',
-    };
-
-    const compactChipLabelStyle: React.CSSProperties = {
-        color: 'var(--agenda-text-muted)',
-        fontSize: '12px',
-        marginBottom: 4,
-    };
 
     const validPlayerStatValues = useMemo(() => {
         const nextValues: { [key: string]: ActorStatValue } = {};
@@ -199,6 +174,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             titleImagePrompt,
             backgroundImageUrl,
             backgroundImagePrompt,
+            creatorNotes,
+            versionNotes,
             startingDate,
             actorStats: actorStats.map(cloneActorStat),
             playerStats: playerStats.map(cloneActorStat),
@@ -217,6 +194,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         actorStats,
         backgroundImagePrompt,
         backgroundImageUrl,
+        creatorNotes,
         managedCalendarEvents,
         playerStats,
         validPlayerStatValues,
@@ -226,6 +204,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         title,
         titleImagePrompt,
         titleImageUrl,
+        versionNotes,
     ]);
 
     const portableGameConfigurationJson = useMemo(
@@ -236,13 +215,13 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         () => buildCreatorNotesHtml({
             stage: stageInstance,
             title,
-            artStyle,
+            creatorNotes: `${creatorNotes || ''}${versionNotes ? '<br><br><h3>Version Notes</h3><br>' + versionNotes : ''}`.trim(),
             backgroundImageUrl,
             titleImageUrl,
             activeActors,
             activeLocations,
         }),
-        [activeActors, activeLocations, artStyle, backgroundImageUrl, stageInstance, title, titleImageUrl],
+        [activeActors, activeLocations, creatorNotes, versionNotes, backgroundImageUrl, stageInstance, title, titleImageUrl],
     );
 
 
@@ -296,6 +275,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             titleImagePrompt: titleImagePrompt,
             backgroundImageUrl,
             backgroundImagePrompt: backgroundImagePrompt,
+            creatorNotes,
+            versionNotes,
             startingDate,
             artStyle,
         });
@@ -329,7 +310,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             });
         });
 
-    }, [activeActors, activeLocations, activeMaps, actorStats, backgroundImagePrompt, backgroundImageUrl, managedCalendarEvents, playerStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validPlayerStatValues]);
+    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, creatorNotes, managedCalendarEvents, playerStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validPlayerStatValues, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;

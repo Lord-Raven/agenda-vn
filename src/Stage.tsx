@@ -120,6 +120,8 @@ export type GameConfiguration = {
     backgroundImagePrompt: string, // Prompt for generating a background image for the menu and calendar screens
     startingDate: string; // The starting date of the game, in YYYY-MM-DD format (applies to new game)
     artStyle: string; // Describes the art style used for image generation
+    creatorNotes: string; // Optional notes from the creator about the game, its world, or its characters; this is displayed in the Creator Notes HTML.
+    versionNotes: string; // Optional notes about the current version of the game, its world, or its characters; this replaces version details in MenuScreen and is inserted after creator notes in Creator Notes HTML.
 
 }
 
@@ -238,6 +240,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             backgroundImagePrompt: 'Generate a background image for the menu and calendar screens of a visual novel game called "Agenda VN".',
             startingDate: new Date().toISOString().slice(0, 10),
             artStyle: 'Anime-inspired concept art with thick brush strokes and vibrant colors, emphasizing expression and dynamic composition.',
+            creatorNotes: '',
+            versionNotes: '',
         };
     }
 
@@ -297,6 +301,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             backgroundImageUrl: this.saveData.configuration.backgroundImageUrl || defaultConfiguration.backgroundImageUrl,
             backgroundImagePrompt: this.saveData.configuration.backgroundImagePrompt || defaultConfiguration.backgroundImagePrompt,
             artStyle: this.saveData.configuration.artStyle || defaultConfiguration.artStyle,
+            creatorNotes: this.saveData.configuration.creatorNotes || defaultConfiguration.creatorNotes,
+            versionNotes: this.saveData.configuration.versionNotes || defaultConfiguration.versionNotes,
         };
 
         this.syncUniversalSchedule();

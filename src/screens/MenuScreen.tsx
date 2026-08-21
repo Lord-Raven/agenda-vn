@@ -461,7 +461,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                                 boxSizing: 'border-box',
                                             }}
                                         >
-                                            {'v2026.07.06 - Attempting to repair prompting damaged by recent Soji changes.'}
+                                            {stage().getConfiguration().versionNotes || 'v2026.08.20 - Initial release of Agenda VN.'}
                                         </div>
                                         <div
                                             style={{

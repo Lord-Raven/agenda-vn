@@ -7,7 +7,7 @@ import { buildGoogleFontLinkTags } from '../components/FontHandler';
 export interface CreatorNotesHtmlProps {
     stage: Stage;
     title: string;
-    artStyle?: string;
+    creatorNotes?: string;
     backgroundImageUrl?: string;
     titleImageUrl?: string;
     activeActors: Actor[];
@@ -28,14 +28,14 @@ const escapeHtml = (value: string) => {
 export const buildCreatorNotesHtml = ({
     stage,
     title,
-    artStyle,
+    creatorNotes,
     backgroundImageUrl,
     titleImageUrl,
     activeActors,
     activeLocations,
 }: CreatorNotesHtmlProps): string => {
     const titleText = (title || 'Untitled Game').trim() || 'Untitled Game';
-    const gameDescription = artStyle?.trim() || 'A story-driven visual novel where lives, choices, and memory reshape the world.';
+    const gameDescription = creatorNotes?.trim() || 'A story-driven visual novel where lives, choices, and memory reshape the world.';
 
     const castItems = activeActors
         .filter(actor => actor?.name && actor !== stage?.getPlayerActor())

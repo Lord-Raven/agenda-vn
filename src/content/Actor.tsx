@@ -311,7 +311,7 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'font',
         label: 'FONT',
-        description: 'A font stack, or font family that reflects the character\'s personality; this will be embedded in a CSS font-family property.',
+        description: 'A font stack, or font family that reflects the character\'s personality; favor Google fonts when possible. This will be embedded in a CSS font-family property.',
     },
 ];
 
