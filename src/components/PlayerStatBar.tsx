@@ -146,9 +146,8 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                         sx={{
                             color: "var(--agenda-text-primary)",
                             fontFamily: "var(--agenda-font-flavor)",
-                            fontSize: "1.1rem",
                             fontWeight: 700,
-                            lineHeight: 1.2,
+                            fontSize: { xs: '1.25rem', md: '1.8rem' },
                             wordBreak: "break-word",
                         }}
                     >

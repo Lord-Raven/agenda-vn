@@ -9,7 +9,7 @@ import { Stage } from '../Stage';
 import { ScreenType } from './BaseScreen';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { useTooltip } from '../components/TooltipContext';
-import { Button, GlassPanel } from '../components/UiComponents';
+import { Button } from '../components/UiComponents';
 import { evaluateConditionCollections } from '../content/Condition';
 import { LocationActorPortraits } from '../components/LocationActorPortraits';
 import { PlayerStatBar } from '../components/PlayerStatBar';
@@ -91,8 +91,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                     />
                 </Box>
 
-                <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <Box sx={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid var(--agenda-line-strong)', borderRadius: '8px', background: 'color-mix(in srgb, var(--agenda-surface-base) 90%, black 10%)' }}>
+                <Box sx={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid var(--agenda-line-strong)', borderRadius: '8px', background: 'color-mix(in srgb, var(--agenda-surface-base) 90%, black 10%)' }}>
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={`${displayedMap.id}-label`}
@@ -190,8 +189,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                 })}
                             </motion.div>
                         </AnimatePresence>
-                    </Box>
-                </GlassPanel>
+                </Box>
             </Box>
             {showContentManagement && <ContentManagementScreen stage={stage} onClose={() => { stage().saveGame(); setShowContentManagement(false); }} />}
         </>

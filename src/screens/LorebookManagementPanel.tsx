@@ -116,6 +116,15 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             .filter((location) => location.loreId)
             .map((location) => location.loreId),
     ), [activeLocations]);
+    const locationLoreIdToCategory = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const location of activeLocations) {
+            if (location.loreId) {
+                map.set(location.loreId, location.category?.trim() || 'Other');
+            }
+        }
+        return map;
+    }, [activeLocations]);
     const [loreEntries, setLoreEntries] = useState<Lore[]>(() => sortLoreEntries(save.lorebook || []));
     const [selectedLoreId, setSelectedLoreId] = useState<string | null>(() => {
         const initialEntries = sortLoreEntries(save.lorebook || []);
@@ -126,6 +135,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('lorebook-management');
     const [collapsedCharacterCategories, setCollapsedCharacterCategories] = useCachedSidebarCollapseState('lorebook-character-categories');
+    const [collapsedLocationCategories, setCollapsedLocationCategories] = useCachedSidebarCollapseState('lorebook-location-categories');
 
     const categoryOrder = useMemo(() => {
         // Add a category for each Actor name not present in the groups, to allow users to assign lore entries to them
@@ -156,7 +166,13 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
         return categoryOrder.map((category) => {
             const entries = sortLoreEntries(groups[category] || []);
-            if (category !== 'character' || entries.length === 0) {
+            const secondaryLoreIdToCategory = category === 'character'
+                ? actorLoreIdToCategory
+                : category === 'location'
+                    ? locationLoreIdToCategory
+                    : null;
+
+            if (!secondaryLoreIdToCategory || entries.length === 0) {
                 return {
                     id: category,
                     title: getCategoryLabel(category),
@@ -164,13 +180,13 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                 };
             }
 
-            const characterGroups = new Map<string, Lore[]>();
+            const secondaryGroups = new Map<string, Lore[]>();
             for (const entry of entries) {
-                const actorCategory = actorLoreIdToCategory.get(entry.id)?.trim() || 'Other';
-                characterGroups.set(actorCategory, [...(characterGroups.get(actorCategory) || []), entry]);
+                const secondaryCategory = secondaryLoreIdToCategory.get(entry.id)?.trim() || 'Other';
+                secondaryGroups.set(secondaryCategory, [...(secondaryGroups.get(secondaryCategory) || []), entry]);
             }
 
-            const characterCategories = [...characterGroups.keys()].sort((left, right) => {
+            const secondaryCategories = [...secondaryGroups.keys()].sort((left, right) => {
                 if (left === 'Other') return 1;
                 if (right === 'Other') return -1;
                 return left.localeCompare(right);
@@ -180,14 +196,14 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                 id: category,
                 title: getCategoryLabel(category),
                 entries,
-                subsections: characterCategories.map((actorCategory) => ({
-                    id: `character:${actorCategory}`,
-                    title: actorCategory,
-                    entries: sortLoreEntries(characterGroups.get(actorCategory) || []),
+                subsections: secondaryCategories.map((secondaryCategory) => ({
+                    id: `${category}:${secondaryCategory}`,
+                    title: secondaryCategory,
+                    entries: sortLoreEntries(secondaryGroups.get(secondaryCategory) || []),
                 })),
             };
         });
-    }, [loreEntries, categoryOrder, actorLoreIdToCategory]);
+    }, [loreEntries, categoryOrder, actorLoreIdToCategory, locationLoreIdToCategory]);
 
     const selectedLore = useMemo(() => loreEntries.find((entry) => entry.id === selectedLoreId) || null, [loreEntries, selectedLoreId]);
 
@@ -433,9 +449,13 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                     onToggleSection={(sectionId) => {
                         setCollapsedCategories((current) => toggleSidebarCollapseState(current, sectionId, true));
                     }}
-                    collapsedSubsections={collapsedCharacterCategories}
+                    collapsedSubsections={{ ...collapsedCharacterCategories, ...collapsedLocationCategories }}
                     onToggleSubsection={(subsectionId) => {
-                        setCollapsedCharacterCategories((current) => toggleSidebarCollapseState(current, subsectionId, true));
+                        if (subsectionId.startsWith('location:')) {
+                            setCollapsedLocationCategories((current) => toggleSidebarCollapseState(current, subsectionId, true));
+                        } else {
+                            setCollapsedCharacterCategories((current) => toggleSidebarCollapseState(current, subsectionId, true));
+                        }
                     }}
                     renderEntry={(entry) => {
                         const isSelected = selectedLoreId === entry.id;
