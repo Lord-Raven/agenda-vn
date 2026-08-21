@@ -129,8 +129,8 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                 <Box
                     title={`Current Date: ${formatCurrentDate(currentDate, currentTimeOfDay)}`}
                     sx={{
-                        flex: "1 1 190px",
-                        minWidth: 0,
+                        flex: "0 0 auto",
+                        whiteSpace: "nowrap",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -148,7 +148,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                             fontFamily: "var(--agenda-font-flavor)",
                             fontWeight: 700,
                             fontSize: { xs: '1.25rem', md: '1.8rem' },
-                            wordBreak: "break-word",
+                            whiteSpace: "nowrap",
                         }}
                     >
                         {formatDateLabel(currentDate)}

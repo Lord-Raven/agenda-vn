@@ -122,13 +122,13 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                 </Box>
                             </motion.div>
                         </AnimatePresence>
-                        <AnimatePresence mode="wait">
+                        <AnimatePresence initial={false}>
                             <motion.div
                                 key={displayedMap.id}
-                                initial={{ opacity: 0, scale: 1.025 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.985 }}
-                                transition={{ duration: 0.32, ease: 'easeInOut' }}
+                                initial={{ x: '100%' }}
+                                animate={{ x: '0%' }}
+                                exit={{ x: '-100%' }}
+                                transition={{ duration: 0.45, ease: 'easeInOut' }}
                                 style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
                             >
                                 {displayedMap.links.map((link, index) => {
