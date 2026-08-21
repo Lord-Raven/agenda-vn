@@ -312,9 +312,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 <Button
                                     variant="secondary"
                                     onClick={() => setScreenType(ScreenType.MAP)}
-                                    onMouseEnter={() => setTooltip("Switch to map", MapRounded)}
+                                    onMouseEnter={() => setTooltip("View map", MapRounded)}
                                     onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 14px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                                    style={{ padding: "8px 10px" }}
                                 >
                                     <MapRounded fontSize="small" />
                                 </Button>
@@ -341,7 +341,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                     />
                 </Box>
 
-                <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                         <Box
                             sx={{
                                 display: "grid",
@@ -352,8 +352,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 boxSizing: "border-box",
                                 justifyItems: "stretch",
                                 border: "1px solid var(--agenda-panel-border)",
+                                borderTop: 0,
                                 borderBottom: 0,
-                                borderRadius: "12px 12px 0 0",
+                                borderRadius: "13px 13px 0 0",
                                 overflow: "hidden",
                             }}
                         >
@@ -394,7 +395,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 minHeight: 0,
                                 border: "1px solid var(--agenda-panel-border)",
                                 borderTop: 0,
-                                borderRadius: "0 0 12px 12px",
+                                borderRadius: "0 0 13px 13px",
                                 overflow: "visible",
                                 isolation: "isolate",
                                 background: "var(--agenda-panel-surface)",

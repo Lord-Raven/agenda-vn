@@ -124,7 +124,6 @@ export function updateLocationDescription(locationId: string, description: strin
 	const lore = getLinkedLocationLore(location, stage);
 	if (lore) {
 		lore.content = description;
-		return;
 	}
 
 	location.description = description;

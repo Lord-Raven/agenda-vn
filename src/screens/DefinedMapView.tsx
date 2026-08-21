@@ -92,20 +92,37 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                 </Box>
 
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-                        <Box sx={{ minWidth: 0, textAlign: 'center' }}>
-                            <Typography sx={{ color: 'var(--agenda-text-primary)', fontFamily: 'var(--agenda-font-flavor)', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.8rem' }, lineHeight: 1.1 }}>
-                                {displayedMap.name || 'Unnamed Map'}
-                            </Typography>
-                            {displayedMap.description && (
-                                <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.78rem', mt: 0.35, maxWidth: 620, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {displayedMap.description}
-                                </Typography>
-                            )}
-                        </Box>
-                    </Box>
-
                     <Box sx={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid var(--agenda-line-strong)', borderRadius: '8px', background: 'color-mix(in srgb, var(--agenda-surface-base) 90%, black 10%)' }}>
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={`${displayedMap.id}-label`}
+                                initial={{ x: -48, opacity: 0 }}
+                                animate={{ x: 0, opacity: 1 }}
+                                exit={{ x: -48, opacity: 0 }}
+                                transition={{ duration: 0.28, ease: 'easeInOut' }}
+                                style={{ position: 'absolute', top: 0, left: 0, zIndex: 3, maxWidth: 'min(72%, 460px)', pointerEvents: 'none' }}
+                            >
+                                <Box
+                                    sx={{
+                                        background: 'linear-gradient(90deg, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 60%, transparent 100%)',
+                                        backdropFilter: 'blur(6px)',
+                                        WebkitBackdropFilter: 'blur(6px)',
+                                        px: { xs: 1.5, md: 2 },
+                                        py: { xs: 1, md: 1.25 },
+                                        pr: { xs: 4, md: 6 },
+                                    }}
+                                >
+                                    <Typography sx={{ color: 'var(--agenda-text-primary)', fontFamily: 'var(--agenda-font-flavor)', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.8rem' }, lineHeight: 1.1 }}>
+                                        {displayedMap.name || 'Unnamed Map'}
+                                    </Typography>
+                                    {displayedMap.description && (
+                                        <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.78rem', mt: 0.35, maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {displayedMap.description}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            </motion.div>
+                        </AnimatePresence>
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={displayedMap.id}
