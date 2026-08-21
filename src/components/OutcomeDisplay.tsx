@@ -4,6 +4,7 @@ import { Actor } from '../content/Actor';
 import { Outcome, OutcomeType } from '../content/Outcome';
 import { Stage } from '../Stage';
 import { ActorPortrait } from './ActorPortrait';
+import { resolveActorStatValueText } from './ActorStatDisplay';
 
 interface OutcomeDisplayProps {
     outcomes: Outcome[];
@@ -51,7 +52,9 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     const nextValue = Number.isFinite(currentValue) ? currentValue : 0;
                     const arrow = '→';
                     topLine = `${actor?.name || 'Actor'} · ${statName}`;
-                    bottomLine = `${currentValue} ${arrow} ${nextValue + delta}`;
+                    bottomLine = stat
+                        ? `${resolveActorStatValueText(stat, currentValue)} ${arrow} ${resolveActorStatValueText(stat, nextValue + delta)}`
+                        : `${currentValue} ${arrow} ${nextValue + delta}`;
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Player Stat';
                     const changeValue = Number(outcome.details?.changeValue ?? 0);

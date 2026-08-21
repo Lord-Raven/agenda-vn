@@ -2,14 +2,16 @@ import { v4 as generateUuid } from 'uuid';
 import { ActorConditionTarget, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
 // 'location' stats hold a location ID (a key into the save's atlas) rather than a display value.
-export type ActorStatType = 'number' | 'percentage' | 'rating' | 'letter grade' | 'option' | 'text' | 'checkbox' | 'location';
+export type ActorStatType = 'number' | 'option' | 'text' | 'checkbox' | 'location';
+export type ActorStatDisplayType = 'straight' | 'percentage' | 'bar' | 'rating' | 'letter grade';
 export type ActorStatValue = number | string | boolean;
 
-const NUMERIC_ACTOR_STAT_DISPLAY_TYPES: ActorStatType[] = ['number', 'percentage', 'rating', 'letter grade'];
+export const isNumericDisplayType = (type: ActorStatType): boolean => type === 'number';
 
-export const isNumericDisplayType = (displayType: ActorStatType): boolean => NUMERIC_ACTOR_STAT_DISPLAY_TYPES.includes(displayType);
+export const isLocationDisplayType = (type: ActorStatType): boolean => type === 'location';
 
-export const isLocationDisplayType = (displayType: ActorStatType): boolean => displayType === 'location';
+// Resolves the effective display style for a numeric stat, defaulting to a plain number.
+export const resolveActorStatDisplayType = (stat: ActorStat): ActorStatDisplayType => (stat.type === 'number' ? (stat.displayType || 'straight') : 'straight');
 
 export type ActorStatOption = {
     name: string;
@@ -92,6 +94,8 @@ export type ActorStat = {
     guidance: string;
     default: ActorStatValue;
     type: ActorStatType;
+    // Only meaningful when type is 'number'; controls how the numeric value is rendered (straight number, bar, etc).
+    displayType?: ActorStatDisplayType;
     options?: ActorStatOption[];
     min?: number;
     max?: number;
@@ -131,6 +135,7 @@ export const cloneActorStat = (stat: ActorStat): ActorStat => ({
     guidance: stat.guidance,
     default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
     type: stat.type,
+    displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
     options: (stat.options || []).map((option) => ({
         name: option.name,
         description: option.description,
@@ -139,7 +144,7 @@ export const cloneActorStat = (stat: ActorStat): ActorStat => ({
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true || stat.exposed === true,
     exposed: stat.exposed === true,
-    iconName: stat.iconName || (stat.type === 'rating' ? 'star' : undefined),
+    iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
     labelIconName: stat.labelIconName || undefined,
 });
 

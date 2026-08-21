@@ -70,11 +70,11 @@ const resolveActorStatRange = (stat: ActorStat): { min: number; max: number; ste
         return { min: stat.min, max: stat.max, step: 1, hasRange: true };
     }
 
-    if (stat.type === 'percentage') {
+    if (stat.displayType === 'percentage' || stat.displayType === 'bar') {
         return { min: 0, max: 100, step: 1, hasRange: true };
     }
 
-    if (stat.type === 'rating') {
+    if (stat.displayType === 'rating') {
         return {
             min: 0,
             max: Number.isFinite(stat.max) ? Math.max(1, Math.round(Number(stat.max))) : 5,
@@ -83,7 +83,7 @@ const resolveActorStatRange = (stat: ActorStat): { min: number; max: number; ste
         };
     }
 
-    if (stat.type === 'letter grade') {
+    if (stat.displayType === 'letter grade') {
         return { min: 0, max: 100, step: 1, hasRange: true };
     }
 
@@ -952,7 +952,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                 />
             );
         }
-        if (stat.type === 'rating') {
+        if (stat.type === 'number' && stat.displayType === 'rating') {
             return <ActorStatRating stat={stat} value={Number.isFinite(value) ? Number(value) : 0} updateScore={(next) => onChange(next)} />;
         }
         const range = resolveActorStatRange(stat);
@@ -2033,7 +2033,7 @@ ${indent}}`;
                                                                 />
                                                             )}
 
-                                                            {stat.type === 'rating' && (
+                                                            {stat.type === 'number' && stat.displayType === 'rating' && (
                                                                 <ActorStatRating
                                                                     stat={stat}
                                                                     value={displayValue}
@@ -2041,7 +2041,7 @@ ${indent}}`;
                                                                 />
                                                             )}
 
-                                                            {stat.type === 'letter grade' && (
+                                                            {stat.type === 'number' && stat.displayType === 'letter grade' && (
                                                                 <div>
                                                                     <select
                                                                         value={nearestGrade.label}
@@ -2073,7 +2073,7 @@ ${indent}}`;
                                                                 </div>
                                                             )}
 
-                                                            {stat.type === 'percentage' || (stat.type === 'number' && statRange.hasRange) && (
+                                                            {stat.type === 'number' && stat.displayType !== 'rating' && stat.displayType !== 'letter grade' && statRange.hasRange && (
                                                                 <input
                                                                     type="range"
                                                                     min={statRange.min}

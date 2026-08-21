@@ -3,6 +3,7 @@ import { Box, Typography } from "@mui/material";
 import { Stage } from "../Stage";
 import { ActorStat } from '../content/ActorStat';
 import { resolveIcon } from "./ActorStatRating";
+import { ActorStatValueDisplay } from "./ActorStatDisplay";
 
 interface PlayerStatBarProps {
     stage: () => Stage;
@@ -73,40 +74,7 @@ const resolveDisplayValue = (stat: ActorStat, value: unknown, atlas?: { [key: st
         return normalized === true ? "True" : "False";
     }
 
-    if (stat.type === "percentage") {
-        return `${Number(normalized)}%`;
-    }
-
-    if (stat.type === "rating") {
-        return `${Number(normalized)}`;
-    }
-
-    if (stat.type === "letter grade") {
-        const numeric = Number(normalized);
-        return Number.isFinite(numeric) ? `${numeric}` : "0";
-    }
-
     return `${Number(normalized)}`;
-};
-
-const resolveNumericRange = (stat: ActorStat): { min: number; max: number } => {
-    if (typeof stat.min === "number" && typeof stat.max === "number" && stat.max > stat.min) {
-        return { min: stat.min, max: stat.max };
-    }
-    if (stat.type === "percentage" || stat.type === "letter grade") {
-        return { min: 0, max: 100 };
-    }
-    return { min: 0, max: Number.isFinite(stat.max) ? Number(stat.max) : 100 };
-};
-
-const getPercent = (stat: ActorStat, value: unknown): number => {
-    const numeric = Number(normalizeStatValue(value, stat));
-    const { min, max } = resolveNumericRange(stat);
-    if (!Number.isFinite(numeric) || max === min) {
-        return 0;
-    }
-
-    return Math.max(0, Math.min(100, ((numeric - min) / (max - min)) * 100));
 };
 
 export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
@@ -150,8 +118,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                     ?? stageInstance.getConfiguration()?.playerStatValues?.[stat.id]
                     ?? stat.default;
                 const normalizedValue = normalizeStatValue(rawValue, stat);
-                const isNumericStat = ["number", "percentage", "rating", "letter grade"].includes(stat.type);
-                const progressPct = isNumericStat ? getPercent(stat, normalizedValue) : 0;
+                const isNumericStat = stat.type === "number";
                 const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
 
                 return (
@@ -194,37 +161,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                         </Box>
 
                         {isNumericStat ? (
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                <Box
-                                    sx={{
-                                        flex: 1,
-                                        height: 8,
-                                        borderRadius: "999px",
-                                        background: "color-mix(in srgb, var(--agenda-text-primary) 12%, transparent)",
-                                        overflow: "hidden",
-                                    }}
-                                >
-                                    <Box
-                                        sx={{
-                                            width: `${progressPct}%`,
-                                            height: "100%",
-                                            borderRadius: "inherit",
-                                            background: "linear-gradient(90deg, var(--agenda-highlight), var(--agenda-accent-primary))",
-                                        }}
-                                    />
-                                </Box>
-                                <Typography
-                                    sx={{
-                                        color: "var(--agenda-text-primary)",
-                                        fontSize: "0.75rem",
-                                        fontWeight: 700,
-                                        minWidth: "2.5em",
-                                        textAlign: "right",
-                                    }}
-                                >
-                                    {resolveDisplayValue(stat, normalizedValue, stageInstance.getSave()?.atlas)}
-                                </Typography>
-                            </Box>
+                            <ActorStatValueDisplay stat={stat} value={Number(normalizedValue)} style={{ minHeight: 20 }} />
                         ) : (
                             <Typography
                                 sx={{

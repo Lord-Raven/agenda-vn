@@ -4,7 +4,8 @@ import { Stage } from '../Stage';
 import { ActorStat } from '../content/ActorStat';
 import { Actor } from '../content/Actor';
 import { NamePlate } from './UiComponents';
-import { ActorStatRating, resolveIcon } from './ActorStatRating';
+import { resolveIcon } from './ActorStatRating';
+import { ActorStatValueDisplay } from './ActorStatDisplay';
 
 interface ActorCardProps {
     actor?: Actor;
@@ -13,27 +14,9 @@ interface ActorCardProps {
     className?: string;
 }
 
-const LETTER_GRADES = ['F', 'D', 'C', 'B', 'A', 'S'];
-
 const resolveStatValue = (actor: Actor, stat: ActorStat): number | string | boolean => {
     const raw = (actor.statMap as { [key: string]: number | string | boolean } | undefined)?.[stat.id];
     return raw === undefined || raw === null || raw === '' ? stat.default : raw;
-};
-
-const resolveNumericRange = (stat: ActorStat): { min: number; max: number } => {
-    if (typeof stat.min === 'number' && typeof stat.max === 'number' && stat.max > stat.min) {
-        return { min: stat.min, max: stat.max };
-    }
-    if (stat.type === 'percentage' || stat.type === 'letter grade') {
-        return { min: 0, max: 100 };
-    }
-    return { min: 0, max: Number.isFinite(stat.max) ? Number(stat.max) : 100 };
-};
-
-const toLetterGrade = (value: number, stat: ActorStat): string => {
-    const { min, max } = resolveNumericRange(stat);
-    const ratio = Math.max(0, Math.min(1, (value - min) / Math.max(1, max - min)));
-    return LETTER_GRADES[Math.round(ratio * (LETTER_GRADES.length - 1))];
 };
 
 const StatValue: FC<{ stat: ActorStat; value: number | string | boolean; atlas?: { [key: string]: { name: string } } }> = ({ stat, value, atlas }) => {
@@ -52,41 +35,19 @@ const StatValue: FC<{ stat: ActorStat; value: number | string | boolean; atlas?:
         );
     }
     const numericValue = Number(value);
-    const hasNumericValue = Number.isFinite(numericValue);
 
-    if (stat.type === 'rating' && hasNumericValue) {
+    if (stat.type === 'number' && Number.isFinite(numericValue)) {
+        const isBarType = stat.displayType === 'percentage' || stat.displayType === 'bar';
         return (
-            <Box sx={{ height: '16px', display: 'flex', justifyContent: 'flex-end' }}>
-                <ActorStatRating stat={stat} value={numericValue} />
+            <Box sx={{ width: isBarType ? '90px' : undefined, height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                <ActorStatValueDisplay stat={stat} value={numericValue} />
             </Box>
         );
     }
-
-    if (stat.type === 'percentage' && hasNumericValue) {
-        const { min, max } = resolveNumericRange(stat);
-        const ratio = Math.max(0, Math.min(1, (numericValue - min) / Math.max(1, max - min)));
-        return (
-            <Box
-                sx={{
-                    width: '90px',
-                    height: '8px',
-                    borderRadius: '4px',
-                    overflow: 'hidden',
-                    backgroundColor: 'color-mix(in srgb, var(--agenda-text-primary) 15%, transparent)',
-                }}
-            >
-                <Box sx={{ width: `${ratio * 100}%`, height: '100%', backgroundColor: 'var(--agenda-highlight)' }} />
-            </Box>
-        );
-    }
-
-    const text = stat.type === 'letter grade' && hasNumericValue
-        ? toLetterGrade(numericValue, stat)
-        : String(value ?? '');
 
     return (
         <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 700, whiteSpace: 'nowrap' }}>
-            {text}
+            {String(value ?? '')}
         </Box>
     );
 };

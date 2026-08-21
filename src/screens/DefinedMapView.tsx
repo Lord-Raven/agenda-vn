@@ -83,7 +83,6 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                 >
                                     <EventAvailable fontSize="small" />
-                                    Calendar
                                 </Button>
                                 <Button variant="secondary" onClick={() => setShowContentManagement(true)} onMouseEnter={() => setTooltip('Manage configuration, actors, locations, maps, and more', Settings)} onMouseLeave={clearTooltip} style={{ padding: '8px 10px' }}><Settings fontSize="small" /></Button>
                                 <Button variant="secondary" onClick={() => setScreenType(ScreenType.MENU)} onMouseEnter={() => setTooltip('Main menu', MenuRounded)} onMouseLeave={clearTooltip} style={{ padding: '8px 10px' }}><MenuRounded fontSize="small" /></Button>

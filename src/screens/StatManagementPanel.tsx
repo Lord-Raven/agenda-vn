@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { ActorStat, ActorStatType, ActorStatValue, ActorStatValueRule, StatUpdateRule, cloneActorStatValueRules, cloneStatUpdateRules, isNumericDisplayType } from '../content/ActorStat';
+import { ActorStat, ActorStatDisplayType, ActorStatType, ActorStatValue, ActorStatValueRule, StatUpdateRule, cloneActorStatValueRules, cloneStatUpdateRules, isNumericDisplayType } from '../content/ActorStat';
 import { Button, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/ActorStatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
@@ -24,6 +24,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     guidance: stat.guidance,
     default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
     type: stat.type,
+    displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
     options: (stat.options || []).map((option) => ({
         name: option.name,
         description: option.description,
@@ -32,7 +33,7 @@ const cloneActorStat = (stat: ActorStat): ActorStat => ({
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true || stat.exposed === true,
     exposed: stat.exposed === true,
-    iconName: stat.iconName || (stat.type === 'rating' ? 'star' : undefined),
+    iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
 });
 
 const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
@@ -115,7 +116,8 @@ const defaultActorStat = (): ActorStat => ({
     perActorDefaultRules: [],
     guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
     default: 50,
-    type: 'percentage',
+    type: 'number',
+    displayType: 'percentage',
     min: 0,
     max: 100,
     options: [],
@@ -147,6 +149,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
             default: defaultValue,
             min: undefined,
             max: undefined,
+            displayType: undefined,
             iconName: stat.iconName || 'star',
         };
     }
@@ -158,6 +161,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
             options: [],
             min: undefined,
             max: undefined,
+            displayType: undefined,
             iconName: stat.iconName || 'star',
         };
     }
@@ -166,6 +170,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
         ...stat,
         default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
         options: [],
+        displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
         iconName: stat.iconName || 'star',
     };
 };
@@ -182,6 +187,7 @@ const normalizeActorStatShape = (stat: ActorStat): ActorStat => {
             default: defaultValue,
             min: undefined,
             max: undefined,
+            displayType: undefined,
             iconName: stat.iconName || 'star',
         };
     }
@@ -193,6 +199,7 @@ const normalizeActorStatShape = (stat: ActorStat): ActorStat => {
             options: [],
             min: undefined,
             max: undefined,
+            displayType: undefined,
             iconName: stat.iconName || 'star',
         };
     }
@@ -201,6 +208,7 @@ const normalizeActorStatShape = (stat: ActorStat): ActorStat => {
         ...stat,
         default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
         options: [],
+        displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
         iconName: stat.iconName || 'star',
     };
 };
@@ -574,28 +582,48 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             </div>
 
                                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Display</label>
+                                                <label style={fieldLabelStyle}>Type</label>
                                                 <select
                                                     className="input-base"
                                                     value={stat.type}
                                                     onChange={(e) => {
-                                                        const nextDisplayType = e.target.value as ActorStat['type'];
+                                                        const nextType = e.target.value as ActorStat['type'];
                                                         updatePlayerStat(statIndex, normalizePlayerStatShape({
                                                             ...stat,
-                                                            type: nextDisplayType,
+                                                            type: nextType,
                                                         }));
                                                     }}
                                                 >
                                                     <option value="checkbox">Checkbox</option>
-                                                    <option value="letter grade">Letter Grade</option>
                                                     <option value="location">Location</option>
                                                     <option value="number">Number</option>
                                                     <option value="option">Option</option>
-                                                    <option value="percentage">Percentage</option>
-                                                    <option value="rating">Rating</option>
                                                     <option value="text">Text</option>
                                                 </select>
                                             </div>
+
+                                            {normalizedStat.type === 'number' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Display</label>
+                                                    <select
+                                                        className="input-base"
+                                                        value={normalizedStat.displayType || 'straight'}
+                                                        onChange={(e) => {
+                                                            const nextDisplayType = e.target.value as ActorStatDisplayType;
+                                                            updatePlayerStat(statIndex, {
+                                                                displayType: nextDisplayType,
+                                                                iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
+                                                            });
+                                                        }}
+                                                    >
+                                                        <option value="straight">Straight Number</option>
+                                                        <option value="percentage">Percentage</option>
+                                                        <option value="bar">Bar</option>
+                                                        <option value="rating">Rating</option>
+                                                        <option value="letter grade">Letter Grade</option>
+                                                    </select>
+                                                </div>
+                                            )}
 
                                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                                 <label style={fieldLabelStyle}>Editable In Settings</label>
@@ -686,7 +714,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            {normalizedStat.type === 'rating' && (
+                                            {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
                                                     {renderIconPicker(normalizedStat.iconName, (iconName) => updatePlayerStat(statIndex, { iconName }))}
@@ -830,28 +858,48 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             </div>
 
                                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Display</label>
+                                                <label style={fieldLabelStyle}>Type</label>
                                                 <select
                                                     className="input-base"
                                                     value={normalizedStat.type}
                                                     onChange={(e) => {
-                                                        const nextDisplayType = e.target.value as ActorStat['type'];
+                                                        const nextType = e.target.value as ActorStat['type'];
                                                         updateActorStat(statIndex, normalizeActorStatShape({
                                                             ...stat,
-                                                            type: nextDisplayType,
+                                                            type: nextType,
                                                         }));
                                                     }}
                                                 >
                                                     <option value="checkbox">Checkbox</option>
-                                                    <option value="letter grade">Letter Grade</option>
                                                     <option value="location">Location</option>
                                                     <option value="number">Number</option>
                                                     <option value="option">Option</option>
-                                                    <option value="percentage">Percentage</option>
-                                                    <option value="rating">Rating</option>
                                                     <option value="text">Text</option>
                                                 </select>
                                             </div>
+
+                                            {normalizedStat.type === 'number' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Display</label>
+                                                    <select
+                                                        className="input-base"
+                                                        value={normalizedStat.displayType || 'straight'}
+                                                        onChange={(e) => {
+                                                            const nextDisplayType = e.target.value as ActorStatDisplayType;
+                                                            updateActorStat(statIndex, {
+                                                                displayType: nextDisplayType,
+                                                                iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
+                                                            });
+                                                        }}
+                                                    >
+                                                        <option value="straight">Straight Number</option>
+                                                        <option value="percentage">Percentage</option>
+                                                        <option value="bar">Bar</option>
+                                                        <option value="rating">Rating</option>
+                                                        <option value="letter grade">Letter Grade</option>
+                                                    </select>
+                                                </div>
+                                            )}
 
                                             {normalizedStat.type === 'option' && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
@@ -988,7 +1036,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            {normalizedStat.type === 'rating' && (
+                                            {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
                                                     {renderIconPicker(normalizedStat.iconName, (iconName) => updateActorStat(statIndex, { iconName }))}
