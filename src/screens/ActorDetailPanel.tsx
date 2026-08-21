@@ -140,7 +140,7 @@ const cloneActorStatInitial = (initial: ActorStatInitial | undefined, stat: Acto
 const createInitialActorStatInitialMap = (actor: Actor, actorStats: ActorStat[]): { [key: string]: ActorStatInitial } => {
     const nextMap: { [key: string]: ActorStatInitial } = {};
     actorStats.forEach((stat) => {
-        nextMap[stat.name] = cloneActorStatInitial(actor.statInitialMap?.[stat.name], stat);
+        nextMap[stat.id] = cloneActorStatInitial(actor.statInitialMap?.[stat.id], stat);
     });
     return nextMap;
 };
@@ -562,10 +562,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
 
         actor.statInitialMap = {};
         actorStats.forEach((stat) => {
-            actor.statInitialMap[stat.name] = cloneActorStatInitial(nextEditedStatInitialMap[stat.name], stat);
+            actor.statInitialMap[stat.id] = cloneActorStatInitial(nextEditedStatInitialMap[stat.id], stat);
         });
 
-        const activePerActorStatNames = new Set(perActorStats.map((stat) => stat.name));
+        const activePerActorStatNames = new Set(perActorStats.map((stat) => stat.id));
         actor.perActorStatMap = clonePerActorStatValueMap(nextEditedPerActorStatMap);
         actor.perActorValueRules = clonePerActorValueRuleMap(nextEditedPerActorValueRules);
         Object.keys(actor.perActorStatMap).forEach((statName) => {
@@ -614,9 +614,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         setEditedStatMap((prev) => {
             const next = createInitialActorStatMap(actor, actorStats);
             actorStats.forEach((stat) => {
-                const previousValue = Number(prev[stat.name]);
+                const previousValue = Number(prev[stat.id]);
                 if (Number.isFinite(previousValue)) {
-                    next[stat.name] = clampActorStatValue(previousValue, stat);
+                    next[stat.id] = clampActorStatValue(previousValue, stat);
                 }
             });
 
@@ -635,8 +635,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         setEditedStatInitialMap((prev) => {
             const next = createInitialActorStatInitialMap(actor, actorStats);
             actorStats.forEach((stat) => {
-                if (prev[stat.name]) {
-                    next[stat.name] = cloneActorStatInitial(prev[stat.name], stat);
+                if (prev[stat.id]) {
+                    next[stat.id] = cloneActorStatInitial(prev[stat.id], stat);
                 }
             });
             return next;
@@ -647,8 +647,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         setEditedPerActorStatMap((prev) => {
             const next = clonePerActorStatValueMap(actor.perActorStatMap);
             perActorStats.forEach((stat) => {
-                if (prev[stat.name]) {
-                    next[stat.name] = { ...next[stat.name], ...prev[stat.name] };
+                if (prev[stat.id]) {
+                    next[stat.id] = { ...next[stat.id], ...prev[stat.id] };
                 }
             });
             return next;
@@ -656,8 +656,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         setEditedPerActorValueRules((prev) => {
             const next = clonePerActorValueRuleMap(actor.perActorValueRules);
             perActorStats.forEach((stat) => {
-                if (prev[stat.name]) {
-                    next[stat.name] = prev[stat.name];
+                if (prev[stat.id]) {
+                    next[stat.id] = prev[stat.id];
                 }
             });
             return next;
@@ -777,21 +777,21 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         if (stat.type === 'checkbox') {
             setEditedStatMap((prev) => ({
                 ...prev,
-                [stat.name]: Boolean(value),
+                [stat.id]: Boolean(value),
             }));
             return;
         }
         const normalized = clampActorStatValue(value, stat);
         setEditedStatMap((prev) => ({
             ...prev,
-            [stat.name]: normalized,
+            [stat.id]: normalized,
         }));
     };
 
     const handleActorStatLocationChange = (stat: ActorStat, locationId: string) => {
         setEditedStatMap((prev) => ({
             ...prev,
-            [stat.name]: locationId,
+            [stat.id]: locationId,
         }));
     };
 
@@ -799,14 +799,14 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         if (stat.type === 'checkbox') {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
-                [stat.name]: { ...cloneActorStatInitial(prev[stat.name], stat), value: Boolean(value) },
+                [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: Boolean(value) },
             }));
             return;
         }
         const normalized = clampActorStatValue(Number(value), stat);
         setEditedStatInitialMap((prev) => ({
             ...prev,
-            [stat.name]: { ...cloneActorStatInitial(prev[stat.name], stat), value: normalized },
+            [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: normalized },
         }));
     };
 
@@ -824,33 +824,33 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
 
     const addActorStatModifier = (stat: ActorStat) => {
         setEditedStatInitialMap((prev) => {
-            const current = cloneActorStatInitial(prev[stat.name], stat);
+            const current = cloneActorStatInitial(prev[stat.id], stat);
             current.modifiers = [...current.modifiers, { id: generateUuid(), amount: 0, conditions: [] }];
-            return { ...prev, [stat.name]: current };
+            return { ...prev, [stat.id]: current };
         });
     };
 
     const removeActorStatModifier = (stat: ActorStat, modifierId: string) => {
         setEditedStatInitialMap((prev) => {
-            const current = cloneActorStatInitial(prev[stat.name], stat);
+            const current = cloneActorStatInitial(prev[stat.id], stat);
             current.modifiers = current.modifiers.filter((modifier) => modifier.id !== modifierId);
-            return { ...prev, [stat.name]: current };
+            return { ...prev, [stat.id]: current };
         });
     };
 
     const updateActorStatModifierAmount = (stat: ActorStat, modifierId: string, amount: number) => {
         setEditedStatInitialMap((prev) => {
-            const current = cloneActorStatInitial(prev[stat.name], stat);
+            const current = cloneActorStatInitial(prev[stat.id], stat);
             current.modifiers = current.modifiers.map((modifier) => modifier.id === modifierId ? { ...modifier, amount: Number.isFinite(amount) ? amount : 0 } : modifier);
-            return { ...prev, [stat.name]: current };
+            return { ...prev, [stat.id]: current };
         });
     };
 
     const updateActorStatModifierConditions = (stat: ActorStat, modifierId: string, conditions: ActorStatModifier['conditions']) => {
         setEditedStatInitialMap((prev) => {
-            const current = cloneActorStatInitial(prev[stat.name], stat);
+            const current = cloneActorStatInitial(prev[stat.id], stat);
             current.modifiers = current.modifiers.map((modifier) => modifier.id === modifierId ? { ...modifier, conditions } : modifier);
-            return { ...prev, [stat.name]: current };
+            return { ...prev, [stat.id]: current };
         });
     };
 
@@ -889,41 +889,41 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     };
 
     const hasExplicitPerActorOverride = (stat: ActorStat, targetActorId: string): boolean =>
-        editedPerActorStatMap[stat.name]?.[targetActorId] !== undefined;
+        editedPerActorStatMap[stat.id]?.[targetActorId] !== undefined;
 
     const handlePerActorStatValueChange = (stat: ActorStat, targetActorId: string, value: ActorStatValue) => {
         setEditedPerActorStatMap((prev) => ({
             ...prev,
-            [stat.name]: { ...(prev[stat.name] || {}), [targetActorId]: value },
+            [stat.id]: { ...(prev[stat.id] || {}), [targetActorId]: value },
         }));
     };
 
     const handleResetPerActorStatValue = (stat: ActorStat, targetActorId: string) => {
         setEditedPerActorStatMap((prev) => {
-            const current = { ...(prev[stat.name] || {}) };
+            const current = { ...(prev[stat.id] || {}) };
             delete current[targetActorId];
-            return { ...prev, [stat.name]: current };
+            return { ...prev, [stat.id]: current };
         });
     };
 
     const addPerActorValueRule = (stat: ActorStat) => {
         setEditedPerActorValueRules((prev) => {
             const rule: ActorStatValueRule = { id: generateUuid(), value: resolveActorStatDefault(stat), conditions: [] };
-            return { ...prev, [stat.name]: [...(prev[stat.name] || []), rule] };
+            return { ...prev, [stat.id]: [...(prev[stat.id] || []), rule] };
         });
     };
 
     const removePerActorValueRule = (stat: ActorStat, ruleId: string) => {
         setEditedPerActorValueRules((prev) => ({
             ...prev,
-            [stat.name]: (prev[stat.name] || []).filter((rule) => rule.id !== ruleId),
+            [stat.id]: (prev[stat.id] || []).filter((rule) => rule.id !== ruleId),
         }));
     };
 
     const updatePerActorValueRule = (stat: ActorStat, ruleId: string, patch: Partial<ActorStatValueRule>) => {
         setEditedPerActorValueRules((prev) => ({
             ...prev,
-            [stat.name]: (prev[stat.name] || []).map((rule) => rule.id === ruleId ? { ...rule, ...patch } : rule),
+            [stat.id]: (prev[stat.id] || []).map((rule) => rule.id === ruleId ? { ...rule, ...patch } : rule),
         }));
     };
 
@@ -1970,12 +1970,12 @@ ${indent}}`;
                                                     const closestDelta = Math.abs(closest.value - displayValue);
                                                     return optionDelta < closestDelta ? option : closest;
                                                 }, letterGradeOptions[0]);
-                                                const statInitial = cloneActorStatInitial(editedStatInitialMap[stat.name], stat);
-                                                const isExpanded = expandedStatNames.has(stat.name);
+                                                const statInitial = cloneActorStatInitial(editedStatInitialMap[stat.id], stat);
+                                                const isExpanded = expandedStatNames.has(stat.id);
 
                                                 return (
                                                     <div
-                                                        key={stat.name}
+                                                        key={stat.id}
                                                         style={{
                                                             display: 'flex',
                                                             flexDirection: 'column',
@@ -1989,7 +1989,7 @@ ${indent}}`;
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', height: '40px' }}>
                                                             <Button
                                                                 variant="secondary"
-                                                                onClick={() => toggleStatExpanded(stat.name)}
+                                                                onClick={() => toggleStatExpanded(stat.id)}
                                                                 aria-label={isExpanded ? `Collapse ${stat.name} details` : `Expand ${stat.name} details`}
                                                                 style={{
                                                                     display: 'inline-flex',
@@ -2065,7 +2065,7 @@ ${indent}}`;
                                                                         }}
                                                                     >
                                                                         {letterGradeOptions.map((option) => (
-                                                                            <option key={`${stat.name}-grade-${option.label}`} value={option.label}>
+                                                                            <option key={`${stat.id}-grade-${option.label}`} value={option.label}>
                                                                                 {option.label}
                                                                             </option>
                                                                         ))}
@@ -2210,12 +2210,12 @@ ${indent}}`;
 
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                         {perActorStats.map((stat) => {
-                                            const isExpanded = expandedPerActorStatNames.has(stat.name);
-                                            const rules = editedPerActorValueRules[stat.name] || [];
+                                            const isExpanded = expandedPerActorStatNames.has(stat.id);
+                                            const rules = editedPerActorValueRules[stat.id] || [];
 
                                             return (
                                                 <div
-                                                    key={stat.name}
+                                                    key={stat.id}
                                                     style={{
                                                         display: 'flex',
                                                         flexDirection: 'column',
@@ -2228,7 +2228,7 @@ ${indent}}`;
                                                 >
                                                     <Button
                                                         variant="secondary"
-                                                        onClick={() => togglePerActorStatExpanded(stat.name)}
+                                                        onClick={() => togglePerActorStatExpanded(stat.id)}
                                                         aria-label={isExpanded ? `Collapse ${stat.name} details` : `Expand ${stat.name} details`}
                                                         style={{
                                                             display: 'inline-flex',
