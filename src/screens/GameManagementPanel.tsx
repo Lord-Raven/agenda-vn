@@ -444,6 +444,28 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         />
                     </div>
                     <div>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Creator Notes</label>
+                        <TextArea
+                            fullWidth
+                            rows={5}
+                            value={creatorNotes}
+                            onChange={(e) => setCreatorNotes(e.target.value)}
+                            placeholder="Notes shown in creator notes export."
+                            style={{ resize: 'vertical' }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Version Notes</label>
+                        <TextArea
+                            fullWidth
+                            rows={5}
+                            value={versionNotes}
+                            onChange={(e) => setVersionNotes(e.target.value)}
+                            placeholder="Changelog or release notes for this version."
+                            style={{ resize: 'vertical' }}
+                        />
+                    </div>
+                    <div>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Start Date</label>
                         <TextInput
                             fullWidth

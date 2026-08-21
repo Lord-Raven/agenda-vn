@@ -6,6 +6,7 @@ import { Box, Typography } from "@mui/material";
 import {
     ArrowBackRounded,
     ArrowForwardRounded,
+    EventAvailable,
     MapRounded,
     MenuRounded,
     Settings,
