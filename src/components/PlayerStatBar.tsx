@@ -1,6 +1,8 @@
 import { FC, ReactNode, useMemo } from "react";
 import { Box, Typography } from "@mui/material";
+import { Bed, Bedtime, EventAvailable, WbSunny, WbTwilight } from "@mui/icons-material";
 import { Stage } from "../Stage";
+import { formatCurrentDate } from "../content/Skit";
 import { ActorStat } from '../content/ActorStat';
 import { resolveIcon } from "./ActorStatRating";
 import { ActorStatValueDisplay } from "./ActorStatDisplay";
@@ -9,6 +11,22 @@ interface PlayerStatBarProps {
     stage: () => Stage;
     buttons?: ReactNode;
 }
+
+const getDateTimeIcon = (timeOfDay?: string) => {
+    if (timeOfDay === "morning") {
+        return WbTwilight;
+    }
+    if (timeOfDay === "afternoon") {
+        return WbSunny;
+    }
+    if (timeOfDay === "evening") {
+        return Bedtime;
+    }
+    if (timeOfDay === "night") {
+        return Bed;
+    }
+    return EventAvailable;
+};
 
 const resolveStatDefaultValue = (stat: ActorStat): number | string | boolean => {
     if (stat.type === "option") {
@@ -83,10 +101,11 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
         const allStats = stageInstance.getConfiguration()?.playerStats || [];
         return allStats.filter((stat) => stat?.name?.trim() && stat.exposed === true);
     }, [stage]);
-
-    if (stats.length === 0 && !buttons) {
-        return null;
-    }
+    const stageInstance = stage();
+    const save = stageInstance.getSave();
+    const currentDate = save?.currentDate || stageInstance.getConfiguration()?.startingDate || new Date().toISOString().slice(0, 10);
+    const currentTimeOfDay = save?.currentTimeOfDay || "morning";
+    const DateTimeIcon = getDateTimeIcon(currentTimeOfDay);
 
     return (
         <Box
@@ -107,6 +126,55 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                     alignItems: "stretch",
                 }}
             >
+                <Box
+                    sx={{
+                        flex: "1 1 190px",
+                        minWidth: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.6,
+                        padding: "8px 10px",
+                        borderRadius: "12px",
+                        border: "1px solid var(--agenda-panel-border)",
+                        background: "color-mix(in srgb, var(--agenda-panel-surface) 88%, transparent)",
+                        boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--agenda-text-primary) 4%, transparent)",
+                    }}
+                >
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.6,
+                            color: "var(--agenda-text-muted)",
+                            lineHeight: 1.2,
+                        }}
+                    >
+                        <DateTimeIcon sx={{ fontSize: "0.8rem", color: "var(--agenda-highlight)" }} />
+                        <Typography
+                            sx={{
+                                color: "var(--agenda-text-muted)",
+                                fontSize: "0.66rem",
+                                letterSpacing: "0.1em",
+                                textTransform: "uppercase",
+                                lineHeight: 1.2,
+                            }}
+                        >
+                            Date
+                        </Typography>
+                    </Box>
+
+                    <Typography
+                        sx={{
+                            color: "var(--agenda-text-primary)",
+                            fontSize: "0.8rem",
+                            fontWeight: 700,
+                            lineHeight: 1.2,
+                            wordBreak: "break-word",
+                        }}
+                    >
+                        {formatCurrentDate(currentDate, currentTimeOfDay)}
+                    </Typography>
+                </Box>
                 {stats.map((stat) => {
                 const statName = (stat.name || "").trim();
                 if (!statName) {

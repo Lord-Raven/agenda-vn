@@ -6,15 +6,10 @@ import { Box, Typography } from "@mui/material";
 import {
     ArrowBackRounded,
     ArrowForwardRounded,
-    Bed,
-    Bedtime,
-    EventAvailable,
     MapRounded,
     MenuRounded,
     Settings,
     TodayRounded,
-    WbSunny,
-    WbTwilight,
 } from "@mui/icons-material";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button, GlassPanel } from "../components/UiComponents";
@@ -64,50 +59,6 @@ const formatDate = (dateText: string) => {
         year: "numeric",
         timeZone: "UTC",
     });
-};
-
-const formatMonthLabel = (date: Date) => date.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-});
-
-const formatOrdinal = (value: number) => {
-    const mod100 = value % 100;
-    if (mod100 >= 11 && mod100 <= 13) {
-        return `${value}th`;
-    }
-    const mod10 = value % 10;
-    if (mod10 === 1) {
-        return `${value}st`;
-    }
-    if (mod10 === 2) {
-        return `${value}nd`;
-    }
-    if (mod10 === 3) {
-        return `${value}rd`;
-    }
-    return `${value}th`;
-};
-
-const formatCurrentDateLabel = (date: Date) => {
-    const dayOfMonth = date.getUTCDate();
-    const year = date.getUTCFullYear();
-    const monthString = date.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
-    return `${monthString} ${formatOrdinal(dayOfMonth)}, ${year}`;
-};
-
-const getTimeOfDayIcon = (timeOfDay: CalendarTimeOfDay) => {
-    if (timeOfDay === "morning") {
-        return WbTwilight;
-    }
-    if (timeOfDay === "afternoon") {
-        return WbSunny;
-    }
-    if (timeOfDay === "evening") {
-        return Bedtime;
-    }
-    return Bed;
 };
 
 const formatRecurrenceSummary = (recurrence?: CalendarEventRecurrence | null) => {
@@ -236,8 +187,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [activeDateKey, setActiveDateKey] = useState<string | null>(null);
-    const isViewingCurrentMonth = viewMonth.getUTCMonth() === todayDate.getUTCMonth() && viewMonth.getUTCFullYear() === todayDate.getUTCFullYear();
-    const CurrentTimeIcon = getTimeOfDayIcon(currentTimeOfDay);
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
@@ -334,6 +283,33 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             <>
                                 <Button
                                     variant="secondary"
+                                    onClick={() => changeMonth(-1)}
+                                    onMouseEnter={() => setTooltip("Previous month", ArrowBackRounded)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 10px" }}
+                                >
+                                    <ArrowBackRounded fontSize="small" />
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={jumpToCurrentMonth}
+                                    onMouseEnter={() => setTooltip("Jump to current month", TodayRounded)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 10px" }}
+                                >
+                                    <TodayRounded fontSize="small" />
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => changeMonth(1)}
+                                    onMouseEnter={() => setTooltip("Next month", ArrowForwardRounded)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 10px" }}
+                                >
+                                    <ArrowForwardRounded fontSize="small" />
+                                </Button>
+                                <Button
+                                    variant="secondary"
                                     onClick={() => setScreenType(ScreenType.MAP)}
                                     onMouseEnter={() => setTooltip("Switch to map", MapRounded)}
                                     onMouseLeave={clearTooltip}
@@ -365,59 +341,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                 </Box>
 
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-                            <Typography
-                                sx={{
-                                    color: isViewingCurrentMonth ? "var(--agenda-text-primary)" : "var(--agenda-text-muted)",
-                                    fontFamily: "var(--agenda-font-flavor)",
-                                    fontWeight: 700,
-                                    fontSize: { xs: "2rem", md: "3rem" },
-                                    letterSpacing: "0.04em",
-                                    lineHeight: 1,
-                                    textShadow: isViewingCurrentMonth
-                                        ? "0 3px 14px color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)"
-                                        : "none",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                }}
-                            >
-                                {isViewingCurrentMonth ? formatCurrentDateLabel(todayDate) : `(${formatMonthLabel(viewMonth)})`}
-                                {isViewingCurrentMonth && <CurrentTimeIcon sx={{ fontSize: { xs: "1.4rem", md: "2rem" }, opacity: 0.9 }} />}
-                            </Typography>
-
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, opacity: 0.82, flexWrap: "wrap", justifyContent: "flex-end" }}>
-
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => changeMonth(-1)}
-                                    onMouseEnter={() => setTooltip("Previous month", ArrowBackRounded)}
-                                    onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 10px" }}
-                                >
-                                    <ArrowBackRounded fontSize="small" />
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={jumpToCurrentMonth}
-                                    onMouseEnter={() => setTooltip("Jump to current month", TodayRounded)}
-                                    onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 10px" }}
-                                >
-                                    <TodayRounded fontSize="small" />
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => changeMonth(1)}
-                                    onMouseEnter={() => setTooltip("Next month", ArrowForwardRounded)}
-                                    onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 10px" }}
-                                >
-                                    <ArrowForwardRounded fontSize="small" />
-                                </Button>
-                            </Box>
-                        </Box>
-
                         <Box
                             sx={{
                                 display: "grid",
