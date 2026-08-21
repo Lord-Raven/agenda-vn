@@ -1,4 +1,4 @@
-import { FC, useMemo } from "react";
+import { FC, ReactNode, useMemo } from "react";
 import { Box, Typography } from "@mui/material";
 import { Stage } from "../Stage";
 import { ActorStat } from '../content/ActorStat';
@@ -6,6 +6,7 @@ import { resolveIcon } from "./ActorStatRating";
 
 interface PlayerStatBarProps {
     stage: () => Stage;
+    buttons?: ReactNode;
 }
 
 const resolveStatDefaultValue = (stat: ActorStat): number | string | boolean => {
@@ -108,14 +109,14 @@ const getPercent = (stat: ActorStat, value: unknown): number => {
     return Math.max(0, Math.min(100, ((numeric - min) / (max - min)) * 100));
 };
 
-export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
+export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
     const stats = useMemo(() => {
         const stageInstance = stage();
         const allStats = stageInstance.getConfiguration()?.playerStats || [];
-        return allStats.filter((stat) => stat?.name?.trim() && (stat.setByPlayer === true || stat.exposed === true));
+        return allStats.filter((stat) => stat?.name?.trim() && stat.exposed === true);
     }, [stage]);
 
-    if (stats.length === 0) {
+    if (stats.length === 0 && !buttons) {
         return null;
     }
 
@@ -123,13 +124,22 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
         <Box
             sx={{
                 display: "flex",
-                flexWrap: "wrap",
+                alignItems: "flex-start",
                 gap: 1,
                 width: "100%",
-                alignItems: "stretch",
             }}
         >
-            {stats.map((stat) => {
+            <Box
+                sx={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 1,
+                    flex: 1,
+                    minWidth: 0,
+                    alignItems: "stretch",
+                }}
+            >
+                {stats.map((stat) => {
                 const statName = (stat.name || "").trim();
                 if (!statName) {
                     return null;
@@ -231,6 +241,20 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage }) => {
                     </Box>
                 );
             })}
+            </Box>
+
+            {buttons && (
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 0.75,
+                        flexShrink: 0,
+                    }}
+                >
+                    {buttons}
+                </Box>
+            )}
         </Box>
     );
 };

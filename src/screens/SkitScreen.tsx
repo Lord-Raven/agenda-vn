@@ -12,6 +12,7 @@ import { getLocationImageUrl } from "../content/Location";
 import { ContentManagementScreen } from "./ContentManagementScreen";
 import { Outcome } from "../content/Outcome";
 import { OutcomeDisplay } from "../components/OutcomeDisplay";
+import { PlayerStatBar } from "../components/PlayerStatBar";
 
 
 import {
@@ -230,72 +231,75 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                 display: 'flex',
                 flexDirection: 'column'
             }}>
-                {/* Top right control buttons */}
                 <div style={{
-                    justifyContent: 'flex-end',
-                    padding: '1rem',
-                    display: 'flex',
-                    gap: '0.5rem',
+                    padding: '12px 16px 0',
                     zIndex: 10
                 }}>
-                    {isTextToSpeechEnabled && (
-                        <IconButton
-                            onClick={() => setIsAudioEnabled(prev => !prev)}
-                            onMouseEnter={() => setTooltip(isAudioEnabled ? 'Mute Audio' : 'Enable Audio', isAudioEnabled ? VolumeUp : VolumeOff)}
-                            onMouseLeave={() => clearTooltip()}
-                            sx={{
-                                ...cornerButtonSx,
-                                opacity: isAudioEnabled ? 0.95 : 0.55,
-                            }}
-                        >
-                            {isAudioEnabled ? <VolumeUp /> : <VolumeOff />}
-                        </IconButton>
-                    )}
-                    <IconButton
-                        onClick={() => setShowContentManagement(true)}
-                        onMouseEnter={() => setTooltip('Content Management', EditNote)}
-                        onMouseLeave={() => clearTooltip()}
-                        sx={cornerButtonSx}
-                    >
-                        <EditNote />
-                    </IconButton>
-                    <IconButton
-                        onClick={() => setScreenType(ScreenType.MENU)}
-                        onMouseEnter={() => setTooltip('Main Menu', MenuIcon)}
-                        onMouseLeave={() => clearTooltip()}
-                        sx={cornerButtonSx}
-                    >
-                        <MenuIcon />
-                    </IconButton>
-                    <IconButton
-                        onClick={handleClose}
-                        onMouseEnter={() => setTooltip(isLoading ? 'Cannot close while content is generating' : ((accumulatedOutcomes.length > 0 ? 'Accept Outcomes and ' : '') + (shouldHighlightCloseButton ? 'End Scene Here' : 'End Scene Here (Discard Remaining Entries)')), shouldHighlightCloseButton ? Close : Warning)}
-                        onMouseLeave={() => clearTooltip()}
-                        disabled={isLoading || skit.script.length < 3}
-                        sx={{
-                            ...cornerButtonSx,
-                            ...(!isLoading && shouldHighlightCloseButton ? {
-                                color: 'var(--agenda-warning)',
-                                backgroundColor: 'color-mix(in srgb, var(--agenda-warning) 12%, transparent)',
-                                animation: 'closeButtonPulse 1.6s ease-in-out infinite',
-                                '@keyframes closeButtonPulse': {
-                                    '0%, 100%': {
-                                        transform: 'scale(1)',
-                                        boxShadow: '0 0 0 0 color-mix(in srgb, var(--agenda-text-primary) 35%, transparent)'
-                                    },
-                                    '50%': {
-                                        transform: 'scale(1.08)',
-                                        boxShadow: '0 0 0 8px transparent'
-                                    }
-                                }
-                            } : {}),
-                            '&.Mui-disabled': {
-                                color: 'color-mix(in srgb, var(--agenda-text-primary) 25%, transparent)'
-                            }
-                        }}
-                    >
-                        <Close />
-                    </IconButton>
+                    <PlayerStatBar
+                        stage={stage}
+                        buttons={
+                            <>
+                                {isTextToSpeechEnabled && (
+                                    <IconButton
+                                        onClick={() => setIsAudioEnabled(prev => !prev)}
+                                        onMouseEnter={() => setTooltip(isAudioEnabled ? 'Mute Audio' : 'Enable Audio', isAudioEnabled ? VolumeUp : VolumeOff)}
+                                        onMouseLeave={() => clearTooltip()}
+                                        sx={{
+                                            ...cornerButtonSx,
+                                            opacity: isAudioEnabled ? 0.95 : 0.55,
+                                        }}
+                                    >
+                                        {isAudioEnabled ? <VolumeUp /> : <VolumeOff />}
+                                    </IconButton>
+                                )}
+                                <IconButton
+                                    onClick={() => setShowContentManagement(true)}
+                                    onMouseEnter={() => setTooltip('Content Management', EditNote)}
+                                    onMouseLeave={() => clearTooltip()}
+                                    sx={cornerButtonSx}
+                                >
+                                    <EditNote />
+                                </IconButton>
+                                <IconButton
+                                    onClick={() => setScreenType(ScreenType.MENU)}
+                                    onMouseEnter={() => setTooltip('Main Menu', MenuIcon)}
+                                    onMouseLeave={() => clearTooltip()}
+                                    sx={cornerButtonSx}
+                                >
+                                    <MenuIcon />
+                                </IconButton>
+                                <IconButton
+                                    onClick={handleClose}
+                                    onMouseEnter={() => setTooltip(isLoading ? 'Cannot close while content is generating' : ((accumulatedOutcomes.length > 0 ? 'Accept Outcomes and ' : '') + (shouldHighlightCloseButton ? 'End Scene Here' : 'End Scene Here (Discard Remaining Entries)')), shouldHighlightCloseButton ? Close : Warning)}
+                                    onMouseLeave={() => clearTooltip()}
+                                    disabled={isLoading || skit.script.length < 3}
+                                    sx={{
+                                        ...cornerButtonSx,
+                                        ...(!isLoading && shouldHighlightCloseButton ? {
+                                            color: 'var(--agenda-warning)',
+                                            backgroundColor: 'color-mix(in srgb, var(--agenda-warning) 12%, transparent)',
+                                            animation: 'closeButtonPulse 1.6s ease-in-out infinite',
+                                            '@keyframes closeButtonPulse': {
+                                                '0%, 100%': {
+                                                    transform: 'scale(1)',
+                                                    boxShadow: '0 0 0 0 color-mix(in srgb, var(--agenda-text-primary) 35%, transparent)'
+                                                },
+                                                '50%': {
+                                                    transform: 'scale(1.08)',
+                                                    boxShadow: '0 0 0 8px transparent'
+                                                }
+                                            }
+                                        } : {}),
+                                        '&.Mui-disabled': {
+                                            color: 'color-mix(in srgb, var(--agenda-text-primary) 25%, transparent)'
+                                        }
+                                    }}
+                                >
+                                    <Close />
+                                </IconButton>
+                            </>
+                        }
+                    />
                 </div>
                     <NovelVisualizer
                         skit={skit}

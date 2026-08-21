@@ -327,6 +327,43 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                     backgroundRepeat: "no-repeat",
                 }}
             >
+                <Box sx={{ flexShrink: 0, mb: 1.25 }}>
+                    <PlayerStatBar
+                        stage={stage}
+                        buttons={
+                            <>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setScreenType(ScreenType.MAP)}
+                                    onMouseEnter={() => setTooltip("Switch to map", MapRounded)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 14px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                                >
+                                    <MapRounded fontSize="small" />
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setShowContentManagement(true)}
+                                    onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", Settings)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 10px" }}
+                                >
+                                    <Settings fontSize="small" />
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setScreenType(ScreenType.MENU)}
+                                    onMouseEnter={() => setTooltip("Main menu", MenuRounded)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: "8px 10px" }}
+                                >
+                                    <MenuRounded fontSize="small" />
+                                </Button>
+                            </>
+                        }
+                    />
+                </Box>
+
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
                             <Typography
@@ -378,39 +415,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 >
                                     <ArrowForwardRounded fontSize="small" />
                                 </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setScreenType(ScreenType.MAP)}
-                                    onMouseEnter={() => setTooltip("Switch to map", MapRounded)}
-                                    onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 14px", display: "inline-flex", alignItems: "center", gap: "6px" }}
-                                >
-                                    <MapRounded fontSize="small" />
-                                    Map
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setShowContentManagement(true)}
-                                    onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", Settings)}
-                                    onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 10px" }}
-                                >
-                                    <Settings fontSize="small" />
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setScreenType(ScreenType.MENU)}
-                                    onMouseEnter={() => setTooltip("Main menu", MenuRounded)}
-                                    onMouseLeave={clearTooltip}
-                                    style={{ padding: "8px 10px" }}
-                                >
-                                    <MenuRounded fontSize="small" />
-                                </Button>
                             </Box>
-                        </Box>
-
-                        <Box sx={{ mt: 0.5, mb: 1.25 }}>
-                            <PlayerStatBar stage={stage} />
                         </Box>
 
                         <Box

@@ -12,6 +12,7 @@ import { useTooltip } from '../components/TooltipContext';
 import { Button, GlassPanel } from '../components/UiComponents';
 import { evaluateConditionCollections } from '../content/Condition';
 import { LocationActorPortraits } from '../components/LocationActorPortraits';
+import { PlayerStatBar } from '../components/PlayerStatBar';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -68,19 +69,31 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
 
     return (
         <>
-            <Box sx={{ width: '100vw', height: '100dvh', boxSizing: 'border-box', p: { xs: '12px', md: '18px' }, overflow: 'hidden', backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${configuredBackgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
-                <GlassPanel variant="bright" style={{ height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setScreenType(ScreenType.CALENDAR)}
-                            onMouseEnter={() => setTooltip('Switch to calendar', EventAvailable)}
-                            onMouseLeave={clearTooltip}
-                            style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                        >
-                            <EventAvailable fontSize="small" />
-                            Calendar
-                        </Button>
+            <Box sx={{ width: '100vw', height: '100dvh', boxSizing: 'border-box', p: { xs: '12px', md: '18px' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'hidden', backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${configuredBackgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
+                <Box sx={{ flexShrink: 0 }}>
+                    <PlayerStatBar
+                        stage={stage}
+                        buttons={
+                            <>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setScreenType(ScreenType.CALENDAR)}
+                                    onMouseEnter={() => setTooltip('Switch to calendar', EventAvailable)}
+                                    onMouseLeave={clearTooltip}
+                                    style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    <EventAvailable fontSize="small" />
+                                    Calendar
+                                </Button>
+                                <Button variant="secondary" onClick={() => setShowContentManagement(true)} onMouseEnter={() => setTooltip('Manage configuration, actors, locations, maps, and more', Settings)} onMouseLeave={clearTooltip} style={{ padding: '8px 10px' }}><Settings fontSize="small" /></Button>
+                                <Button variant="secondary" onClick={() => setScreenType(ScreenType.MENU)} onMouseEnter={() => setTooltip('Main menu', MenuRounded)} onMouseLeave={clearTooltip} style={{ padding: '8px 10px' }}><MenuRounded fontSize="small" /></Button>
+                            </>
+                        }
+                    />
+                </Box>
+
+                <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                         <Box sx={{ minWidth: 0, textAlign: 'center' }}>
                             <Typography sx={{ color: 'var(--agenda-text-primary)', fontFamily: 'var(--agenda-font-flavor)', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.8rem' }, lineHeight: 1.1 }}>
                                 {displayedMap.name || 'Unnamed Map'}
@@ -90,10 +103,6 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     {displayedMap.description}
                                 </Typography>
                             )}
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 0.75 }}>
-                            <Button variant="secondary" onClick={() => setShowContentManagement(true)} onMouseEnter={() => setTooltip('Manage configuration, actors, locations, maps, and more', Settings)} onMouseLeave={clearTooltip} style={{ padding: '8px 10px' }}><Settings fontSize="small" /></Button>
-                            <Button variant="secondary" onClick={() => setScreenType(ScreenType.MENU)} onMouseEnter={() => setTooltip('Main menu', MenuRounded)} onMouseLeave={clearTooltip} style={{ padding: '8px 10px' }}><MenuRounded fontSize="small" /></Button>
                         </Box>
                     </Box>
 
