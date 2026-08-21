@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { ActorStat, ActorStatType, ActorStatValue, isNumericDisplayType } from '../content/ActorStat';
+import { Stat, StatType, StatValue, cloneStat, isNumericDisplayType } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { buildCreatorNotesHtml } from './CreatorNotesHtml';
@@ -11,24 +11,7 @@ interface GameManagementPanelProps {
     stage: () => Stage;
 }
 
-const cloneActorStat = (stat: ActorStat): ActorStat => ({
-    id: stat.id || generateUuid(),
-    name: stat.name,
-    description: stat.description,
-    guidance: stat.guidance,
-    default: typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : 0,
-    type: stat.type,
-    options: (stat.options || []).map((option) => ({
-        name: option.name,
-        description: option.description,
-    })),
-    min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
-    max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
-    setByPlayer: stat.setByPlayer === true || stat.exposed === true,
-    exposed: stat.exposed === true,
-});
-
-const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
+const resolveStatDefaultValue = (stat: Stat): StatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
@@ -48,7 +31,7 @@ const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const normalizeStatValue = (value: unknown, stat: ActorStat): ActorStatValue => {
+const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof value === 'string' && optionNames.includes(value)) {
@@ -84,7 +67,7 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): ActorStatValue => 
     return resolved;
 };
 
-const clampStatValue = (value: number, stat: ActorStat): number => {
+const clampStatValue = (value: number, stat: Stat): number => {
     let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
     if (typeof stat.min === 'number') {
         resolved = Math.max(stat.min, resolved);
@@ -114,15 +97,18 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [versionNotes, setVersionNotes] = useState<string>(() => configuration.versionNotes || '');
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
     const [artStyle, setArtStyle] = useState<string>(() => configuration.artStyle || '');
-    const [playerStats, setPlayerStats] = useState<ActorStat[]>(() =>
-        (configuration.playerStats || []).map(cloneActorStat),
+    const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
+        (configuration.globalStats || []).map(cloneStat),
     );
-    const [actorStats, setActorStats] = useState<ActorStat[]>(() =>
-        (configuration.actorStats || []).map(cloneActorStat),
+    const [actorStats, setActorStats] = useState<Stat[]>(() =>
+        (configuration.actorStats || []).map(cloneStat),
     );
-    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: ActorStatValue }>(() => ({
-        ...configuration.playerStatValues,
-        ...save.playerStatValues,
+    const [locationStats, setLocationStats] = useState<Stat[]>(() =>
+        (configuration.locationStats || []).map(cloneStat),
+    );
+    const [globalStatValues, setGlobalStatValues] = useState<{ [key: string]: StatValue }>(() => ({
+        ...configuration.globalStatValues,
+        ...save.globalStatValues,
     }));
     const [isCopyingConfigurationJson, setIsCopyingConfigurationJson] = useState(false);
     const [isCopyingCreatorNotesHtml, setIsCopyingCreatorNotesHtml] = useState(false);
@@ -130,19 +116,19 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const didMountRef = useRef(false);
     const saveGameConfigurationRef = useRef<() => void>(() => {});
 
-    const validPlayerStatValues = useMemo(() => {
-        const nextValues: { [key: string]: ActorStatValue } = {};
+    const validGlobalStatValues = useMemo(() => {
+        const nextValues: { [key: string]: StatValue } = {};
 
-        playerStats.forEach((stat) => {
+        globalStats.forEach((stat) => {
             if (!stat.id || !(stat.name || '').trim()) {
                 return;
             }
 
-            nextValues[stat.id] = normalizeStatValue(playerStatValues[stat.id], stat);
+            nextValues[stat.id] = normalizeStatValue(globalStatValues[stat.id], stat);
         });
 
         return nextValues;
-    }, [playerStatValues, playerStats]);
+    }, [globalStatValues, globalStats]);
 
     const activeActors = useMemo(() => {
         return Object.values(save.actors || {})
@@ -177,9 +163,10 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             creatorNotes,
             versionNotes,
             startingDate,
-            actorStats: actorStats.map(cloneActorStat),
-            playerStats: playerStats.map(cloneActorStat),
-            playerStatValues: { ...validPlayerStatValues },
+            actorStats: actorStats.map(cloneStat),
+            locationStats: locationStats.map(cloneStat),
+            globalStats: globalStats.map(cloneStat),
+            globalStatValues: { ...validGlobalStatValues },
             actors: activeActors,
             locations: activeLocations,
             maps: activeMaps,
@@ -196,8 +183,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         backgroundImageUrl,
         creatorNotes,
         managedCalendarEvents,
-        playerStats,
-        validPlayerStatValues,
+        globalStats,
+        locationStats,
+        validGlobalStatValues,
         save.lorebook,
         stageInstance,
         startingDate,
@@ -267,8 +255,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
             calendarEvents: managedCalendarEvents,
             actorStats,
-            playerStats,
-            playerStatValues: validPlayerStatValues,
+            locationStats,
+            globalStats: globalStats,
+            globalStatValues: validGlobalStatValues,
             uiSettings: stageInstance.getUiSettings(),
             title,
             titleImageUrl,
@@ -310,7 +299,34 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             });
         });
 
-    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, creatorNotes, managedCalendarEvents, playerStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validPlayerStatValues, versionNotes]);
+        const locationStatIds = new Set(
+            locationStats
+                .filter(stat => isNumericDisplayType(stat.type))
+                .map(stat => stat.id),
+        );
+        Object.values(currentSave.atlas || {}).forEach(location => {
+            if (!location.statMap || typeof location.statMap !== 'object') {
+                location.statMap = {};
+            }
+
+            locationStats.filter(stat => isNumericDisplayType(stat.type)).forEach(stat => {
+                if (!stat.id || !stat.name.trim()) {
+                    return;
+                }
+                const existing = location.statMap[stat.id];
+                const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
+                const value = Number.isFinite(existing) ? Number(existing) : fallback;
+                location.statMap[stat.id] = clampStatValue(value, stat);
+            });
+
+            Object.keys(location.statMap).forEach(statId => {
+                if (!locationStatIds.has(statId)) {
+                    delete location.statMap[statId];
+                }
+            });
+        });
+
+    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, creatorNotes, managedCalendarEvents, globalStats, locationStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;

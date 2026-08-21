@@ -3,7 +3,7 @@ import {StageBase, StageResponse, InitialData, Message, User, Character, AspectR
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, loadSupportedActor, resolveActorSchedule, ScheduleContext } from "./content/Actor";
-import { ActorStat, ActorStatType, ActorStatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneActorStat, cloneStatUpdateRules, isNumericActorStat, normalizeActorStatValue, resolveActorStatText } from './content/ActorStat';
+import { Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
@@ -52,7 +52,7 @@ export type SaveType = {
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
     upcomingEvents?: CalendarEvent[];
-    playerStatValues?: {[key: string]: ActorStatValue};
+    globalStatValues?: {[key: string]: StatValue};
     uiSettings?: UiSettings;
     betaMode?: boolean;
 }
@@ -108,9 +108,10 @@ export type GameConfiguration = {
     universalSchedule: ActorSchedule, // Universal schedule for all actors (applies to current and new games)
     lorebook: Lore[], // Lore entries to seed into new games
     calendarEvents: CalendarEvent[], // Calendar event series definitions to seed into new games
-    actorStats: ActorStat[], // All custom actor stats and defaults (applies to current and new games)
-    playerStats: ActorStat[], // Stats that apply to the player only
-    playerStatValues: {[key: string]: ActorStatValue}, // Selected/default values for player stats
+    actorStats: Stat[], // All custom actor stats and defaults (applies to current and new games)
+    locationStats: Stat[], // All custom location stats and defaults (applies to current and new games)
+    globalStats: Stat[], // Stats that apply to the game in general (player or world state)
+    globalStatValues: {[key: string]: StatValue}, // Selected/default values for global stats
     statUpdateRules: StatUpdateRule[], // Recurring stat changes applied as in-game time advances
     uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
@@ -138,6 +139,7 @@ const cloneActor = (actor: Actor): Actor => new Actor({
 const cloneLocation = (location: Location): Location => new Location({
     ...location,
     focalPoint: location.focalPoint ? { ...location.focalPoint } : undefined,
+    statMap: location.statMap && typeof location.statMap === 'object' ? { ...location.statMap } : {},
 });
 
 const cloneMap = (map: GameMap): GameMap => new GameMap({
@@ -229,8 +231,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             lorebook: [],
             calendarEvents: [],
             actorStats: [],
-            playerStats: [],
-            playerStatValues: {},
+            locationStats: [],
+            globalStats: [],
+            globalStatValues: {},
             statUpdateRules: [],
             uiSettings: cloneUiSettings(DEFAULT_UI_SETTINGS),
             title: 'Agenda VN',
@@ -272,9 +275,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 universalSchedule: cloneActorSchedule(activeSave?.universalSchedule),
                 lorebook: (activeSave?.lorebook || []).map(cloneLore),
                 calendarEvents: [],
-                actorStats: (this.getConfiguration()?.actorStats || []).map(cloneActorStat),
-                playerStats: (this.getConfiguration()?.playerStats || []).map(cloneActorStat),
-                playerStatValues: { ...(activeSave?.playerStatValues || {}) },
+                actorStats: (this.getConfiguration()?.actorStats || []).map(cloneStat),
+                locationStats: (this.getConfiguration()?.locationStats || []).map(cloneStat),
+                globalStats: (this.getConfiguration()?.globalStats || []).map(cloneStat),
+                globalStatValues: { ...(activeSave?.globalStatValues || {}) },
                 statUpdateRules: cloneStatUpdateRules(this.getConfiguration()?.statUpdateRules),
                 uiSettings: cloneUiSettings(activeSave?.uiSettings || {}),
             };
@@ -289,9 +293,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             universalSchedule: cloneActorSchedule(this.saveData.configuration.universalSchedule),
             lorebook: (this.saveData.configuration.lorebook || defaultConfiguration.lorebook).map(cloneLore),
             calendarEvents: (this.saveData.configuration.calendarEvents || defaultConfiguration.calendarEvents).map(cloneCalendarEvent),
-            actorStats: (this.saveData.configuration.actorStats || defaultConfiguration.actorStats).map(cloneActorStat),
-            playerStats: (this.saveData.configuration.playerStats || defaultConfiguration.playerStats).map(cloneActorStat),
-            playerStatValues: { ...(this.saveData.configuration.playerStatValues || defaultConfiguration.playerStatValues) },
+            actorStats: (this.saveData.configuration.actorStats || defaultConfiguration.actorStats).map(cloneStat),
+            locationStats: (this.saveData.configuration.locationStats || defaultConfiguration.locationStats).map(cloneStat),
+            globalStats: (this.saveData.configuration.globalStats || defaultConfiguration.globalStats).map(cloneStat),
+            globalStatValues: { ...(this.saveData.configuration.globalStatValues || defaultConfiguration.globalStatValues) },
             statUpdateRules: cloneStatUpdateRules(this.saveData.configuration.statUpdateRules),
             uiSettings: cloneUiSettings(this.saveData.configuration.uiSettings || defaultConfiguration.uiSettings),
             startingDate: this.saveData.configuration.startingDate || defaultConfiguration.startingDate,
@@ -326,7 +331,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // that point at a location-type ActorStat rather than a fixed location id.
     getScheduleContext(save: SaveType): ScheduleContext {
         const configuration = this.getConfiguration();
-        return { ...save, playerStats: configuration.playerStats, actorStats: configuration.actorStats };
+        return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats };
     }
 
     updateConfiguration(updates: Partial<GameConfiguration>) {
@@ -346,9 +351,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             universalSchedule: cloneActorSchedule(updates.universalSchedule ?? current.universalSchedule),
             lorebook: (updates.lorebook ?? current.lorebook ?? []).map(cloneLore),
             calendarEvents: (updates.calendarEvents ?? current.calendarEvents ?? []).map(cloneCalendarEvent),
-            actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneActorStat),
-            playerStats: (updates.playerStats ?? current.playerStats ?? []).map(cloneActorStat),
-            playerStatValues: { ...(updates.playerStatValues ?? current.playerStatValues ?? {}) },
+            actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneStat),
+            locationStats: (updates.locationStats ?? current.locationStats ?? []).map(cloneStat),
+            globalStats: (updates.globalStats ?? current.globalStats ?? []).map(cloneStat),
+            globalStatValues: { ...(updates.globalStatValues ?? current.globalStatValues ?? {}) },
             statUpdateRules: cloneStatUpdateRules(updates.statUpdateRules ?? current.statUpdateRules),
             uiSettings: cloneUiSettings(updates.uiSettings ?? current.uiSettings ?? DEFAULT_UI_SETTINGS),
             startingDate: updates.startingDate ?? current.startingDate,
@@ -356,9 +362,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const currentSave = this.saveData.saves[this.saveData.lastSaveSlot];
         if (currentSave) {
-            currentSave.playerStatValues = { ...(this.saveData.configuration.playerStatValues || {}) };
+            currentSave.globalStatValues = { ...(this.saveData.configuration.globalStatValues || {}) };
             this.syncActorStats(currentSave);
-            this.syncPlayerStats(currentSave);
+            this.syncLocationStats(currentSave);
+            this.syncGlobalStats(currentSave);
         }
         this.syncUniversalSchedule();
     }
@@ -461,7 +468,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             currentTimeOfDay: 'morning',
             upcomingEvents: seededEvents,
             lorebook: (configuration.lorebook || []).map(cloneLore),
-            playerStatValues: { ...(configuration.playerStatValues || {}) },
+            globalStatValues: { ...(configuration.globalStatValues || {}) },
             uiSettings: cloneUiSettings(configuration.uiSettings || DEFAULT_UI_SETTINGS),
         };
     }
@@ -480,8 +487,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const persistedConfiguration = this.getConfiguration();
 
-        if (!newSave.playerStatValues) {
-            newSave.playerStatValues = { ...(persistedConfiguration.playerStatValues || {}) };
+        if (!newSave.globalStatValues) {
+            newSave.globalStatValues = { ...(persistedConfiguration.globalStatValues || {}) };
         }
 
         if (!newSave.lorebook || newSave.lorebook.length === 0) {
@@ -504,7 +511,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         this.syncActorStats(newSave);
-    this.syncPlayerStats(newSave);
+    this.syncLocationStats(newSave);
+    this.syncGlobalStats(newSave);
 
         if (!newSave.currentDate && persistedConfiguration.startingDate) {
             newSave.currentDate = persistedConfiguration.startingDate;
@@ -1071,12 +1079,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const configuration = this.getConfiguration();
 
         if (update.targetType === 'player') {
-            const stat = (configuration.playerStats || []).find(candidate => candidate.id === update.statId);
+            const stat = (configuration.globalStats || []).find(candidate => candidate.id === update.statId);
             if (!stat) {
                 return;
             }
-            save.playerStatValues = save.playerStatValues || {};
-            save.playerStatValues[stat.id] = applyStatUpdateValue(save.playerStatValues[stat.id], update, stat);
+            save.globalStatValues = save.globalStatValues || {};
+            save.globalStatValues[stat.id] = applyStatUpdateValue(save.globalStatValues[stat.id], update, stat);
             return;
         }
 
@@ -1338,10 +1346,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 : undefined,
         }));
 
-        save.playerStatValues = { ...(this.getConfiguration().playerStatValues || {}) };
+        save.globalStatValues = { ...(this.getConfiguration().globalStatValues || {}) };
 
         this.syncActorStats(save);
-        this.syncPlayerStats(save);
+        this.syncLocationStats(save);
+        this.syncGlobalStats(save);
 
         if (!save.uiSettings) {
             save.uiSettings = {...DEFAULT_UI_SETTINGS};
@@ -1353,7 +1362,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private syncActorStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().actorStats || [])
             .filter(stat => stat?.name?.trim())
-            .filter(stat => isNumericActorStat(stat) || stat.type === 'checkbox' || stat.type === 'location');
+            .filter(stat => stat.type === 'number' || stat.type === 'checkbox' || stat.type === 'location');
         const scalarStats = configuredStats.filter(stat => !stat.perActor);
         const perActorStats = configuredStats.filter(stat => stat.perActor);
         const statIds = new Set(scalarStats.map(stat => stat.id));
@@ -1372,7 +1381,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             scalarStats.forEach(stat => {
                 const existingValue = actor.statMap[stat.id];
-                const normalized = normalizeActorStatValue(existingValue, stat);
+                const normalized = normalizeStatValue(existingValue, stat);
                 if (stat.type === 'location') {
                     actor.statMap[stat.id] = typeof normalized === 'string' ? normalized : '';
                     return;
@@ -1414,19 +1423,52 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         });
     }
 
-    private syncPlayerStats(save: SaveType) {
-        const configuredStats = (this.getConfiguration().playerStats || []).filter(stat => stat?.name?.trim());
-        const currentValues = save.playerStatValues && typeof save.playerStatValues === 'object'
-            ? save.playerStatValues
+    private syncLocationStats(save: SaveType) {
+        const configuredStats = (this.getConfiguration().locationStats || [])
+            .filter(stat => stat?.name?.trim())
+            .filter(stat => stat.type === 'number' || stat.type === 'checkbox' || stat.type === 'location');
+        const statIds = new Set(configuredStats.map(stat => stat.id));
+
+        Object.values(save.atlas || {}).forEach(location => {
+            if (!location.statMap || typeof location.statMap !== 'object') {
+                location.statMap = {};
+            }
+
+            configuredStats.forEach(stat => {
+                const existingValue = location.statMap[stat.id];
+                const normalized = normalizeStatValue(existingValue, stat);
+                if (stat.type === 'location') {
+                    location.statMap[stat.id] = typeof normalized === 'string' ? normalized : '';
+                    return;
+                }
+                location.statMap[stat.id] = typeof normalized === 'boolean'
+                    ? normalized
+                    : Number.isFinite(normalized)
+                        ? Number(normalized)
+                        : 0;
+            });
+
+            Object.keys(location.statMap).forEach(statId => {
+                if (!statIds.has(statId)) {
+                    delete location.statMap[statId];
+                }
+            });
+        });
+    }
+
+    private syncGlobalStats(save: SaveType) {
+        const configuredStats = (this.getConfiguration().globalStats || []).filter(stat => stat?.name?.trim());
+        const currentValues = save.globalStatValues && typeof save.globalStatValues === 'object'
+            ? save.globalStatValues
             : {};
 
-        const normalizedValues: { [key: string]: ActorStatValue } = {};
+        const normalizedValues: { [key: string]: StatValue } = {};
         configuredStats.forEach((stat) => {
             const statName = stat.name.trim();
-            normalizedValues[stat.id] = normalizeActorStatValue(currentValues[stat.id], stat);
+            normalizedValues[stat.id] = normalizeStatValue(currentValues[stat.id], stat);
         });
 
-        save.playerStatValues = normalizedValues;
+        save.globalStatValues = normalizedValues;
     }
 
     private createCalendarEvents(save: SaveType, count: number): CalendarEvent[] {
@@ -1656,11 +1698,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                             const currentValue = Number.isFinite(existingValue)
                                 ? existingValue
                                 : (resolvedStat
-                                    ? Number(normalizeActorStatValue(Number(resolvedStat.default) || 0, resolvedStat))
+                                    ? Number(normalizeStatValue(Number(resolvedStat.default) || 0, resolvedStat))
                                     : 0);
                             const nextValue = currentValue + changeValue;
                             actor.statMap[targetStatId] = resolvedStat
-                                ? Number(normalizeActorStatValue(nextValue, resolvedStat))
+                                ? Number(normalizeStatValue(nextValue, resolvedStat))
                                 : nextValue;
                         }
                         this.saveGame();
@@ -1766,28 +1808,28 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private buildActiveSettingContextSummary(save: SaveType): string {
         const agendaConfig = this.getConfiguration();
-        if (!agendaConfig?.playerStats?.length) {
+        if (!agendaConfig?.globalStats?.length) {
             return 'No player stat context is active.';
         }
 
         const lines: string[] = [];
-        for (const stat of agendaConfig.playerStats) {
+        for (const stat of agendaConfig.globalStats) {
             const statName = (stat.name || '').trim();
             if (!statName) {
                 continue;
             }
 
-            const value = normalizeActorStatValue(save.playerStatValues?.[stat.id], stat);
+            const value = normalizeStatValue(save.globalStatValues?.[stat.id], stat);
             const valueText = stat.type === 'location'
                 ? (save.atlas?.[String(value)]?.name || '')
                 : (typeof value === 'number' ? String(value) : value);
 
             if (stat.type === 'option') {
                 const selectedOption = (stat.options || []).find(option => option.name === valueText);
-                const optionDescription = resolveActorStatText(selectedOption?.description, this).trim();
+                const optionDescription = resolveStatText(selectedOption?.description, this).trim();
                 const line = [
                     `${statName}: ${valueText}`,
-                    resolveActorStatText(stat.description, this).trim(),
+                    resolveStatText(stat.description, this).trim(),
                     optionDescription,
                 ].filter(Boolean).join('\n');
                 lines.push(line);
@@ -1796,7 +1838,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             const line = [
                 `${statName}: ${valueText}`,
-                resolveActorStatText(stat.description, this).trim(),
+                resolveStatText(stat.description, this).trim(),
             ].filter(Boolean).join('\n');
             lines.push(line);
         }

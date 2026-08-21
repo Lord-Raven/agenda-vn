@@ -409,7 +409,7 @@ export async function distillLocation(location: Location, definition: any, stage
 
 	const save = stage.getSave();
 	const configuration = stage.getConfiguration();
-	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, playerStats: configuration.playerStats, actorStats: configuration.actorStats })) || 'None provided.';
+	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats })) || 'None provided.';
 
 	const locationDetails = [
 		`Name: ${String(definition?.name || location.name || '').trim()}`,
@@ -490,6 +490,7 @@ export class Location {
     focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
     themeColor: string = ''; // A color associated with this location, used for UI theming.
 	conditionCollections: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
+	statMap: { [key: string]: number | string | boolean } = {}; // Map of custom location stat id to value for this location
 
     constructor(props: any) {
         Object.assign(this, props);
@@ -500,6 +501,7 @@ export class Location {
 		this.active = this.active !== false;
 		this.alternativeImages = Array.isArray(this.alternativeImages) ? this.alternativeImages.map(createAlternativeImage) : [];
 		this.conditionCollections = (this.conditionCollections || []).map((collection) => [...collection]);
+		this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
         if (!this.themeColor) {
             // Pick from the core game theme palette in index.scss.
             const colors = ['#8ab0cc', '#89cd87', '#7a7b6b', '#b98f6e', '#2e354d'];

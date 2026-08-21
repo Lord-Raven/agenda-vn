@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, LinkOffRounded, LinkRounded, PersonOffOutlined, SwapHoriz } from '@mui/icons-material';
-import { ActorStat } from '../content/ActorStat';
+import { Stat } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
 import { Button, LocationSelect, TextInput } from './UiComponents';
@@ -9,8 +9,8 @@ import { LocationLike } from './LocationPortrait';
 
 interface ConditionEditorProps {
     conditionCollections: ConditionCollection[];
-    playerStats: ActorStat[];
-    actorStats?: ActorStat[];
+    globalStats: Stat[];
+    actorStats?: Stat[];
     actors?: Array<{ id: string; name: string }>;
     locations?: LocationLike[];
     allowVariableActorTarget?: boolean;
@@ -58,7 +58,7 @@ const iconButtonStyle = {
     padding: 0,
 };
 
-const getDefaultConditionValue = (stat?: ActorStat): string | number | boolean => {
+const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
     if (!stat) {
         return 0;
     }
@@ -91,7 +91,7 @@ export const buildActorTargetOptions = (actors: Array<{ id: string; name: string
     return options;
 };
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, playerStats, actorStats = [], actors = [], locations = [], allowVariableActorTarget = false, onChange }) => {
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], actors = [], locations = [], allowVariableActorTarget = false, onChange }) => {
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
     const actorTargetOptions = buildActorTargetOptions(actors, allowVariableActorTarget);
     const concreteActorOptions = actorTargetOptions.filter((option) => !['variable', 'any', 'none'].includes(option.key));
@@ -160,7 +160,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (condition.type === 'calendar' && condition.field === 'dayOfWeek') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
         }
-        const stat = condition.type === 'playerStat' ? playerStats.find(candidate => candidate.id === condition.statId) : (condition.type === 'actorStat' ? actorStats.find(candidate => candidate.id === condition.statId) : undefined);
+        const stat = condition.type === 'globalStat' ? globalStats.find(candidate => candidate.id === condition.statId) : (condition.type === 'actorStat' ? actorStats.find(candidate => candidate.id === condition.statId) : undefined);
         if (stat?.type === 'option') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{(stat.options || []).map(option => <option key={option.name} value={option.name}>{option.name}</option>)}</select>;
         }
@@ -199,14 +199,14 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             style={selectStyle}
                             value={condition.type}
                             onChange={(event) => {
-                                const nextType = event.target.value as 'calendar' | 'playerStat' | 'actorStat' | 'actorIdentity';
+                                const nextType = event.target.value as 'calendar' | 'globalStat' | 'actorStat' | 'actorIdentity';
                                 if (nextType === 'calendar') {
                                     updateCondition(collectionIndex, conditionIndex, { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' });
                                     return;
                                 }
-                                if (nextType === 'playerStat') {
-                                    const stat = playerStats[0];
-                                    updateCondition(collectionIndex, conditionIndex, { type: 'playerStat', statId: stat?.id || '', comparison: 'equals', value: getDefaultConditionValue(stat) });
+                                if (nextType === 'globalStat') {
+                                    const stat = globalStats[0];
+                                    updateCondition(collectionIndex, conditionIndex, { type: 'globalStat', statId: stat?.id || '', comparison: 'equals', value: getDefaultConditionValue(stat) });
                                     return;
                                 }
                                 const target = actorTargetOptions[0]?.key || 'any';
@@ -219,7 +219,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             }}
                         >
                             <option value="calendar">Calendar</option>
-                            <option value="playerStat">Player Stat</option>
+                            <option value="globalStat">Global Stat</option>
                             <option value="actorStat">Actor Stat</option>
                             {allowVariableActorTarget && <option value="actorIdentity">Actor Identity</option>}
                         </select>
@@ -245,12 +245,12 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         ) : (
                             <div />
                         )}
-                        {(condition.type === 'playerStat' || condition.type === 'actorStat') && (
+                        {(condition.type === 'globalStat' || condition.type === 'actorStat') && (
                             <select style={selectStyle} value={condition.statId} onChange={(event) => {
-                                const stat = (condition.type === 'playerStat' ? playerStats : actorStats).find(candidate => candidate.id === event.target.value);
+                                const stat = (condition.type === 'globalStat' ? globalStats : actorStats).find(candidate => candidate.id === event.target.value);
                                 updateCondition(collectionIndex, conditionIndex, { ...condition, statId: event.target.value, value: getDefaultConditionValue(stat) } as Condition);
                             }}>
-                                {(condition.type === 'playerStat' ? playerStats : actorStats).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
+                                {(condition.type === 'globalStat' ? globalStats : actorStats).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
                             </select>
                         )}
                         {condition.type === 'calendar' && (

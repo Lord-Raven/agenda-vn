@@ -1,12 +1,12 @@
 import { FC } from 'react';
 import { Box, Typography } from '@mui/material';
-import { ActorStat } from '../content/ActorStat';
-import { ActorStatRating } from './ActorStatRating';
+import { Stat } from '../content/Stat';
+import { StatRating } from './StatRating';
 
 // Coarse letter-grade scale shared with ActorDetailPanel's per-stat editor.
 const LETTER_GRADES = ['F', 'D', 'C', 'B', 'A', 'S'];
 
-export const resolveActorStatNumericRange = (stat: ActorStat): { min: number; max: number } => {
+export const resolveStatNumericRange = (stat: Stat): { min: number; max: number } => {
     if (typeof stat.min === 'number' && typeof stat.max === 'number' && stat.max > stat.min) {
         return { min: stat.min, max: stat.max };
     }
@@ -16,50 +16,50 @@ export const resolveActorStatNumericRange = (stat: ActorStat): { min: number; ma
     return { min: 0, max: Number.isFinite(stat.max) ? Number(stat.max) : 100 };
 };
 
-export const resolveActorStatPercent = (stat: ActorStat, value: number): number => {
-    const { min, max } = resolveActorStatNumericRange(stat);
+export const resolveStatPercent = (stat: Stat, value: number): number => {
+    const { min, max } = resolveStatNumericRange(stat);
     if (!Number.isFinite(value) || max === min) {
         return 0;
     }
     return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
 };
 
-export const resolveActorStatLetterGrade = (stat: ActorStat, value: number): string => {
-    const ratio = resolveActorStatPercent(stat, value) / 100;
+export const resolveStatLetterGrade = (stat: Stat, value: number): string => {
+    const ratio = resolveStatPercent(stat, value) / 100;
     return LETTER_GRADES[Math.round(ratio * (LETTER_GRADES.length - 1))];
 };
 
 // Plain-text rendering of a numeric stat's value according to its displayType; used anywhere a compact
 // string is needed instead of a full visual component (e.g. outcome summaries).
-export const resolveActorStatValueText = (stat: ActorStat, value: number): string => {
+export const resolveStatValueText = (stat: Stat, value: number): string => {
     if (!Number.isFinite(value)) {
         return '0';
     }
     if (stat.displayType === 'percentage') {
-        return `${Math.round(resolveActorStatPercent(stat, value))}%`;
+        return `${Math.round(resolveStatPercent(stat, value))}%`;
     }
     if (stat.displayType === 'letter grade') {
-        return resolveActorStatLetterGrade(stat, value);
+        return resolveStatLetterGrade(stat, value);
     }
     return `${value}`;
 };
 
-interface ActorStatValueDisplayProps {
-    stat: ActorStat;
+interface StatValueDisplayProps {
+    stat: Stat;
     value: number;
     style?: React.CSSProperties;
     showText?: boolean;
 }
 
-// Renders a numeric ActorStat's value using its selected displayType: pips for 'rating', a progress bar for
+// Renders a numeric Stat's value using its selected displayType: pips for 'rating', a progress bar for
 // 'bar'/'percentage', or plain text for 'straight'/'letter grade'.
-export const ActorStatValueDisplay: FC<ActorStatValueDisplayProps> = ({ stat, value, style, showText = true }) => {
+export const StatValueDisplay: FC<StatValueDisplayProps> = ({ stat, value, style, showText = true }) => {
     if (stat.displayType === 'rating') {
-        return <ActorStatRating stat={stat} value={value} style={style} />;
+        return <StatRating stat={stat} value={value} style={style} />;
     }
 
     if (stat.displayType === 'bar' || stat.displayType === 'percentage') {
-        const percent = resolveActorStatPercent(stat, value);
+        const percent = resolveStatPercent(stat, value);
         return (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', ...style }}>
                 <Box
@@ -90,7 +90,7 @@ export const ActorStatValueDisplay: FC<ActorStatValueDisplayProps> = ({ stat, va
                             textAlign: 'right',
                         }}
                     >
-                        {resolveActorStatValueText(stat, value)}
+                        {resolveStatValueText(stat, value)}
                     </Typography>
                 )}
             </Box>
@@ -108,7 +108,7 @@ export const ActorStatValueDisplay: FC<ActorStatValueDisplayProps> = ({ stat, va
                 ...style,
             }}
         >
-            {resolveActorStatValueText(stat, value)}
+            {resolveStatValueText(stat, value)}
         </Typography>
     );
 };

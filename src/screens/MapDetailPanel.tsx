@@ -359,7 +359,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                 </div>
                                 <ConditionEditor
                                     conditionCollections={link.conditionCollections || []}
-                                    playerStats={stageInstance.getConfiguration().playerStats || []}
+                                    globalStats={stageInstance.getConfiguration().globalStats || []}
                                     actorStats={stageInstance.getConfiguration().actorStats || []}
                                     actors={Object.values(stageInstance.getSave().actors || {})}
                                     allowVariableActorTarget
@@ -517,7 +517,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                         />
                                         <ConditionEditor
                                             conditionCollections={alternative.conditionCollections}
-                                            playerStats={stageInstance.getConfiguration().playerStats || []}
+                                            globalStats={stageInstance.getConfiguration().globalStats || []}
                                             actorStats={stageInstance.getConfiguration().actorStats || []}
                                             actors={Object.values(stageInstance.getSave().actors || {})}
                                             allowVariableActorTarget

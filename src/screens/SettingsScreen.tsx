@@ -1,11 +1,11 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SaveType, Stage } from '../Stage';
-import { ActorStat, ActorStatValue, isNumericDisplayType } from '../content/ActorStat';
+import { Stat, StatValue, isNumericDisplayType } from '../content/Stat';
 import { GlassPanel, Title, Button, ColorPickerInput, LocationSelect, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
-import { resolveIcon } from '../components/ActorStatRating';
+import { resolveIcon } from '../components/StatRating';
 import { ScreenType } from './BaseScreen';
 
 export const DEFAULT_PLAYER_THEME_COLOR = '#66bbee';
@@ -36,12 +36,12 @@ interface SettingsData {
     language: string;
 }
 
-const resolveActivePlayerStats = (stageInstance: Stage): ActorStat[] => {
+const resolveActiveGlobalStats = (stageInstance: Stage): Stat[] => {
 
-    return stageInstance.getConfiguration()?.playerStats || [];
+    return stageInstance.getConfiguration()?.globalStats || [];
 };
 
-const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
+const resolveStatDefaultValue = (stat: Stat): StatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
@@ -61,7 +61,7 @@ const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const normalizePlayerStatValue = (value: unknown, stat: ActorStat): ActorStatValue => {
+const normalizeGlobalStatValue = (value: unknown, stat: Stat): StatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof value === 'string' && optionNames.includes(value)) {
@@ -97,18 +97,18 @@ const normalizePlayerStatValue = (value: unknown, stat: ActorStat): ActorStatVal
     return resolved;
 };
 
-const buildPlayerStatValues = (
-    stats: ActorStat[],
-    preferredValues: { [key: string]: ActorStatValue },
-): { [key: string]: ActorStatValue } => {
-    const nextValues: { [key: string]: ActorStatValue } = {};
+const buildGlobalStatValues = (
+    stats: Stat[],
+    preferredValues: { [key: string]: StatValue },
+): { [key: string]: StatValue } => {
+    const nextValues: { [key: string]: StatValue } = {};
 
     stats.forEach((stat) => {
         if (!stat.id || !(stat.name || '').trim()) {
             return;
         }
 
-        nextValues[stat.id] = normalizePlayerStatValue(preferredValues[stat.id], stat);
+        nextValues[stat.id] = normalizeGlobalStatValue(preferredValues[stat.id], stat);
     });
 
     return nextValues;
@@ -141,10 +141,10 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         language: stageInstance.getSave()?.language || 'English',
     });
 
-    const [playerStats] = useState<ActorStat[]>(() => resolveActivePlayerStats(stageInstance));
-    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: ActorStatValue }>(() => {
-        const savePlayerStatValues = stageInstance.getSave()?.playerStatValues || {};
-        return buildPlayerStatValues(resolveActivePlayerStats(stageInstance), savePlayerStatValues as { [key: string]: ActorStatValue });
+    const [globalStats] = useState<Stat[]>(() => resolveActiveGlobalStats(stageInstance));
+    const [globalStatValues, setGlobalStatValues] = useState<{ [key: string]: StatValue }>(() => {
+        const saveGlobalStatValues = stageInstance.getSave()?.globalStatValues || {};
+        return buildGlobalStatValues(resolveActiveGlobalStats(stageInstance), saveGlobalStatValues as { [key: string]: StatValue });
     });
 
     const [languageSuggestions, setLanguageSuggestions] = useState<string[]>([]);
@@ -154,7 +154,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     const handleSave = () => {
         console.log('Saving settings:', settings);
         const playerThemeColor = resolvePlayerThemeColor(settings.playerColor);
-        const resolvedPlayerStatValues = buildPlayerStatValues(playerStats, playerStatValues);
+        const resolvedGlobalStatValues = buildGlobalStatValues(globalStats, globalStatValues);
         
         if (isNewGame) {
             console.log('Starting new game with settings');
@@ -173,7 +173,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             });
 
             const newSave = stageInstance.getSave();
-            newSave.playerStatValues = resolvedPlayerStatValues;
+            newSave.globalStatValues = resolvedGlobalStatValues;
             setScreenType(ScreenType.LOADING);
         } else {
             console.log('Updating settings');
@@ -185,7 +185,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             saveData.enableTextToSpeech = settings.enableTextToSpeech;
             saveData.betaMode = settings.betaMode;
             saveData.language = settings.language;
-            saveData.playerStatValues = resolvedPlayerStatValues;
+            saveData.globalStatValues = resolvedGlobalStatValues;
 
             const player = stageInstance.getPlayerActor();
             player.name = settings.playerName;
@@ -232,13 +232,13 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         setShowLanguageSuggestions(false);
     };
 
-    const handlePlayerStatValueChange = (stat: ActorStat, nextValue: string | number) => {
+    const handleGlobalStatValueChange = (stat: Stat, nextValue: string | number) => {
         if (!stat.id || !(stat.name || '').trim()) {
             return;
         }
 
-        const normalized = normalizePlayerStatValue(nextValue, stat);
-        setPlayerStatValues(prev => ({
+        const normalized = normalizeGlobalStatValue(nextValue, stat);
+        setGlobalStatValues(prev => ({
             ...prev,
             [stat.id]: normalized,
         }));
@@ -409,7 +409,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                 />
                             </div>
 
-                            {playerStats.filter((stat) => stat.setByPlayer === true).length > 0 && (
+                            {globalStats.filter((stat) => stat.setByPlayer === true).length > 0 && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     <label
                                         style={{
@@ -423,11 +423,11 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         Player Settings
                                     </label>
 
-                                    {playerStats
+                                    {globalStats
                                         .filter((stat) => stat.setByPlayer === true)
                                         .map((stat) => {
                                         const statName = (stat.name || '').trim();
-                                        const selectedValue = normalizePlayerStatValue(playerStatValues[stat.id], stat);
+                                        const selectedValue = normalizeGlobalStatValue(globalStatValues[stat.id], stat);
                                         const optionEntries = stat.options || [];
 
                                         const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
@@ -457,7 +457,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     <select
                                                         className="input-base"
                                                         value={typeof selectedValue === 'string' ? selectedValue : ''}
-                                                        onChange={(e) => handlePlayerStatValueChange(stat, e.target.value)}
+                                                        onChange={(e) => handleGlobalStatValueChange(stat, e.target.value)}
                                                         style={{ fontSize: '13px' }}
                                                     >
                                                         {optionEntries.map((option, optionIndex) => (
@@ -477,7 +477,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 {stat.type === 'location' && (
                                                     <LocationSelect
                                                         value={typeof selectedValue === 'string' ? selectedValue : ''}
-                                                        onChange={(locationId) => handlePlayerStatValueChange(stat, locationId)}
+                                                        onChange={(locationId) => handleGlobalStatValueChange(stat, locationId)}
                                                         locations={Object.values(stageInstance.getSave().atlas || {})
                                                             .filter((location) => location.active !== false)}
                                                         stage={stage}
@@ -488,7 +488,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 {stat.type === 'text' && (
                                                     <TextArea
                                                         value={typeof selectedValue === 'string' ? selectedValue : ''}
-                                                        onChange={(e) => handlePlayerStatValueChange(stat, e.target.value)}
+                                                        onChange={(e) => handleGlobalStatValueChange(stat, e.target.value)}
                                                         rows={2}
                                                         style={{ width: '100%', resize: 'vertical', fontSize: '13px' }}
                                                     />
@@ -500,7 +500,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                             fullWidth
                                                             type="number"
                                                             value={String(selectedValue)}
-                                                            onChange={(e) => handlePlayerStatValueChange(stat, Number(e.target.value) || 0)}
+                                                            onChange={(e) => handleGlobalStatValueChange(stat, Number(e.target.value) || 0)}
                                                             style={{ fontSize: '13px' }}
                                                         />
                                                         {(typeof stat.min === 'number' || typeof stat.max === 'number') && (

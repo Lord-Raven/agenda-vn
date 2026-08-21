@@ -1,11 +1,11 @@
 import { FC, useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Stage } from '../Stage';
-import { ActorStat } from '../content/ActorStat';
+import { Stat } from '../content/Stat';
 import { Actor } from '../content/Actor';
 import { NamePlate } from './UiComponents';
-import { resolveIcon } from './ActorStatRating';
-import { ActorStatValueDisplay } from './ActorStatDisplay';
+import { resolveIcon } from './StatRating';
+import { StatValueDisplay } from './StatDisplay';
 
 interface ActorCardProps {
     actor?: Actor;
@@ -14,12 +14,12 @@ interface ActorCardProps {
     className?: string;
 }
 
-const resolveStatValue = (actor: Actor, stat: ActorStat): number | string | boolean => {
+const resolveStatValue = (actor: Actor, stat: Stat): number | string | boolean => {
     const raw = (actor.statMap as { [key: string]: number | string | boolean } | undefined)?.[stat.id];
     return raw === undefined || raw === null || raw === '' ? stat.default : raw;
 };
 
-const StatValue: FC<{ stat: ActorStat; value: number | string | boolean; atlas?: { [key: string]: { name: string } } }> = ({ stat, value, atlas }) => {
+const StatValue: FC<{ stat: Stat; value: number | string | boolean; atlas?: { [key: string]: { name: string } } }> = ({ stat, value, atlas }) => {
     if (stat.type === 'location') {
         return (
             <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 700, whiteSpace: 'nowrap' }}>
@@ -40,7 +40,7 @@ const StatValue: FC<{ stat: ActorStat; value: number | string | boolean; atlas?:
         const isBarType = stat.displayType === 'percentage' || stat.displayType === 'bar';
         return (
             <Box sx={{ width: isBarType ? '90px' : undefined, height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                <ActorStatValueDisplay stat={stat} value={numericValue} />
+                <StatValueDisplay stat={stat} value={numericValue} />
             </Box>
         );
     }

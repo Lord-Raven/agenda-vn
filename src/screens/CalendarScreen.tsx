@@ -17,7 +17,7 @@ import { Button, GlassPanel } from "../components/UiComponents";
 import { useTooltip } from "../components/TooltipContext";
 import { ContentManagementScreen } from "./ContentManagementScreen";
 import { Actor, getEmotionImage } from "../content/Actor";
-import { PlayerStatBar } from "../components/PlayerStatBar";
+import { GlobalStatBar } from "../components/GlobalStatBar";
 
 interface CalendarScreenProps {
     stage: () => Stage;
@@ -278,7 +278,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                 }}
             >
                 <Box sx={{ flexShrink: 0, mb: 1.25 }}>
-                    <PlayerStatBar
+                    <GlobalStatBar
                         stage={stage}
                         buttons={
                             <>

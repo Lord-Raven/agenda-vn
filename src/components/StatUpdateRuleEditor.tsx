@@ -1,7 +1,7 @@
 import { FC, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
-import { ActorStat, ActorStatValue, StatUpdate, StatUpdateRule, isNumericDisplayType } from '../content/ActorStat';
+import { Stat, StatValue, StatUpdate, StatUpdateRule, isNumericDisplayType } from '../content/Stat';
 import { Condition, ConditionCollection } from '../content/Condition';
 import { Stage } from '../Stage';
 import { Button } from './UiComponents';
@@ -12,8 +12,8 @@ import { LocationLike } from './LocationPortrait';
 
 interface StatUpdateRuleEditorProps {
     rules: StatUpdateRule[];
-    playerStats: ActorStat[];
-    actorStats: ActorStat[];
+    globalStats: Stat[];
+    actorStats: Stat[];
     actors: Array<{ id: string; name: string }>;
     locations: LocationLike[];
     stage?: Stage | (() => Stage);
@@ -79,7 +79,7 @@ const describeTrigger = (rule: StatUpdateRule): string => {
     return hasOtherConditions ? `${base} (conditional)` : base;
 };
 
-const describeUpdate = (update: StatUpdate, stat: ActorStat | undefined): string => {
+const describeUpdate = (update: StatUpdate, stat: Stat | undefined): string => {
     if (!stat) {
         return 'Unassigned stat';
     }
@@ -87,7 +87,7 @@ const describeUpdate = (update: StatUpdate, stat: ActorStat | undefined): string
     return `${stat.name} ${verb} ${update.value}`;
 };
 
-export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, playerStats, actorStats, actors, locations, stage, onChange }) => {
+export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, globalStats: globalStats, actorStats, actors, locations, stage, onChange }) => {
     const [collapsedRules, setCollapsedRules] = useState<Record<string, boolean>>({});
     // perActor stats have no single target here, so they cannot be written by a rule.
     const updatableActorStats = actorStats.filter(stat => !stat.perActor);
@@ -97,7 +97,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, pla
         id: generateUuid(),
         targetType: updatableActorStats.length > 0 ? 'actor' : 'player',
         actorId: 'any',
-        statId: (updatableActorStats.length > 0 ? updatableActorStats[0] : playerStats[0])?.id || '',
+        statId: (updatableActorStats.length > 0 ? updatableActorStats[0] : globalStats[0])?.id || '',
         operation: 'adjust',
         value: 0,
     });
@@ -122,8 +122,8 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, pla
         onChange(nextRules);
     };
 
-    const statsForUpdate = (update: StatUpdate): ActorStat[] => update.targetType === 'player' ? playerStats : updatableActorStats;
-    const resolveUpdateStat = (update: StatUpdate): ActorStat | undefined => statsForUpdate(update).find(stat => stat.id === update.statId);
+    const statsForUpdate = (update: StatUpdate): Stat[] => update.targetType === 'player' ? globalStats : updatableActorStats;
+    const resolveUpdateStat = (update: StatUpdate): Stat | undefined => statsForUpdate(update).find(stat => stat.id === update.statId);
 
     return (
         <div style={{ display: 'grid', gap: 10 }}>
@@ -153,7 +153,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, pla
                                 <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>When</label>
                                 <ConditionEditor
                                     conditionCollections={rule.conditions}
-                                    playerStats={playerStats}
+                                    globalStats={globalStats}
                                     actorStats={actorStats}
                                     actors={actors}
                                     locations={locations}
@@ -174,7 +174,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, pla
                                                 value={update.targetType}
                                                 onChange={(event) => {
                                                     const targetType = event.target.value as StatUpdate['targetType'];
-                                                    const nextStats = targetType === 'player' ? playerStats : updatableActorStats;
+                                                    const nextStats = targetType === 'player' ? globalStats : updatableActorStats;
                                                     updateStatUpdate(rule.id, update.id, { targetType, statId: nextStats[0]?.id || '', value: 0 });
                                                 }}
                                             >
@@ -212,7 +212,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, pla
                                             <StatValueInput
                                                 stat={stat}
                                                 value={update.value}
-                                                onChange={(value: ActorStatValue) => updateStatUpdate(rule.id, update.id, { value })}
+                                                onChange={(value: StatValue) => updateStatUpdate(rule.id, update.id, { value })}
                                                 locations={locations}
                                                 stage={stage}
                                                 allowExpression
@@ -230,7 +230,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, pla
                                 })}
                                 <Button
                                     variant="secondary"
-                                    disabled={playerStats.length === 0 && updatableActorStats.length === 0}
+                                    disabled={globalStats.length === 0 && updatableActorStats.length === 0}
                                     onClick={() => updateRule(rule.id, { updates: [...rule.updates, createUpdate()] })}
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifySelf: 'start' }}
                                 >

@@ -1,7 +1,7 @@
 import { FC } from 'react';
 import { Add, ArrowDownward, ArrowUpward, Delete, EventAvailable, EventBusy, NotListedLocation } from '@mui/icons-material';
 import { ActorSchedule, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, ACTOR_SCHEDULE_PLAYER_STAT_PREFIX, ACTOR_SCHEDULE_ACTOR_STAT_PREFIX } from '../content/Actor';
-import { ActorStat, isLocationDisplayType } from '../content/ActorStat';
+import { Stat, isLocationDisplayType } from '../content/Stat';
 import { Button } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationPortrait, LocationLike } from './LocationPortrait';
@@ -10,8 +10,8 @@ import { ConditionEditor } from './ConditionEditor';
 interface ActorScheduleEditorProps {
     schedule: ActorSchedule;
     locations: LocationLike[];
-    playerStats: ActorStat[];
-    actorStats: ActorStat[];
+    globalStats: Stat[];
+    actorStats: Stat[];
     actors?: Array<{ id: string; name: string }>;
     emptyLabel?: string;
     onChange: (schedule: ActorSchedule) => void;
@@ -21,7 +21,7 @@ const cloneSchedule = (entries: Array<[string, ActorSchedule[string]]>): ActorSc
     entries.map(([destination, collections]) => [destination, collections.map(collection => [...collection])]),
 );
 
-export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, locations, playerStats, actorStats, actors = [], emptyLabel = 'No schedule entries. This actor is generally available.', onChange }) => {
+export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, locations, globalStats: globalStats, actorStats, actors = [], emptyLabel = 'No schedule entries. This actor is generally available.', onChange }) => {
     const entries = Object.entries(schedule);
     const targets = [
         { key: ACTOR_SCHEDULE_AVAILABLE, label: 'Generally available', icon: EventAvailable },
@@ -33,7 +33,7 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
                 <LocationPortrait location={location} width={Math.round(size * 1.34)} height={size} highlighted={active} />
             ),
         })),
-        ...playerStats.filter(stat => isLocationDisplayType(stat.type)).map(stat => ({
+        ...globalStats.filter(stat => isLocationDisplayType(stat.type)).map(stat => ({
             key: ACTOR_SCHEDULE_PLAYER_STAT_PREFIX + stat.id,
             label: stat.name,
             icon: NotListedLocation,
@@ -100,7 +100,7 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
                         </div>
                         <ConditionEditor
                             conditionCollections={conditionCollections}
-                            playerStats={playerStats}
+                            globalStats={globalStats}
                             actorStats={actorStats}
                             actors={actors}
                             locations={locations}

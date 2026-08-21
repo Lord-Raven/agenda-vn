@@ -12,7 +12,7 @@ import { useTooltip } from '../components/TooltipContext';
 import { Button } from '../components/UiComponents';
 import { evaluateConditionCollections } from '../content/Condition';
 import { LocationActorPortraits } from '../components/LocationActorPortraits';
-import { PlayerStatBar } from '../components/PlayerStatBar';
+import { GlobalStatBar } from '../components/GlobalStatBar';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -71,7 +71,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
         <>
             <Box sx={{ width: '100vw', height: '100dvh', boxSizing: 'border-box', p: { xs: '12px', md: '18px' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'hidden', backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${configuredBackgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
                 <Box sx={{ flexShrink: 0 }}>
-                    <PlayerStatBar
+                    <GlobalStatBar
                         stage={stage}
                         buttons={
                             <>
@@ -146,7 +146,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const markerName = currentEvent?.name || linkedLocation?.name || linkedMap?.name || 'Unnamed';
                                     const markerSize = isVerticalLayout ? 44 : 52;
                                     const configuration = stage().getConfiguration();
-                                    const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, playerStats: configuration.playerStats, actorStats: configuration.actorStats });
+                                    const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats });
                                     const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
                                     const handleMarkerClick = () => {
                                         if (linkedMap) {

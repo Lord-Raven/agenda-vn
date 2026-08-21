@@ -1,13 +1,13 @@
 import { FC } from 'react';
-import { ActorStat, ActorStatValue, isNumericDisplayType } from '../content/ActorStat';
+import { Stat, StatValue, isNumericDisplayType } from '../content/Stat';
 import { Stage } from '../Stage';
 import { LocationSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
 
 interface StatValueInputProps {
-    stat?: ActorStat;
-    value: ActorStatValue;
-    onChange: (value: ActorStatValue) => void;
+    stat?: Stat;
+    value: StatValue;
+    onChange: (value: StatValue) => void;
     locations?: LocationLike[];
     stage?: Stage | (() => Stage);
     // When true, numeric stats accept dice/relative expressions (e.g. "1d6+1", "-2") instead of a plain number.

@@ -10,7 +10,7 @@ import { useTooltip } from "../components/TooltipContext";
 import { Button, GlassPanel } from "../components/UiComponents";
 import { DefinedMapView } from "./DefinedMapView";
 import { LocationActorPortraits } from "../components/LocationActorPortraits";
-import { PlayerStatBar } from "../components/PlayerStatBar";
+import { GlobalStatBar } from "../components/GlobalStatBar";
 
 interface MapScreenProps {
     stage: () => Stage;
@@ -133,7 +133,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                 }}
             >
                 <Box sx={{ flexShrink: 0 }}>
-                    <PlayerStatBar
+                    <GlobalStatBar
                         stage={stage}
                         buttons={
                             <>

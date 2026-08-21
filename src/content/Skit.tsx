@@ -192,7 +192,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     currentActors.forEach(() => {});
     const lorebook = save.lorebook || [];
     const agendaConfig = stage.getConfiguration();
-    const conditionContext: ConditionContext = { ...save, playerStats: agendaConfig.playerStats, actorStats: agendaConfig.actorStats };
+    const conditionContext: ConditionContext = { ...save, globalStats: agendaConfig.globalStats, actorStats: agendaConfig.actorStats };
     const passedProbabilityLoreIds = new Set(
         lorebook.filter((lore) => isLoreProbabilityActive(lore)).map((lore) => lore.id),
     );
@@ -204,13 +204,13 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
 
     // Exposed settings are conscious choices player's made; present them as settings.
-    const playerSettingContext = (agendaConfig?.playerStats || []).map((stat) => {
+    const playerSettingContext = (agendaConfig?.globalStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
         if (!statName || !stat.setByPlayer) {
             return '';
         }
 
-        const value = agendaConfig?.playerStatValues?.[stat.id] ?? stat.default;
+        const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
         const valueText = stat.type === 'location'
             ? (save.atlas?.[String(value)]?.name || '')
             : (typeof value === 'number' ? String(value) : String(value || ''));
@@ -234,13 +234,13 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     }).filter(Boolean).join('\n\n');
 
     // Unexposed settings are more like stats beyond their control; present them that way.
-    const playerStatContext = (agendaConfig?.playerStats || []).map((stat) => {
+    const globalStatContext = (agendaConfig?.globalStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
         if (!statName || stat.setByPlayer) {
             return '';
         }
 
-        const value = agendaConfig?.playerStatValues?.[stat.id] ?? stat.default;
+        const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
         const valueText = stat.type === 'location'
             ? (save.atlas?.[String(value)]?.name || '')
             : (typeof value === 'number' ? String(value) : String(value || ''));
@@ -316,7 +316,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
     return (builder: PromptBuilder) => builder.addBlock(`World Context`, agendaContext || 'None.')
         .addBlock(`Selected Player Settings`, playerSettingContext || 'None.')
-        .addBlock(`Player Stats`, playerStatContext || 'None.')
+        .addBlock(`Player Stats`, globalStatContext || 'None.')
         .addBlock(`Lore Entries`, (builder) => {
             // Add each lore entry as a separate block, with the title and content.
             triggeredLore.forEach(lore => {

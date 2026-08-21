@@ -2,9 +2,9 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { ActorStat, ActorStatDisplayType, ActorStatType, ActorStatValue, ActorStatValueRule, StatUpdateRule, cloneActorStatValueRules, cloneStatUpdateRules, isNumericDisplayType } from '../content/ActorStat';
+import { Stat, StatDisplayType, StatType, StatValue, StatValueRule, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, isNumericDisplayType, cloneStat } from '../content/Stat';
 import { Button, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
-import { IconPicker } from '../components/ActorStatRating';
+import { IconPicker } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
@@ -15,28 +15,7 @@ interface StatManagementPanelProps {
     stage: () => Stage;
 }
 
-const cloneActorStat = (stat: ActorStat): ActorStat => ({
-    id: stat.id || generateUuid(),
-    name: stat.name,
-    description: stat.description,
-    perActor: stat.perActor === true,
-    perActorDefaultRules: cloneActorStatValueRules(stat.perActorDefaultRules),
-    guidance: stat.guidance,
-    default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
-    type: stat.type,
-    displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
-    options: (stat.options || []).map((option) => ({
-        name: option.name,
-        description: option.description,
-    })),
-    min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
-    max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
-    setByPlayer: stat.setByPlayer === true || stat.exposed === true,
-    exposed: stat.exposed === true,
-    iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
-});
-
-const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
+const resolveStatDefaultValue = (stat: Stat): StatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
@@ -56,7 +35,7 @@ const resolveStatDefaultValue = (stat: ActorStat): ActorStatValue => {
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const normalizeStatValue = (value: unknown, stat: ActorStat): ActorStatValue => {
+const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof value === 'string' && optionNames.includes(value)) {
@@ -92,7 +71,7 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): ActorStatValue => 
     return resolved;
 };
 
-const defaultPlayerStat = (): ActorStat => ({
+const defaultGlobalStat = (): Stat => ({
     id: generateUuid(),
     name: 'New Setting',
     description: 'Describe what this player setting controls.',
@@ -108,7 +87,7 @@ const defaultPlayerStat = (): ActorStat => ({
     iconName: 'star',
 });
 
-const defaultActorStat = (): ActorStat => ({
+const defaultActorStat = (): Stat => ({
     id: generateUuid(),
     name: 'Name',
     description: 'A user-facing description of this stat.',
@@ -126,7 +105,23 @@ const defaultActorStat = (): ActorStat => ({
     iconName: 'star',
 });
 
-const clampStatValue = (value: number, stat: ActorStat): number => {
+const defaultLocationStat = (): Stat => ({
+    id: generateUuid(),
+    name: 'Name',
+    description: 'A user-facing description of this stat.',
+    guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
+    default: 50,
+    type: 'number',
+    displayType: 'percentage',
+    min: 0,
+    max: 100,
+    options: [],
+    setByPlayer: false,
+    exposed: false,
+    iconName: 'star',
+});
+
+const clampStatValue = (value: number, stat: Stat): number => {
     let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
     if (typeof stat.min === 'number') {
         resolved = Math.max(stat.min, resolved);
@@ -137,7 +132,7 @@ const clampStatValue = (value: number, stat: ActorStat): number => {
     return resolved;
 };
 
-const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
+const normalizeGlobalStatShape = (stat: Stat): Stat => {
     if (stat.type === 'option') {
         const options = (stat.options || []).filter(option => option.name.trim());
         const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
@@ -175,7 +170,7 @@ const normalizePlayerStatShape = (stat: ActorStat): ActorStat => {
     };
 };
 
-const normalizeActorStatShape = (stat: ActorStat): ActorStat => {
+const normalizeActorStatShape = (stat: Stat): Stat => {
     if (stat.type === 'option') {
         const options = (stat.options || []).filter(option => option.name.trim());
         const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
@@ -218,26 +213,32 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
     const save = stageInstance.getSave();
     const configuration = stageInstance.getConfiguration();
 
-    const [playerStats, setPlayerStats] = useState<ActorStat[]>(() =>
-        (configuration.playerStats || []).map(cloneActorStat),
+    const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
+        (configuration.globalStats || []).map(cloneStat),
     );
     const locationOptions = useMemo(
         () => Object.values(save.atlas || {})
             .filter(location => location.active !== false),
         [save.atlas],
     );
-    const [collapsedPlayerStats, setCollapsedPlayerStats] = useState<boolean[]>(() =>
-        (configuration.playerStats || []).map(() => true),
+    const [collapsedGlobalStats, setCollapsedGlobalStats] = useState<boolean[]>(() =>
+        (configuration.globalStats || []).map(() => true),
     );
     const [collapsedActorStats, setCollapsedActorStats] = useState<boolean[]>(() =>
         (configuration.actorStats || []).map(() => true),
     );
-    const [actorStats, setActorStats] = useState<ActorStat[]>(() =>
-        (configuration.actorStats || []).map(cloneActorStat),
+    const [actorStats, setActorStats] = useState<Stat[]>(() =>
+        (configuration.actorStats || []).map(cloneStat),
     );
-    const [playerStatValues, setPlayerStatValues] = useState<{ [key: string]: ActorStatValue }>(() => ({
-        ...configuration.playerStatValues,
-        ...save.playerStatValues,
+    const [collapsedLocationStats, setCollapsedLocationStats] = useState<boolean[]>(() =>
+        (configuration.locationStats || []).map(() => true),
+    );
+    const [locationStats, setLocationStats] = useState<Stat[]>(() =>
+        (configuration.locationStats || []).map(cloneStat),
+    );
+    const [globalStatValues, setGlobalStatValues] = useState<{ [key: string]: StatValue }>(() => ({
+        ...configuration.globalStatValues,
+        ...save.globalStatValues,
     }));
     const [universalSchedule, setUniversalSchedule] = useState<ActorSchedule>(() =>
         cloneActorSchedule(configuration.universalSchedule),
@@ -275,25 +276,26 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         marginBottom: 4,
     };
 
-    const validPlayerStatValues = useMemo(() => {
-        const nextValues: { [key: string]: ActorStatValue } = {};
+    const validGlobalStatValues = useMemo(() => {
+        const nextValues: { [key: string]: StatValue } = {};
 
-        playerStats.forEach((stat) => {
+        globalStats.forEach((stat) => {
             if (!stat.id || !(stat.name || '').trim()) {
                 return;
             }
 
-            nextValues[stat.id] = normalizeStatValue(playerStatValues[stat.id], stat);
+            nextValues[stat.id] = normalizeStatValue(globalStatValues[stat.id], stat);
         });
 
         return nextValues;
-    }, [playerStatValues, playerStats]);
+    }, [globalStatValues, globalStats]);
 
     const saveGameConfiguration = useCallback(() => {
         stageInstance.updateConfiguration({
             actorStats,
-            playerStats,
-            playerStatValues: validPlayerStatValues,
+            locationStats,
+            globalStats: globalStats,
+            globalStatValues: validGlobalStatValues,
             universalSchedule,
             statUpdateRules,
         });
@@ -333,7 +335,38 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 }
             });
         });
-    }, [actorStats, playerStats, stageInstance, statUpdateRules, universalSchedule, validPlayerStatValues]);
+
+        const locationStatIds = new Set(locationStats.map(stat => stat.id));
+
+        Object.values(currentSave.atlas || {}).forEach(location => {
+            if (!location.statMap || typeof location.statMap !== 'object') {
+                location.statMap = {};
+            }
+
+            locationStats.filter(stat => isNumericDisplayType(stat.type) || stat.type === 'location').forEach(stat => {
+                if (!stat.id || !stat.name.trim()) {
+                    return;
+                }
+
+                if (stat.type === 'location') {
+                    const existing = location.statMap[stat.id];
+                    location.statMap[stat.id] = typeof existing === 'string' ? existing : (typeof stat.default === 'string' ? stat.default : '');
+                    return;
+                }
+
+                const existing = location.statMap[stat.id];
+                const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
+                const value = Number.isFinite(existing) ? Number(existing) : fallback;
+                location.statMap[stat.id] = clampStatValue(value, stat);
+            });
+
+            Object.keys(location.statMap).forEach(statId => {
+                if (!locationStatIds.has(statId)) {
+                    delete location.statMap[statId];
+                }
+            });
+        });
+    }, [actorStats, globalStats, locationStats, stageInstance, statUpdateRules, universalSchedule, validGlobalStatValues]);
 
     useEffect(() => {
         if (!didMountRef.current) {
@@ -364,23 +397,23 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         };
     }, [saveGameConfiguration]);
 
-    const updatePlayerStat = (index: number, patch: Partial<ActorStat>) => {
-        setPlayerStats(prev => prev.map((stat, idx) => (
+    const updateGlobalStat = (index: number, patch: Partial<Stat>) => {
+        setGlobalStats(prev => prev.map((stat, idx) => (
             idx === index ? { ...stat, ...patch } : stat
         )));
     };
 
-    const setPlayerStatName = (index: number, rawName: string) => {
-        const previousName = (playerStats[index]?.name || '').trim();
+    const setGlobalStatName = (index: number, rawName: string) => {
+        const previousName = (globalStats[index]?.name || '').trim();
 
-        updatePlayerStat(index, { name: rawName });
+        updateGlobalStat(index, { name: rawName });
 
         const trimmedNextName = rawName.trim();
         if (!previousName || !trimmedNextName || previousName === trimmedNextName) {
             return;
         }
 
-        setPlayerStatValues((prev) => {
+        setGlobalStatValues((prev) => {
             const nextValues = { ...prev };
             const existingValue = nextValues[previousName];
             delete nextValues[previousName];
@@ -391,14 +424,14 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         });
     };
 
-    const removePlayerStat = (index: number) => {
-        const removedName = (playerStats[index]?.name || '').trim();
+    const removeGlobalStat = (index: number) => {
+        const removedName = (globalStats[index]?.name || '').trim();
 
-        setPlayerStats(prev => prev.filter((_, idx) => idx !== index));
-        setCollapsedPlayerStats(prev => prev.filter((_, idx) => idx !== index));
+        setGlobalStats(prev => prev.filter((_, idx) => idx !== index));
+        setCollapsedGlobalStats(prev => prev.filter((_, idx) => idx !== index));
 
         if (removedName) {
-            setPlayerStatValues((prev) => {
+            setGlobalStatValues((prev) => {
                 const nextValues = { ...prev };
                 delete nextValues[removedName];
                 return nextValues;
@@ -406,14 +439,14 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         }
     };
 
-    const togglePlayerStat = (index: number) => {
-        setCollapsedPlayerStats(prev => prev.map((isCollapsed, idx) => (
+    const toggleGlobalStat = (index: number) => {
+        setCollapsedGlobalStats(prev => prev.map((isCollapsed, idx) => (
             idx === index ? !isCollapsed : isCollapsed
         )));
     };
 
-    const updatePlayerStatOption = (statIndex: number, optionIndex: number, patch: { name?: string; description?: string }) => {
-        setPlayerStats(prev => prev.map((stat, idx) => {
+    const updateGlobalStatOption = (statIndex: number, optionIndex: number, patch: { name?: string; description?: string }) => {
+        setGlobalStats(prev => prev.map((stat, idx) => {
             if (idx !== statIndex) {
                 return stat;
             }
@@ -425,8 +458,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         }));
     };
 
-    const removePlayerStatOption = (statIndex: number, optionIndex: number) => {
-        setPlayerStats(prev => prev.map((stat, idx) => {
+    const removeGlobalStatOption = (statIndex: number, optionIndex: number) => {
+        setGlobalStats(prev => prev.map((stat, idx) => {
             if (idx !== statIndex) {
                 return stat;
             }
@@ -444,8 +477,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         }));
     };
 
-    const addPlayerStatOption = (statIndex: number) => {
-        setPlayerStats(prev => prev.map((stat, idx) => {
+    const addGlobalStatOption = (statIndex: number) => {
+        setGlobalStats(prev => prev.map((stat, idx) => {
             if (idx !== statIndex) {
                 return stat;
             }
@@ -465,7 +498,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         }));
     };
 
-    const updateActorStat = (index: number, patch: Partial<ActorStat>) => {
+    const updateActorStat = (index: number, patch: Partial<Stat>) => {
         setActorStats(prev => prev.map((stat, idx) => (
             idx === index ? { ...stat, ...patch } : stat
         )));
@@ -476,7 +509,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             if (idx !== index) {
                 return stat;
             }
-            const rule: ActorStatValueRule = { id: generateUuid(), value: resolveStatDefaultValue(stat), conditions: [] };
+            const rule: StatValueRule = { id: generateUuid(), value: resolveStatDefaultValue(stat), conditions: [] };
             return { ...stat, perActorDefaultRules: [...(stat.perActorDefaultRules || []), rule] };
         }));
     };
@@ -487,7 +520,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
-    const updateActorStatPerActorRule = (index: number, ruleId: string, patch: Partial<ActorStatValueRule>) => {
+    const updateActorStatPerActorRule = (index: number, ruleId: string, patch: Partial<StatValueRule>) => {
         setActorStats(prev => prev.map((stat, idx) => (
             idx === index
                 ? { ...stat, perActorDefaultRules: (stat.perActorDefaultRules || []).map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule) }
@@ -499,7 +532,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         <IconPicker value={value} onChange={onChange} allowClear={allowClear} />
     );
 
-    const renderRuleValueInput = (stat: ActorStat, rule: ActorStatValueRule, onChange: (value: ActorStatValue) => void) => (
+    const renderRuleValueInput = (stat: Stat, rule: StatValueRule, onChange: (value: StatValue) => void) => (
         <StatValueInput stat={stat} value={rule.value} onChange={onChange} locations={locationOptions} stage={stage} />
     );
 
@@ -514,14 +547,31 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
+    const updateLocationStat = (index: number, patch: Partial<Stat>) => {
+        setLocationStats(prev => prev.map((stat, idx) => (
+            idx === index ? { ...stat, ...patch } : stat
+        )));
+    };
+
+    const removeLocationStat = (index: number) => {
+        setLocationStats(prev => prev.filter((_, idx) => idx !== index));
+        setCollapsedLocationStats(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const toggleLocationStat = (index: number) => {
+        setCollapsedLocationStats(prev => prev.map((isCollapsed, idx) => (
+            idx === index ? !isCollapsed : isCollapsed
+        )));
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <GlassPanel variant="default" style={{ padding: '18px' }}>
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Player Stats</Title>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {playerStats.map((stat, statIndex) => {
+                    {globalStats.map((stat, statIndex) => {
                         const optionEntries = stat.options || [];
-                        const normalizedStat = normalizePlayerStatShape(stat);
+                        const normalizedStat = normalizeGlobalStatShape(stat);
 
                         return (
                             <div key={`player-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
@@ -529,12 +579,12 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                     <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
                                         {stat.name?.trim() || `Player Stat ${statIndex + 1}`}
                                     </div>
-                                    <Button variant="secondary" onClick={() => togglePlayerStat(statIndex)}>
-                                        {collapsedPlayerStats[statIndex] ? 'Expand' : 'Collapse'}
+                                    <Button variant="secondary" onClick={() => toggleGlobalStat(statIndex)}>
+                                        {collapsedGlobalStats[statIndex] ? 'Expand' : 'Collapse'}
                                     </Button>
                                 </div>
 
-                                {!collapsedPlayerStats[statIndex] && (
+                                {!collapsedGlobalStats[statIndex] && (
                                     <>
                                         <div style={{ marginTop: 10 }}>
                                             <div style={inlineFieldStyle}>
@@ -542,7 +592,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 <TextInput
                                                     fullWidth
                                                     value={stat.name}
-                                                    onChange={(e) => setPlayerStatName(statIndex, e.target.value)}
+                                                    onChange={(e) => setGlobalStatName(statIndex, e.target.value)}
                                                     placeholder="Setting name"
                                                 />
                                             </div>
@@ -553,7 +603,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     <input
                                                         type="checkbox"
                                                         checked={stat.exposed === true}
-                                                        onChange={(e) => updatePlayerStat(statIndex, { exposed: e.target.checked })}
+                                                        onChange={(e) => updateGlobalStat(statIndex, { exposed: e.target.checked })}
                                                     />
                                                     Exposed
                                                 </label>
@@ -564,7 +614,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     <label style={fieldLabelStyle}>Description</label>
                                                     <TextArea
                                                         value={stat.description}
-                                                        onChange={(e) => updatePlayerStat(statIndex, { description: e.target.value })}
+                                                        onChange={(e) => updateGlobalStat(statIndex, { description: e.target.value })}
                                                         rows={2}
                                                         style={{ width: '100%', resize: 'vertical' }}
                                                     />
@@ -575,7 +625,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 <label style={fieldLabelStyle}>Guidance</label>
                                                 <TextArea
                                                     value={stat.guidance}
-                                                    onChange={(e) => updatePlayerStat(statIndex, { guidance: e.target.value })}
+                                                    onChange={(e) => updateGlobalStat(statIndex, { guidance: e.target.value })}
                                                     rows={2}
                                                     style={{ width: '100%', resize: 'vertical' }}
                                                 />
@@ -587,8 +637,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     className="input-base"
                                                     value={stat.type}
                                                     onChange={(e) => {
-                                                        const nextType = e.target.value as ActorStat['type'];
-                                                        updatePlayerStat(statIndex, normalizePlayerStatShape({
+                                                        const nextType = e.target.value as Stat['type'];
+                                                        updateGlobalStat(statIndex, normalizeGlobalStatShape({
                                                             ...stat,
                                                             type: nextType,
                                                         }));
@@ -609,8 +659,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         className="input-base"
                                                         value={normalizedStat.displayType || 'straight'}
                                                         onChange={(e) => {
-                                                            const nextDisplayType = e.target.value as ActorStatDisplayType;
-                                                            updatePlayerStat(statIndex, {
+                                                            const nextDisplayType = e.target.value as StatDisplayType;
+                                                            updateGlobalStat(statIndex, {
                                                                 displayType: nextDisplayType,
                                                                 iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
                                                             });
@@ -631,7 +681,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     <input
                                                         type="checkbox"
                                                         checked={stat.setByPlayer === true}
-                                                        onChange={(e) => updatePlayerStat(statIndex, { setByPlayer: e.target.checked })}
+                                                        onChange={(e) => updateGlobalStat(statIndex, { setByPlayer: e.target.checked })}
                                                     />
                                                     Set by Player
                                                 </label>
@@ -644,7 +694,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         <select
                                                             className="input-base"
                                                             value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                            onChange={(e) => updatePlayerStat(statIndex, { default: e.target.value })}
+                                                            onChange={(e) => updateGlobalStat(statIndex, { default: e.target.value })}
                                                         >
                                                             {optionEntries.map((option, idx) => (
                                                                 <option key={`${statIndex}-default-option-${idx}`} value={option.name}>
@@ -661,7 +711,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                 <TextInput
                                                                     fullWidth
                                                                     value={option.name}
-                                                                    onChange={(e) => updatePlayerStatOption(statIndex, optionIndex, { name: e.target.value })}
+                                                                    onChange={(e) => updateGlobalStatOption(statIndex, optionIndex, { name: e.target.value })}
                                                                     placeholder="Option name"
                                                                 />
                                                             </div>
@@ -670,21 +720,21 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                     <label style={fieldLabelStyle}>Option Description</label>
                                                                     <TextArea
                                                                         value={option.description}
-                                                                        onChange={(e) => updatePlayerStatOption(statIndex, optionIndex, { description: e.target.value })}
+                                                                        onChange={(e) => updateGlobalStatOption(statIndex, optionIndex, { description: e.target.value })}
                                                                         rows={2}
                                                                         style={{ width: '100%', resize: 'vertical' }}
                                                                     />
                                                                 </div>
                                                             )}
                                                             <div style={{ marginTop: 8 }}>
-                                                                <Button variant="danger" onClick={() => removePlayerStatOption(statIndex, optionIndex)}>
+                                                                <Button variant="danger" onClick={() => removeGlobalStatOption(statIndex, optionIndex)}>
                                                                     Remove Option
                                                                 </Button>
                                                             </div>
                                                         </div>
                                                     ))}
 
-                                                    <Button variant="secondary" onClick={() => addPlayerStatOption(statIndex)}>
+                                                    <Button variant="secondary" onClick={() => addGlobalStatOption(statIndex)}>
                                                         Add Option
                                                     </Button>
                                                 </div>
@@ -695,7 +745,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     <label style={fieldLabelStyle}>Default Value</label>
                                                     <TextArea
                                                         value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                        onChange={(e) => updatePlayerStat(statIndex, { default: e.target.value })}
+                                                        onChange={(e) => updateGlobalStat(statIndex, { default: e.target.value })}
                                                         rows={2}
                                                         style={{ width: '100%', resize: 'vertical' }}
                                                     />
@@ -707,7 +757,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     <label style={fieldLabelStyle}>Default Location</label>
                                                     <LocationSelect
                                                         value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                        onChange={(locationId) => updatePlayerStat(statIndex, { default: locationId })}
+                                                        onChange={(locationId) => updateGlobalStat(statIndex, { default: locationId })}
                                                         locations={locationOptions}
                                                         stage={stage}
                                                     />
@@ -717,7 +767,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
-                                                    {renderIconPicker(normalizedStat.iconName, (iconName) => updatePlayerStat(statIndex, { iconName }))}
+                                                    {renderIconPicker(normalizedStat.iconName, (iconName) => updateGlobalStat(statIndex, { iconName }))}
                                                 </div>
                                             )}
 
@@ -731,7 +781,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                 fullWidth
                                                                 type="number"
                                                                 value={String(Number.isFinite(normalizedStat.default) ? Number(normalizedStat.default) : 0)}
-                                                                onChange={(e) => updatePlayerStat(statIndex, { default: Number(e.target.value) || 0 })}
+                                                                onChange={(e) => updateGlobalStat(statIndex, { default: Number(e.target.value) || 0 })}
                                                             />
                                                         </div>
                                                         <div>
@@ -740,7 +790,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                 fullWidth
                                                                 type="number"
                                                                 value={typeof normalizedStat.min === 'number' ? String(normalizedStat.min) : ''}
-                                                                onChange={(e) => updatePlayerStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                                                onChange={(e) => updateGlobalStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
                                                             />
                                                         </div>
                                                         <div>
@@ -749,7 +799,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                 fullWidth
                                                                 type="number"
                                                                 value={typeof normalizedStat.max === 'number' ? String(normalizedStat.max) : ''}
-                                                                onChange={(e) => updatePlayerStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                                                onChange={(e) => updateGlobalStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
                                                             />
                                                         </div>
                                                     </div>
@@ -758,7 +808,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                         </div>
 
                                         <div style={{ marginTop: 10 }}>
-                                            <Button variant="danger" onClick={() => removePlayerStat(statIndex)}>Remove Player Stat</Button>
+                                            <Button variant="danger" onClick={() => removeGlobalStat(statIndex)}>Remove Player Stat</Button>
                                         </div>
                                     </>
                                 )}
@@ -769,8 +819,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     <Button
                         variant="secondary"
                         onClick={() => {
-                            setPlayerStats(prev => [...prev, defaultPlayerStat()]);
-                            setCollapsedPlayerStats(prev => [...prev, false]);
+                            setGlobalStats(prev => [...prev, defaultGlobalStat()]);
+                            setCollapsedGlobalStats(prev => [...prev, false]);
                         }}
                     >
                         Add Player Stat
@@ -863,7 +913,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     className="input-base"
                                                     value={normalizedStat.type}
                                                     onChange={(e) => {
-                                                        const nextType = e.target.value as ActorStat['type'];
+                                                        const nextType = e.target.value as Stat['type'];
                                                         updateActorStat(statIndex, normalizeActorStatShape({
                                                             ...stat,
                                                             type: nextType,
@@ -885,7 +935,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         className="input-base"
                                                         value={normalizedStat.displayType || 'straight'}
                                                         onChange={(e) => {
-                                                            const nextDisplayType = e.target.value as ActorStatDisplayType;
+                                                            const nextDisplayType = e.target.value as StatDisplayType;
                                                             updateActorStat(statIndex, {
                                                                 displayType: nextDisplayType,
                                                                 iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
@@ -1119,7 +1169,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                             </div>
                                                             <ConditionEditor
                                                                 conditionCollections={rule.conditions}
-                                                                playerStats={[...actorStats, ...playerStats]}
+                                                                globalStats={[...actorStats, ...globalStats]}
                                                                 actorStats={actorStats}
                                                                 actors={Object.values(stageInstance.getSave().actors || {})}
                                                                 locations={locationOptions}
@@ -1166,14 +1216,330 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             </GlassPanel>
 
             <GlassPanel variant="default" style={{ padding: '18px' }}>
+                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Location Stats</Title>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {locationStats.map((stat, statIndex) => {
+                        const normalizedStat = normalizeActorStatShape(stat);
+                        const optionEntries = normalizedStat.options || [];
+
+                        return (
+                            <div key={`location-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                    <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
+                                        {stat.name?.trim() || `Location Stat ${statIndex + 1}`}
+                                    </div>
+                                    <Button variant="secondary" onClick={() => toggleLocationStat(statIndex)}>
+                                        {collapsedLocationStats[statIndex] ? 'Expand' : 'Collapse'}
+                                    </Button>
+                                </div>
+
+                                {!collapsedLocationStats[statIndex] && (
+                                    <>
+                                        <div style={{ marginTop: 10 }}>
+                                            <div style={inlineFieldStyle}>
+                                                <label style={fieldLabelStyle}>Name</label>
+                                                <TextInput
+                                                    fullWidth
+                                                    value={stat.name}
+                                                    onChange={(e) => updateLocationStat(statIndex, { name: e.target.value })}
+                                                    placeholder="Stat name"
+                                                />
+                                            </div>
+
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Visible In UI</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.exposed === true}
+                                                        onChange={(e) => updateLocationStat(statIndex, { exposed: e.target.checked })}
+                                                    />
+                                                    Exposed
+                                                </label>
+                                            </div>
+
+                                            {stat.exposed === true && (
+                                                <div style={inlineFieldTopStyle}>
+                                                    <label style={fieldLabelStyle}>Description</label>
+                                                    <TextArea
+                                                        value={stat.description}
+                                                        onChange={(e) => updateLocationStat(statIndex, { description: e.target.value })}
+                                                        rows={2}
+                                                        placeholder="Describe what this stat represents."
+                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <div style={inlineFieldTopStyle}>
+                                                <label style={fieldLabelStyle}>Guidance</label>
+                                                <TextArea
+                                                    value={stat.guidance}
+                                                    onChange={(e) => updateLocationStat(statIndex, { guidance: e.target.value })}
+                                                    rows={2}
+                                                    placeholder="Guidance for using this stat in generated narrative."
+                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                />
+                                            </div>
+
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Type</label>
+                                                <select
+                                                    className="input-base"
+                                                    value={normalizedStat.type}
+                                                    onChange={(e) => {
+                                                        const nextType = e.target.value as Stat['type'];
+                                                        updateLocationStat(statIndex, normalizeActorStatShape({
+                                                            ...stat,
+                                                            type: nextType,
+                                                        }));
+                                                    }}
+                                                >
+                                                    <option value="checkbox">Checkbox</option>
+                                                    <option value="location">Location</option>
+                                                    <option value="number">Number</option>
+                                                    <option value="option">Option</option>
+                                                    <option value="text">Text</option>
+                                                </select>
+                                            </div>
+
+                                            {normalizedStat.type === 'number' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Display</label>
+                                                    <select
+                                                        className="input-base"
+                                                        value={normalizedStat.displayType || 'straight'}
+                                                        onChange={(e) => {
+                                                            const nextDisplayType = e.target.value as StatDisplayType;
+                                                            updateLocationStat(statIndex, {
+                                                                displayType: nextDisplayType,
+                                                                iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
+                                                            });
+                                                        }}
+                                                    >
+                                                        <option value="straight">Straight Number</option>
+                                                        <option value="percentage">Percentage</option>
+                                                        <option value="bar">Bar</option>
+                                                        <option value="rating">Rating</option>
+                                                        <option value="letter grade">Letter Grade</option>
+                                                    </select>
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.type === 'option' && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
+                                                    <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
+                                                        <label style={fieldLabelStyle}>Default Option</label>
+                                                        <select
+                                                            className="input-base"
+                                                            value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
+                                                            onChange={(e) => updateLocationStat(statIndex, { default: e.target.value })}
+                                                        >
+                                                            {optionEntries.map((option, idx) => (
+                                                                <option key={`${statIndex}-location-default-option-${idx}`} value={option.name}>
+                                                                    {option.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {optionEntries.map((option, optionIndex) => (
+                                                        <div key={`${statIndex}-location-option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
+                                                            <div style={inlineFieldStyle}>
+                                                                <label style={fieldLabelStyle}>Option Name</label>
+                                                                <TextInput
+                                                                    fullWidth
+                                                                    value={option.name}
+                                                                    onChange={(e) => {
+                                                                        setLocationStats(prev => prev.map((item, idx) => {
+                                                                            if (idx !== statIndex) {
+                                                                                return item;
+                                                                            }
+
+                                                                            const currentOptions = [...(item.options || [])];
+                                                                            const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), name: e.target.value };
+                                                                            currentOptions[optionIndex] = nextOption;
+                                                                            return { ...item, options: currentOptions };
+                                                                        }));
+                                                                    }}
+                                                                    placeholder="Option name"
+                                                                />
+                                                            </div>
+                                                            {stat.exposed === true && (
+                                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                                                    <label style={fieldLabelStyle}>Option Description</label>
+                                                                    <TextArea
+                                                                        value={option.description}
+                                                                        onChange={(e) => {
+                                                                            setLocationStats(prev => prev.map((item, idx) => {
+                                                                                if (idx !== statIndex) {
+                                                                                    return item;
+                                                                                }
+
+                                                                                const currentOptions = [...(item.options || [])];
+                                                                                const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), description: e.target.value };
+                                                                                currentOptions[optionIndex] = nextOption;
+                                                                                return { ...item, options: currentOptions };
+                                                                            }));
+                                                                        }}
+                                                                        rows={2}
+                                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            <div style={{ marginTop: 8 }}>
+                                                                <Button variant="danger" onClick={() => {
+                                                                    setLocationStats(prev => prev.map((item, idx) => {
+                                                                        if (idx !== statIndex) {
+                                                                            return item;
+                                                                        }
+
+                                                                        const options = (item.options || []).filter((_, idx2) => idx2 !== optionIndex);
+                                                                        const defaultValue = typeof item.default === 'string' && options.some(option => option.name === item.default)
+                                                                            ? item.default
+                                                                            : (options[0]?.name || '');
+
+                                                                        return {
+                                                                            ...item,
+                                                                            options,
+                                                                            default: defaultValue,
+                                                                        };
+                                                                    }));
+                                                                }}>
+                                                                    Remove Option
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    <Button variant="secondary" onClick={() => {
+                                                        setLocationStats(prev => prev.map((item, idx) => {
+                                                            if (idx !== statIndex) {
+                                                                return item;
+                                                            }
+
+                                                            const options = [...(item.options || [])];
+                                                            const nextLabel = `Option ${options.length + 1}`;
+                                                            options.push({
+                                                                name: nextLabel,
+                                                                description: '',
+                                                            });
+
+                                                            return {
+                                                                ...item,
+                                                                options,
+                                                                default: typeof item.default === 'string' && item.default.trim() ? item.default : nextLabel,
+                                                            };
+                                                        }));
+                                                    }}>
+                                                        Add Option
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.type === 'text' && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Value</label>
+                                                    <TextArea
+                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
+                                                        onChange={(e) => updateLocationStat(statIndex, { default: e.target.value })}
+                                                        rows={2}
+                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.type === 'location' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Location</label>
+                                                    <LocationSelect
+                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
+                                                        onChange={(locationId) => updateLocationStat(statIndex, { default: locationId })}
+                                                        locations={locationOptions}
+                                                        stage={stage}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Rating Icon</label>
+                                                    {renderIconPicker(normalizedStat.iconName, (iconName) => updateLocationStat(statIndex, { iconName }))}
+                                                </div>
+                                            )}
+
+                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Label Icon</label>
+                                                {renderIconPicker(stat.labelIconName, (iconName) => updateLocationStat(statIndex, { labelIconName: iconName || undefined }), true)}
+                                            </div>
+
+                                            {isNumericDisplayType(normalizedStat.type) && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                                    <label style={fieldLabelStyle}>Properties</label>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                                                        <div>
+                                                            <div style={compactChipLabelStyle}>Default</div>
+                                                            <TextInput
+                                                                fullWidth
+                                                                type="number"
+                                                                value={String(Number.isFinite(normalizedStat.default) ? Number(normalizedStat.default) : 0)}
+                                                                onChange={(e) => updateLocationStat(statIndex, { default: Number(e.target.value) || 0 })}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <div style={compactChipLabelStyle}>Min</div>
+                                                            <TextInput
+                                                                fullWidth
+                                                                type="number"
+                                                                value={typeof normalizedStat.min === 'number' ? String(normalizedStat.min) : ''}
+                                                                onChange={(e) => updateLocationStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <div style={compactChipLabelStyle}>Max</div>
+                                                            <TextInput
+                                                                fullWidth
+                                                                type="number"
+                                                                value={typeof normalizedStat.max === 'number' ? String(normalizedStat.max) : ''}
+                                                                onChange={(e) => updateLocationStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div style={{ marginTop: 10 }}>
+                                            <Button variant="danger" onClick={() => removeLocationStat(statIndex)}>Remove Location Stat</Button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setLocationStats(prev => [...prev, defaultLocationStat()]);
+                            setCollapsedLocationStats(prev => [...prev, false]);
+                        }}
+                    >
+                        Add Location Stat
+                    </Button>
+                </div>
+            </GlassPanel>
+
+            <GlassPanel variant="default" style={{ padding: '18px' }}>
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Universal Schedule</Title>
+
                 <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '11px', marginBottom: 10 }}>
                     Applies to every actor and is evaluated after that actor's own schedule. The first destination to match wins, but any matching "Generally unavailable" entry supersedes a matched location.
                 </span>
                 <ActorScheduleEditor
                     schedule={universalSchedule}
                     locations={locationOptions}
-                    playerStats={playerStats}
+                    globalStats={globalStats}
                     actorStats={actorStats}
                     actors={Object.values(save.actors || {})}
                     emptyLabel="No universal schedule entries. Every actor falls back to their own schedule."
@@ -1188,7 +1554,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 </span>
                 <StatUpdateRuleEditor
                     rules={statUpdateRules}
-                    playerStats={playerStats}
+                    globalStats={globalStats}
                     actorStats={actorStats}
                     actors={Object.values(save.actors || {})}
                     locations={locationOptions}

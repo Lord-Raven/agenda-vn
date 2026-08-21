@@ -1,5 +1,5 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
-import type { ActorStat } from './ActorStat';
+import type { Stat } from './Stat';
 
 export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual';
 export type ActorConditionTarget = 'any' | 'none' | 'variable' | string;
@@ -11,8 +11,8 @@ export type CalendarCondition = {
     value: string | number;
 };
 
-export type PlayerStatCondition = {
-    type: 'playerStat';
+export type GlobalStatCondition = {
+    type: 'globalStat';
     statId: string;
     comparison: ConditionComparison;
     value: string | number | boolean;
@@ -35,7 +35,7 @@ export type ActorIdentityCondition = {
     value: string;
 };
 
-export type Condition = CalendarCondition | PlayerStatCondition | ActorStatCondition | ActorIdentityCondition;
+export type Condition = CalendarCondition | GlobalStatCondition | ActorStatCondition | ActorIdentityCondition;
 
 // A ConditionCollection is an array of Condition objects, where all conditions must be satisfied for the collection to be considered true.
 export type ConditionCollection = Condition[];
@@ -43,9 +43,9 @@ export type ConditionCollection = Condition[];
 export type ConditionContext = {
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
-    playerStatValues?: Record<string, string | number | boolean>;
-    playerStats?: ActorStat[];
-    actorStats?: ActorStat[];
+    globalStatValues?: Record<string, string | number | boolean>;
+    globalStats?: Stat[];
+    actorStats?: Stat[];
     actors?: Array<{ id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string }> | Record<string, { id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string }>;
     currentActor?: { id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string };
     actorStatValues?: Record<string, Record<string, string | number | boolean>>;
@@ -114,7 +114,7 @@ const buildDiceSeed = (condition: Condition, context: ConditionContext): string 
 
 // Resolves a condition's target value, rolling dice notation deterministically if present.
 const resolveConditionValue = (condition: Condition, context: ConditionContext): string | number | boolean => {
-    const value = (condition as PlayerStatCondition | ActorStatCondition | CalendarCondition).value;
+    const value = (condition as GlobalStatCondition | ActorStatCondition | CalendarCondition).value;
     return isDiceNotation(value) ? rollDiceNotation(value, buildDiceSeed(condition, context)) : value;
 };
 
@@ -228,9 +228,9 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
         return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
     }
 
-    if (condition.type === 'playerStat') {
-        const stat = context.playerStats?.find(candidate => candidate.id === condition.statId);
-            const actual = stat ? context.playerStatValues?.[condition.statId] : undefined;
+    if (condition.type === 'globalStat') {
+        const stat = context.globalStats?.find(candidate => candidate.id === condition.statId);
+            const actual = stat ? context.globalStatValues?.[condition.statId] : undefined;
         return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
     }
 

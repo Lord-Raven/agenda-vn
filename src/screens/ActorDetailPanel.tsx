@@ -2,14 +2,14 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { ActorStat, ActorStatValue, ActorStatValueRule, resolveActorStatDefault } from '../content/ActorStat';
+import { Stat, StatValue, StatValueRule, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ConditionContext } from '../content/Condition';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
-import { ActorStatRating } from '../components/ActorStatRating';
+import { StatRating } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
 
@@ -54,7 +54,7 @@ const DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION: ActorDetailGenerationSelection 
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 
-const clampActorStatValue = (value: number, stat: ActorStat): number => {
+const clampActorStatValue = (value: number, stat: Stat): number => {
     let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
     if (typeof stat.min === 'number') {
         resolved = Math.max(stat.min, resolved);
@@ -65,7 +65,7 @@ const clampActorStatValue = (value: number, stat: ActorStat): number => {
     return resolved;
 };
 
-const resolveActorStatRange = (stat: ActorStat): { min: number; max: number; step: number; hasRange: boolean } => {
+const resolveActorStatRange = (stat: Stat): { min: number; max: number; step: number; hasRange: boolean } => {
     if (typeof stat.min === 'number' && typeof stat.max === 'number' && stat.max > stat.min) {
         return { min: stat.min, max: stat.max, step: 1, hasRange: true };
     }
@@ -90,7 +90,7 @@ const resolveActorStatRange = (stat: ActorStat): { min: number; max: number; ste
     return { min: 0, max: 100, step: 1, hasRange: false };
 };
 
-const buildLetterGradeOptions = (stat: ActorStat): Array<{ label: string; value: number }> => {
+const buildLetterGradeOptions = (stat: Stat): Array<{ label: string; value: number }> => {
     const { min, max } = resolveActorStatRange(stat);
     const labels = ['F', 'D', 'C', 'B', 'A', 'S'];
     const span = Math.max(1, max - min);
@@ -105,8 +105,8 @@ const buildLetterGradeOptions = (stat: ActorStat): Array<{ label: string; value:
     });
 };
 
-const createInitialActorStatMap = (actor: Actor, actorStats: ActorStat[]): { [key: string]: ActorStatValue } => {
-    const nextMap: { [key: string]: ActorStatValue } = {};
+const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: string]: StatValue } => {
+    const nextMap: { [key: string]: StatValue } = {};
     actorStats.forEach((stat) => {
         if (stat.type === 'location') {
             const currentValue = actor.statMap?.[stat.id];
@@ -132,12 +132,12 @@ const cloneActorStatModifier = (modifier: ActorStatModifier): ActorStatModifier 
     conditions: (modifier.conditions || []).map((collection) => [...collection]),
 });
 
-const cloneActorStatInitial = (initial: ActorStatInitial | undefined, stat: ActorStat): ActorStatInitial => ({
+const cloneActorStatInitial = (initial: ActorStatInitial | undefined, stat: Stat): ActorStatInitial => ({
     value: Number.isFinite(initial?.value) ? Number(initial!.value) : (Number.isFinite(stat.default) ? Number(stat.default) : 0),
     modifiers: (initial?.modifiers || []).map(cloneActorStatModifier),
 });
 
-const createInitialActorStatInitialMap = (actor: Actor, actorStats: ActorStat[]): { [key: string]: ActorStatInitial } => {
+const createInitialActorStatInitialMap = (actor: Actor, actorStats: Stat[]): { [key: string]: ActorStatInitial } => {
     const nextMap: { [key: string]: ActorStatInitial } = {};
     actorStats.forEach((stat) => {
         nextMap[stat.id] = cloneActorStatInitial(actor.statInitialMap?.[stat.id], stat);
@@ -152,7 +152,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     const isProfileBackedByLore = !!linkedLoreEntry;
     const actorStats = useMemo(() => {
         const configured = stage().getConfiguration().actorStats || [];
-        const uniqueStatMap: { [name: string]: ActorStat } = {};
+        const uniqueStatMap: { [name: string]: Stat } = {};
         configured.filter((stat) => !stat.perActor).forEach((stat) => {
             const name = stat?.name?.trim();
             if (!name || uniqueStatMap[name]) {
@@ -174,7 +174,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
 
     const perActorStats = useMemo(() => {
         const configured = stage().getConfiguration().actorStats || [];
-        const uniqueStatMap: { [name: string]: ActorStat } = {};
+        const uniqueStatMap: { [name: string]: Stat } = {};
         configured.filter((stat) => stat.perActor === true).forEach((stat) => {
             const name = stat?.name?.trim();
             if (!name || uniqueStatMap[name]) {
@@ -297,7 +297,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         };
     }, [actor.id, stage]);
     const [editedOutfits, setEditedOutfits] = useState<Outfit[]>(() => getClonedOutfits());
-    const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: ActorStatValue }>(() =>
+    const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: StatValue }>(() =>
         createInitialActorStatMap(actor, actorStats),
     );
     const [editedStatInitialMap, setEditedStatInitialMap] = useState<{ [key: string]: ActorStatInitial }>(() =>
@@ -486,7 +486,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     const persistActor = (
         nextEditedActor: typeof editedActor,
         nextEditedOutfits: Outfit[],
-        nextEditedStatMap: { [key: string]: ActorStatValue },
+        nextEditedStatMap: { [key: string]: StatValue },
         nextEditedStatInitialMap: { [key: string]: ActorStatInitial },
         nextEditedPerActorStatMap: PerActorStatValueMap = editedPerActorStatMapRef.current,
         nextEditedPerActorValueRules: PerActorValueRuleMap = editedPerActorValueRulesRef.current,
@@ -773,7 +773,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         )));
     };
 
-    const handleActorStatValueChange = (stat: ActorStat, value: number) => {
+    const handleActorStatValueChange = (stat: Stat, value: number) => {
         if (stat.type === 'checkbox') {
             setEditedStatMap((prev) => ({
                 ...prev,
@@ -788,14 +788,14 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         }));
     };
 
-    const handleActorStatLocationChange = (stat: ActorStat, locationId: string) => {
+    const handleActorStatLocationChange = (stat: Stat, locationId: string) => {
         setEditedStatMap((prev) => ({
             ...prev,
             [stat.id]: locationId,
         }));
     };
 
-    const handleActorStatInitialValueChange = (stat: ActorStat, value: number | boolean) => {
+    const handleActorStatInitialValueChange = (stat: Stat, value: number | boolean) => {
         if (stat.type === 'checkbox') {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
@@ -822,7 +822,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         });
     };
 
-    const addActorStatModifier = (stat: ActorStat) => {
+    const addActorStatModifier = (stat: Stat) => {
         setEditedStatInitialMap((prev) => {
             const current = cloneActorStatInitial(prev[stat.id], stat);
             current.modifiers = [...current.modifiers, { id: generateUuid(), amount: 0, conditions: [] }];
@@ -830,7 +830,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         });
     };
 
-    const removeActorStatModifier = (stat: ActorStat, modifierId: string) => {
+    const removeActorStatModifier = (stat: Stat, modifierId: string) => {
         setEditedStatInitialMap((prev) => {
             const current = cloneActorStatInitial(prev[stat.id], stat);
             current.modifiers = current.modifiers.filter((modifier) => modifier.id !== modifierId);
@@ -838,7 +838,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         });
     };
 
-    const updateActorStatModifierAmount = (stat: ActorStat, modifierId: string, amount: number) => {
+    const updateActorStatModifierAmount = (stat: Stat, modifierId: string, amount: number) => {
         setEditedStatInitialMap((prev) => {
             const current = cloneActorStatInitial(prev[stat.id], stat);
             current.modifiers = current.modifiers.map((modifier) => modifier.id === modifierId ? { ...modifier, amount: Number.isFinite(amount) ? amount : 0 } : modifier);
@@ -846,7 +846,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         });
     };
 
-    const updateActorStatModifierConditions = (stat: ActorStat, modifierId: string, conditions: ActorStatModifier['conditions']) => {
+    const updateActorStatModifierConditions = (stat: Stat, modifierId: string, conditions: ActorStatModifier['conditions']) => {
         setEditedStatInitialMap((prev) => {
             const current = cloneActorStatInitial(prev[stat.id], stat);
             current.modifiers = current.modifiers.map((modifier) => modifier.id === modifierId ? { ...modifier, conditions } : modifier);
@@ -871,15 +871,15 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         return {
             currentDate: save.currentDate,
             currentTimeOfDay: save.currentTimeOfDay,
-            playerStatValues: save.playerStatValues as Record<string, ActorStatValue>,
-            playerStats: stage().getConfiguration().playerStats,
+            globalStatValues: save.globalStatValues as Record<string, StatValue>,
+            globalStats: stage().getConfiguration().globalStats,
             actorStats: stage().getConfiguration().actorStats,
             actors: save.actors,
             currentActor: { id: targetActor.id, name: targetActor.name, statMap: targetActor.statMap },
         };
     };
 
-    const resolveDisplayedPerActorValue = (stat: ActorStat, targetActor: Actor): ActorStatValue => {
+    const resolveDisplayedPerActorValue = (stat: Stat, targetActor: Actor): StatValue => {
         return resolvePerActorStatValue(
             { perActorStatMap: editedPerActorStatMap, perActorValueRules: editedPerActorValueRules },
             stat,
@@ -888,17 +888,17 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         );
     };
 
-    const hasExplicitPerActorOverride = (stat: ActorStat, targetActorId: string): boolean =>
+    const hasExplicitPerActorOverride = (stat: Stat, targetActorId: string): boolean =>
         editedPerActorStatMap[stat.id]?.[targetActorId] !== undefined;
 
-    const handlePerActorStatValueChange = (stat: ActorStat, targetActorId: string, value: ActorStatValue) => {
+    const handlePerActorStatValueChange = (stat: Stat, targetActorId: string, value: StatValue) => {
         setEditedPerActorStatMap((prev) => ({
             ...prev,
             [stat.id]: { ...(prev[stat.id] || {}), [targetActorId]: value },
         }));
     };
 
-    const handleResetPerActorStatValue = (stat: ActorStat, targetActorId: string) => {
+    const handleResetPerActorStatValue = (stat: Stat, targetActorId: string) => {
         setEditedPerActorStatMap((prev) => {
             const current = { ...(prev[stat.id] || {}) };
             delete current[targetActorId];
@@ -906,28 +906,28 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         });
     };
 
-    const addPerActorValueRule = (stat: ActorStat) => {
+    const addPerActorValueRule = (stat: Stat) => {
         setEditedPerActorValueRules((prev) => {
-            const rule: ActorStatValueRule = { id: generateUuid(), value: resolveActorStatDefault(stat), conditions: [] };
+            const rule: StatValueRule = { id: generateUuid(), value: resolveStatDefault(stat), conditions: [] };
             return { ...prev, [stat.id]: [...(prev[stat.id] || []), rule] };
         });
     };
 
-    const removePerActorValueRule = (stat: ActorStat, ruleId: string) => {
+    const removePerActorValueRule = (stat: Stat, ruleId: string) => {
         setEditedPerActorValueRules((prev) => ({
             ...prev,
             [stat.id]: (prev[stat.id] || []).filter((rule) => rule.id !== ruleId),
         }));
     };
 
-    const updatePerActorValueRule = (stat: ActorStat, ruleId: string, patch: Partial<ActorStatValueRule>) => {
+    const updatePerActorValueRule = (stat: Stat, ruleId: string, patch: Partial<StatValueRule>) => {
         setEditedPerActorValueRules((prev) => ({
             ...prev,
             [stat.id]: (prev[stat.id] || []).map((rule) => rule.id === ruleId ? { ...rule, ...patch } : rule),
         }));
     };
 
-    const renderPerActorValueInput = (stat: ActorStat, value: ActorStatValue, onChange: (value: ActorStatValue) => void) => {
+    const renderPerActorValueInput = (stat: Stat, value: StatValue, onChange: (value: StatValue) => void) => {
         if (stat.type === 'checkbox') {
             return <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
         }
@@ -953,7 +953,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             );
         }
         if (stat.type === 'number' && stat.displayType === 'rating') {
-            return <ActorStatRating stat={stat} value={Number.isFinite(value) ? Number(value) : 0} updateScore={(next) => onChange(next)} />;
+            return <StatRating stat={stat} value={Number.isFinite(value) ? Number(value) : 0} updateScore={(next) => onChange(next)} />;
         }
         const range = resolveActorStatRange(stat);
         return (
@@ -1929,7 +1929,7 @@ ${indent}}`;
                                         <ActorScheduleEditor
                                             schedule={editedActor.schedule}
                                             locations={Object.values(stage().getSave().atlas || {}).filter(location => location.active !== false)}
-                                            playerStats={stage().getConfiguration().playerStats || []}
+                                            globalStats={stage().getConfiguration().globalStats || []}
                                             actorStats={actorStats}
                                             actors={Object.values(stage().getSave().actors || {})}
                                             onChange={(schedule) => setEditedActor(current => ({ ...current, schedule }))}
@@ -2034,7 +2034,7 @@ ${indent}}`;
                                                             )}
 
                                                             {stat.type === 'number' && stat.displayType === 'rating' && (
-                                                                <ActorStatRating
+                                                                <StatRating
                                                                     stat={stat}
                                                                     value={displayValue}
                                                                     updateScore={(nextValue) => handleActorStatValueChange(stat, nextValue)}
@@ -2162,7 +2162,7 @@ ${indent}}`;
                                                                             </div>
                                                                             <ConditionEditor
                                                                                 conditionCollections={modifier.conditions}
-                                                                                playerStats={[...actorStats, ...(stage().getConfiguration().playerStats || [])]}
+                                                                                globalStats={[...actorStats, ...(stage().getConfiguration().globalStats || [])]}
                                                                                 actors={Object.values(stage().getSave().actors || {})}
                                                                                 locations={locationOptions}
                                                                                 onChange={(conditions) => updateActorStatModifierConditions(stat, modifier.id, conditions)}
@@ -2297,7 +2297,7 @@ ${indent}}`;
                                                                         </div>
                                                                         <ConditionEditor
                                                                             conditionCollections={rule.conditions}
-                                                                            playerStats={[...actorStats, ...(stage().getConfiguration().playerStats || [])]}
+                                                                            globalStats={[...actorStats, ...(stage().getConfiguration().globalStats || [])]}
                                                                             actorStats={actorStats}
                                                                             actors={Object.values(stage().getSave().actors || {})}
                                                                             locations={locationOptions}

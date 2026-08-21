@@ -81,7 +81,7 @@ import {
     FormatPaint,
     FreeBreakfast,
 } from '@mui/icons-material';
-import { ActorStat } from '../content/ActorStat';
+import { Stat } from '../content/Stat';
 
 const KEEP_FIRST_ICONS = ['star', 'heart', 'favorite', 'wrench', 'coin', 'shield', 'sun', 'moon', 'fire', 'flake', 'bolt', 'happy', 'sad', 'battery'];
 const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [
@@ -378,15 +378,15 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
     );
 };
 
-interface ActorStatRatingProps {
-    stat: ActorStat;
+interface StatRatingProps {
+    stat: Stat;
     value: number;
     updateScore?: (value: number) => void;
     readOnly?: boolean;
     style?: React.CSSProperties;
 }
 
-const resolvePipCount = (stat: ActorStat): number => {
+const resolvePipCount = (stat: Stat): number => {
     if (Number.isFinite(stat.max)) {
         return Math.max(1, Math.round(Number(stat.max)));
     }
@@ -427,7 +427,7 @@ const iconStyleBase: React.CSSProperties = {
 };
 
 const renderStatIcon = (
-    stat: ActorStat,
+    stat: Stat,
     pipValue: number,
     filled: boolean,
     updateScore?: (value: number) => void,
@@ -464,7 +464,7 @@ const renderStatIcon = (
 
 export { RATING_ICON_OPTIONS, resolveIcon, type RatingIconKey };
 
-export const ActorStatRating: FC<ActorStatRatingProps> = ({
+export const StatRating: FC<StatRatingProps> = ({
     stat,
     value,
     updateScore,

@@ -12,7 +12,7 @@ import { getLocationImageUrl } from "../content/Location";
 import { ContentManagementScreen } from "./ContentManagementScreen";
 import { Outcome } from "../content/Outcome";
 import { OutcomeDisplay } from "../components/OutcomeDisplay";
-import { PlayerStatBar } from "../components/PlayerStatBar";
+import { GlobalStatBar } from "../components/GlobalStatBar";
 
 
 import {
@@ -235,7 +235,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                     padding: '12px 16px 0',
                     zIndex: 10
                 }}>
-                    <PlayerStatBar
+                    <GlobalStatBar
                         stage={stage}
                         buttons={
                             <>

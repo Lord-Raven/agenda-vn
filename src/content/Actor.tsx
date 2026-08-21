@@ -1,7 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emotion';
 import { Stage } from '../Stage';
-import { ActorStat, ActorStatValue, ActorStatValueRule, cloneActorStatValueRules, isNumericDisplayType, normalizeActorStatValue, resolveActorStatDefault, resolvePerActorValueRule, resolveActorStatText } from './ActorStat';
+import { Stat, StatValue, StatValueRule, cloneStatValueRules, isNumericDisplayType, normalizeStatValue, resolveStatDefault, resolvePerActorValueRule, resolveStatText } from './Stat';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -23,7 +23,7 @@ export type ActorStatModifier = {
 
 // The initial value and conditional modifiers used to compute an actor's stat value when a new game is initialized.
 export type ActorStatInitial = {
-    value: ActorStatValue;
+    value: StatValue;
     modifiers: ActorStatModifier[];
 };
 
@@ -36,10 +36,10 @@ const cloneStatModifier = (modifier: any): ActorStatModifier => ({
 });
 
 // Per-target-actor value overrides/rules for perActor stats, keyed by stat name then target actor id.
-export type PerActorStatValueMap = { [statName: string]: { [targetActorId: string]: ActorStatValue } };
+export type PerActorStatValueMap = { [statName: string]: { [targetActorId: string]: StatValue } };
 // Per-actor override rules for perActor stats, keyed by stat name; these take precedence over the stat
 // definition's own perActorDefaultRules.
-export type PerActorValueRuleMap = { [statName: string]: ActorStatValueRule[] };
+export type PerActorValueRuleMap = { [statName: string]: StatValueRule[] };
 
 export const clonePerActorStatValueMap = (map: unknown): PerActorStatValueMap => {
     if (!map || typeof map !== 'object' || Array.isArray(map)) {
@@ -57,7 +57,7 @@ export const clonePerActorValueRuleMap = (map: unknown): PerActorValueRuleMap =>
     }
     return Object.fromEntries(Object.entries(map as Record<string, any>).map(([statName, rules]) => [
         statName,
-        cloneActorStatValueRules(Array.isArray(rules) ? rules : []),
+        cloneStatValueRules(Array.isArray(rules) ? rules : []),
     ]));
 };
 
@@ -67,13 +67,13 @@ export const clonePerActorValueRuleMap = (map: unknown): PerActorValueRuleMap =>
 // conditions in rules can inspect the target's own stats.
 export const resolvePerActorStatValue = (
     hostActor: Pick<Actor, 'perActorStatMap' | 'perActorValueRules'>,
-    stat: ActorStat,
+    stat: Stat,
     targetActorId: string,
     context: ConditionContext,
-): ActorStatValue => {
+): StatValue => {
     const explicitValue = hostActor.perActorStatMap?.[stat.name]?.[targetActorId];
     if (explicitValue !== undefined) {
-        return normalizeActorStatValue(explicitValue, stat);
+        return normalizeStatValue(explicitValue, stat);
     }
 
     const hostRuleValue = resolvePerActorValueRule(hostActor.perActorValueRules?.[stat.name], stat, context);
@@ -86,7 +86,7 @@ export const resolvePerActorStatValue = (
         return statRuleValue;
     }
 
-    return resolveActorStatDefault(stat);
+    return resolveStatDefault(stat);
 };
 
 const cloneStatInitialMap = (statInitialMap: unknown): { [key: string]: ActorStatInitial } => {
@@ -112,7 +112,7 @@ export const ACTOR_SCHEDULE_AVAILABLE = 'available';
 export const ACTOR_SCHEDULE_UNAVAILABLE = 'unavailable';
 // Destination prefixes for schedule entries that resolve to a location dynamically via an ActorStat of type
 // 'location', rather than a fixed location id; the suffix is the referenced ActorStat's id.
-export const ACTOR_SCHEDULE_PLAYER_STAT_PREFIX = 'playerStat:';
+export const ACTOR_SCHEDULE_PLAYER_STAT_PREFIX = 'globalStat:';
 export const ACTOR_SCHEDULE_ACTOR_STAT_PREFIX = 'actorStat:';
 export type ActorSchedule = Record<string, ConditionCollection[]>;
 
@@ -134,18 +134,18 @@ export const cloneActorSchedule = (schedule: unknown): ActorSchedule => {
 
 export type ScheduleContext = ConditionContext & {
     universalSchedule?: ActorSchedule;
-    playerStats?: ActorStat[];
-    actorStats?: ActorStat[];
+    globalStats?: Stat[];
+    actorStats?: Stat[];
 };
 
 // Resolves a destination that references an ActorStat of type 'location' (see ACTOR_SCHEDULE_*_STAT_PREFIX)
-// down to the actual location id it currently points to; a player stat reads from context.playerStatValues,
+// down to the actual location id it currently points to; a global stat reads from context.globalStatValues,
 // while an actor stat reads from the scheduled actor's own statMap. Returns '' if unresolved.
 const resolveScheduleStatDestination = (destination: string, actor: Pick<Actor, 'statMap'>, context: ScheduleContext): string => {
     if (destination.startsWith(ACTOR_SCHEDULE_PLAYER_STAT_PREFIX)) {
         const statId = destination.slice(ACTOR_SCHEDULE_PLAYER_STAT_PREFIX.length);
-        const stat = (context.playerStats || []).find(candidate => candidate.id === statId);
-        const value = stat ? context.playerStatValues?.[stat.id] : undefined;
+        const stat = (context.globalStats || []).find(candidate => candidate.id === statId);
+        const value = stat ? context.globalStatValues?.[stat.id] : undefined;
         return typeof value === 'string' ? value : '';
     }
     if (destination.startsWith(ACTOR_SCHEDULE_ACTOR_STAT_PREFIX)) {
@@ -323,19 +323,19 @@ const OUTFIT_PROMPT_FIELDS: StructuredFieldDefinition[] = [
     },
 ];
 
-function buildActorStatFields(actorStats: ActorStat[], stage?: Stage): StructuredFieldDefinition[] {
+function buildActorStatFields(actorStats: Stat[], stage?: Stage): StructuredFieldDefinition[] {
     return actorStats.map((stat, index) => ({
         key: `stat_${index}`,
         label: `STAT ${index + 1}`,
         description:
             `${stat.type === 'checkbox' ? 'Boolean value' : 'Numeric value'} for "${stat.name}".` +
-            ` Description: ${resolveActorStatText(stat.description, stage) || 'N/A'}.` +
-            ` Guidance: ${resolveActorStatText(stat.guidance, stage) || 'N/A'}.` +
+            ` Description: ${resolveStatText(stat.description, stage) || 'N/A'}.` +
+            ` Guidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}.` +
             `${stat.type === 'checkbox' ? ` Default: ${stat.default === true}.` : ` Range: ${typeof stat.min === 'number' ? stat.min : '-inf'} to ${typeof stat.max === 'number' ? stat.max : '+inf'}. Default: ${Number.isFinite(stat.default) ? Number(stat.default) : 0}.`}`,
     }));
 }
 
-function clampActorStatValue(value: number, stat: ActorStat): number {
+function clampActorStatValue(value: number, stat: Stat): number {
     let normalized = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
     if (typeof stat.min === 'number') {
         normalized = Math.max(stat.min, normalized);
@@ -347,7 +347,7 @@ function clampActorStatValue(value: number, stat: ActorStat): number {
 }
 
 // Computes an actor's initial stat value from its configured initial value plus any modifiers whose conditions currently evaluate true.
-export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStatInitial | undefined, context: ConditionContext): number | boolean | string {
+export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatInitial | undefined, context: ConditionContext): number | boolean | string {
     if (stat.type === 'location') {
         return typeof initial?.value === 'string' && initial.value
             ? initial.value
@@ -363,7 +363,7 @@ export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStat
         return baseValue;
     }
 
-    const normalizedBaseValue = normalizeActorStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
+    const normalizedBaseValue = normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
     const baseValue = Number.isFinite(normalizedBaseValue) ? Number(normalizedBaseValue) : 0;
     const modifierTotal = (initial?.modifiers || []).reduce((total, modifier) => {
         return evaluateConditionCollections(modifier.conditions, context) ? total + (Number.isFinite(modifier.amount) ? Number(modifier.amount) : 0) : total;
@@ -372,7 +372,7 @@ export function resolveInitialActorStatValue(stat: ActorStat, initial: ActorStat
 }
 
 // Seeds an actor's statMap from its statInitialMap (initial value +/- applicable modifiers); used when initializing actors for a new game.
-export function applyActorInitialStats(actor: Actor, actorStats: ActorStat[], context: ConditionContext): void {
+export function applyActorInitialStats(actor: Actor, actorStats: Stat[], context: ConditionContext): void {
     if (!actor.statMap || typeof actor.statMap !== 'object') {
         actor.statMap = {};
     }
@@ -452,12 +452,12 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     const actorStatContext = actorStats.length > 0
         ? actorStats.map((stat, index) => {
             if (stat.type === 'checkbox') {
-                return `${index + 1}. ${stat.name}\nDescription: ${resolveActorStatText(stat.description, stage) || 'N/A'}\nGuidance: ${resolveActorStatText(stat.guidance, stage) || 'N/A'}\nType: checkbox\nDefault: ${stat.default === true}`;
+                return `${index + 1}. ${stat.name}\nDescription: ${resolveStatText(stat.description, stage) || 'N/A'}\nGuidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}\nType: checkbox\nDefault: ${stat.default === true}`;
             }
             const defaultValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
             const minValue = typeof stat.min === 'number' ? `${stat.min}` : '-inf';
             const maxValue = typeof stat.max === 'number' ? `${stat.max}` : '+inf';
-            return `${index + 1}. ${stat.name}\nDescription: ${resolveActorStatText(stat.description, stage) || 'N/A'}\nGuidance: ${resolveActorStatText(stat.guidance, stage) || 'N/A'}\nRange: ${minValue} to ${maxValue}\nDefault: ${defaultValue}`;
+            return `${index + 1}. ${stat.name}\nDescription: ${resolveStatText(stat.description, stage) || 'N/A'}\nGuidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}\nRange: ${minValue} to ${maxValue}\nDefault: ${defaultValue}`;
         }).join('\n\n')
         : 'No custom actor stats are configured.';
 
@@ -472,7 +472,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
-    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, playerStats: configuration.playerStats, actorStats: configuration.actorStats })) || 'None provided.';
+    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats })) || 'None provided.';
     const otherActorsContext = Object.values(stage.getSave().actors || {})
         .filter(otherActor => otherActor?.id && otherActor.id !== actor.id && otherActor.active !== false && otherActor !== stage.getPlayerActor())
         .map(otherActor => {
@@ -874,8 +874,8 @@ export function getActorLore(actorId: string, stage: Stage) {
             actors: [actor],
             currentActor: actor,
             actorStatValues: { [actor.id]: actor.statMap || {} },
-            playerStatValues: save.playerStatValues,
-            playerStats: configuration.playerStats,
+            globalStatValues: save.globalStatValues,
+            globalStats: configuration.globalStats,
             actorStats: configuration.actorStats,
         }))
         .map((entry) => `Additional Instruction: ${entry.title}\n${entry.content}`)
@@ -905,7 +905,7 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage) {
 	}
 }
 
-const formatActorStatValue = (value: ActorStatValue, stat: ActorStat, atlas?: { [key: string]: { name: string } }): string => {
+const formatActorStatValue = (value: StatValue, stat: Stat, atlas?: { [key: string]: { name: string } }): string => {
     if (stat.type === 'checkbox') {
         return value === true ? 'yes' : 'no';
     }
@@ -954,7 +954,7 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
         const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
         const scalarStatLines = actorStats
             .filter(stat => !stat.perActor && actor.statMap?.[stat.id] !== undefined)
-            .map(stat => `${stat.name}: ${formatActorStatValue(normalizeActorStatValue(actor.statMap[stat.id], stat), stat, save.atlas)}`);
+            .map(stat => `${stat.name}: ${formatActorStatValue(normalizeStatValue(actor.statMap[stat.id], stat), stat, save.atlas)}`);
         if (scalarStatLines.length > 0) {
             builder.addBlock('Stats', scalarStatLines.join('\n'));
         }
@@ -967,8 +967,8 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
                 const context: ConditionContext = {
                     currentDate: save.currentDate,
                     currentTimeOfDay: save.currentTimeOfDay,
-                    playerStatValues: save.playerStatValues,
-                    playerStats: stage.getConfiguration().playerStats,
+                    globalStatValues: save.globalStatValues,
+                    globalStats: stage.getConfiguration().globalStats,
                     actorStats: stage.getConfiguration().actorStats,
                     actors: save.actors,
                     currentActor: { id: target.id, name: target.name, statMap: target.statMap },

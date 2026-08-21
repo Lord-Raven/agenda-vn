@@ -13,12 +13,86 @@ import {
     updateLocationDescription,
     upsertLocationLoreEntry,
 } from '../content/Location';
-import { Add, ArrowDownward, ArrowUpward, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { Add, ArrowDownward, ArrowUpward, Delete, ExpandLess, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
+import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
+import { Stat, StatValue } from '../content/Stat';
+import { StatRating } from '../components/StatRating';
+
+const clampLocationStatValue = (value: number, stat: Stat): number => {
+    let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
+    if (typeof stat.min === 'number') {
+        resolved = Math.max(stat.min, resolved);
+    }
+    if (typeof stat.max === 'number') {
+        resolved = Math.min(stat.max, resolved);
+    }
+    return resolved;
+};
+
+const resolveLocationStatRange = (stat: Stat): { min: number; max: number; step: number; hasRange: boolean } => {
+    if (typeof stat.min === 'number' && typeof stat.max === 'number' && stat.max > stat.min) {
+        return { min: stat.min, max: stat.max, step: 1, hasRange: true };
+    }
+
+    if (stat.displayType === 'percentage' || stat.displayType === 'bar') {
+        return { min: 0, max: 100, step: 1, hasRange: true };
+    }
+
+    if (stat.displayType === 'rating') {
+        return {
+            min: 0,
+            max: Number.isFinite(stat.max) ? Math.max(1, Math.round(Number(stat.max))) : 5,
+            step: 1,
+            hasRange: true,
+        };
+    }
+
+    if (stat.displayType === 'letter grade') {
+        return { min: 0, max: 100, step: 1, hasRange: true };
+    }
+
+    return { min: 0, max: 100, step: 1, hasRange: false };
+};
+
+const buildLocationStatLetterGradeOptions = (stat: Stat): Array<{ label: string; value: number }> => {
+    const { min, max } = resolveLocationStatRange(stat);
+    const labels = ['F', 'D', 'C', 'B', 'A', 'S'];
+    const span = Math.max(1, max - min);
+
+    return labels.map((label, index) => {
+        const ratio = index / (labels.length - 1);
+        const value = min + (span * ratio);
+        return {
+            label,
+            value: Number(value.toFixed(2)),
+        };
+    });
+};
+
+const createInitialLocationStatMap = (location: Location, locationStats: Stat[]): { [key: string]: StatValue } => {
+    const nextMap: { [key: string]: StatValue } = {};
+    locationStats.forEach((stat) => {
+        if (stat.type === 'location') {
+            const currentValue = location.statMap?.[stat.id];
+            nextMap[stat.id] = typeof currentValue === 'string' ? currentValue : (typeof stat.default === 'string' ? stat.default : '');
+            return;
+        }
+        if (stat.type === 'checkbox') {
+            const currentValue = location.statMap?.[stat.id];
+            nextMap[stat.id] = typeof currentValue === 'boolean' ? currentValue : (typeof stat.default === 'boolean' ? stat.default : false);
+            return;
+        }
+        const currentValue = Number(location.statMap?.[stat.id]);
+        const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
+        const resolved = Number.isFinite(currentValue) ? currentValue : fallback;
+        nextMap[stat.id] = clampLocationStatValue(resolved, stat);
+    });
+    return nextMap;
+};
 
 interface LocationDetailPanelProps {
     location: Location;
@@ -30,6 +104,28 @@ interface LocationDetailPanelProps {
 export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onUpdate, onDeactivate }) => {
     const linkedLoreEntry = getLinkedLocationLore(location, stage());
     const isDescriptionBackedByLore = !!linkedLoreEntry;
+
+    const locationStats = useMemo(() => {
+        const configured = stage().getConfiguration().locationStats || [];
+        const uniqueStatMap: { [name: string]: Stat } = {};
+        configured.forEach((stat) => {
+            const name = stat?.name?.trim();
+            if (!name || uniqueStatMap[name]) {
+                return;
+            }
+            uniqueStatMap[name] = {
+                ...stat,
+                name,
+                default: stat.type === 'location'
+                    ? (typeof stat.default === 'string' ? stat.default : '')
+                    : (Number.isFinite(stat.default) ? Number(stat.default) : 0),
+            };
+        });
+        return Object.values(uniqueStatMap);
+    }, [stage]);
+
+    const locationOptions = useMemo(() => Object.values(stage().getSave().atlas || {})
+        .filter((candidate) => candidate.active !== false), [stage]);
 
     const [editedLocation, setEditedLocation] = useState<{
         name: string;
@@ -95,6 +191,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         (location.alternativeImages || []).map(() => false)
     );
     const [isGeneratingAlternativeImages, setIsGeneratingAlternativeImages] = useState<Record<number, boolean>>({});
+    const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: StatValue }>(() =>
+        createInitialLocationStatMap(location, locationStats)
+    );
+    const [expandedStatNames, setExpandedStatNames] = useState<Set<string>>(new Set());
     const [confirmDialog, setConfirmDialog] = useState<{
         open: boolean;
         title: string;
@@ -102,13 +202,15 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         actions?: Array<{ label: string; onClick: () => void; variant?: 'primary' | 'secondary' }>;
     }>({ open: false, title: '', message: '' });
     const editedLocationRef = useRef(editedLocation);
+    const editedStatMapRef = useRef(editedStatMap);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
     const focalPreviewRef = useRef<HTMLDivElement>(null);
     const [previewSelection, setPreviewSelection] = useState<'base' | number>('base');
 
     const persistLocation = (
-        nextLocation: typeof editedLocation
+        nextLocation: typeof editedLocation,
+        nextStatMap: { [key: string]: StatValue }
     ) => {
 
         if (autoSaveTimeoutRef.current) {
@@ -130,10 +232,38 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.alternativeImages = nextLocation.alternativeImages.map(createAlternativeImage);
         location.conditionCollections = nextLocation.conditionCollections.map(collection => [...collection]);
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
+        location.statMap = location.statMap && typeof location.statMap === 'object' ? { ...location.statMap } : {};
+
+        const activeStatIds = new Set<string>();
+        locationStats.forEach((stat) => {
+            activeStatIds.add(stat.id);
+            if (stat.type === 'location') {
+                const candidateValue = nextStatMap[stat.id];
+                location.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
+                return;
+            }
+            if (stat.type === 'checkbox') {
+                const candidateValue = nextStatMap[stat.id];
+                location.statMap[stat.id] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
+                return;
+            }
+            const candidateValue = Number(nextStatMap[stat.id]);
+            const fallbackValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
+            const resolvedValue = Number.isFinite(candidateValue) ? candidateValue : fallbackValue;
+            location.statMap[stat.id] = clampLocationStatValue(resolvedValue, stat);
+        });
+
+        Object.keys(location.statMap).forEach((statId) => {
+            if (!activeStatIds.has(statId)) {
+                delete location.statMap[statId];
+            }
+        });
+
         onUpdate?.();
     };
 
     const syncEditedLocationFromSource = () => {
+        setEditedStatMap(createInitialLocationStatMap(location, locationStats));
         setEditedLocation({
             name: location.name,
             category: location.category ?? '',
@@ -153,6 +283,34 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     }, [editedLocation]);
 
     useEffect(() => {
+        editedStatMapRef.current = editedStatMap;
+    }, [editedStatMap]);
+
+    useEffect(() => {
+        setEditedStatMap((prev) => {
+            const next = createInitialLocationStatMap(location, locationStats);
+            locationStats.forEach((stat) => {
+                if (stat.type === 'location' || stat.type === 'checkbox') {
+                    return;
+                }
+                const previousValue = Number(prev[stat.id]);
+                if (Number.isFinite(previousValue)) {
+                    next[stat.id] = clampLocationStatValue(previousValue, stat);
+                }
+            });
+
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(next);
+            if (prevKeys.length !== nextKeys.length) {
+                return next;
+            }
+
+            const hasDiff = nextKeys.some((key) => prev[key] !== next[key]);
+            return hasDiff ? next : prev;
+        });
+    }, [location, locationStats]);
+
+    useEffect(() => {
         if (!didMountRef.current) {
             didMountRef.current = true;
             return;
@@ -163,7 +321,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         }
 
         autoSaveTimeoutRef.current = window.setTimeout(() => {
-            persistLocation(editedLocationRef.current);
+            persistLocation(editedLocationRef.current, editedStatMapRef.current);
         }, 300);
 
         return () => {
@@ -171,7 +329,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                 clearTimeout(autoSaveTimeoutRef.current);
             }
         };
-    }, [editedLocation]);
+    }, [editedLocation, editedStatMap]);
 
     useEffect(() => {
         if (previewSelection !== 'base' && previewSelection >= editedLocation.alternativeImages.length) {
@@ -182,13 +340,47 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     useEffect(() => {
         return () => {
             if (autoSaveTimeoutRef.current) {
-                persistLocation(editedLocationRef.current);
+                persistLocation(editedLocationRef.current, editedStatMapRef.current);
             }
         };
     }, []);
 
     const handleInputChange = <K extends keyof typeof editedLocation,>(field: K, value: (typeof editedLocation)[K]) => {
         setEditedLocation(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleLocationStatValueChange = (stat: Stat, value: number) => {
+        if (stat.type === 'checkbox') {
+            setEditedStatMap((prev) => ({
+                ...prev,
+                [stat.id]: Boolean(value),
+            }));
+            return;
+        }
+        const normalized = clampLocationStatValue(value, stat);
+        setEditedStatMap((prev) => ({
+            ...prev,
+            [stat.id]: normalized,
+        }));
+    };
+
+    const handleLocationStatLocationChange = (stat: Stat, locationId: string) => {
+        setEditedStatMap((prev) => ({
+            ...prev,
+            [stat.id]: locationId,
+        }));
+    };
+
+    const toggleLocationStatExpanded = (statId: string) => {
+        setExpandedStatNames((prev) => {
+            const next = new Set(prev);
+            if (next.has(statId)) {
+                next.delete(statId);
+            } else {
+                next.add(statId);
+            }
+            return next;
+        });
     };
 
     const handleLocationImageUpload = async (file: File) => {
@@ -281,7 +473,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
 
         setIsGeneratingAlternativeImages((current) => ({ ...current, [index]: true }));
         try {
-            persistLocation(editedLocationRef.current);
+            persistLocation(editedLocationRef.current, editedStatMapRef.current);
             if (!location.imageUrl) {
                 await generateBaseLocationImage(location, stage());
             }
@@ -308,7 +500,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         }
 
         const nextLocation = editedLocationRef.current;
-        persistLocation(nextLocation);
+        persistLocation(nextLocation, editedStatMapRef.current);
 
         const linkedLore = getLinkedLocationLore(location, stage());
         const previousState = {
@@ -570,11 +762,195 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                 <h2 style={sectionHeadingStyle}>Availability</h2>
                                 <ConditionEditor
                                     conditionCollections={editedLocation.conditionCollections}
-                                    playerStats={stage().getConfiguration().playerStats || []}
+                                    globalStats={stage().getConfiguration().globalStats || []}
                                     actors={Object.values(stage().getSave().actors || {})}
                                     onChange={(conditionCollections) => setEditedLocation(current => ({ ...current, conditionCollections }))}
                                 />
                             </section>
+
+                            {locationStats.length > 0 && (
+                                <section>
+                                    <h2 style={sectionHeadingStyle}>Location Stats</h2>
+                                    <div style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '12px',
+                                        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)',
+                                        border: '1px solid color-mix(in srgb, var(--agenda-highlight) 20%, transparent)',
+                                        borderRadius: '8px',
+                                        padding: '12px',
+                                    }}>
+                                        {locationStats.map((stat) => {
+                                            const value = Number(editedStatMap[stat.id]);
+                                            const displayValue = Number.isFinite(value)
+                                                ? value
+                                                : clampLocationStatValue(Number(stat.default) || 0, stat);
+                                            const statRange = resolveLocationStatRange(stat);
+                                            const letterGradeOptions = buildLocationStatLetterGradeOptions(stat);
+                                            const nearestGrade = letterGradeOptions.reduce((closest, option) => {
+                                                const optionDelta = Math.abs(option.value - displayValue);
+                                                const closestDelta = Math.abs(closest.value - displayValue);
+                                                return optionDelta < closestDelta ? option : closest;
+                                            }, letterGradeOptions[0]);
+                                            const isExpanded = expandedStatNames.has(stat.id);
+
+                                            return (
+                                                <div
+                                                    key={stat.id}
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: '8px',
+                                                        border: '1px solid color-mix(in srgb, var(--agenda-highlight) 18%, transparent)',
+                                                        borderRadius: '6px',
+                                                        padding: '10px',
+                                                        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)',
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', height: '40px' }}>
+                                                        <Button
+                                                            variant="secondary"
+                                                            onClick={() => toggleLocationStatExpanded(stat.id)}
+                                                            aria-label={isExpanded ? `Collapse ${stat.name} details` : `Expand ${stat.name} details`}
+                                                            style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px',
+                                                                padding: 0,
+                                                                minWidth: 0,
+                                                                background: 'transparent',
+                                                                border: 'none',
+                                                                borderRadius: 0,
+                                                                boxShadow: 'none',
+                                                                textTransform: 'none',
+                                                                letterSpacing: 'normal',
+                                                                justifyContent: 'flex-start',
+                                                            }}
+                                                        >
+                                                            {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                                                            <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
+                                                                {stat.name}
+                                                            </span>
+                                                        </Button>
+
+                                                        {stat.type === 'checkbox' && (
+                                                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={Boolean(editedStatMap[stat.id] === true)}
+                                                                    onChange={(e) => handleLocationStatValueChange(stat, e.target.checked ? 1 : 0)}
+                                                                />
+                                                                {Boolean(editedStatMap[stat.id] === true) ? 'True' : 'False'}
+                                                            </label>
+                                                        )}
+
+                                                        {stat.type === 'location' && (
+                                                            <LocationSelect
+                                                                value={typeof editedStatMap[stat.id] === 'string' ? String(editedStatMap[stat.id]) : ''}
+                                                                onChange={(locationId) => handleLocationStatLocationChange(stat, locationId)}
+                                                                locations={locationOptions}
+                                                                stage={stage}
+                                                                style={{ maxWidth: '220px' }}
+                                                            />
+                                                        )}
+
+                                                        {stat.type === 'number' && stat.displayType === 'rating' && (
+                                                            <StatRating
+                                                                stat={stat}
+                                                                value={displayValue}
+                                                                updateScore={(nextValue) => handleLocationStatValueChange(stat, nextValue)}
+                                                            />
+                                                        )}
+
+                                                        {stat.type === 'number' && stat.displayType === 'letter grade' && (
+                                                            <div>
+                                                                <select
+                                                                    value={nearestGrade.label}
+                                                                    onChange={(e) => {
+                                                                        const selectedOption = letterGradeOptions.find((option) => option.label === e.target.value);
+                                                                        if (!selectedOption) {
+                                                                            return;
+                                                                        }
+                                                                        handleLocationStatValueChange(stat, selectedOption.value);
+                                                                    }}
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        padding: '10px',
+                                                                        fontSize: '14px',
+                                                                        backgroundColor: 'var(--agenda-surface-raised)',
+                                                                        border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
+                                                                        borderRadius: '5px',
+                                                                        color: 'var(--agenda-text-primary)',
+                                                                        fontFamily: 'inherit',
+                                                                        cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    {letterGradeOptions.map((option) => (
+                                                                        <option key={`${stat.id}-grade-${option.label}`} value={option.label}>
+                                                                            {option.label}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        )}
+
+                                                        {stat.type === 'number' && stat.displayType !== 'rating' && stat.displayType !== 'letter grade' && statRange.hasRange && (
+                                                            <input
+                                                                type="range"
+                                                                min={statRange.min}
+                                                                max={statRange.max}
+                                                                step={statRange.step}
+                                                                value={Math.min(statRange.max, Math.max(statRange.min, displayValue))}
+                                                                onChange={(e) => handleLocationStatValueChange(stat, Number(e.target.value))}
+                                                                style={{ width: '100%' }}
+                                                            />
+                                                        )}
+
+                                                        {stat.type === 'option' && (
+                                                            <select
+                                                                value={typeof editedStatMap[stat.id] === 'string' ? String(editedStatMap[stat.id]) : ''}
+                                                                onChange={(e) => setEditedStatMap((prev) => ({ ...prev, [stat.id]: e.target.value }))}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '10px',
+                                                                    fontSize: '14px',
+                                                                    backgroundColor: 'var(--agenda-surface-raised)',
+                                                                    border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
+                                                                    borderRadius: '5px',
+                                                                    color: 'var(--agenda-text-primary)',
+                                                                    fontFamily: 'inherit',
+                                                                    cursor: 'pointer',
+                                                                }}
+                                                            >
+                                                                {(stat.options || []).map((option) => (
+                                                                    <option key={`${stat.id}-option-${option.name}`} value={option.name}>
+                                                                        {option.name}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        )}
+
+                                                        {stat.type === 'text' && (
+                                                            <TextInput
+                                                                fullWidth
+                                                                value={typeof editedStatMap[stat.id] === 'string' ? String(editedStatMap[stat.id]) : ''}
+                                                                onChange={(e) => setEditedStatMap((prev) => ({ ...prev, [stat.id]: e.target.value }))}
+                                                                style={{ maxWidth: '220px' }}
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    {isExpanded && !!stat.description?.trim() && (
+                                                        <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 75%, transparent)', fontSize: '12px' }}>
+                                                            {stat.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+                            )}
 
                             {/* Visual Theme */}
                             <section>
@@ -822,7 +1198,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                             <div style={{ marginTop: '12px' }}>
                                                                 <ConditionEditor
                                                                     conditionCollections={alternative.conditionCollections}
-                                                                    playerStats={stage().getConfiguration().playerStats || []}
+                                                                    globalStats={stage().getConfiguration().globalStats || []}
                                                                     actors={Object.values(stage().getSave().actors || {})}
                                                                     onChange={(conditionCollections) => updateAlternative(index, { conditionCollections })}
                                                                 />

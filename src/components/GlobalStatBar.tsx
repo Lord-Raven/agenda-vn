@@ -3,11 +3,11 @@ import { Box, Typography } from "@mui/material";
 import { Bed, Bedtime, EventAvailable, WbSunny, WbTwilight } from "@mui/icons-material";
 import { Stage } from "../Stage";
 import { formatCurrentDate, formatDateLabel } from "../content/Skit";
-import { ActorStat } from '../content/ActorStat';
-import { resolveIcon } from "./ActorStatRating";
-import { ActorStatValueDisplay } from "./ActorStatDisplay";
+import { Stat } from '../content/Stat';
+import { resolveIcon } from "./StatRating";
+import { StatValueDisplay } from "./StatDisplay";
 
-interface PlayerStatBarProps {
+interface GlobalStatBarProps {
     stage: () => Stage;
     buttons?: ReactNode;
 }
@@ -28,7 +28,7 @@ const getDateTimeIcon = (timeOfDay?: string) => {
     return EventAvailable;
 };
 
-const resolveStatDefaultValue = (stat: ActorStat): number | string | boolean => {
+const resolveStatDefaultValue = (stat: Stat): number | string | boolean => {
     if (stat.type === "option") {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === "string" && optionNames.includes(stat.default)) {
@@ -48,7 +48,7 @@ const resolveStatDefaultValue = (stat: ActorStat): number | string | boolean => 
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-const normalizeStatValue = (value: unknown, stat: ActorStat): number | string | boolean => {
+const normalizeStatValue = (value: unknown, stat: Stat): number | string | boolean => {
     if (stat.type === "option") {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof value === "string" && optionNames.includes(value)) {
@@ -74,7 +74,7 @@ const normalizeStatValue = (value: unknown, stat: ActorStat): number | string | 
     return resolved;
 };
 
-const resolveDisplayValue = (stat: ActorStat, value: unknown, atlas?: { [key: string]: { name: string } }): string => {
+const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]: { name: string } }): string => {
     const normalized = normalizeStatValue(value, stat);
     if (stat.type === "location") {
         return atlas?.[String(normalized)]?.name || "";
@@ -95,10 +95,10 @@ const resolveDisplayValue = (stat: ActorStat, value: unknown, atlas?: { [key: st
     return `${Number(normalized)}`;
 };
 
-export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
+export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
     const stats = useMemo(() => {
         const stageInstance = stage();
-        const allStats = stageInstance.getConfiguration()?.playerStats || [];
+        const allStats = stageInstance.getConfiguration()?.globalStats || [];
         return allStats.filter((stat) => stat?.name?.trim() && stat.exposed === true);
     }, [stage]);
     const stageInstance = stage();
@@ -162,8 +162,8 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                 }
 
                 const stageInstance = stage();
-                const rawValue = stageInstance.getSave()?.playerStatValues?.[stat.id]
-                    ?? stageInstance.getConfiguration()?.playerStatValues?.[stat.id]
+                const rawValue = stageInstance.getSave()?.globalStatValues?.[stat.id]
+                    ?? stageInstance.getConfiguration()?.globalStatValues?.[stat.id]
                     ?? stat.default;
                 const normalizedValue = normalizeStatValue(rawValue, stat);
                 const isNumericStat = stat.type === "number";
@@ -209,7 +209,7 @@ export const PlayerStatBar: FC<PlayerStatBarProps> = ({ stage, buttons }) => {
                         </Box>
 
                         {isNumericStat ? (
-                            <ActorStatValueDisplay stat={stat} value={Number(normalizedValue)} style={{ minHeight: 20 }} />
+                            <StatValueDisplay stat={stat} value={Number(normalizedValue)} style={{ minHeight: 20 }} />
                         ) : (
                             <Typography
                                 sx={{

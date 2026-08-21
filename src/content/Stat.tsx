@@ -2,23 +2,23 @@ import { v4 as generateUuid } from 'uuid';
 import { ActorConditionTarget, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
 // 'location' stats hold a location ID (a key into the save's atlas) rather than a display value.
-export type ActorStatType = 'number' | 'option' | 'text' | 'checkbox' | 'location';
-export type ActorStatDisplayType = 'straight' | 'percentage' | 'bar' | 'rating' | 'letter grade';
-export type ActorStatValue = number | string | boolean;
+export type StatType = 'number' | 'option' | 'text' | 'checkbox' | 'location';
+export type StatDisplayType = 'straight' | 'percentage' | 'bar' | 'rating' | 'letter grade';
+export type StatValue = number | string | boolean;
 
-export const isNumericDisplayType = (type: ActorStatType): boolean => type === 'number';
+export const isNumericDisplayType = (type: StatType): boolean => type === 'number';
 
-export const isLocationDisplayType = (type: ActorStatType): boolean => type === 'location';
+export const isLocationDisplayType = (type: StatType): boolean => type === 'location';
 
 // Resolves the effective display style for a numeric stat, defaulting to a plain number.
-export const resolveActorStatDisplayType = (stat: ActorStat): ActorStatDisplayType => (stat.type === 'number' ? (stat.displayType || 'straight') : 'straight');
+export const resolveStatDisplayType = (stat: Stat): StatDisplayType => (stat.type === 'number' ? (stat.displayType || 'straight') : 'straight');
 
-export type ActorStatOption = {
+export type StatOption = {
     name: string;
     description: string;
 };
 
-type ActorStatValueOptions = {
+type StatValueOptions = {
     evaluateDiceNotation?: boolean;
 };
 
@@ -74,14 +74,14 @@ export const evaluateNumericStatExpression = (value: unknown): number | undefine
 // A single rule used to resolve a per-actor stat's value for a given target actor; rules are evaluated in
 // order and the first whose conditions are satisfied wins (conditions may reference the target via the
 // 'variable' actor target so they can inspect the target actor's own stats).
-export type ActorStatValueRule = {
+export type StatValueRule = {
     id: string;
-    value: ActorStatValue;
+    value: StatValue;
     conditions: ConditionCollection[];
 };
 
 // Represents a custom stat that applies to all actors in the game.
-export type ActorStat = {
+export type Stat = {
     id: string;
     name: string;
     description: string;
@@ -90,13 +90,13 @@ export type ActorStat = {
     perActor?: boolean;
     // Rules used to resolve a default value for a given target actor when perActor is true and neither the
     // host actor's own perActorValueRules nor an explicit override provide a value. Evaluated in order.
-    perActorDefaultRules?: ActorStatValueRule[];
+    perActorDefaultRules?: StatValueRule[];
     guidance: string;
-    default: ActorStatValue;
-    type: ActorStatType;
+    default: StatValue;
+    type: StatType;
     // Only meaningful when type is 'number'; controls how the numeric value is rendered (straight number, bar, etc).
-    displayType?: ActorStatDisplayType;
-    options?: ActorStatOption[];
+    displayType?: StatDisplayType;
+    options?: StatOption[];
     min?: number;
     max?: number;
     setByPlayer: boolean;
@@ -105,33 +105,33 @@ export type ActorStat = {
     labelIconName?: string;
 };
 
-type ActorStatTextContext = {
+type StatTextContext = {
     getPlayerActor?: () => { name?: string } | undefined;
     primaryUser?: { name?: string };
 };
 
-export const resolveActorStatText = (
+export const resolveStatText = (
     rawText: string | undefined,
-    stage?: ActorStatTextContext | null,
+    stage?: StatTextContext | null,
 ): string => {
     const playerName = stage?.getPlayerActor?.()?.name || stage?.primaryUser?.name || 'the player';
     return String(rawText || '').replace(/\{\{\s*user\s*\}\}/gi, playerName);
 };
 
-export const cloneActorStatValueRule = (rule: ActorStatValueRule): ActorStatValueRule => ({
+export const cloneStatValueRule = (rule: StatValueRule): StatValueRule => ({
     id: rule.id,
     value: typeof rule.value === 'boolean' || typeof rule.value === 'number' || typeof rule.value === 'string' ? rule.value : 0,
     conditions: (rule.conditions || []).map((collection) => [...collection]),
 });
 
-export const cloneActorStatValueRules = (rules: ActorStatValueRule[] | undefined): ActorStatValueRule[] => (rules || []).map(cloneActorStatValueRule);
+export const cloneStatValueRules = (rules: StatValueRule[] | undefined): StatValueRule[] => (rules || []).map(cloneStatValueRule);
 
-export const cloneActorStat = (stat: ActorStat): ActorStat => ({
+export const cloneStat = (stat: Stat): Stat => ({
     id: stat.id || generateUuid(),
     name: stat.name,
     description: stat.description,
     perActor: stat.perActor === true,
-    perActorDefaultRules: cloneActorStatValueRules(stat.perActorDefaultRules),
+    perActorDefaultRules: cloneStatValueRules(stat.perActorDefaultRules),
     guidance: stat.guidance,
     default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
     type: stat.type,
@@ -148,9 +148,7 @@ export const cloneActorStat = (stat: ActorStat): ActorStat => ({
     labelIconName: stat.labelIconName || undefined,
 });
 
-export const isNumericActorStat = (stat: ActorStat): boolean => isNumericDisplayType(stat.type);
-
-export const resolveActorStatDefault = (stat: ActorStat, options: ActorStatValueOptions = {}): ActorStatValue => {
+export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): StatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
         if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
@@ -174,10 +172,10 @@ export const resolveActorStatDefault = (stat: ActorStat, options: ActorStatValue
     return Number.isFinite(stat.default) ? Number(stat.default) : 0;
 };
 
-export const normalizeActorStatValue = (value: unknown, stat: ActorStat, options: ActorStatValueOptions = {}): ActorStatValue => {
+export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValueOptions = {}): StatValue => {
     if (stat.type === 'option') {
         const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        const fallback = resolveActorStatDefault(stat, options);
+        const fallback = resolveStatDefault(stat, options);
         if (typeof value === 'string' && optionNames.includes(value)) {
             return value;
         }
@@ -188,7 +186,7 @@ export const normalizeActorStatValue = (value: unknown, stat: ActorStat, options
         if (typeof value === 'string') {
             return value;
         }
-        const fallback = resolveActorStatDefault(stat, options);
+        const fallback = resolveStatDefault(stat, options);
         return typeof fallback === 'string' ? fallback : '';
     }
 
@@ -201,7 +199,7 @@ export const normalizeActorStatValue = (value: unknown, stat: ActorStat, options
             if (lower === 'true') return true;
             if (lower === 'false') return false;
         }
-        return typeof resolveActorStatDefault(stat, options) === 'boolean' ? resolveActorStatDefault(stat, options) : false;
+        return typeof resolveStatDefault(stat, options) === 'boolean' ? resolveStatDefault(stat, options) : false;
     }
 
     const expressionValue = options.evaluateDiceNotation ? evaluateNumericStatExpression(value) : undefined;
@@ -209,7 +207,7 @@ export const normalizeActorStatValue = (value: unknown, stat: ActorStat, options
         ? Number(value)
         : expressionValue !== undefined
             ? expressionValue
-            : Number(resolveActorStatDefault(stat, options)) || 0;
+            : Number(resolveStatDefault(stat, options)) || 0;
     if (typeof stat.min === 'number') {
         resolved = Math.max(stat.min, resolved);
     }
@@ -223,19 +221,19 @@ export const normalizeActorStatValue = (value: unknown, stat: ActorStat, options
 // context.currentActor set to the target actor so 'variable' actor-stat conditions inspect the target).
 // Returns undefined if no rule matches, so callers can continue to the next fallback tier.
 export const resolvePerActorValueRule = (
-    rules: ActorStatValueRule[] | undefined,
-    stat: ActorStat,
+    rules: StatValueRule[] | undefined,
+    stat: Stat,
     context: ConditionContext,
-): ActorStatValue | undefined => {
+): StatValue | undefined => {
     const matchedRule = (rules || []).find((rule) => evaluateConditionCollections(rule.conditions, context));
-    return matchedRule ? normalizeActorStatValue(matchedRule.value, stat) : undefined;
+    return matchedRule ? normalizeStatValue(matchedRule.value, stat) : undefined;
 };
 
 export type StatUpdateTargetType = 'player' | 'actor';
 export type StatUpdateOperation = 'set' | 'adjust';
 
-// A single stat write performed by a StatUpdateRule. Shares ActorStatValue (and, for numeric stats, the same
-// dice/relative expression support) with ActorStatValueRule so both rule flavors can use the same editors.
+// A single stat write performed by a StatUpdateRule. Shares StatValue (and, for numeric stats, the same
+// dice/relative expression support) with StatValueRule so both rule flavors can use the same editors.
 export type StatUpdate = {
     id: string;
     targetType: StatUpdateTargetType;
@@ -243,7 +241,7 @@ export type StatUpdate = {
     actorId: ActorConditionTarget;
     statId: string;
     operation: StatUpdateOperation;
-    value: ActorStatValue;
+    value: StatValue;
 };
 
 // A recurring "every <calendar condition> do these things" rule; conditions are the same ConditionCollections
@@ -276,20 +274,20 @@ export const cloneStatUpdateRules = (rules: unknown): StatUpdateRule[] => (Array
 // Resolves the value a stat update writes, given the target's current value. Numeric stats evaluate the
 // update's value as a dice/relative expression, so 'adjust' adds the rolled amount while 'set' replaces with
 // it; non-numeric stats always write a literal value.
-export const applyStatUpdateValue = (currentValue: ActorStatValue | undefined, update: StatUpdate, stat: ActorStat): ActorStatValue => {
+export const applyStatUpdateValue = (currentValue: StatValue | undefined, update: StatUpdate, stat: Stat): StatValue => {
     if (!isNumericDisplayType(stat.type)) {
-        return normalizeActorStatValue(update.value, stat);
+        return normalizeStatValue(update.value, stat);
     }
 
     const amount = evaluateNumericStatExpression(update.value);
     if (amount === undefined) {
-        return normalizeActorStatValue(currentValue, stat);
+        return normalizeStatValue(currentValue, stat);
     }
 
     if (update.operation === 'set') {
-        return normalizeActorStatValue(amount, stat);
+        return normalizeStatValue(amount, stat);
     }
 
-    const base = Number.isFinite(currentValue) ? Number(currentValue) : Number(resolveActorStatDefault(stat)) || 0;
-    return normalizeActorStatValue(base + amount, stat);
+    const base = Number.isFinite(currentValue) ? Number(currentValue) : Number(resolveStatDefault(stat)) || 0;
+    return normalizeStatValue(base + amount, stat);
 };
