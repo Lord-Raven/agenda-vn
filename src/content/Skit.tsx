@@ -45,10 +45,16 @@ export const formatDateLabel = (currentDate?: string): string => {
     const dateLabel = date.toLocaleDateString('en-US', {
         weekday: 'long',
         month: 'long',
-        timeZone: 'UTC',
+        day: 'numeric',
+        year: 'numeric'
     });
 
-    return `${dateLabel} ${dayOfMonth}${suffix}, ${date.getUTCFullYear()}`;
+    // Insert suffix after the day of the month in the date label
+    const dayIndex = dateLabel.indexOf(dayOfMonth.toString());
+    if (dayIndex !== -1) {
+        return `${dateLabel.slice(0, dayIndex + dayOfMonth.toString().length)}${suffix}${dateLabel.slice(dayIndex + dayOfMonth.toString().length)}`;
+    }
+    return `${dateLabel}`;
 };
 
 export const formatTimeOfDayLabel = (currentTimeOfDay?: string): string => {
