@@ -966,6 +966,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
         if (retry >= 3) {
             console.error('Failed to generate a valid script after 3 attempts.');
             stage.pushMessage('Failed to generate a valid script after 3 attempts.');
+            set
             break;
         }
     }

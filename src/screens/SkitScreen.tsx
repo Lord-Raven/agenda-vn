@@ -55,7 +55,7 @@ const getSceneLocationIdAtIndex = (skit: Skit, scriptIndex: number): string => {
 
 const getActorsAtIndex = (skit: Skit, scriptIndex: number, stage: Stage): Actor[] => {
 
-    return getCurrentActors(skit, scriptIndex).map(actorId => stage.getSave().actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[];
+    return getCurrentActors(skit, scriptIndex).map(actorId => stage.getSave().actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor());
 };
 
 /**
