@@ -462,7 +462,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `When establishing a character at the beginning of a scene or when moving to this location with a movement tag, give special consideration to the inclusion of a 'wears' tag to explicitly call out an appropriate look. ` +
                             `OUTFIT NAME must be found under the specified character—either their current outfit or one of their listed alternatives.`)
                         .addBlock('Movement Tags',
-                            `\n\nA Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be included when a Present Character leaves the scene or moves to another location. ` +
+                            `A Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be included when a Present Character leaves the scene or moves to another location. ` +
                             `\n\nA Scene movement tag ("<Movement><Scene/><Location>[HERE|location name|location ID]</Location></Movement>") may be used when the scene itself transitions to another location. ` +
                             `When this tag is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
                             `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "HERE" to move to the scene's location, or "AWAY" to leave this area. ` +
@@ -962,6 +962,11 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             return scriptEntries;
         } else {
             retry++;
+        }
+        if (retry >= 3) {
+            console.error('Failed to generate a valid script after 3 attempts.');
+            stage.pushMessage('Failed to generate a valid script after 3 attempts.');
+            break;
         }
     }
 

@@ -7,7 +7,7 @@ import { Button, NamePlate } from "../components/UiComponents";
 import { ActorCard } from "../components/ActorCard";
 import { useTooltip } from "../components/TooltipContext";
 import { Actor, getActorLore, getEmotionImage } from "../content/Actor";
-import { accumulateOutcomes, determineEmotion, generateSkitScript, getCurrentLocation, Skit } from "../content/Skit";
+import { accumulateOutcomes, determineEmotion, generateSkitScript, getCurrentActors, getCurrentLocation, Skit } from "../content/Skit";
 import { getLocationImageUrl } from "../content/Location";
 import { ContentManagementScreen } from "./ContentManagementScreen";
 import { Outcome } from "../content/Outcome";
@@ -53,37 +53,9 @@ const getSceneLocationIdAtIndex = (skit: Skit, scriptIndex: number): string => {
     return sceneLocationId;
 };
 
-/**
- * Helper function to get the actors present in the scene at a given script index.
- * Walks through movements from initialActorLocations, filtering by scene location at index.
- */
-const getActorsAtIndex = (skit: Skit, scriptIndex: number, allActors: {[key: string]: Actor}, save: SaveType): Actor[] => {
-    // Start with initial actor locations
-    const currentLocations = {...(skit.initialActors || {})};
-    const movedActorIds = new Set<string>();
-    
-    // Apply movements up to and including the current index
-    /*for (let i = 0; i <= scriptIndex && i < skit.script.length; i++) {
-        const entry = skit.script[i];
-        if (entry.movements) {
-            Object.entries(entry.movements).forEach(([actorId, newLocationId]) => {
-                movedActorIds.add(actorId);
-                currentLocations[actorId] = newLocationId;
-            });
-        }
-    }*/
-    
-    const sceneLocationId = getSceneLocationIdAtIndex(skit, scriptIndex);
+const getActorsAtIndex = (skit: Skit, scriptIndex: number, stage: Stage): Actor[] => {
 
-    // Filter actors who are at the skit's location and are active in the save
-    const actorsInScene: Actor[] = [];
-    Object.entries(currentLocations).forEach(([actorId, locationId]) => {
-        if (locationId === sceneLocationId && allActors[actorId]) {
-            actorsInScene.push(allActors[actorId]);
-        }
-    });
-    
-    return actorsInScene;
+    return getCurrentActors(skit, scriptIndex).map(actorId => stage.getSave().actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[];
 };
 
 /**
@@ -322,7 +294,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         actors={actors}
                         playerActorId={'player'}
                         getPresentActors={(_script, _index) =>
-                            getActorsAtIndex(_script, _index, stage().getSave().actors, stage().getSave()) || []
+                            getActorsAtIndex(_script, _index, stage()) || []
                         }
                         getActorImageUrl={(actor, _script, index) => {
                             let emotion = Emotion.neutral;
