@@ -98,22 +98,6 @@ export function getLinkedLocationLore(location: Location, stage: Stage) {
 	return bestMatch;
 }
 
-export function getLocationName(locationId: unknown, atlas: { [key: string]: Location } | undefined): string {
-	if (typeof locationId !== 'string' || !locationId) {
-		return '';
-	}
-	return atlas?.[locationId]?.name || '';
-}
-
-export function getLocationDescription(locationId: string, stage: Stage) {
-	const location = stage.getSave().atlas[locationId];
-	if (!location) {
-		return '';
-	}
-
-	const lore = getLinkedLocationLore(location, stage);
-	return lore?.content ?? location.description;
-}
 
 export function updateLocationDescription(locationId: string, description: string, stage: Stage) {
 	const location = stage.getSave().atlas[locationId];
@@ -508,4 +492,17 @@ export class Location {
             this.themeColor = colors[Math.floor(Math.random() * colors.length)];
         }
     }
+}
+
+// Replace {{user}} with the player's name
+export function getLocationName(locationId: string, stage: Stage): string {
+	const location = stage.getSave().atlas[locationId];
+	return location?.name.replace('{{user}}', stage.getPlayerActor().name) || 'Unknown Location';
+}
+
+export function getLocationDescription(locationId: string, stage: Stage): string {
+	const location = stage.getSave().atlas[locationId];
+
+	const lore = getLinkedLocationLore(location, stage);
+	return (lore?.content ?? location.description).replace('{{user}}', stage.getPlayerActor().name) || 'Unknown Description';
 }

@@ -3,7 +3,7 @@ import { v4 as generateUuid } from 'uuid';
 import { Outcome, OutcomeType } from "./Outcome";
 import { Stage } from "../Stage";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, buildActorContext, findBestNameMatch, getActorLore, resolveActorSchedule } from "./Actor";
-import { getLocationDescription } from "./Location";
+import { getLocationDescription, getLocationName } from "./Location";
 import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
 import {
@@ -218,7 +218,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
         const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
         const valueText = stat.type === 'location'
-            ? (save.atlas?.[String(value)]?.name || '')
+            ? getLocationName(String(value), stage)
             : (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
             return '';
@@ -248,7 +248,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
         const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
         const valueText = stat.type === 'location'
-            ? (save.atlas?.[String(value)]?.name || '')
+            ? getLocationName(String(value), stage)
             : (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
             return '';
@@ -331,7 +331,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         }).addBlock(`Recent Events`, (builder) => {
             pastEvents.forEach((event, index) => {
                 if (event.skit) {
-                    const locationName = (event.skit.initialLocationId ? save.atlas[event.skit.initialLocationId]?.name : '') ?? 'Unknown Location';
+                    const locationName = event.skit.initialLocationId ? getLocationName(event.skit.initialLocationId, stage) : 'Unknown Location';
                     const daysAgo = event.date && save.currentDate
                         ? getDayDifference(event.date, save.currentDate)
                         : Math.max(1, index + 1);
@@ -340,7 +340,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
                 }
             });
         }).addBlock(`Current Location`, 
-            `${location?.name || 'Unknown Location'}:\n  ${getLocationDescription(location?.id || '', stage) || 'No description available.'}`
+            `${location?.id ? getLocationName(location.id, stage) : 'Unknown Location'}:\n  ${getLocationDescription(location?.id || '', stage) || 'No description available.'}`
         ).addBlock(`Current Date`,
             formatCurrentDate(save.currentDate, save.currentTimeOfDay)
         ).addBlock(`Player Profile`,
@@ -381,7 +381,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         `use the format below to output guidance for the upcoming scene: plot goals, challenges, slice-of-life vignettes, or intimate moments. ` +
                         `Then, name the characters from the Available Characters list that will participate.`)
                     .addBlock('Location',
-                        `  ${skit.initialLocationId ? (save.atlas?.[skit.initialLocationId]?.name || 'Unknown Location') : 'Unknown Location'}\n` +
+                        `  ${skit.initialLocationId ? getLocationName(skit.initialLocationId, stage) : 'Unknown Location'}\n` +
                         `    ${getLocationDescription(skit.initialLocationId, stage) || 'No description available.'}`)
                     .addBlock('Known Characters',
                         availableActors.map(actor => {return buildActorContext(actor, '', stage, [], ['profile'])}))
