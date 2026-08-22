@@ -179,12 +179,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
         () => [...(save.upcomingEvents || [])].sort((left, right) => compareEventSchedule(left, right)),
         [save.upcomingEvents, save.currentDate, save.currentTimeOfDay, stageInstance],
     );
-    const upcomingEvents = useMemo(() => [...stageInstance.getUpcomingEvents()], [save.upcomingEvents, save.currentDate, save.currentTimeOfDay, stageInstance]);
-    // In this screen, "today" is anchored to the next event date to match narrative progression.
-    const todayDateKey = upcomingEvents[0]?.date || currentDateKey;
-    const todayDate = parseDateKey(todayDateKey);
 
-    const [viewMonth, setViewMonth] = useState(() => startOfMonth(todayDate));
+    const [viewMonth, setViewMonth] = useState(() => startOfMonth(currentDate));
     const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [activeDateKey, setActiveDateKey] = useState<string | null>(null);
@@ -192,8 +188,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
     const todayDateCellIndex = useMemo(
-        () => monthGrid.findIndex((gridDate) => formatDateKey(gridDate) === todayDateKey),
-        [monthGrid, todayDateKey],
+        () => monthGrid.findIndex((gridDate) => formatDateKey(gridDate) === currentDateKey),
+        [monthGrid, currentDateKey],
     );
     const todayWeekRowIndex = useMemo(() => {
         return todayDateCellIndex >= 0 ? Math.floor((todayDateCellIndex + 1) / 7) : -1;
@@ -236,7 +232,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     }, [setScreenType]);
 
     const jumpToCurrentMonth = () => {
-        setViewMonth(startOfMonth(todayDate));
+        setViewMonth(startOfMonth(currentDate));
     };
 
     const changeMonth = (offset: number) => {
@@ -404,7 +400,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             {monthGrid.map((cellDate) => {
                                 const dateKey = formatDateKey(cellDate);
                                 const isCurrentMonth = cellDate.getUTCMonth() === viewMonth.getUTCMonth();
-                                const isToday = isSameDate(cellDate, todayDate);
+                                const isToday = isSameDate(cellDate, currentDate);
                                 const cellEvents = eventsByDate.get(dateKey) || [];
                                 const hasEvents = cellEvents.length > 0;
                                 const isActiveDate = hasEvents && activeDateKey === dateKey;

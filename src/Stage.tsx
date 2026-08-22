@@ -1604,7 +1604,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             try {
                 console.log(`Attempting text generation (attempt ${attempt} of ${tries})`);
                 const response = await this.generator.textGen({
-                    prompt: `{{messages}}${prompt}`,
+                    prompt: `{{messages}}${prompt.replace('{{user}}', this.getPlayerActor().name)}`,
                     min_tokens: minTokens,
                     max_tokens: maxTokens,
                     include_history: true,

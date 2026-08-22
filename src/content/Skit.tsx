@@ -26,7 +26,9 @@ const getDayDifference = (startDate: string, endDate: string): number => {
 };
 
 export const formatDateLabel = (currentDate?: string): string => {
+    console.log(`Input currentDate: ${currentDate}`);
     const date = currentDate ? new Date(`${currentDate}T00:00:00Z`) : null;
+    console.log(`Parsed date: ${date}`);
     if (!date || Number.isNaN(date.getTime())) {
         return 'Unknown Date';
     }
@@ -46,7 +48,8 @@ export const formatDateLabel = (currentDate?: string): string => {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
-        year: 'numeric'
+        year: 'numeric',
+        
     });
 
     // Insert suffix after the day of the month in the date label
