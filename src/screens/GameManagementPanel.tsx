@@ -460,6 +460,15 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         />
                     </div>
                     <div>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Start Date</label>
+                        <TextInput
+                            fullWidth
+                            type="date"
+                            value={startingDate}
+                            onChange={(e) => setStartingDate(e.target.value)}
+                        />
+                    </div>
+                    <div>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Creator Notes</label>
                         <TextArea
                             fullWidth
@@ -479,15 +488,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             onChange={(e) => setVersionNotes(e.target.value)}
                             placeholder="Changelog or release notes for this version."
                             style={{ resize: 'vertical' }}
-                        />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Start Date</label>
-                        <TextInput
-                            fullWidth
-                            type="date"
-                            value={startingDate}
-                            onChange={(e) => setStartingDate(e.target.value)}
                         />
                     </div>
                     <div>

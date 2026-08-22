@@ -20,7 +20,7 @@ interface ContentManagementScreenProps {
 type TabType = 'game' | 'style' | 'stats' | 'lorebook' | 'actors' | 'locations' | 'maps' | 'calendarEvents';
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
-    const [activeTab, setActiveTab] = useState<TabType>('style');
+    const [activeTab, setActiveTab] = useState<TabType>('actors');
 
     const sortByName = <T extends { name?: string }>(a: T, b: T) =>
         (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), undefined, { sensitivity: 'base' });

@@ -27,7 +27,7 @@ const getDayDifference = (startDate: string, endDate: string): number => {
 
 export const formatDateLabel = (currentDate?: string): string => {
     console.log(`Input currentDate: ${currentDate}`);
-    const date = currentDate ? new Date(`${currentDate}T00:00:00Z`) : null;
+    const date = currentDate ? new Date(`${currentDate}`) : null;
     console.log(`Parsed date: ${date}`);
     if (!date || Number.isNaN(date.getTime())) {
         return 'Unknown Date';
@@ -49,16 +49,13 @@ export const formatDateLabel = (currentDate?: string): string => {
         month: 'long',
         day: 'numeric',
         year: 'numeric',
-        
     });
 
     // Insert suffix after the day of the month in the date label
     const dayIndex = dateLabel.indexOf(dayOfMonth.toString());
     if (dayIndex !== -1) {
-        console.log(`Inserting suffix '${suffix}' after day of month '${dayOfMonth}' in date label '${dateLabel}'`);
         return `${dateLabel.slice(0, dayIndex + dayOfMonth.toString().length)}${suffix}${dateLabel.slice(dayIndex + dayOfMonth.toString().length)}`;
     }
-    console.log(`Could not find day of month '${dayOfMonth}' in date label '${dateLabel}', returning original date label.`);
     return `${dateLabel}`;
 };
 
