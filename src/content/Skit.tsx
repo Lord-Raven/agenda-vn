@@ -25,10 +25,9 @@ const getDayDifference = (startDate: string, endDate: string): number => {
     return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
 };
 
+// Date should be timezone agnostic here.
 export const formatDateLabel = (currentDate?: string): string => {
-    console.log(`Input currentDate: ${currentDate}`);
-    const date = currentDate ? new Date(`${currentDate}`) : null;
-    console.log(`Parsed date: ${date}`);
+    const date = currentDate ? new Date(`${currentDate}T00:00:00Z`) : null;
     if (!date || Number.isNaN(date.getTime())) {
         return 'Unknown Date';
     }
@@ -45,6 +44,7 @@ export const formatDateLabel = (currentDate?: string): string => {
                     ? 'rd'
                     : 'th';
     const dateLabel = date.toLocaleDateString('en-US', {
+        timeZone: 'UTC',
         weekday: 'long',
         month: 'long',
         day: 'numeric',
@@ -350,7 +350,9 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         ).addBlock(`Characters Present`, (builder) => {
             if (skit) {
                 currentActors.forEach(actor => {
-                    builder.addBlock(`${actor.name}`, buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id))
+                    builder.addBlock(
+                        `${actor.name}`,
+                        buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id)).format(),
                     );
                 })
             }
@@ -386,7 +388,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         `  ${skit.initialLocationId ? getLocationName(skit.initialLocationId, stage) : 'Unknown Location'}\n` +
                         `    ${getLocationDescription(skit.initialLocationId, stage) || 'No description available.'}`)
                     .addBlock('Known Characters',
-                        availableActors.map(actor => {return buildActorContext(actor, '', stage, [], ['profile'])}))
+                        availableActors.map(actor => buildActorContext(actor, '', stage, [], ['profile']).format()))
                     .addBlock('Response Format',
                         buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
                     .addBlock('Example Response',
@@ -414,8 +416,12 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 const guidanceText = parsedResponse.guidance?.trim();
                 const participantsText = parsedResponse.participants?.trim();
                 if (guidanceText && participantsText) {
+                    console.log('Parsed skit guidance:', parsedResponse);
+                    console.log('Guidance Text:', guidanceText);
+                    console.log('Participants Text:', participantsText);
                     skit.guidance = guidanceText;
                     const selectedActorIds = participantsText.split(',').map(name => findBestNameMatch(name.trim(), availableActors, ['name'])?.id).filter(id => id !== undefined) as string[];
+                    console.log('Selected Actor IDs:', selectedActorIds);
                     skit.initialActors = Array.from(new Set([...actorsAtLocation.map(actor => actor.id), ...selectedActorIds]));
                     break;
                 }
