@@ -3,7 +3,7 @@ import {StageBase, StageResponse, InitialData, Message, User, Character, AspectR
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, loadSupportedActor, resolveActorSchedule, ScheduleContext } from "./content/Actor";
-import { Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveStatText } from './content/Stat';
+import { Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
@@ -456,6 +456,23 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             this.expandRecurringEvent(this.normalizeCalendarEventForSave(cloneCalendarEvent(event), draftSaveContext)),
         );
 
+        // Resolve each global stat's starting value from its defaultValueRules (first match wins), falling
+        // back to the configured value/default; used to seed a brand new save.
+        const configuredGlobalStats = (configuration.globalStats || []).filter(stat => stat?.name?.trim());
+        const globalStatValues: { [key: string]: StatValue } = {};
+        const globalStatContext: ConditionContext = {
+            actors: Object.values(actors),
+            globalStats: configuration.globalStats,
+            actorStats: configuration.actorStats,
+            globalStatValues,
+        };
+        configuredGlobalStats.forEach((stat) => {
+            const ruleValue = resolveStatValueRule(stat.defaultValueRules, stat, globalStatContext);
+            globalStatValues[stat.id] = ruleValue !== undefined
+                ? ruleValue
+                : normalizeStatValue(configuration.globalStatValues?.[stat.id], stat);
+        });
+
         return {playerId: this.primaryUser.anonymizedId,
             actors,
             atlas,
@@ -468,7 +485,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             currentTimeOfDay: 'morning',
             upcomingEvents: seededEvents,
             lorebook: (configuration.lorebook || []).map(cloneLore),
-            globalStatValues: { ...(configuration.globalStatValues || {}) },
+            globalStatValues,
             uiSettings: cloneUiSettings(configuration.uiSettings || DEFAULT_UI_SETTINGS),
         };
     }
@@ -1464,7 +1481,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const normalizedValues: { [key: string]: StatValue } = {};
         configuredStats.forEach((stat) => {
-            const statName = stat.name.trim();
             normalizedValues[stat.id] = normalizeStatValue(currentValues[stat.id], stat);
         });
 

@@ -9,7 +9,7 @@ import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
 import { StatValueInput } from '../components/StatValueInput';
-import { Add } from '@mui/icons-material';
+import { Add, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-material';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
@@ -120,6 +120,12 @@ const defaultLocationStat = (): Stat => ({
     exposed: false,
     iconName: 'star',
 });
+
+const swapArrayItems = <T,>(items: T[], indexA: number, indexB: number): T[] => {
+    const next = [...items];
+    [next[indexA], next[indexB]] = [next[indexB], next[indexA]];
+    return next;
+};
 
 const clampStatValue = (value: number, stat: Stat): number => {
     let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
@@ -445,6 +451,15 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
+    const moveGlobalStat = (index: number, direction: -1 | 1) => {
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= globalStats.length) {
+            return;
+        }
+        setGlobalStats(prev => swapArrayItems(prev, index, targetIndex));
+        setCollapsedGlobalStats(prev => swapArrayItems(prev, index, targetIndex));
+    };
+
     const updateGlobalStatOption = (statIndex: number, optionIndex: number, patch: { name?: string; description?: string }) => {
         setGlobalStats(prev => prev.map((stat, idx) => {
             if (idx !== statIndex) {
@@ -504,6 +519,30 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
+    const addGlobalStatDefaultRule = (index: number) => {
+        setGlobalStats(prev => prev.map((stat, idx) => {
+            if (idx !== index) {
+                return stat;
+            }
+            const rule: StatValueRule = { id: generateUuid(), value: resolveStatDefaultValue(stat), conditions: [] };
+            return { ...stat, defaultValueRules: [...(stat.defaultValueRules || []), rule] };
+        }));
+    };
+
+    const removeGlobalStatDefaultRule = (index: number, ruleId: string) => {
+        setGlobalStats(prev => prev.map((stat, idx) => (
+            idx === index ? { ...stat, defaultValueRules: (stat.defaultValueRules || []).filter(rule => rule.id !== ruleId) } : stat
+        )));
+    };
+
+    const updateGlobalStatDefaultRule = (index: number, ruleId: string, patch: Partial<StatValueRule>) => {
+        setGlobalStats(prev => prev.map((stat, idx) => (
+            idx === index
+                ? { ...stat, defaultValueRules: (stat.defaultValueRules || []).map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule) }
+                : stat
+        )));
+    };
+
     const addActorStatPerActorRule = (index: number) => {
         setActorStats(prev => prev.map((stat, idx) => {
             if (idx !== index) {
@@ -526,7 +565,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 ? { ...stat, perActorDefaultRules: (stat.perActorDefaultRules || []).map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule) }
                 : stat
         )));
-    };
+    }; 
 
     const renderIconPicker = (value: string | undefined, onChange: (iconName: string | undefined) => void, allowClear = false) => (
         <IconPicker value={value} onChange={onChange} allowClear={allowClear} />
@@ -547,6 +586,15 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
+    const moveActorStat = (index: number, direction: -1 | 1) => {
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= actorStats.length) {
+            return;
+        }
+        setActorStats(prev => swapArrayItems(prev, index, targetIndex));
+        setCollapsedActorStats(prev => swapArrayItems(prev, index, targetIndex));
+    };
+
     const updateLocationStat = (index: number, patch: Partial<Stat>) => {
         setLocationStats(prev => prev.map((stat, idx) => (
             idx === index ? { ...stat, ...patch } : stat
@@ -564,10 +612,19 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         )));
     };
 
+    const moveLocationStat = (index: number, direction: -1 | 1) => {
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= locationStats.length) {
+            return;
+        }
+        setLocationStats(prev => swapArrayItems(prev, index, targetIndex));
+        setCollapsedLocationStats(prev => swapArrayItems(prev, index, targetIndex));
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Player Stats</Title>
+                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Global Stats</Title>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {globalStats.map((stat, statIndex) => {
                         const optionEntries = stat.options || [];
@@ -577,11 +634,19 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                             <div key={`player-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                                     <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
-                                        {stat.name?.trim() || `Player Stat ${statIndex + 1}`}
+                                        {stat.name?.trim() || `Global Stat ${statIndex + 1}`}
                                     </div>
-                                    <Button variant="secondary" onClick={() => toggleGlobalStat(statIndex)}>
-                                        {collapsedGlobalStats[statIndex] ? 'Expand' : 'Collapse'}
-                                    </Button>
+                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                        <Button variant="secondary" disabled={statIndex === 0} onClick={() => moveGlobalStat(statIndex, -1)} style={{ padding: '4px 8px', minWidth: 0 }}>
+                                            <KeyboardArrowUp fontSize="small" />
+                                        </Button>
+                                        <Button variant="secondary" disabled={statIndex === globalStats.length - 1} onClick={() => moveGlobalStat(statIndex, 1)} style={{ padding: '4px 8px', minWidth: 0 }}>
+                                            <KeyboardArrowDown fontSize="small" />
+                                        </Button>
+                                        <Button variant="secondary" onClick={() => toggleGlobalStat(statIndex)}>
+                                            {collapsedGlobalStats[statIndex] ? 'Expand' : 'Collapse'}
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 {!collapsedGlobalStats[statIndex] && (
@@ -608,8 +673,20 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     Exposed
                                                 </label>
                                             </div>
+                                            
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Editable In Settings</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.setByPlayer === true}
+                                                        onChange={(e) => updateGlobalStat(statIndex, { setByPlayer: e.target.checked })}
+                                                    />
+                                                    Set by Player
+                                                </label>
+                                            </div>
 
-                                            {stat.exposed === true && (
+                                            {(stat.exposed === true || stat.setByPlayer === true) && (
                                                 <div style={inlineFieldTopStyle}>
                                                     <label style={fieldLabelStyle}>Description</label>
                                                     <TextArea
@@ -675,18 +752,6 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Editable In Settings</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.setByPlayer === true}
-                                                        onChange={(e) => updateGlobalStat(statIndex, { setByPlayer: e.target.checked })}
-                                                    />
-                                                    Set by Player
-                                                </label>
-                                            </div>
-
                                             {normalizedStat.type === 'option' && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
                                                     <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
@@ -715,7 +780,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                     placeholder="Option name"
                                                                 />
                                                             </div>
-                                                            {stat.exposed === true && (
+                                                            {(stat.exposed === true || stat.setByPlayer === true) && (
                                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                                                     <label style={fieldLabelStyle}>Option Description</label>
                                                                     <TextArea
@@ -807,8 +872,65 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             )}
                                         </div>
 
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 10 }}>
+                                            <label style={fieldLabelStyle}>Default Value Rules</label>
+                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                Evaluated in order when a new game starts. The first matching rule wins and seeds this stat's starting value; falls back to the Default above if none match.
+                                            </span>
+                                            {(stat.defaultValueRules || []).length === 0 && (
+                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                    No rules. The Default value above is used to start every new game.
+                                                </span>
+                                            )}
+                                            {(stat.defaultValueRules || []).map((rule) => (
+                                                <div
+                                                    key={rule.id}
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: '6px',
+                                                        padding: '8px',
+                                                        border: '1px solid var(--agenda-line-subtle)',
+                                                        borderRadius: 6,
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Value</span>
+                                                        {renderRuleValueInput(stat, rule, (value) => updateGlobalStatDefaultRule(statIndex, rule.id, { value }))}
+                                                        <Button
+                                                            variant="danger"
+                                                            onClick={() => removeGlobalStatDefaultRule(statIndex, rule.id)}
+                                                            style={{ marginLeft: 'auto' }}
+                                                        >
+                                                            Delete
+                                                        </Button>
+                                                    </div>
+                                                    <ConditionEditor
+                                                        conditionCollections={rule.conditions}
+                                                        globalStats={[...globalStats, ...actorStats]}
+                                                        actorStats={actorStats}
+                                                        actors={Object.values(stageInstance.getSave().actors || {})}
+                                                        locations={locationOptions}
+                                                        onChange={(conditions) => updateGlobalStatDefaultRule(statIndex, rule.id, { conditions })}
+                                                    />
+                                                    {rule.conditions.length === 0 && (
+                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                            Always matches (should typically be the last rule).
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => addGlobalStatDefaultRule(statIndex)}
+                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifySelf: 'start' }}
+                                            >
+                                                <Add fontSize="small" /> Add rule
+                                            </Button>
+                                        </div>
+
                                         <div style={{ marginTop: 10 }}>
-                                            <Button variant="danger" onClick={() => removeGlobalStat(statIndex)}>Remove Player Stat</Button>
+                                            <Button variant="danger" onClick={() => removeGlobalStat(statIndex)}>Remove Global Stat</Button>
                                         </div>
                                     </>
                                 )}
@@ -823,7 +945,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                             setCollapsedGlobalStats(prev => [...prev, false]);
                         }}
                     >
-                        Add Player Stat
+                        Add Global Stat
                     </Button>
                 </div>
             </GlassPanel>
@@ -841,9 +963,17 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                     <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
                                         {stat.name?.trim() || `Actor Stat ${statIndex + 1}`}
                                     </div>
-                                    <Button variant="secondary" onClick={() => toggleActorStat(statIndex)}>
-                                        {collapsedActorStats[statIndex] ? 'Expand' : 'Collapse'}
-                                    </Button>
+                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                        <Button variant="secondary" disabled={statIndex === 0} onClick={() => moveActorStat(statIndex, -1)} style={{ padding: '4px 8px', minWidth: 0 }}>
+                                            <KeyboardArrowUp fontSize="small" />
+                                        </Button>
+                                        <Button variant="secondary" disabled={statIndex === actorStats.length - 1} onClick={() => moveActorStat(statIndex, 1)} style={{ padding: '4px 8px', minWidth: 0 }}>
+                                            <KeyboardArrowDown fontSize="small" />
+                                        </Button>
+                                        <Button variant="secondary" onClick={() => toggleActorStat(statIndex)}>
+                                            {collapsedActorStats[statIndex] ? 'Expand' : 'Collapse'}
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 {!collapsedActorStats[statIndex] && (
@@ -1228,9 +1358,17 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                     <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
                                         {stat.name?.trim() || `Location Stat ${statIndex + 1}`}
                                     </div>
-                                    <Button variant="secondary" onClick={() => toggleLocationStat(statIndex)}>
-                                        {collapsedLocationStats[statIndex] ? 'Expand' : 'Collapse'}
-                                    </Button>
+                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                        <Button variant="secondary" disabled={statIndex === 0} onClick={() => moveLocationStat(statIndex, -1)} style={{ padding: '4px 8px', minWidth: 0 }}>
+                                            <KeyboardArrowUp fontSize="small" />
+                                        </Button>
+                                        <Button variant="secondary" disabled={statIndex === locationStats.length - 1} onClick={() => moveLocationStat(statIndex, 1)} style={{ padding: '4px 8px', minWidth: 0 }}>
+                                            <KeyboardArrowDown fontSize="small" />
+                                        </Button>
+                                        <Button variant="secondary" onClick={() => toggleLocationStat(statIndex)}>
+                                            {collapsedLocationStats[statIndex] ? 'Expand' : 'Collapse'}
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 {!collapsedLocationStats[statIndex] && (

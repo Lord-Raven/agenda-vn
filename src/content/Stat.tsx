@@ -91,6 +91,9 @@ export type Stat = {
     // Rules used to resolve a default value for a given target actor when perActor is true and neither the
     // host actor's own perActorValueRules nor an explicit override provide a value. Evaluated in order.
     perActorDefaultRules?: StatValueRule[];
+    // For global stats: rules used to resolve this stat's initial value when a new game starts, evaluated in
+    // order (first matching wins); falls back to `default` if none match. See applyGlobalStatDefaults.
+    defaultValueRules?: StatValueRule[];
     guidance: string;
     default: StatValue;
     type: StatType;
@@ -132,6 +135,7 @@ export const cloneStat = (stat: Stat): Stat => ({
     description: stat.description,
     perActor: stat.perActor === true,
     perActorDefaultRules: cloneStatValueRules(stat.perActorDefaultRules),
+    defaultValueRules: cloneStatValueRules(stat.defaultValueRules),
     guidance: stat.guidance,
     default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
     type: stat.type,
@@ -228,6 +232,10 @@ export const resolvePerActorValueRule = (
     const matchedRule = (rules || []).find((rule) => evaluateConditionCollections(rule.conditions, context));
     return matchedRule ? normalizeStatValue(matchedRule.value, stat) : undefined;
 };
+
+// Generic alias for resolvePerActorValueRule; used wherever an ordered StatValueRule list needs to be
+// resolved but there is no per-actor target involved (e.g. a global stat's defaultValueRules at game start).
+export const resolveStatValueRule = resolvePerActorValueRule;
 
 export type StatUpdateTargetType = 'player' | 'actor';
 export type StatUpdateOperation = 'set' | 'adjust';
