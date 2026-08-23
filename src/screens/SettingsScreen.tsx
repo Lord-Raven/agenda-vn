@@ -1,7 +1,7 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SaveType, Stage } from '../Stage';
-import { Stat, StatValue, isNumericDisplayType } from '../content/Stat';
+import { Stat, StatValue, applyUserPlaceholder, isNumericDisplayType } from '../content/Stat';
 import { GlassPanel, Title, Button, ColorPickerInput, LocationSelect, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
@@ -150,6 +150,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     const [languageSuggestions, setLanguageSuggestions] = useState<string[]>([]);
     const [showLanguageSuggestions, setShowLanguageSuggestions] = useState(false);
     const resolvedPlayerThemeColor = resolvePlayerThemeColor(settings.playerColor);
+    const resolveText = (rawText?: string) => applyUserPlaceholder(rawText, settings.playerName.trim());
 
     const handleSave = async () => {
         console.log('Saving settings:', settings);
@@ -429,6 +430,9 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         const statName = (stat.name || '').trim();
                                         const selectedValue = normalizeGlobalStatValue(globalStatValues[stat.id], stat);
                                         const optionEntries = stat.options || [];
+                                        const selectedOptionDescription = stat.type === 'option'
+                                            ? resolveText(optionEntries.find((option) => option.name === selectedValue)?.description).trim()
+                                            : '';
 
                                         const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
 
@@ -450,7 +454,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     <span>{statName}</span>
                                                 </div>
                                                 <div style={{ color: 'color-mix(in srgb, var(--agenda-text-muted) 80%, transparent)', fontSize: '13px' }}>
-                                                    {stat.description}
+                                                    {resolveText(stat.description)}
                                                 </div>
 
                                                 {stat.type === 'option' && optionEntries.length > 0 && (
@@ -466,6 +470,12 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                             </option>
                                                         ))}
                                                     </select>
+                                                )}
+
+                                                {!!selectedOptionDescription && (
+                                                    <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)', fontSize: '12px', fontStyle: 'italic' }}>
+                                                        {selectedOptionDescription}
+                                                    </div>
                                                 )}
 
                                                 {stat.type === 'option' && optionEntries.length === 0 && (

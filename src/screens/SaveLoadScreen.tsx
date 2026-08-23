@@ -262,7 +262,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                                     fontWeight: 'bold',
                                     color: 'var(--agenda-highlight)'
                                 }}>
-                                    {save.actors[save.playerId].name} - Day {save.currentDate || 'Unknown'}
+                                    {save.actors[save.playerId].name} - {save.currentDate || 'Unknown'}
                                 </div>
                             </div>
                         </>

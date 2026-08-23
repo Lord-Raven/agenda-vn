@@ -3,7 +3,7 @@ import { Box, Typography } from "@mui/material";
 import { Bed, Bedtime, EventAvailable, WbSunny, WbTwilight } from "@mui/icons-material";
 import { Stage } from "../Stage";
 import { formatCurrentDate, formatDateLabel } from "../content/Skit";
-import { Stat } from '../content/Stat';
+import { Stat, resolveStatText } from '../content/Stat';
 import { resolveIcon } from "./StatRating";
 import { StatValueDisplay } from "./StatDisplay";
 
@@ -168,10 +168,17 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
                 const normalizedValue = normalizeStatValue(rawValue, stat);
                 const isNumericStat = stat.type === "number";
                 const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
+                const selectedOptionDescription = stat.type === "option"
+                    ? resolveStatText((stat.options || []).find((option) => option.name === normalizedValue)?.description, stageInstance).trim()
+                    : "";
+                const tooltipText = [resolveStatText(stat.description, stageInstance).trim(), selectedOptionDescription]
+                    .filter(Boolean)
+                    .join("\n\n");
 
                 return (
                     <Box
                         key={`player-stat-bar-${statName}`}
+                        title={tooltipText || undefined}
                         sx={{
                             flex: "1 1 150px",
                             minWidth: 0,

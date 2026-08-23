@@ -113,13 +113,14 @@ type StatTextContext = {
     primaryUser?: { name?: string };
 };
 
+export const applyUserPlaceholder = (rawText: string | undefined, playerName: string): string => (
+    String(rawText || '').replace(/\{\{\s*user\s*\}\}/gi, playerName || 'the player')
+);
+
 export const resolveStatText = (
     rawText: string | undefined,
     stage?: StatTextContext | null,
-): string => {
-    const playerName = stage?.getPlayerActor?.()?.name || stage?.primaryUser?.name || 'the player';
-    return String(rawText || '').replace(/\{\{\s*user\s*\}\}/gi, playerName);
-};
+): string => applyUserPlaceholder(rawText, stage?.getPlayerActor?.()?.name || stage?.primaryUser?.name || 'the player');
 
 export const cloneStatValueRule = (rule: StatValueRule): StatValueRule => ({
     id: rule.id,
