@@ -116,6 +116,7 @@ const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: st
         if (stat.type === 'locationList') {
             const currentValue = actor.statMap?.[stat.id];
             nextMap[stat.id] = Array.isArray(currentValue) ? normalizeLocationListValue(currentValue) : normalizeLocationListValue(stat.default);
+            console.log(`Debugging: normalizing locationList for stat id ${stat.id}`, nextMap[stat.id]);
             return;
         }
         if (stat.type === 'checkbox') {
