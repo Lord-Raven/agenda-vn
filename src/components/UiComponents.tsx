@@ -385,6 +385,61 @@ export const LocationSelect: FC<LocationSelectProps> = ({
 	);
 };
 
+interface LocationMultiSelectProps {
+	values: string[];
+	onChange: (locationIds: string[]) => void;
+	locations: LocationLike[];
+	stage?: Stage | (() => Stage);
+	emptyLabel?: string;
+	title?: string;
+	style?: React.CSSProperties;
+	className?: string;
+}
+
+export const LocationMultiSelect: FC<LocationMultiSelectProps> = ({
+	values,
+	onChange,
+	locations,
+	stage,
+	emptyLabel = 'No locations',
+	title = 'Choose locations',
+	style,
+}) => {
+	const sortedLocations = [...locations].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+	// Keep dangling ids (e.g. a deleted location) selectable so saving does not silently drop them.
+	const missingIds = values.filter((id) => id && !sortedLocations.some((location) => location.id === id));
+
+	const options: PickerOption[] = sortedLocations.map((location) => ({
+		key: location.id,
+		label: location.name || 'Unnamed location',
+		category: location.category?.trim() || 'Uncategorized',
+		renderAvatar: (size, active) => (
+			<LocationPortrait
+				location={location}
+				stage={stage}
+				width={Math.round(size * 1.34)}
+				height={size}
+				highlighted={active}
+			/>
+		),
+	}));
+	missingIds.forEach((id) => options.push({ key: id, label: 'Unknown location', icon: Place }));
+
+	return (
+		<div style={{ width: '100%', ...style }}>
+			<SearchableOptionPicker
+				multiple
+				values={values}
+				onChange={(nextValue) => onChange(Array.isArray(nextValue) ? nextValue : (nextValue ? [nextValue] : []))}
+				options={options}
+				emptyLabel={emptyLabel}
+				title={title}
+				placeholder="Search locations"
+			/>
+		</div>
+	);
+};
+
 interface ColorPickerInputProps {
 	value: string;
 	onChange: (value: string) => void;

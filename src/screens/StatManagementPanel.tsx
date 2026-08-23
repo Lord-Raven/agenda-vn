@@ -2,8 +2,8 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatDisplayType, StatType, StatValue, StatValueRule, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, isNumericDisplayType, cloneStat } from '../content/Stat';
-import { Button, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
+import { Stat, StatDisplayType, StatType, StatValue, StatValueRule, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, isNumericDisplayType, normalizeLocationListValue, cloneStat } from '../content/Stat';
+import { Button, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
@@ -24,6 +24,10 @@ const resolveStatDefaultValue = (stat: Stat): StatValue => {
         return optionNames[0] || '';
     }
 
+    if (stat.type === 'locationList') {
+        return normalizeLocationListValue(stat.default);
+    }
+
     if (stat.type === 'text' || stat.type === 'location') {
         return typeof stat.default === 'string' ? stat.default : '';
     }
@@ -42,6 +46,10 @@ const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
             return value;
         }
         return resolveStatDefaultValue(stat);
+    }
+
+    if (stat.type === 'locationList') {
+        return Array.isArray(value) ? normalizeLocationListValue(value) : resolveStatDefaultValue(stat);
     }
 
     if (stat.type === 'text' || stat.type === 'location') {
@@ -155,6 +163,18 @@ const normalizeGlobalStatShape = (stat: Stat): Stat => {
         };
     }
 
+    if (stat.type === 'locationList') {
+        return {
+            ...stat,
+            default: normalizeLocationListValue(stat.default),
+            options: [],
+            min: undefined,
+            max: undefined,
+            displayType: undefined,
+            iconName: stat.iconName || 'star',
+        };
+    }
+
     if (stat.type === 'text' || stat.type === 'location') {
         return {
             ...stat,
@@ -186,6 +206,18 @@ const normalizeActorStatShape = (stat: Stat): Stat => {
             ...stat,
             options,
             default: defaultValue,
+            min: undefined,
+            max: undefined,
+            displayType: undefined,
+            iconName: stat.iconName || 'star',
+        };
+    }
+
+    if (stat.type === 'locationList') {
+        return {
+            ...stat,
+            default: normalizeLocationListValue(stat.default),
+            options: [],
             min: undefined,
             max: undefined,
             displayType: undefined,
@@ -318,7 +350,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 actor.statMap = {};
             }
 
-            actorStats.filter(stat => (isNumericDisplayType(stat.type) || stat.type === 'location') && !stat.perActor).forEach(stat => {
+            actorStats.filter(stat => (isNumericDisplayType(stat.type) || stat.type === 'location' || stat.type === 'locationList') && !stat.perActor).forEach(stat => {
                 if (!stat.id || !stat.name.trim()) {
                     return;
                 }
@@ -326,6 +358,12 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 if (stat.type === 'location') {
                     const existing = actor.statMap[stat.id];
                     actor.statMap[stat.id] = typeof existing === 'string' ? existing : (typeof stat.default === 'string' ? stat.default : '');
+                    return;
+                }
+
+                if (stat.type === 'locationList') {
+                    const existing = actor.statMap[stat.id];
+                    actor.statMap[stat.id] = Array.isArray(existing) ? normalizeLocationListValue(existing) : normalizeLocationListValue(stat.default);
                     return;
                 }
 
@@ -349,7 +387,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 location.statMap = {};
             }
 
-            locationStats.filter(stat => isNumericDisplayType(stat.type) || stat.type === 'location').forEach(stat => {
+            locationStats.filter(stat => isNumericDisplayType(stat.type) || stat.type === 'location' || stat.type === 'locationList').forEach(stat => {
                 if (!stat.id || !stat.name.trim()) {
                     return;
                 }
@@ -357,6 +395,12 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 if (stat.type === 'location') {
                     const existing = location.statMap[stat.id];
                     location.statMap[stat.id] = typeof existing === 'string' ? existing : (typeof stat.default === 'string' ? stat.default : '');
+                    return;
+                }
+
+                if (stat.type === 'locationList') {
+                    const existing = location.statMap[stat.id];
+                    location.statMap[stat.id] = Array.isArray(existing) ? normalizeLocationListValue(existing) : normalizeLocationListValue(stat.default);
                     return;
                 }
 
@@ -723,6 +767,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 >
                                                     <option value="checkbox">Checkbox</option>
                                                     <option value="location">Location</option>
+                                                    <option value="locationList">Location List</option>
                                                     <option value="number">Number</option>
                                                     <option value="option">Option</option>
                                                     <option value="text">Text</option>
@@ -823,6 +868,18 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     <LocationSelect
                                                         value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
                                                         onChange={(locationId) => updateGlobalStat(statIndex, { default: locationId })}
+                                                        locations={locationOptions}
+                                                        stage={stage}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.type === 'locationList' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Locations</label>
+                                                    <LocationMultiSelect
+                                                        values={Array.isArray(normalizedStat.default) ? normalizedStat.default : []}
+                                                        onChange={(locationIds) => updateGlobalStat(statIndex, { default: locationIds })}
                                                         locations={locationOptions}
                                                         stage={stage}
                                                     />
@@ -1052,6 +1109,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 >
                                                     <option value="checkbox">Checkbox</option>
                                                     <option value="location">Location</option>
+                                                    <option value="locationList">Location List</option>
                                                     <option value="number">Number</option>
                                                     <option value="option">Option</option>
                                                     <option value="text">Text</option>
@@ -1210,6 +1268,18 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     <LocationSelect
                                                         value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
                                                         onChange={(locationId) => updateActorStat(statIndex, { default: locationId })}
+                                                        locations={locationOptions}
+                                                        stage={stage}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.type === 'locationList' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Locations</label>
+                                                    <LocationMultiSelect
+                                                        values={Array.isArray(normalizedStat.default) ? normalizedStat.default : []}
+                                                        onChange={(locationIds) => updateActorStat(statIndex, { default: locationIds })}
                                                         locations={locationOptions}
                                                         stage={stage}
                                                     />
@@ -1435,6 +1505,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 >
                                                     <option value="checkbox">Checkbox</option>
                                                     <option value="location">Location</option>
+                                                    <option value="locationList">Location List</option>
                                                     <option value="number">Number</option>
                                                     <option value="option">Option</option>
                                                     <option value="text">Text</option>
@@ -1599,6 +1670,18 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
+                                            {normalizedStat.type === 'locationList' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Locations</label>
+                                                    <LocationMultiSelect
+                                                        values={Array.isArray(normalizedStat.default) ? normalizedStat.default : []}
+                                                        onChange={(locationIds) => updateLocationStat(statIndex, { default: locationIds })}
+                                                        locations={locationOptions}
+                                                        stage={stage}
+                                                    />
+                                                </div>
+                                            )}
+
                                             {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
@@ -1672,7 +1755,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Universal Schedule</Title>
 
                 <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '11px', marginBottom: 10 }}>
-                    Applies to every actor and is evaluated after that actor's own schedule. The first destination to match wins, but any matching "Generally unavailable" entry supersedes a matched location.
+                    Applies to every actor and is evaluated after that actor's own schedule. The first destination to match wins, but any matching "Unavailable" entry supersedes a matched location.
                 </span>
                 <ActorScheduleEditor
                     schedule={universalSchedule}

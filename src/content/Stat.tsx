@@ -2,13 +2,20 @@ import { v4 as generateUuid } from 'uuid';
 import { ActorConditionTarget, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
 // 'location' stats hold a location ID (a key into the save's atlas) rather than a display value.
-export type StatType = 'number' | 'option' | 'text' | 'checkbox' | 'location';
+// 'locationList' stats hold a set of location IDs (chosen via a multi-select picker) rather than a single value.
+export type StatType = 'number' | 'option' | 'text' | 'checkbox' | 'location' | 'locationList';
 export type StatDisplayType = 'straight' | 'percentage' | 'bar' | 'rating' | 'letter grade';
-export type StatValue = number | string | boolean;
+export type StatValue = number | string | boolean | string[];
 
 export const isNumericDisplayType = (type: StatType): boolean => type === 'number';
 
 export const isLocationDisplayType = (type: StatType): boolean => type === 'location';
+
+export const isLocationListDisplayType = (type: StatType): boolean => type === 'locationList';
+
+export const normalizeLocationListValue = (value: unknown): string[] => (
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+);
 
 // Resolves the effective display style for a numeric stat, defaulting to a plain number.
 export const resolveStatDisplayType = (stat: Stat): StatDisplayType => (stat.type === 'number' ? (stat.displayType || 'straight') : 'straight');
@@ -138,7 +145,9 @@ export const cloneStat = (stat: Stat): Stat => ({
     perActorDefaultRules: cloneStatValueRules(stat.perActorDefaultRules),
     defaultValueRules: cloneStatValueRules(stat.defaultValueRules),
     guidance: stat.guidance,
-    default: typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0)),
+    default: stat.type === 'locationList'
+        ? normalizeLocationListValue(stat.default)
+        : (typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0))),
     type: stat.type,
     displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
     options: (stat.options || []).map((option) => ({
@@ -160,6 +169,10 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
             return stat.default;
         }
         return optionNames[0] || '';
+    }
+
+    if (stat.type === 'locationList') {
+        return normalizeLocationListValue(stat.default);
     }
 
     if (stat.type === 'text' || stat.type === 'location') {
@@ -185,6 +198,10 @@ export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValu
             return value;
         }
         return typeof fallback === 'string' ? fallback : '';
+    }
+
+    if (stat.type === 'locationList') {
+        return Array.isArray(value) ? normalizeLocationListValue(value) : normalizeLocationListValue(resolveStatDefault(stat, options));
     }
 
     if (stat.type === 'text' || stat.type === 'location') {

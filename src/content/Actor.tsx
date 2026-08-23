@@ -1,7 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emotion';
 import { Stage } from '../Stage';
-import { Stat, StatValue, StatValueRule, cloneStatValueRules, isNumericDisplayType, normalizeStatValue, resolveStatDefault, resolvePerActorValueRule, resolveStatText } from './Stat';
+import { Stat, StatValue, StatValueRule, cloneStatValueRules, isNumericDisplayType, normalizeLocationListValue, normalizeStatValue, resolveStatDefault, resolvePerActorValueRule, resolveStatText } from './Stat';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -11,9 +11,8 @@ import {
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
+import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableActorTarget, pickSeededItem } from './Condition';
 import { formatCurrentDate } from './Skit';
-
 // A single conditional adjustment to an actor's initial stat value; applied when its conditions evaluate true at game start.
 export type ActorStatModifier = {
     id: string;
@@ -138,21 +137,37 @@ export type ScheduleContext = ConditionContext & {
     actorStats?: Stat[];
 };
 
-// Resolves a destination that references an ActorStat of type 'location' (see ACTOR_SCHEDULE_*_STAT_PREFIX)
-// down to the actual location id it currently points to; a global stat reads from context.globalStatValues,
-// while an actor stat reads from the scheduled actor's own statMap. Returns '' if unresolved.
-const resolveScheduleStatDestination = (destination: string, actor: Pick<Actor, 'statMap'>, context: ScheduleContext): string => {
+// Resolves a stat's value to a single location id: 'location' stats already hold one, while 'locationList'
+// stats hold a set and pick one deterministically for the given seed (so the same actor/destination/date/time
+// always resolves to the same location, but different seeds can resolve independently).
+const resolveStatLocationValue = (stat: Stat, value: StatValue | undefined, seed: string): string => {
+    if (stat.type === 'locationList') {
+        return pickSeededItem(normalizeLocationListValue(value), seed) || '';
+    }
+    return typeof value === 'string' ? value : '';
+};
+
+// Resolves a destination that references an ActorStat of type 'location'/'locationList' (see
+// ACTOR_SCHEDULE_*_STAT_PREFIX) down to the actual location id it currently points to; a global stat reads
+// from context.globalStatValues, while an actor stat reads from the scheduled actor's own statMap. Returns
+// '' if unresolved.
+const resolveScheduleStatDestination = (destination: string, actor: Pick<Actor, 'id' | 'statMap'>, context: ScheduleContext): string => {
+    const seed = `${destination}|${context.currentDate || ''}|${context.currentTimeOfDay || ''}|${actor.id || ''}`;
     if (destination.startsWith(ACTOR_SCHEDULE_PLAYER_STAT_PREFIX)) {
         const statId = destination.slice(ACTOR_SCHEDULE_PLAYER_STAT_PREFIX.length);
         const stat = (context.globalStats || []).find(candidate => candidate.id === statId);
-        const value = stat ? context.globalStatValues?.[stat.id] : undefined;
-        return typeof value === 'string' ? value : '';
+        if (!stat) {
+            return '';
+        }
+        return resolveStatLocationValue(stat, context.globalStatValues?.[stat.id], seed);
     }
     if (destination.startsWith(ACTOR_SCHEDULE_ACTOR_STAT_PREFIX)) {
         const statId = destination.slice(ACTOR_SCHEDULE_ACTOR_STAT_PREFIX.length);
         const stat = (context.actorStats || []).find(candidate => candidate.id === statId);
-        const value = stat ? actor.statMap?.[stat.id] : undefined;
-        return typeof value === 'string' ? value : '';
+        if (!stat) {
+            return '';
+        }
+        return resolveStatLocationValue(stat, actor.statMap?.[stat.id], seed);
     }
     return destination;
 };
@@ -213,7 +228,7 @@ export class Actor {
     themeColor: string = ''; // Theme color (hex code)
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
-    statMap: { [key: string]: number | string | boolean } = {}; // Map of custom stat name to value for this actor
+    statMap: { [key: string]: StatValue } = {}; // Map of custom stat name to value for this actor
     statInitialMap: { [key: string]: ActorStatInitial } = {}; // Map of custom stat name to its initial value and conditional modifiers, used to seed statMap when a new game starts
     perActorStatMap: PerActorStatValueMap = {}; // For perActor stats: map of stat name to a map of target actorId to explicit value override
     perActorValueRules: PerActorValueRuleMap = {}; // For perActor stats: map of stat name to this actor's own default-value rules, which take precedence over the stat's perActorDefaultRules

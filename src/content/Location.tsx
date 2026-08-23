@@ -13,6 +13,7 @@ import {
 import { CalendarTimeOfDay } from './CalendarEvent';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import { AlternativeImage, createAlternativeImage, getMatchingAlternativeImage } from './AlternativeImage';
+import { StatValue } from './Stat';
 
 export type CalendarDayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
@@ -474,7 +475,7 @@ export class Location {
     focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
     themeColor: string = ''; // A color associated with this location, used for UI theming.
 	conditionCollections: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
-	statMap: { [key: string]: number | string | boolean } = {}; // Map of custom location stat id to value for this location
+	statMap: { [key: string]: StatValue } = {}; // Map of custom location stat id to value for this location
 
     constructor(props: any) {
         Object.assign(this, props);

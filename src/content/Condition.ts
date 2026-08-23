@@ -1,5 +1,5 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
-import type { Stat } from './Stat';
+import type { Stat, StatValue } from './Stat';
 
 export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual';
 export type ActorConditionTarget = 'any' | 'none' | 'variable' | string;
@@ -43,12 +43,12 @@ export type ConditionCollection = Condition[];
 export type ConditionContext = {
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
-    globalStatValues?: Record<string, string | number | boolean>;
+    globalStatValues?: Record<string, StatValue>;
     globalStats?: Stat[];
     actorStats?: Stat[];
-    actors?: Array<{ id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string }> | Record<string, { id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string }>;
-    currentActor?: { id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string };
-    actorStatValues?: Record<string, Record<string, string | number | boolean>>;
+    actors?: Array<{ id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string }> | Record<string, { id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string }>;
+    currentActor?: { id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string };
+    actorStatValues?: Record<string, Record<string, StatValue>>;
 };
 
 const TIME_OF_DAY_VALUES: Record<CalendarTimeOfDay, number> = {
@@ -68,7 +68,7 @@ const DICE_NOTATION_PATTERN = /^(\d*)d(\d+)([+-]\d+)?$/i;
 export const isDiceNotation = (value: unknown): value is string => typeof value === 'string' && DICE_NOTATION_PATTERN.test(value.trim());
 
 // FNV-1a string hash, used only to derive a numeric seed for the dice PRNG - not for anything security-sensitive.
-const hashString = (value: string): number => {
+export const hashString = (value: string): number => {
     let hash = 2166136261;
     for (let index = 0; index < value.length; index++) {
         hash ^= value.charCodeAt(index);
@@ -78,7 +78,7 @@ const hashString = (value: string): number => {
 };
 
 // mulberry32 PRNG - small, fast, and deterministic for a given 32-bit seed.
-const createSeededRandom = (seed: number) => {
+export const createSeededRandom = (seed: number) => {
     let state = seed;
     return () => {
         state |= 0;
@@ -87,6 +87,17 @@ const createSeededRandom = (seed: number) => {
         t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+};
+
+// Deterministically picks an item from a list based on a seed string (e.g. combining a schedule destination,
+// the current date/time of day, and a target actor id), so the same inputs always yield the same pick while
+// different seeds (different actors, dates, etc.) can pick independently.
+export const pickSeededItem = <T,>(items: T[], seed: string): T | undefined => {
+    if (items.length === 0) {
+        return undefined;
+    }
+    const random = createSeededRandom(hashString(seed));
+    return items[Math.floor(random() * items.length) % items.length];
 };
 
 const rollDiceNotation = (notation: string, seed: string): number => {
@@ -118,8 +129,8 @@ const resolveConditionValue = (condition: Condition, context: ConditionContext):
     return isDiceNotation(value) ? rollDiceNotation(value, buildDiceSeed(condition, context)) : value;
 };
 
-const compareValues = (actual: string | number | boolean | undefined, expected: string | number | boolean, comparison: ConditionComparison): boolean => {
-    if (actual === undefined) {
+const compareValues = (actual: StatValue | undefined, expected: string | number | boolean, comparison: ConditionComparison): boolean => {
+    if (actual === undefined || Array.isArray(actual)) {
         return false;
     }
 
@@ -166,14 +177,14 @@ const getCalendarValue = (condition: CalendarCondition, context: ConditionContex
     }
 };
 
-const getActorStatValue = (actor: { statMap?: Record<string, string | number | boolean> } | undefined, statId: string): string | number | boolean | undefined => {
+const getActorStatValue = (actor: { statMap?: Record<string, StatValue> } | undefined, statId: string): StatValue | undefined => {
     if (!actor) {
         return undefined;
     }
     return actor.statMap?.[statId];
 };
 
-type ConditionActor = { id?: string; name?: string; statMap?: Record<string, string | number | boolean>; generic?: boolean; status?: string };
+type ConditionActor = { id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string };
 
 // Resolves which actor(s) an actorStat condition's `actorId` target refers to: 'any'/'none' check every actor
 // in context, 'variable' refers to the actor currently under consideration (context.currentActor, e.g. the

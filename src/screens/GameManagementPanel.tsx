@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { Stage, buildPortableGameConfiguration } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { Stat, StatType, StatValue, cloneStat, isNumericDisplayType } from '../content/Stat';
+import { Stat, StatType, StatValue, cloneStat, isNumericDisplayType, normalizeLocationListValue } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { buildCreatorNotesHtml } from './CreatorNotesHtml';
@@ -18,6 +18,10 @@ const resolveStatDefaultValue = (stat: Stat): StatValue => {
             return stat.default;
         }
         return optionNames[0] || '';
+    }
+
+    if (stat.type === 'locationList') {
+        return normalizeLocationListValue(stat.default);
     }
 
     if (stat.type === 'text' || stat.type === 'location') {
@@ -38,6 +42,10 @@ const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
             return value;
         }
         return resolveStatDefaultValue(stat);
+    }
+
+    if (stat.type === 'locationList') {
+        return Array.isArray(value) ? normalizeLocationListValue(value) : resolveStatDefaultValue(stat);
     }
 
     if (stat.type === 'text' || stat.type === 'location') {

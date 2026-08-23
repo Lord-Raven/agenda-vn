@@ -1,7 +1,7 @@
 import { FC } from 'react';
 import { Stat, StatValue, isNumericDisplayType } from '../content/Stat';
 import { Stage } from '../Stage';
-import { LocationSelect, TextInput } from './UiComponents';
+import { LocationMultiSelect, LocationSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
 
 interface StatValueInputProps {
@@ -46,6 +46,17 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
             <LocationSelect
                 value={typeof value === 'string' ? value : ''}
                 onChange={(locationId) => onChange(locationId)}
+                locations={locations}
+                stage={stage}
+            />
+        );
+    }
+
+    if (stat.type === 'locationList') {
+        return (
+            <LocationMultiSelect
+                values={Array.isArray(value) ? value : []}
+                onChange={(locationIds) => onChange(locationIds)}
                 locations={locations}
                 stage={stage}
             />
