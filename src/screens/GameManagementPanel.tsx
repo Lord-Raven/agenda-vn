@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
-import { Stage } from '../Stage';
+import { Stage, buildPortableGameConfiguration } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
 import { Stat, StatType, StatValue, cloneStat, isNumericDisplayType } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
@@ -154,7 +154,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     }, [stageInstance, save.upcomingEvents, save.currentDate, save.currentTimeOfDay]);
 
     const portableGameConfiguration = useMemo(() => {
-        return {
+        return buildPortableGameConfiguration({
             title,
             titleImageUrl,
             titleImagePrompt,
@@ -163,17 +163,17 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             creatorNotes,
             versionNotes,
             startingDate,
-            actorStats: actorStats.map(cloneStat),
-            locationStats: locationStats.map(cloneStat),
-            globalStats: globalStats.map(cloneStat),
-            globalStatValues: { ...validGlobalStatValues },
+            actorStats,
+            locationStats,
+            globalStats,
+            globalStatValues: validGlobalStatValues,
             actors: activeActors,
             locations: activeLocations,
             maps: activeMaps,
-            lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
+            lorebook: save.lorebook || [],
             calendarEvents: managedCalendarEvents,
-            uiSettings: JSON.parse(JSON.stringify(stageInstance.getUiSettings())),
-        };
+            uiSettings: stageInstance.getUiSettings(),
+        });
     }, [
         activeActors,
         activeLocations,

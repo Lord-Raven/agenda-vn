@@ -151,14 +151,15 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     const [showLanguageSuggestions, setShowLanguageSuggestions] = useState(false);
     const resolvedPlayerThemeColor = resolvePlayerThemeColor(settings.playerColor);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         console.log('Saving settings:', settings);
         const playerThemeColor = resolvePlayerThemeColor(settings.playerColor);
         const resolvedGlobalStatValues = buildGlobalStatValues(globalStats, globalStatValues);
         
         if (isNewGame) {
             console.log('Starting new game with settings');
-            stageInstance.startNewGame({
+            setScreenType(ScreenType.LOADING);
+            await stageInstance.startNewGame({
                 name: settings.playerName,
                 themeColor: playerThemeColor,
                 data: {
@@ -174,7 +175,6 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
             const newSave = stageInstance.getSave();
             newSave.globalStatValues = resolvedGlobalStatValues;
-            setScreenType(ScreenType.LOADING);
         } else {
             console.log('Updating settings');
             const saveData = stageInstance.getSave();

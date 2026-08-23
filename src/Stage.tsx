@@ -177,6 +177,51 @@ type TimelineEntry = {
     skit?: Skit;
 }
 
+// The subset of GameConfiguration that is portable: it is what gets exported as JSON from the GameManagementPanel
+// and is the same content pushed to/pulled from storage so new games (and other owner-hosted chats) stay in sync.
+export type PortableGameConfiguration = {
+    title: string;
+    titleImageUrl: string;
+    titleImagePrompt: string;
+    backgroundImageUrl: string;
+    backgroundImagePrompt: string;
+    creatorNotes: string;
+    versionNotes: string;
+    startingDate: string;
+    actorStats: Stat[];
+    locationStats: Stat[];
+    globalStats: Stat[];
+    globalStatValues: { [key: string]: StatValue };
+    actors: Actor[];
+    locations: Location[];
+    maps: GameMap[];
+    lorebook: Lore[];
+    calendarEvents: CalendarEvent[];
+    uiSettings: UiSettings;
+};
+
+// Shared by the GameManagementPanel's JSON export/preview and Stage's storage sync so both always agree on shape.
+export const buildPortableGameConfiguration = (input: PortableGameConfiguration): PortableGameConfiguration => ({
+    title: input.title,
+    titleImageUrl: input.titleImageUrl,
+    titleImagePrompt: input.titleImagePrompt,
+    backgroundImageUrl: input.backgroundImageUrl,
+    backgroundImagePrompt: input.backgroundImagePrompt,
+    creatorNotes: input.creatorNotes,
+    versionNotes: input.versionNotes,
+    startingDate: input.startingDate,
+    actorStats: (input.actorStats || []).map(cloneStat),
+    locationStats: (input.locationStats || []).map(cloneStat),
+    globalStats: (input.globalStats || []).map(cloneStat),
+    globalStatValues: { ...(input.globalStatValues || {}) },
+    actors: (input.actors || []).map(cloneActor),
+    locations: (input.locations || []).map(cloneLocation),
+    maps: (input.maps || []).map(cloneMap),
+    lorebook: (input.lorebook || []).map(cloneLore),
+    calendarEvents: (input.calendarEvents || []).map(cloneCalendarEvent),
+    uiSettings: cloneUiSettings(input.uiSettings || DEFAULT_UI_SETTINGS),
+});
+
 export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateType, ConfigType> {
 
     readonly SAVE_SLOT_COUNT = 10;
@@ -187,6 +232,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     primaryCharacter: Character;
     generationPromises: {[key: string]: Promise<any|void>} = {};
     anticipatedLoadingPromiseCount: number = 4;
+    isOwner: boolean = false;
 
     constructor(data: InitialData<InitStateType, ChatStateType, MessageStateType, ConfigType>) {
         super(data);
@@ -372,6 +418,20 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     async load(): Promise<Partial<LoadResponse<InitStateType, ChatStateType, MessageStateType>>> {
 
+        // Test whether userId has storage access to update this bot.
+        try {
+            const response: any = await this.storage.set('dummy', {data: "dummy data"}).forCharacterSensitive(this.primaryCharacter.anonymizedId);
+            console.log(response);
+            if (response.errors && response.errors.length) {
+                console.log(`Failed sensitive storage access for ${this.primaryCharacter.anonymizedId}: ${response.errors}`);
+            } else {
+                console.log(`Successfully accessed sensitive storage for ${this.primaryCharacter.anonymizedId}`);
+                this.isOwner = true;
+            }
+        } catch (error) {
+            console.log(`Error accessing sensitive storage for ${this.primaryCharacter.anonymizedId}: ${error}`);
+        }
+
         return {
             success: true,
             error: null,
@@ -490,9 +550,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
     }
 
-    startNewGame(playerData: {name: string, data: Partial<SaveType>, personality: string, themeColor?: string}) {
+    async startNewGame(playerData: {name: string, data: Partial<SaveType>, personality: string, themeColor?: string}): Promise<void> {
         // Insert a dummy promise into generationPromises to ensure the loading screen shows until we manually clear it after the initial actors are loaded.
         this.generationPromises['newGame'] = new Promise(() => {});
+
+        // Refresh the configuration from storage first, so a new game uses the most current owner-published content.
+        await this.readStageConfiguration();
 
         // Get empty save slot or replace the oldest save if all slots are full
         const emptySlotIndex = this.saveData.saves.findIndex(save => save === undefined);
@@ -608,6 +671,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     saveGame() {
         this.messenger.updateChatState(this.saveData);
+        // Save configuration to storage (this will only do something if the user has storage access, which is only true for the owner of the bot.)
+        this.updateStageConfiguration();
     }
 
     isCalendarScreenLoading(): boolean {
@@ -2122,6 +2187,74 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         // Vertical layout when height > width (portrait orientation)
         return window.innerHeight > window.innerWidth;
     }
+
+
+    // Gathers the same portable configuration content that GameManagementPanel exports as JSON, so it can be
+    // pushed to or pulled from storage.
+    private buildPortableConfiguration(): PortableGameConfiguration {
+        const configuration = this.getConfiguration();
+        const save = this.getSave();
+
+        const activeActors = Object.values(save.actors || {})
+            .filter(actor => actor.id !== save.playerId)
+            .filter(actor => actor.active !== false);
+        const activeLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
+        const activeMaps = (save.maps || []).filter(map => map.active !== false);
+
+        const globalStatValues: { [key: string]: StatValue } = {};
+        (configuration.globalStats || []).forEach((stat) => {
+            if (!stat.id || !(stat.name || '').trim()) {
+                return;
+            }
+            globalStatValues[stat.id] = normalizeStatValue(save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id], stat);
+        });
+
+        return buildPortableGameConfiguration({
+            title: configuration.title,
+            titleImageUrl: configuration.titleImageUrl,
+            titleImagePrompt: configuration.titleImagePrompt,
+            backgroundImageUrl: configuration.backgroundImageUrl,
+            backgroundImagePrompt: configuration.backgroundImagePrompt,
+            creatorNotes: configuration.creatorNotes,
+            versionNotes: configuration.versionNotes,
+            startingDate: configuration.startingDate,
+            actorStats: configuration.actorStats,
+            locationStats: configuration.locationStats,
+            globalStats: configuration.globalStats,
+            globalStatValues,
+            actors: activeActors,
+            locations: activeLocations,
+            maps: activeMaps,
+            lorebook: save.lorebook || [],
+            calendarEvents: this.getManagedCalendarEvents(),
+            uiSettings: this.getUiSettings(),
+        });
+    }
+
+    // Storage functionality
+    async readStageConfiguration(speakerIds: string[] = []): Promise<void> {
+        const characterIds = speakerIds.length ? speakerIds : [this.primaryCharacter.anonymizedId];
+        const storedContent = (await this.storage.get('agenda_configuration').forCharacters(characterIds)).data;
+
+        console.log('Stored stage configuration:');
+        console.log(storedContent);
+
+        // If there was content, load it as the game's configuration so new games use the latest saved content.
+        if (storedContent && typeof storedContent === 'object') {
+            this.updateConfiguration(storedContent as Partial<GameConfiguration>);
+        }
+    }
+
+
+    async updateStageConfiguration() {
+        // Only the owner can update the stage configuration.
+        if (this.isOwner) {
+            const portableConfiguration = this.buildPortableConfiguration();
+            const response = await this.storage.set('agenda_configuration', portableConfiguration).forCharacterSensitive(this.primaryCharacter.anonymizedId);
+            console.log(response);
+        }
+    }
+
 
     render(): ReactElement {
         return <BaseScreen stage={() => this}/>;
