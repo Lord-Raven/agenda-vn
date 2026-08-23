@@ -8,6 +8,7 @@ import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
+import { getLocationName } from '../content/Location';
 
 interface MapDetailPanelProps {
     map: GameMap;
@@ -270,10 +271,19 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
         }
     };
 
-    const resolveTargetName = (childId: string) =>
-        activeMaps.find(candidate => candidate.id === childId)?.name
-        || activeLocations.find(location => location.id === childId)?.name
-        || 'Missing target';
+    const resolveTargetName = (childId: string) => {
+        const mapTarget = activeMaps.find(candidate => candidate.id === childId);
+        if (mapTarget) {
+            return mapTarget.name;
+        }
+
+        const locationTarget = activeLocations.find(location => location.id === childId);
+        if (locationTarget) {
+            return getLocationName(locationTarget.id, stageInstance);
+        }
+
+        return 'Missing target';
+    };
 
     const updateLinkFromPointer = (index: number, event: PointerEvent<HTMLElement>) => {
         const previewBounds = previewRef.current?.getBoundingClientRect();
@@ -347,7 +357,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                         value={link.childId}
                                         onChange={nextValue => updateLink(index, { childId: (nextValue as string) || link.childId })}
                                         options={[
-                                            ...activeLocations.map(location => ({ key: location.id, label: location.name, imageUrl: location.imageUrl, icon: Place, description: 'Location' })),
+                                            ...activeLocations.map(location => ({ key: location.id, label: getLocationName(location.id, stageInstance), imageUrl: location.imageUrl, icon: Place, description: 'Location' })),
                                             ...activeMaps.map(candidate => ({ key: candidate.id, label: candidate.name, imageUrl: candidate.imageUrl, icon: MapIcon, description: 'Map' })),
                                         ]}
                                         title="Choose link target"

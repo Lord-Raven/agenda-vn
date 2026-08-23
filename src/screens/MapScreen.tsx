@@ -1,5 +1,5 @@
 import { FC, useEffect, useMemo, useState } from "react";
-import { ArrowBackRounded, ArrowForwardRounded, EventAvailable, MenuRounded, Settings } from "@mui/icons-material";
+import { ArrowBackRounded, ArrowForwardRounded, EditNote, EventAvailable, MenuRounded, Settings } from "@mui/icons-material";
 import { Box, Typography } from "@mui/material";
 import { motion } from "framer-motion";
 import { Stage } from "../Stage";
@@ -149,11 +149,11 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                 <Button
                                     variant="secondary"
                                     onClick={() => setShowContentManagement(true)}
-                                    onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", Settings)}
+                                    onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", EditNote)}
                                     onMouseLeave={clearTooltip}
                                     style={{ padding: "8px 10px" }}
                                 >
-                                    <Settings fontSize="small" />
+                                    <EditNote fontSize="small" />
                                 </Button>
                                 <Button
                                     variant="secondary"

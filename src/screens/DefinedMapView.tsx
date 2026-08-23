@@ -1,5 +1,5 @@
 import { FC, Fragment, useEffect, useMemo, useState } from 'react';
-import { EventAvailable, MapRounded, MenuRounded, Settings } from '@mui/icons-material';
+import { EditNote, EventAvailable, MapRounded, MenuRounded, Settings } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getMapImageUrl, Map as GameMap } from '../content/Map';
@@ -84,7 +84,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                 >
                                     <EventAvailable fontSize="small" />
                                 </Button>
-                                <Button variant="secondary" onClick={() => setShowContentManagement(true)} onMouseEnter={() => setTooltip('Manage configuration, actors, locations, maps, and more', Settings)} onMouseLeave={clearTooltip} style={{ padding: '8px 10px' }}><Settings fontSize="small" /></Button>
+                                <Button variant="secondary" onClick={() => setShowContentManagement(true)} onMouseEnter={() => setTooltip('Manage configuration, actors, locations, maps, and more', EditNote)} onMouseLeave={clearTooltip} style={{ padding: '8px 10px' }}><EditNote fontSize="small" /></Button>
                                 <Button variant="secondary" onClick={() => setScreenType(ScreenType.MENU)} onMouseEnter={() => setTooltip('Main menu', MenuRounded)} onMouseLeave={clearTooltip} style={{ padding: '8px 10px' }}><MenuRounded fontSize="small" /></Button>
                             </>
                         }
@@ -145,6 +145,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
                                     const markerName = currentEvent?.name || linkedLocation?.name || linkedMap?.name || 'Unnamed';
                                     const markerSize = isVerticalLayout ? 44 : 52;
+                                    const actorPortraitSize = isVerticalLayout ? 28 : 32;
                                     const configuration = stage().getConfiguration();
                                     const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats });
                                     const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
@@ -180,8 +181,8 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             </span>
                                         </motion.button>
                                         {linkedLocation && (
-                                            <div style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `calc(${link.coordinates.y * 100}% + ${markerSize / 2 + 7}px)`, transform: 'translateX(-50%)', zIndex: isHovered ? 3 : 2 }}>
-                                                <LocationActorPortraits locationId={linkedLocation.id} stage={stage()} size={isVerticalLayout ? 28 : 32} />
+                                            <div style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `calc(${link.coordinates.y * 100}% + ${markerSize / 2 - actorPortraitSize * 0.35}px)`, transform: 'translateX(-50%)', zIndex: isHovered ? 4 : 3 }}>
+                                                <LocationActorPortraits locationId={linkedLocation.id} stage={stage()} size={actorPortraitSize} />
                                             </div>
                                         )}
                                         </Fragment>

@@ -6,6 +6,7 @@ import { Box, Typography } from "@mui/material";
 import {
     ArrowBackRounded,
     ArrowForwardRounded,
+    EditNote,
     EventAvailable,
     MapRounded,
     MenuRounded,
@@ -317,11 +318,11 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 <Button
                                     variant="secondary"
                                     onClick={() => setShowContentManagement(true)}
-                                    onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", Settings)}
+                                    onMouseEnter={() => setTooltip("Manage configuration, actors, locations, and more", EditNote)}
                                     onMouseLeave={clearTooltip}
                                     style={{ padding: "8px 10px" }}
                                 >
-                                    <Settings fontSize="small" />
+                                    <EditNote fontSize="small" />
                                 </Button>
                                 <Button
                                     variant="secondary"

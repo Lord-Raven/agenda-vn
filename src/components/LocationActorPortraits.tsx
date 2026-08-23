@@ -20,10 +20,12 @@ export const LocationActorPortraits: FC<LocationActorPortraitsProps> = ({ locati
         return null;
     }
 
+    const overlap = Math.round(size * 0.32);
+
     return (
-        <div aria-label={`Characters at this location: ${actors.map(actor => actor.name).join(', ')}`} style={{ display: 'flex', alignItems: 'center', paddingLeft: Math.min(actors.length - 1, 3) * 8, pointerEvents: 'none' }}>
+        <div aria-label={`Characters at this location: ${actors.map(actor => actor.name).join(', ')}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             {actors.map((actor, index) => (
-                <div key={actor.id} style={{ marginLeft: index === 0 ? 0 : -8 }}>
+                <div key={actor.id} style={{ marginLeft: index === 0 ? 0 : -overlap, zIndex: actors.length - index }}>
                     <ActorPortrait
                         actor={actor}
                         stage={stage}
