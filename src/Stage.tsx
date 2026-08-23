@@ -591,14 +591,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         this.syncActorStats(newSave);
-    this.syncLocationStats(newSave);
-    this.syncGlobalStats(newSave);
+        this.syncLocationStats(newSave);
+        this.syncGlobalStats(newSave);
 
         if (!newSave.currentDate && persistedConfiguration.startingDate) {
             newSave.currentDate = persistedConfiguration.startingDate;
         }
 
-        this.anticipatedLoadingPromiseCount = Math.max(this.INITIAL_ACTORS - Object.keys(newSave.actors).length, 0) * 1 + 3;
+        this.anticipatedLoadingPromiseCount = 5;//Math.max(this.INITIAL_ACTORS - Object.keys(newSave.actors).length, 0) * 1 + 3;
 
         // Save the new game
         this.saveData.saves[saveSlotIndex] = newSave;
@@ -2123,55 +2123,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         this.syncActorStats(save);
                     }
                 } catch (error) {
-                    console.warn(`Failed to distill configured actor ${seededActor.name || seededActor.id}`, error);
+                    console.warn(`Failed to load configured actor ${seededActor.name || seededActor.id}`, error);
                 }
             }
-
-            // Generate additional actors until we reach the initial roster size.
-            let attemptsRemaining = Math.max((this.INITIAL_ACTORS - Object.keys(save.actors).length) * 2, 0);
-            while (Object.keys(save.actors).length < this.INITIAL_ACTORS && attemptsRemaining > 0) {
-                attemptsRemaining -= 1;
-
-                let actorSeed: Partial<Actor> | null = null;
-                try {
-                    actorSeed = await this.generateActorSeed(save);
-                } catch (error) {
-                    console.warn('Failed to generate actor seed', error);
-                    continue;
-                }
-
-                if (!actorSeed?.name) {
-                    continue;
-                }
-
-                const nameKey = actorSeed.name.trim().toLowerCase();
-                const duplicateByName = Object.values(save.actors).some(existing => existing.name?.trim().toLowerCase() === nameKey);
-                if (duplicateByName) {
-                    continue;
-                }
-
-                const draftActor = new Actor(actorSeed);
-                try {
-                    const newActor = await loadSupportedActor(draftActor, this);
-                    if (!newActor) {
-                        continue;
-                    }
-
-                    const alreadyExists = Object.values(save.actors).some(existing =>
-                        existing.id === newActor.id || existing.name?.trim().toLowerCase() === newActor.name?.trim().toLowerCase(),
-                    );
-                    if (alreadyExists) {
-                        continue;
-                    }
-
-                    applyActorInitialStats(newActor, configuredActorStats, this.getScheduleContext(save));
-                    save.actors[newActor.id] = newActor;
-                    this.syncActorStats(save);
-                } catch (error) {
-                    console.warn(`Failed to generate actor from seed ${actorSeed.name}`, error);
-                }
-            }
-
+    
             this.saveGame();
         })().finally(() => {
             delete this.generationPromises['loadActors'];
