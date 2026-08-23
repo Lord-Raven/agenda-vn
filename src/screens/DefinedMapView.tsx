@@ -80,7 +80,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     onClick={() => setScreenType(ScreenType.CALENDAR)}
                                     onMouseEnter={() => setTooltip('Switch to calendar', EventAvailable)}
                                     onMouseLeave={clearTooltip}
-                                    style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                    style={{ padding: '8px 10px' }}
                                 >
                                     <EventAvailable fontSize="small" />
                                 </Button>
