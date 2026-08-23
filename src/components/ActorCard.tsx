@@ -1,7 +1,7 @@
 import { FC, useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Stage } from '../Stage';
-import { Stat } from '../content/Stat';
+import { Stat, StatValue } from '../content/Stat';
 import { Actor } from '../content/Actor';
 import { NamePlate } from './UiComponents';
 import { resolveIcon } from './StatRating';
@@ -14,12 +14,12 @@ interface ActorCardProps {
     className?: string;
 }
 
-const resolveStatValue = (actor: Actor, stat: Stat): number | string | boolean => {
-    const raw = (actor.statMap as { [key: string]: number | string | boolean } | undefined)?.[stat.id];
+const resolveStatValue = (actor: Actor, stat: Stat): StatValue => {
+    const raw = (actor.statMap as { [key: string]: StatValue } | undefined)?.[stat.id];
     return raw === undefined || raw === null || raw === '' ? stat.default : raw;
 };
 
-const StatValue: FC<{ stat: Stat; value: number | string | boolean; atlas?: { [key: string]: { name: string } } }> = ({ stat, value, atlas }) => {
+const StatValueContainer: FC<{ stat: Stat; value: StatValue; atlas?: { [key: string]: { name: string } } }> = ({ stat, value, atlas }) => {
     if (stat.type === 'location') {
         return (
             <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 700, whiteSpace: 'nowrap' }}>
@@ -154,7 +154,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                                     {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
                                     <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.name}</Box>
                                 </Box>
-                                <StatValue stat={stat} value={resolveStatValue(actor, stat)} atlas={stage().getSave()?.atlas} />
+                                <StatValueContainer stat={stat} value={resolveStatValue(actor, stat)} atlas={stage().getSave()?.atlas} />
                             </Box>
                         );
                     })}
