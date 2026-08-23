@@ -92,8 +92,15 @@ const resolveActorStatRange = (stat: Stat): { min: number; max: number; step: nu
 
 const buildLetterGradeOptions = (stat: Stat): Array<{ label: string; value: number }> => {
     const { min, max } = resolveActorStatRange(stat);
-    const labels = ['F', 'D', 'C', 'B', 'A', 'S'];
+    // Labels vary by the range.
+    const possibleLabels: {[key: number]: string[]} = {
+        5: ['F', 'D', 'C', 'B', 'A'],
+        6: ['F', 'D', 'C', 'B', 'A', 'S'],
+        12: ['F', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+']
+    };
     const span = Math.max(1, max - min);
+    // Get highest possibleLabels less than span
+    const labels = possibleLabels[Math.max(...Object.keys(possibleLabels).map(Number).filter(key => key <= span))] || possibleLabels[5];
 
     return labels.map((label, index) => {
         const ratio = index / (labels.length - 1);
@@ -116,7 +123,6 @@ const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: st
         if (stat.type === 'locationList') {
             const currentValue = actor.statMap?.[stat.id];
             nextMap[stat.id] = Array.isArray(currentValue) ? normalizeLocationListValue(currentValue) : normalizeLocationListValue(stat.default);
-            console.log(`Debugging: normalizing locationList for stat id ${stat.id}`, nextMap[stat.id]);
             return;
         }
         if (stat.type === 'checkbox') {

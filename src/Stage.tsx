@@ -3,7 +3,7 @@ import {StageBase, StageResponse, InitialData, Message, User, Character, AspectR
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, loadSupportedActor, resolveActorSchedule, ScheduleContext } from "./content/Actor";
-import { Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
+import { Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeLocationListValue, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
@@ -1444,7 +1444,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private syncActorStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().actorStats || [])
             .filter(stat => stat?.name?.trim())
-            .filter(stat => stat.type === 'number' || stat.type === 'checkbox' || stat.type === 'location');
+            .filter(stat => stat.type === 'number' || stat.type === 'checkbox' || stat.type === 'location' || stat.type === 'locationList');
         const scalarStats = configuredStats.filter(stat => !stat.perActor);
         const perActorStats = configuredStats.filter(stat => stat.perActor);
         const statIds = new Set(scalarStats.map(stat => stat.id));
@@ -1463,6 +1463,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             scalarStats.forEach(stat => {
                 const existingValue = actor.statMap[stat.id];
+                if (stat.type === 'locationList') {
+                    actor.statMap[stat.id] = normalizeLocationListValue(existingValue);
+                    return;
+                }
                 const normalized = normalizeStatValue(existingValue, stat);
                 if (stat.type === 'location') {
                     actor.statMap[stat.id] = typeof normalized === 'string' ? normalized : '';
@@ -1508,7 +1512,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private syncLocationStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().locationStats || [])
             .filter(stat => stat?.name?.trim())
-            .filter(stat => stat.type === 'number' || stat.type === 'checkbox' || stat.type === 'location');
+            .filter(stat => stat.type === 'number' || stat.type === 'checkbox' || stat.type === 'location' || stat.type === 'locationList');
         const statIds = new Set(configuredStats.map(stat => stat.id));
 
         Object.values(save.atlas || {}).forEach(location => {
@@ -1518,6 +1522,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             configuredStats.forEach(stat => {
                 const existingValue = location.statMap[stat.id];
+                if (stat.type === 'locationList') {
+                    location.statMap[stat.id] = normalizeLocationListValue(existingValue);
+                    return;
+                }
                 const normalized = normalizeStatValue(existingValue, stat);
                 if (stat.type === 'location') {
                     location.statMap[stat.id] = typeof normalized === 'string' ? normalized : '';
