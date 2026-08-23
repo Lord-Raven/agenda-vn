@@ -414,6 +414,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                             options={actors.map((actor) => ({
                                 key: actor.id,
                                 label: actor.name,
+                                category: actor.category?.trim() || 'Uncategorized',
                                 imageUrl: actor.outfits?.length ? (stageInstance.getSave()?.actors?.[actor.id]?.outfits?.[0] ? undefined : undefined) : undefined,
                             }))}
                             allowClear

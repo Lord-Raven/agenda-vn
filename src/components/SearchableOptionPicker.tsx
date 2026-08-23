@@ -5,6 +5,7 @@ import { DoNotDisturb } from '@mui/icons-material';
 export type PickerOption = {
     key: string;
     label: string;
+    category?: string;
     icon?: any;
     imageUrl?: string;
     description?: string;
@@ -40,6 +41,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 }) => {
     const [search, setSearch] = useState('');
     const [isOpen, setIsOpen] = useState(false);
+    const optionGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: '8px' };
 
     const orderedOptions = useMemo(() => {
         const allOptions = [...options];
@@ -58,10 +60,31 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
             return preferred;
         }
         return preferred.filter((option) => {
-            const haystack = `${option.label} ${option.description || ''} ${option.key}`.toLowerCase();
+            const haystack = `${option.label} ${option.category || ''} ${option.description || ''} ${option.key}`.toLowerCase();
             return haystack.includes(query);
         });
     }, [defaultOptionKeys, options, search]);
+
+    const optionSections = useMemo(() => {
+        const shouldGroup = orderedOptions.some((option) => option.category?.trim());
+        if (!shouldGroup) {
+            return [{ key: 'all-options', label: '', options: orderedOptions }];
+        }
+
+        const sections: Array<{ key: string; label: string; options: PickerOption[] }> = [];
+        const sectionByLabel = new Map<string, PickerOption[]>();
+        orderedOptions.forEach((option) => {
+            const label = option.category?.trim() || 'Uncategorized';
+            const key = label.toLowerCase();
+            if (!sectionByLabel.has(key)) {
+                const sectionOptions: PickerOption[] = [];
+                sectionByLabel.set(key, sectionOptions);
+                sections.push({ key, label, options: sectionOptions });
+            }
+            sectionByLabel.get(key)?.push(option);
+        });
+        return sections;
+    }, [orderedOptions]);
 
     const selectedValues = multiple ? (values ?? []) : (value ? [value] : []);
     const selectedValue = value ?? (allowClear ? undefined : defaultOptionKeys[0] || options[0]?.key);
@@ -120,6 +143,69 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         setIsOpen(false);
     };
 
+    const renderClearOption = () => (
+        <button
+            key="picker-clear"
+            type="button"
+            onClick={() => handleSelect(undefined)}
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                background: multiple ? (selectedValues.length === 0 ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)') : (selectedValue === undefined ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)'),
+                border: multiple ? (selectedValues.length === 0 ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)') : (selectedValue === undefined ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)'),
+                borderRadius: '8px',
+                color: 'var(--agenda-text-primary)',
+                cursor: 'pointer',
+                padding: '10px 8px',
+                minHeight: '88px',
+                fontSize: '11px',
+                lineHeight: 1.2,
+                whiteSpace: 'normal',
+                textAlign: 'center',
+                overflowWrap: 'anywhere',
+            }}
+        >
+            <DoNotDisturb style={{ fontSize: 24, color: multiple ? (selectedValues.length === 0 ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)') : (selectedValue === undefined ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)') }} />
+            <span>{emptyLabel}</span>
+        </button>
+    );
+
+    const renderOptionButton = (option: PickerOption) => {
+        const active = multiple ? selectedValues.includes(option.key) : selectedValue === option.key;
+        return (
+            <button
+                key={`picker-option-${option.key}`}
+                type="button"
+                onClick={() => handleSelect(option.key)}
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: active ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
+                    border: active ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
+                    borderRadius: '8px',
+                    color: 'var(--agenda-text-primary)',
+                    cursor: 'pointer',
+                    padding: '10px 8px',
+                    minHeight: '88px',
+                    fontSize: '11px',
+                    lineHeight: 1.2,
+                    whiteSpace: 'normal',
+                    textAlign: 'center',
+                    overflowWrap: 'anywhere',
+                }}
+            >
+                {renderOptionAvatar(option, active, 30)}
+                <span style={{ maxWidth: '100%' }}>{option.label}</span>
+            </button>
+        );
+    };
+
     const pickerContent = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <input
@@ -130,68 +216,16 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 placeholder={placeholder}
                 autoFocus
             />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: '8px', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
+            <div style={{ maxHeight: '320px', overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {allowClear && (
-                    <button
-                        key="picker-clear"
-                        type="button"
-                        onClick={() => handleSelect(undefined)}
-                        style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            background: multiple ? (selectedValues.length === 0 ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)') : (selectedValue === undefined ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)'),
-                            border: multiple ? (selectedValues.length === 0 ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)') : (selectedValue === undefined ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)'),
-                            borderRadius: '8px',
-                            color: 'var(--agenda-text-primary)',
-                            cursor: 'pointer',
-                            padding: '10px 8px',
-                            minHeight: '88px',
-                            fontSize: '11px',
-                            lineHeight: 1.2,
-                            whiteSpace: 'normal',
-                            textAlign: 'center',
-                            overflowWrap: 'anywhere',
-                        }}
-                    >
-                        <DoNotDisturb style={{ fontSize: 24, color: multiple ? (selectedValues.length === 0 ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)') : (selectedValue === undefined ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)') }} />
-                        <span>{emptyLabel}</span>
-                    </button>
+                    <div style={optionGridStyle}>{renderClearOption()}</div>
                 )}
-                {orderedOptions.map((option) => {
-                    const active = multiple ? selectedValues.includes(option.key) : selectedValue === option.key;
-                    return (
-                        <button
-                            key={`picker-option-${option.key}`}
-                            type="button"
-                            onClick={() => handleSelect(option.key)}
-                            style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                background: active ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
-                                border: active ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
-                                borderRadius: '8px',
-                                color: 'var(--agenda-text-primary)',
-                                cursor: 'pointer',
-                                padding: '10px 8px',
-                                minHeight: '88px',
-                                fontSize: '11px',
-                                lineHeight: 1.2,
-                                whiteSpace: 'normal',
-                                textAlign: 'center',
-                                overflowWrap: 'anywhere',
-                            }}
-                        >
-                            {renderOptionAvatar(option, active, 30)}
-                            <span style={{ maxWidth: '100%' }}>{option.label}</span>
-                        </button>
-                    );
-                })}
+                {optionSections.map((section) => (
+                    <div key={`picker-section-${section.key}`} style={{ display: 'grid', gap: 6 }}>
+                        {section.label && <div style={{ color: 'var(--agenda-text-muted)', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{section.label}</div>}
+                        <div style={optionGridStyle}>{section.options.map(renderOptionButton)}</div>
+                    </div>
+                ))}
             </div>
         </div>
     );

@@ -12,7 +12,7 @@ interface ActorScheduleEditorProps {
     locations: LocationLike[];
     globalStats: Stat[];
     actorStats: Stat[];
-    actors?: Array<{ id: string; name: string }>;
+    actors?: Array<{ id: string; name: string; category?: string }>;
     emptyLabel?: string;
     onChange: (schedule: ActorSchedule) => void;
 }
@@ -29,6 +29,7 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
         ...locations.map(location => ({
             key: location.id,
             label: location.name || 'Unnamed location',
+            category: location.category?.trim() || 'Uncategorized',
             renderAvatar: (size: number, active: boolean) => (
                 <LocationPortrait location={location} width={Math.round(size * 1.34)} height={size} highlighted={active} />
             ),

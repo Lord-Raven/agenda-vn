@@ -11,7 +11,7 @@ interface ConditionEditorProps {
     conditionCollections: ConditionCollection[];
     globalStats: Stat[];
     actorStats?: Stat[];
-    actors?: Array<{ id: string; name: string }>;
+    actors?: Array<{ id: string; name: string; category?: string }>;
     locations?: LocationLike[];
     allowVariableActorTarget?: boolean;
     onChange: (conditionCollections: ConditionCollection[]) => void;
@@ -74,8 +74,8 @@ const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
     return typeof stat.default === 'number' ? stat.default : 0;
 };
 
-export const buildActorTargetOptions = (actors: Array<{ id: string; name: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] }>, allowVariableActorTarget: boolean) => {
-    const options: Array<{ key: string; label: string; icon?: typeof AllInclusive; imageUrl?: string }> = [];
+export const buildActorTargetOptions = (actors: Array<{ id: string; name: string; category?: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] }>, allowVariableActorTarget: boolean) => {
+    const options: Array<{ key: string; label: string; category?: string; icon?: typeof AllInclusive; imageUrl?: string }> = [];
     if (allowVariableActorTarget) {
         options.push({ key: 'variable', label: 'Variable', icon: SwapHoriz });
     }
@@ -86,7 +86,7 @@ export const buildActorTargetOptions = (actors: Array<{ id: string; name: string
                 ? getEmotionImage(actor as Actor, 'neutral', undefined, actor.outfitId || '') || getEmotionImage(actor as Actor, 'base', undefined, actor.outfitId || '')
                 : ''
         );
-        return { key: actor.id, label: actor.name, imageUrl: portraitUrl || '' };
+        return { key: actor.id, label: actor.name, category: actor.category?.trim() || 'Uncategorized', imageUrl: portraitUrl || '' };
     }));
     return options;
 };
@@ -146,7 +146,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                 <SearchableOptionPicker
                     value={condition.value}
                     onChange={(nextValue) => updateValue((Array.isArray(nextValue) ? nextValue[0] : nextValue) || concreteActorOptions[0]?.key || '')}
-                    options={concreteActorOptions.map((option) => ({ key: option.key, label: option.label, icon: option.icon, imageUrl: option.imageUrl }))}
+                    options={concreteActorOptions.map((option) => ({ key: option.key, label: option.label, category: option.category, icon: option.icon, imageUrl: option.imageUrl }))}
                     allowClear={false}
                     emptyLabel="None"
                     title="Choose actor"
@@ -232,7 +232,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                 <SearchableOptionPicker
                                     value={condition.actorId}
                                     onChange={(nextValue) => updateCondition(collectionIndex, conditionIndex, { ...condition, actorId: nextValue || (allowVariableActorTarget ? 'variable' : 'any') } as Condition)}
-                                    options={actorTargetOptions.map((option) => ({ key: option.key, label: option.label, icon: option.icon, imageUrl: option.imageUrl }))}
+                                    options={actorTargetOptions.map((option) => ({ key: option.key, label: option.label, category: option.category, icon: option.icon, imageUrl: option.imageUrl }))}
                                     defaultOptionKeys={allowVariableActorTarget ? ['variable', 'any', 'none'] : ['any', 'none']}
                                     allowClear={false}
                                     emptyLabel="None"

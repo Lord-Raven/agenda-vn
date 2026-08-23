@@ -4,7 +4,7 @@ import { Location, getLocationImageUrl } from '../content/Location';
 import { Stage } from '../Stage';
 
 export type LocationLike = Pick<Location, 'id' | 'name'>
-    & Partial<Pick<Location, 'imageUrl' | 'alternativeImages' | 'focalPoint' | 'themeColor'>>;
+    & Partial<Pick<Location, 'category' | 'imageUrl' | 'alternativeImages' | 'focalPoint' | 'themeColor'>>;
 
 export interface LocationPortraitProps {
     location?: LocationLike | null;

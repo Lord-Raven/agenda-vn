@@ -355,6 +355,7 @@ export const LocationSelect: FC<LocationSelectProps> = ({
 	const options: PickerOption[] = sortedLocations.map((location) => ({
 		key: location.id,
 		label: location.name || 'Unnamed location',
+		category: location.category?.trim() || 'Uncategorized',
 		renderAvatar: (size, active) => (
 			<LocationPortrait
 				location={location}

@@ -357,8 +357,8 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
                                         value={link.childId}
                                         onChange={nextValue => updateLink(index, { childId: (nextValue as string) || link.childId })}
                                         options={[
-                                            ...activeLocations.map(location => ({ key: location.id, label: getLocationName(location.id, stageInstance), imageUrl: location.imageUrl, icon: Place, description: 'Location' })),
-                                            ...activeMaps.map(candidate => ({ key: candidate.id, label: candidate.name, imageUrl: candidate.imageUrl, icon: MapIcon, description: 'Map' })),
+                                            ...activeLocations.map(location => ({ key: location.id, label: getLocationName(location.id, stageInstance), category: location.category?.trim() || 'Uncategorized', imageUrl: location.imageUrl, icon: Place, description: 'Location' })),
+                                            ...activeMaps.map(candidate => ({ key: candidate.id, label: candidate.name, category: candidate.category?.trim() || 'Uncategorized', imageUrl: candidate.imageUrl, icon: MapIcon, description: 'Map' })),
                                         ]}
                                         title="Choose link target"
                                         placeholder="Search locations and maps"
