@@ -2,6 +2,8 @@ import { FC, ReactNode, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DoNotDisturb } from '@mui/icons-material';
 
+const MAX_SELECTED_PREVIEW = 6;
+
 export type PickerOption = {
     key: string;
     label: string;
@@ -230,11 +232,31 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         </div>
     );
 
+    const selectedOptions = selectedValues
+        .map((key) => options.find((option) => option.key === key))
+        .filter((option): option is PickerOption => Boolean(option));
+    const visibleSelectedOptions = selectedOptions.slice(0, MAX_SELECTED_PREVIEW);
+    const overflowSelectedCount = selectedOptions.length - visibleSelectedOptions.length;
+
     const buttonContent = renderButton
         ? renderButton(multiple ? selectedValues : value)
         : multiple
-            ? (selectedValues.length > 0
-                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, fontSize: '12px', color: 'var(--agenda-text-primary)' }}>{selectedValues.length} selected</span>
+            ? (selectedOptions.length > 0
+                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', minWidth: 0 }}>
+                        {visibleSelectedOptions.map((option, index) => (
+                            <span key={`picker-selected-${option.key}`} style={{ display: 'inline-flex', marginLeft: index === 0 ? 0 : -8, flexShrink: 0 }}>
+                                {renderOptionAvatar(option, false, 22)}
+                            </span>
+                        ))}
+                    </span>
+                    {selectedOptions.length === 1 && (
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px' }}>{selectedOptions[0].label}</span>
+                    )}
+                    {overflowSelectedCount > 0 && (
+                        <span style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>+{overflowSelectedCount}</span>
+                    )}
+                </span>
                 : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, fontSize: '12px', color: 'var(--agenda-text-muted)' }}><DoNotDisturb style={{ fontSize: 18 }} />{emptyLabel}</span>)
             : selectedOption
                 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%' }}>
@@ -264,8 +286,10 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                     padding: '6px 10px',
                     overflow: 'hidden',
                 }}
-                aria-label={selectedOption ? `Selected option: ${selectedOption.label}` : title}
-                title={selectedOption?.label}
+                aria-label={multiple
+                    ? (selectedOptions.length > 0 ? `Selected options: ${selectedOptions.map((option) => option.label).join(', ')}` : title)
+                    : (selectedOption ? `Selected option: ${selectedOption.label}` : title)}
+                title={multiple ? selectedOptions.map((option) => option.label).join(', ') || undefined : selectedOption?.label}
             >
                 {buttonContent}
             </button>

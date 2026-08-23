@@ -2,13 +2,13 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { Stat, StatValue, StatValueRule, resolveStatDefault } from '../content/Stat';
+import { Stat, StatValue, StatValueRule, normalizeLocationListValue, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ConditionContext } from '../content/Condition';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { StatRating } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
@@ -113,6 +113,11 @@ const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: st
             nextMap[stat.id] = typeof currentValue === 'string' ? currentValue : (typeof stat.default === 'string' ? stat.default : '');
             return;
         }
+        if (stat.type === 'locationList') {
+            const currentValue = actor.statMap?.[stat.id];
+            nextMap[stat.id] = Array.isArray(currentValue) ? normalizeLocationListValue(currentValue) : normalizeLocationListValue(stat.default);
+            return;
+        }
         if (stat.type === 'checkbox') {
             const currentValue = actor.statMap?.[stat.id];
             nextMap[stat.id] = typeof currentValue === 'boolean' ? currentValue : (typeof stat.default === 'boolean' ? stat.default : false);
@@ -163,7 +168,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                 name,
                 default: stat.type === 'location'
                     ? (typeof stat.default === 'string' ? stat.default : '')
-                    : (Number.isFinite(stat.default) ? Number(stat.default) : 0),
+                    : stat.type === 'locationList'
+                        ? normalizeLocationListValue(stat.default)
+                        : (Number.isFinite(stat.default) ? Number(stat.default) : 0),
             };
         });
         return Object.values(uniqueStatMap);
@@ -543,6 +550,11 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                 actor.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
                 return;
             }
+            if (stat.type === 'locationList') {
+                const candidateValue = nextEditedStatMap[stat.id];
+                actor.statMap[stat.id] = Array.isArray(candidateValue) ? normalizeLocationListValue(candidateValue) : normalizeLocationListValue(stat.default);
+                return;
+            }
             if (stat.type === 'checkbox') {
                 const candidateValue = nextEditedStatMap[stat.id];
                 actor.statMap[stat.id] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
@@ -788,10 +800,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         }));
     };
 
-    const handleActorStatLocationChange = (stat: Stat, locationId: string) => {
+    const handleActorStatLocationChange = (stat: Stat, locationIds: string | string[]) => {
         setEditedStatMap((prev) => ({
             ...prev,
-            [stat.id]: locationId,
+            [stat.id]: locationIds,
         }));
     };
 
@@ -947,6 +959,16 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
                 <LocationSelect
                     value={typeof value === 'string' ? value : ''}
                     onChange={(locationId) => onChange(locationId)}
+                    locations={locationOptions}
+                    stage={stage}
+                />
+            );
+        }
+        if (stat.type === 'locationList') {
+            return (
+                <LocationMultiSelect
+                    values={Array.isArray(value) ? value : []}
+                    onChange={(locationIds) => onChange(locationIds)}
                     locations={locationOptions}
                     stage={stage}
                 />
@@ -2033,6 +2055,16 @@ ${indent}}`;
                                                                 />
                                                             )}
 
+                                                            {stat.type === 'locationList' && (
+                                                                <LocationMultiSelect
+                                                                    values={Array.isArray(editedStatMap[stat.id]) ? editedStatMap[stat.id] as string[] : []}
+                                                                    onChange={(locationIds) => handleActorStatLocationChange(stat, locationIds)}
+                                                                    locations={locationOptions}
+                                                                    stage={stage}
+                                                                    style={{ maxWidth: '220px' }}
+                                                                />
+                                                            )}
+
                                                             {stat.type === 'number' && stat.displayType === 'rating' && (
                                                                 <StatRating
                                                                     stat={stat}
@@ -2094,7 +2126,7 @@ ${indent}}`;
                                                                     </div>
                                                                 )}
 
-                                                                {stat.type !== 'location' && (
+                                                                {stat.type !== 'location' && stat.type !== 'locationList' && (
                                                                 <>
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
                                                                     <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
