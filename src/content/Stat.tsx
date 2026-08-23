@@ -146,7 +146,7 @@ export const cloneStat = (stat: Stat): Stat => ({
     })),
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
-    setByPlayer: stat.setByPlayer === true || stat.exposed === true,
+    setByPlayer: stat.setByPlayer === true,
     exposed: stat.exposed === true,
     iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
     labelIconName: stat.labelIconName || undefined,
