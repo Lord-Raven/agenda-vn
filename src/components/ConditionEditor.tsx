@@ -63,6 +63,24 @@ const iconButtonStyle = {
     padding: 0,
 };
 
+const getConditionRowTemplate = (condition: Condition, hasCollectionCategories: boolean) => {
+    const parameterColumns = condition.type === 'actorStat'
+        ? ['minmax(120px, 1fr)', 'minmax(120px, 1fr)']
+        : condition.type === 'calendar' || condition.type === 'globalStat'
+            ? ['minmax(120px, 1fr)']
+            : [];
+    return [
+        '32px',
+        '32px',
+        ...(hasCollectionCategories ? ['150px'] : []),
+        'minmax(110px, 130px)',
+        ...parameterColumns,
+        'minmax(100px, 110px)',
+        'minmax(120px, 1fr)',
+        'auto',
+    ].join(' ');
+};
+
 const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
     if (!stat) {
         return 0;
@@ -204,7 +222,8 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                 const isLinked = conditionIndex > 0;
                 const isGrouped = collection.length > 1;
                 return (
-                    <div key={`${collectionIndex}-${conditionIndex}`} style={{ display: 'grid', gridTemplateColumns: collectionCategories ? '32px 150px minmax(110px, 130px) minmax(120px, 1.2fr) minmax(0, 1.3fr) minmax(110px, 1.2fr) minmax(100px, 1fr) auto 8px' : '32px minmax(110px, 130px) minmax(120px, 1.2fr) minmax(0, 1.3fr) minmax(110px, 1.2fr) minmax(100px, 1fr) auto 8px', gap: 8, alignItems: 'center', width: '100%', minWidth: 0 }}>
+                    <div key={`${collectionIndex}-${conditionIndex}`} style={{ display: 'grid', gridTemplateColumns: getConditionRowTemplate(condition, Boolean(collectionCategories)), gap: 8, alignItems: 'center', width: '100%', minWidth: 0 }}>
+                        <div style={{ alignSelf: 'stretch', borderLeft: isGrouped ? '2px solid var(--agenda-accent-primary)' : undefined, borderTop: isGrouped && conditionIndex === 0 ? '2px solid var(--agenda-accent-primary)' : undefined, borderBottom: isGrouped && conditionIndex === collection.length - 1 ? '2px solid var(--agenda-accent-primary)' : undefined }} />
                         <Button
                             variant="secondary"
                             disabled={currentFlatIndex === 0}
@@ -277,11 +296,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                     placeholder="Search actors"
                                 />
                             </div>
-                        ) : condition.type === 'actorIdentity' ? (
-                            <div />
-                        ) : (
-                            <div />
-                        )}
+                        ) : null}
                         {(condition.type === 'globalStat' || condition.type === 'actorStat') && (
                             <select style={selectStyle} value={condition.statId} onChange={(event) => {
                                 const stat = (condition.type === 'globalStat' ? globalStats : actorStats).find(candidate => candidate.id === event.target.value);
@@ -306,7 +321,6 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             <Button variant="secondary" disabled={currentFlatIndex === conditionCount - 1} onClick={() => moveCondition(collectionIndex, conditionIndex, 1)} style={iconButtonStyle} aria-label="Move condition down"><ArrowDownward fontSize="small" /></Button>
                             <Button variant="danger" onClick={() => deleteCondition(collectionIndex, conditionIndex)} style={iconButtonStyle} aria-label="Delete condition"><Delete fontSize="small" /></Button>
                         </div>
-                        <div style={{ alignSelf: 'stretch', borderRight: isGrouped ? '2px solid var(--agenda-accent-primary)' : undefined, borderTop: isGrouped && conditionIndex === 0 ? '2px solid var(--agenda-accent-primary)' : undefined, borderBottom: isGrouped && conditionIndex === collection.length - 1 ? '2px solid var(--agenda-accent-primary)' : undefined }} />
                     </div>
                 );
             }))}

@@ -58,6 +58,9 @@ export const normalizeLocationOpenTimes = (openTimes: unknown): Partial<Record<C
 
 // A disabled location is hidden entirely from maps (e.g. a business that doesn't exist yet).
 export const isLocationDisabled = (location: Location, context: ConditionContext): boolean => {
+	console.log('Checking if location is disabled:', location, 'with context:', context);
+	console.log('Availability conditions:', location.availabilityConditions?.disabled);
+	console.log('Evaluation result:', evaluateConditionCollections(location.availabilityConditions?.disabled, context));
 	return !evaluateConditionCollections(location.availabilityConditions?.disabled, context);
 };
 
