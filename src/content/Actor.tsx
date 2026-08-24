@@ -935,7 +935,7 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
     }
 
     if (options.includes('stats')) {
-        const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
+        const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim() && stat.llmSees !== false);
         const scalarStatLines = actorStats
             .filter(stat => !stat.perActor && actor.statMap?.[stat.id] !== undefined)
             .map(stat => `${stat.name}: ${formatActorStatValue(normalizeStatValue(actor.statMap[stat.id], stat), stat, save.atlas)}`);

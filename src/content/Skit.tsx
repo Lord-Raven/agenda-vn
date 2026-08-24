@@ -215,7 +215,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Exposed settings are conscious choices player's made; present them as settings.
     const playerSettingContext = (agendaConfig?.globalStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
-        if (!statName || !stat.setByPlayer) {
+        if (!statName || !stat.setByPlayer || stat.llmSees === false) {
             return '';
         }
 
@@ -245,7 +245,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Unexposed settings are more like stats beyond their control; present them that way.
     const globalStatContext = (agendaConfig?.globalStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
-        if (!statName || stat.setByPlayer) {
+        if (!statName || stat.setByPlayer || stat.llmSees === false) {
             return '';
         }
 
@@ -805,7 +805,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             const changeValue = parseInt(`${statChange?.Amount ?? statChange?.amount ?? ''}`, 10);
                             const matchedActor = findBestNameMatch(actorName, Object.values(save.actors), ['name']);
                             const normalizedStatName = `${statName || ''}`.trim();
-                            if (matchedActor && normalizedStatName && !isNaN(changeValue) && changeValue !== 0) {
+                            const matchedStat = findBestNameMatch(normalizedStatName, stage.getConfiguration().actorStats || [], ['name']);
+                            if (matchedActor && normalizedStatName && matchedStat && matchedStat.llmMaintained !== false && !isNaN(changeValue) && changeValue !== 0) {
                                 outcomes.push(new Outcome({
                                     type: OutcomeType.ACTOR_STAT,
                                     description: `${matchedActor.name}'s ${normalizedStatName} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,

@@ -134,7 +134,9 @@ export type Stat = {
     // For global stats: rules used to resolve this stat's initial value when a new game starts, evaluated in
     // order (first matching wins); falls back to `default` if none match. See applyGlobalStatDefaults.
     defaultValueRules?: StatValueRule[];
-    guidance: string;
+    llmSees?: boolean; // If true, this stat can be included in context provided to the LLM; if false, this stat is omitted from context (intended for purely mechanical use); if false, the below is also false.
+    llmMaintained?: boolean; // If true, this stat can be updated by the LLM in skit outcomes (see Skit.tsx).
+    guidance: string; // Guidance for the LLM on how to handle this stat. If llmSees is false, the blank for editing this can be omitted from StatManagementPanel.
     default: StatValue;
     type: StatType;
     // Only meaningful when type is 'number'; controls how the numeric value is rendered (straight number, bar, etc).
@@ -177,6 +179,8 @@ export const cloneStat = (stat: Stat): Stat => ({
     perActor: stat.perActor === true,
     perActorDefaultRules: cloneStatValueRules(stat.perActorDefaultRules),
     defaultValueRules: cloneStatValueRules(stat.defaultValueRules),
+    llmSees: stat.llmSees !== false,
+    llmMaintained: stat.llmMaintained !== false,
     guidance: stat.guidance,
     default: stat.type === 'locationList'
         ? normalizeLocationListValue(stat.default)

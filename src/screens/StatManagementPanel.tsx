@@ -90,6 +90,8 @@ const defaultGlobalStat = (): Stat => ({
     }],
     setByPlayer: true,
     exposed: true,
+    llmSees: true,
+    llmMaintained: true,
     iconName: 'star',
 });
 
@@ -108,6 +110,8 @@ const defaultActorStat = (): Stat => ({
     options: [],
     setByPlayer: false,
     exposed: false,
+    llmSees: true,
+    llmMaintained: true,
     iconName: 'star',
 });
 
@@ -124,6 +128,8 @@ const defaultLocationStat = (): Stat => ({
     options: [],
     setByPlayer: false,
     exposed: false,
+    llmSees: true,
+    llmMaintained: true,
     iconName: 'star',
 });
 
@@ -728,6 +734,32 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </label>
                                             </div>
 
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Send to LLM</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.llmSees !== false}
+                                                        onChange={(e) => updateGlobalStat(statIndex, { llmSees: e.target.checked, llmMaintained: e.target.checked ? stat.llmMaintained : false })}
+                                                    />
+                                                    Included in LLM context
+                                                </label>
+                                            </div>
+
+                                            {stat.llmSees !== false && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Generatively Maintained</label>
+                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={stat.llmMaintained !== false}
+                                                            onChange={(e) => updateGlobalStat(statIndex, { llmMaintained: e.target.checked })}
+                                                        />
+                                                        LLM may update this stat via outcomes
+                                                    </label>
+                                                </div>
+                                            )}
+
                                             {(stat.exposed === true || stat.setByPlayer === true) && (
                                                 <div style={inlineFieldTopStyle}>
                                                     <label style={fieldLabelStyle}>Description</label>
@@ -1067,6 +1099,32 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     Maps other actors to distinct values
                                                 </label>
                                             </div>
+
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Send to LLM</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.llmSees !== false}
+                                                        onChange={(e) => updateActorStat(statIndex, { llmSees: e.target.checked, llmMaintained: e.target.checked ? stat.llmMaintained : false })}
+                                                    />
+                                                    Included in LLM context
+                                                </label>
+                                            </div>
+
+                                            {stat.llmSees !== false && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Generatively Maintained</label>
+                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={stat.llmMaintained !== false}
+                                                            onChange={(e) => updateActorStat(statIndex, { llmMaintained: e.target.checked })}
+                                                        />
+                                                        LLM may update this stat via outcomes
+                                                    </label>
+                                                </div>
+                                            )}
 
                                             {stat.exposed === true && (
                                                 <div style={inlineFieldTopStyle}>
@@ -1464,6 +1522,32 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     Exposed
                                                 </label>
                                             </div>
+
+                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Send to LLM</label>
+                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stat.llmSees !== false}
+                                                        onChange={(e) => updateLocationStat(statIndex, { llmSees: e.target.checked, llmMaintained: e.target.checked ? stat.llmMaintained : false })}
+                                                    />
+                                                    Included in LLM context
+                                                </label>
+                                            </div>
+
+                                            {stat.llmSees !== false && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Generatively Maintained</label>
+                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={stat.llmMaintained !== false}
+                                                            onChange={(e) => updateLocationStat(statIndex, { llmMaintained: e.target.checked })}
+                                                        />
+                                                        LLM may update this stat via outcomes
+                                                    </label>
+                                                </div>
+                                            )}
 
                                             {stat.exposed === true && (
                                                 <div style={inlineFieldTopStyle}>
