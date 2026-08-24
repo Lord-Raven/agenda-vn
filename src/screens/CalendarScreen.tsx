@@ -20,6 +20,7 @@ import { ContentManagementScreen } from "./ContentManagementScreen";
 import { Actor, getEmotionImage } from "../content/Actor";
 import { GlobalStatBar } from "../components/GlobalStatBar";
 import { useCachedImageUrl } from "../utils/ImageCache";
+import { CachedBackgroundUrl } from "../components/CachedImage";
 
 interface CalendarScreenProps {
     stage: () => Stage;
@@ -537,21 +538,27 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                                     }}
                                                                 >
                                                                     {participants.slice(0, 4).map((actor, index) => (
-                                                                        <Box
+                                                                        <CachedBackgroundUrl
                                                                             key={`${eventItem.id}-${actor.id}`}
-                                                                            sx={{
-                                                                                width: 20,
-                                                                                height: 20,
-                                                                                marginLeft: index === 0 ? 0 : -0.9,
-                                                                                borderRadius: "50%",
-                                                                                border: "1px solid var(--agenda-line-subtle)",
-                                                                                backgroundImage: `url(${getEmotionImage(actor, "neutral", stageInstance, actor.outfitId) || getEmotionImage(actor, "base", stageInstance, actor.outfitId)})`,
-                                                                                backgroundSize: "cover",
-                                                                                backgroundPosition: "top center",
-                                                                                backgroundColor: "color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)",
-                                                                                boxShadow: "0 1px 4px color-mix(in srgb, var(--agenda-surface-base) 70%, transparent)",
-                                                                            }}
-                                                                        />
+                                                                            url={getEmotionImage(actor, "neutral", stageInstance, actor.outfitId) || getEmotionImage(actor, "base", stageInstance, actor.outfitId)}
+                                                                        >
+                                                                            {(cachedUrl) => (
+                                                                                <Box
+                                                                                    sx={{
+                                                                                        width: 20,
+                                                                                        height: 20,
+                                                                                        marginLeft: index === 0 ? 0 : -0.9,
+                                                                                        borderRadius: "50%",
+                                                                                        border: "1px solid var(--agenda-line-subtle)",
+                                                                                        backgroundImage: `url(${cachedUrl || ''})`,
+                                                                                        backgroundSize: "cover",
+                                                                                        backgroundPosition: "top center",
+                                                                                        backgroundColor: "color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)",
+                                                                                        boxShadow: "0 1px 4px color-mix(in srgb, var(--agenda-surface-base) 70%, transparent)",
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </CachedBackgroundUrl>
                                                                     ))}
                                                                 </Box>
 

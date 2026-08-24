@@ -1,4 +1,4 @@
-import { FC, ImgHTMLAttributes } from 'react';
+import { FC, ImgHTMLAttributes, ReactNode } from 'react';
 import { useCachedImageUrl } from '../utils/ImageCache';
 
 export interface CachedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
@@ -17,6 +17,20 @@ export const CachedImage: FC<CachedImageProps> = ({ src, ...imgProps }) => {
     }
 
     return <img src={cachedSrc} {...imgProps} />;
+};
+
+export interface CachedBackgroundUrlProps {
+    url?: string;
+    children: (cachedUrl: string | undefined) => ReactNode;
+}
+
+/**
+ * Render-prop wrapper that resolves a cached/decoded URL for use in a background-image style.
+ * Use this for items rendered inside a .map() loop, where hooks can't be called directly.
+ */
+export const CachedBackgroundUrl: FC<CachedBackgroundUrlProps> = ({ url, children }) => {
+    const cachedUrl = useCachedImageUrl(url);
+    return <>{children(cachedUrl)}</>;
 };
 
 export default CachedImage;

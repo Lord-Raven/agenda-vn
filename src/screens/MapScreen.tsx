@@ -12,6 +12,7 @@ import { DefinedMapView } from "./DefinedMapView";
 import { LocationActorPortraits } from "../components/LocationActorPortraits";
 import { GlobalStatBar } from "../components/GlobalStatBar";
 import { useCachedImageUrl } from "../utils/ImageCache";
+import { CachedBackgroundUrl } from "../components/CachedImage";
 
 interface MapScreenProps {
     stage: () => Stage;
@@ -291,31 +292,32 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                             };
 
                             return (
-                                <motion.button
-                                    key={location.id}
-                                    type="button"
-                                    disabled={!canVisit}
-                                    onClick={openLocation}
-                                    initial={{ opacity: 0, y: 16 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.22, delay: Math.min(index * 0.04, 0.18) }}
-                                    style={{ width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'inherit', cursor: canVisit ? 'pointer' : 'not-allowed', opacity: canVisit ? 1 : 0.56 }}
-                                >
-                                    <Box
-                                        sx={{
-                                            position: "relative",
-                                            minHeight: isVerticalLayout ? 180 : 210,
-                                            borderRadius: "18px",
-                                            overflow: "hidden",
-                                            border: `1px solid ${borderColor}`,
-                                            backgroundImage: imageUrl
-                                                ? `linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%), url(${imageUrl})`
-                                                : "linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%)",
-                                            backgroundSize: "cover",
-                                            backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
-                                            boxShadow: "0 10px 28px color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)",
-                                        }}
-                                    >
+                                <CachedBackgroundUrl key={location.id} url={imageUrl}>
+                                    {(cachedImageUrl) => (
+                                        <motion.button
+                                            type="button"
+                                            disabled={!canVisit}
+                                            onClick={openLocation}
+                                            initial={{ opacity: 0, y: 16 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.22, delay: Math.min(index * 0.04, 0.18) }}
+                                            style={{ width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'inherit', cursor: canVisit ? 'pointer' : 'not-allowed', opacity: canVisit ? 1 : 0.56 }}
+                                        >
+                                            <Box
+                                                sx={{
+                                                    position: "relative",
+                                                    minHeight: isVerticalLayout ? 180 : 210,
+                                                    borderRadius: "18px",
+                                                    overflow: "hidden",
+                                                    border: `1px solid ${borderColor}`,
+                                                    backgroundImage: cachedImageUrl
+                                                        ? `linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%), url(${cachedImageUrl})`
+                                                        : "linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%)",
+                                                    backgroundSize: "cover",
+                                                    backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
+                                                    boxShadow: "0 10px 28px color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)",
+                                                }}
+                                            >
                                         <Box sx={{ position: "absolute", top: 12, right: 12, zIndex: 2 }}>
                                             <LocationActorPortraits locationId={location.id} stage={stageInstance} size={isVerticalLayout ? 34 : 40} />
                                         </Box>
@@ -382,8 +384,10 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                                 </Typography>
                                             </Box>
                                         </Box>
-                                    </Box>
-                                </motion.button>
+                                            </Box>
+                                        </motion.button>
+                                    )}
+                                </CachedBackgroundUrl>
                             );
                         })}
                     </Box>
