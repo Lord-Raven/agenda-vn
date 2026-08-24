@@ -18,6 +18,7 @@ import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, LocationSe
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from '../components/ConditionEditor';
+import { getStatOptionValue } from '../content/Stat';
 
 type LocationAvailabilityState = 'unavailable' | 'disabled';
 
@@ -951,8 +952,8 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                                     cursor: 'pointer',
                                                                 }}
                                                             >
-                                                                {(stat.options || []).map((option) => (
-                                                                    <option key={`${stat.id}-option-${option.name}`} value={option.name}>
+                                                                {(stat.options || []).map((option, optionIndex) => (
+                                                                    <option key={getStatOptionValue(option, optionIndex)} value={getStatOptionValue(option, optionIndex)}>
                                                                         {option.name}
                                                                     </option>
                                                                 ))}

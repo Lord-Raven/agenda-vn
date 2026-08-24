@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatDisplayType, StatType, StatValue, StatValueRule, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, isNumericDisplayType, normalizeLocationListValue, cloneStat } from '../content/Stat';
+import { Stat, StatDisplayType, StatType, StatValue, StatValueRule, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, findStatOptionByValue, getStatOptionValue, isNumericDisplayType, normalizeLocationListValue, cloneStat } from '../content/Stat';
 import { Button, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
@@ -17,11 +17,8 @@ interface StatManagementPanelProps {
 
 const resolveStatDefaultValue = (stat: Stat): StatValue => {
     if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
-            return stat.default;
-        }
-        return optionNames[0] || '';
+        const defaultOption = findStatOptionByValue(stat, stat.default);
+        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
     }
 
     if (stat.type === 'locationList') {
@@ -41,9 +38,9 @@ const resolveStatDefaultValue = (stat: Stat): StatValue => {
 
 const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
     if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof value === 'string' && optionNames.includes(value)) {
-            return value;
+        const selectedOption = findStatOptionByValue(stat, value);
+        if (selectedOption) {
+            return selectedOption.value;
         }
         return resolveStatDefaultValue(stat);
     }
@@ -87,6 +84,7 @@ const defaultGlobalStat = (): Stat => ({
     default: 'Default',
     type: 'option',
     options: [{
+        id: generateUuid(),
         name: 'Default',
         description: 'Default option behavior for this setting.',
     }],
@@ -148,10 +146,10 @@ const clampStatValue = (value: number, stat: Stat): number => {
 
 const normalizeGlobalStatShape = (stat: Stat): Stat => {
     if (stat.type === 'option') {
-        const options = (stat.options || []).filter(option => option.name.trim());
-        const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
-            ? stat.default
-            : (options[0]?.name || '');
+        const options = (stat.options || [])
+            .filter(option => option.name.trim())
+            .map((option, optionIndex) => ({ ...option, id: getStatOptionValue(option, optionIndex) }));
+        const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
         return {
             ...stat,
             options,
@@ -198,10 +196,10 @@ const normalizeGlobalStatShape = (stat: Stat): Stat => {
 
 const normalizeActorStatShape = (stat: Stat): Stat => {
     if (stat.type === 'option') {
-        const options = (stat.options || []).filter(option => option.name.trim());
-        const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
-            ? stat.default
-            : (options[0]?.name || '');
+        const options = (stat.options || [])
+            .filter(option => option.name.trim())
+            .map((option, optionIndex) => ({ ...option, id: getStatOptionValue(option, optionIndex) }));
+        const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
         return {
             ...stat,
             options,
@@ -511,7 +509,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             }
 
             const currentOptions = [...(stat.options || [])];
-            const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), ...patch };
+            const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
+            const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), ...patch };
             currentOptions[optionIndex] = nextOption;
             return { ...stat, options: currentOptions };
         }));
@@ -524,9 +523,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             }
 
             const options = (stat.options || []).filter((_, idx2) => idx2 !== optionIndex);
-            const defaultValue = typeof stat.default === 'string' && options.some(option => option.name === stat.default)
-                ? stat.default
-                : (options[0]?.name || '');
+            const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
 
             return {
                 ...stat,
@@ -545,6 +542,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             const options = [...(stat.options || [])];
             const nextLabel = `Option ${options.length + 1}`;
             options.push({
+                id: generateUuid(),
                 name: nextLabel,
                 description: '',
             });
@@ -552,7 +550,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
             return {
                 ...stat,
                 options,
-                default: typeof stat.default === 'string' && stat.default.trim() ? stat.default : nextLabel,
+                default: typeof stat.default === 'string' && stat.default.trim() ? stat.default : getStatOptionValue(options[options.length - 1], options.length - 1),
             };
         }));
     };
@@ -671,8 +669,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Global Stats</Title>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {globalStats.map((stat, statIndex) => {
-                        const optionEntries = stat.options || [];
                         const normalizedStat = normalizeGlobalStatShape(stat);
+                        const optionEntries = normalizedStat.options || [];
 
                         return (
                             <div key={`player-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
@@ -807,7 +805,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                             onChange={(e) => updateGlobalStat(statIndex, { default: e.target.value })}
                                                         >
                                                             {optionEntries.map((option, idx) => (
-                                                                <option key={`${statIndex}-default-option-${idx}`} value={option.name}>
+                                                                <option key={getStatOptionValue(option, idx)} value={getStatOptionValue(option, idx)}>
                                                                     {option.name}
                                                                 </option>
                                                             ))}
@@ -1149,7 +1147,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                             onChange={(e) => updateActorStat(statIndex, { default: e.target.value })}
                                                         >
                                                             {optionEntries.map((option, idx) => (
-                                                                <option key={`${statIndex}-actor-default-option-${idx}`} value={option.name}>
+                                                                <option key={getStatOptionValue(option, idx)} value={getStatOptionValue(option, idx)}>
                                                                     {option.name}
                                                                 </option>
                                                             ))}
@@ -1170,7 +1168,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                             }
 
                                                                             const currentOptions = [...(item.options || [])];
-                                                                            const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), name: e.target.value };
+                                                                            const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
+                                                                            const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), name: e.target.value };
                                                                             currentOptions[optionIndex] = nextOption;
                                                                             return { ...item, options: currentOptions };
                                                                         }));
@@ -1190,7 +1189,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                                 }
 
                                                                                 const currentOptions = [...(item.options || [])];
-                                                                                const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), description: e.target.value };
+                                                                                const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
+                                                                                const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), description: e.target.value };
                                                                                 currentOptions[optionIndex] = nextOption;
                                                                                 return { ...item, options: currentOptions };
                                                                             }));
@@ -1208,9 +1208,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                         }
 
                                                                         const options = (item.options || []).filter((_, idx2) => idx2 !== optionIndex);
-                                                                        const defaultValue = typeof item.default === 'string' && options.some(option => option.name === item.default)
-                                                                            ? item.default
-                                                                            : (options[0]?.name || '');
+                                                                        const defaultValue = findStatOptionByValue({ ...item, options }, item.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
 
                                                                         return {
                                                                             ...item,
@@ -1234,6 +1232,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                             const options = [...(item.options || [])];
                                                             const nextLabel = `Option ${options.length + 1}`;
                                                             options.push({
+                                                                id: generateUuid(),
                                                                 name: nextLabel,
                                                                 description: '',
                                                             });
@@ -1241,7 +1240,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                             return {
                                                                 ...item,
                                                                 options,
-                                                                default: typeof item.default === 'string' && item.default.trim() ? item.default : nextLabel,
+                                                                default: typeof item.default === 'string' && item.default.trim() ? item.default : getStatOptionValue(options[options.length - 1], options.length - 1),
                                                             };
                                                         }));
                                                     }}>
@@ -1545,7 +1544,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                             onChange={(e) => updateLocationStat(statIndex, { default: e.target.value })}
                                                         >
                                                             {optionEntries.map((option, idx) => (
-                                                                <option key={`${statIndex}-location-default-option-${idx}`} value={option.name}>
+                                                                <option key={getStatOptionValue(option, idx)} value={getStatOptionValue(option, idx)}>
                                                                     {option.name}
                                                                 </option>
                                                             ))}
@@ -1566,7 +1565,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                             }
 
                                                                             const currentOptions = [...(item.options || [])];
-                                                                            const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), name: e.target.value };
+                                                                            const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
+                                                                            const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), name: e.target.value };
                                                                             currentOptions[optionIndex] = nextOption;
                                                                             return { ...item, options: currentOptions };
                                                                         }));
@@ -1586,7 +1586,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                                 }
 
                                                                                 const currentOptions = [...(item.options || [])];
-                                                                                const nextOption = { ...(currentOptions[optionIndex] || { name: '', description: '' }), description: e.target.value };
+                                                                                const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
+                                                                                const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), description: e.target.value };
                                                                                 currentOptions[optionIndex] = nextOption;
                                                                                 return { ...item, options: currentOptions };
                                                                             }));
@@ -1604,9 +1605,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                         }
 
                                                                         const options = (item.options || []).filter((_, idx2) => idx2 !== optionIndex);
-                                                                        const defaultValue = typeof item.default === 'string' && options.some(option => option.name === item.default)
-                                                                            ? item.default
-                                                                            : (options[0]?.name || '');
+                                                                        const defaultValue = findStatOptionByValue({ ...item, options }, item.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
 
                                                                         return {
                                                                             ...item,
@@ -1630,6 +1629,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                             const options = [...(item.options || [])];
                                                             const nextLabel = `Option ${options.length + 1}`;
                                                             options.push({
+                                                                id: generateUuid(),
                                                                 name: nextLabel,
                                                                 description: '',
                                                             });
@@ -1637,7 +1637,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                             return {
                                                                 ...item,
                                                                 options,
-                                                                default: typeof item.default === 'string' && item.default.trim() ? item.default : nextLabel,
+                                                                default: typeof item.default === 'string' && item.default.trim() ? item.default : getStatOptionValue(options[options.length - 1], options.length - 1),
                                                             };
                                                         }));
                                                     }}>

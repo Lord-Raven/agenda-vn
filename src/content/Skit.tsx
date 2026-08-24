@@ -14,6 +14,7 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
+import { findStatOptionByValue } from './Stat';
 import { build } from "vite";
 
 const getDayDifference = (startDate: string, endDate: string): number => {
@@ -219,16 +220,16 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         }
 
         const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
-        const valueText = stat.type === 'location'
+        const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
+        const valueText = selectedOption?.option.name || (stat.type === 'location'
             ? getLocationName(String(value), stage)
-            : (typeof value === 'number' ? String(value) : String(value || ''));
+            : (typeof value === 'number' ? String(value) : String(value || '')));
         if (!valueText) {
             return '';
         }
 
         if (stat.type === 'option') {
-            const selectedOption = (stat.options || []).find((option) => option.name === valueText);
-            const optionDescription = selectedOption?.description?.trim() || '';
+            const optionDescription = selectedOption?.option.description?.trim() || '';
             return [
                 `${statName}: ${valueText}`,
                 optionDescription,
@@ -249,16 +250,16 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         }
 
         const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
-        const valueText = stat.type === 'location'
+        const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
+        const valueText = selectedOption?.option.name || (stat.type === 'location'
             ? getLocationName(String(value), stage)
-            : (typeof value === 'number' ? String(value) : String(value || ''));
+            : (typeof value === 'number' ? String(value) : String(value || '')));
         if (!valueText) {
             return '';
         }
 
         if (stat.type === 'option') {
-            const selectedOption = (stat.options || []).find((option) => option.name === valueText);
-            const optionDescription = selectedOption?.description?.trim() || '';
+            const optionDescription = selectedOption?.option.description?.trim() || '';
             return [
                 `${statName}: ${valueText}`,
                 optionDescription,

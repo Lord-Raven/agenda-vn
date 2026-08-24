@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { Stat, StatValue, isNumericDisplayType } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, isNumericDisplayType } from '../content/Stat';
 import { Stage } from '../Stage';
 import { LocationMultiSelect, LocationSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
@@ -29,10 +29,13 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     }
 
     if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
+        const selectedOption = findStatOptionByValue(stat, value);
         return (
-            <select className="input-base" value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)}>
-                {optionNames.map(name => <option key={name} value={name}>{name}</option>)}
+            <select className="input-base" value={selectedOption?.value || ''} onChange={(e) => onChange(e.target.value)}>
+                {(stat.options || []).map((option, optionIndex) => {
+                    const optionValue = getStatOptionValue(option, optionIndex);
+                    return <option key={optionValue} value={optionValue}>{option.name}</option>;
+                })}
             </select>
         );
     }

@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, LinkOffRounded, LinkRounded, PersonOffOutlined, SwapHoriz } from '@mui/icons-material';
-import { Stat } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, Stat } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
 import { Button, LocationSelect, TextInput } from './UiComponents';
@@ -89,7 +89,8 @@ const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
         return typeof stat.default === 'boolean' ? stat.default : false;
     }
     if (stat.type === 'option') {
-        return typeof stat.default === 'string' ? stat.default : (stat.options?.[0]?.name || '');
+        const defaultOption = findStatOptionByValue(stat, stat.default);
+        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
     }
     if (stat.type === 'location') {
         return typeof stat.default === 'string' ? stat.default : '';
@@ -199,7 +200,11 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         }
         const stat = condition.type === 'globalStat' ? globalStats.find(candidate => candidate.id === condition.statId) : (condition.type === 'actorStat' ? actorStats.find(candidate => candidate.id === condition.statId) : undefined);
         if (stat?.type === 'option') {
-            return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{(stat.options || []).map(option => <option key={option.name} value={option.name}>{option.name}</option>)}</select>;
+            const selectedOption = findStatOptionByValue(stat, condition.value);
+            return <select style={selectStyle} value={selectedOption?.value || ''} onChange={(event) => updateValue(event.target.value)}>{(stat.options || []).map((option, optionIndex) => {
+                const optionValue = getStatOptionValue(option, optionIndex);
+                return <option key={optionValue} value={optionValue}>{option.name}</option>;
+            })}</select>;
         }
         if (stat?.type === 'checkbox') {
             return <input type="checkbox" checked={Boolean(condition.value === true || condition.value === 'true')} onChange={(event) => updateValue(event.target.checked)} />;

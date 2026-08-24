@@ -1,7 +1,7 @@
 import { FC, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SaveType, Stage } from '../Stage';
-import { Stat, StatValue, applyUserPlaceholder, isNumericDisplayType } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, applyUserPlaceholder, isNumericDisplayType } from '../content/Stat';
 import { GlassPanel, Title, Button, ColorPickerInput, LocationSelect, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
@@ -43,11 +43,8 @@ const resolveActiveGlobalStats = (stageInstance: Stage): Stat[] => {
 
 const resolveStatDefaultValue = (stat: Stat): StatValue => {
     if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
-            return stat.default;
-        }
-        return optionNames[0] || '';
+        const defaultOption = findStatOptionByValue(stat, stat.default);
+        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
     }
 
     if (stat.type === 'text' || stat.type === 'location') {
@@ -63,9 +60,9 @@ const resolveStatDefaultValue = (stat: Stat): StatValue => {
 
 const normalizeGlobalStatValue = (value: unknown, stat: Stat): StatValue => {
     if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof value === 'string' && optionNames.includes(value)) {
-            return value;
+        const selectedOption = findStatOptionByValue(stat, value);
+        if (selectedOption) {
+            return selectedOption.value;
         }
         return resolveStatDefaultValue(stat);
     }
@@ -431,7 +428,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         const selectedValue = normalizeGlobalStatValue(globalStatValues[stat.id], stat);
                                         const optionEntries = stat.options || [];
                                         const selectedOptionDescription = stat.type === 'option'
-                                            ? resolveText(optionEntries.find((option) => option.name === selectedValue)?.description).trim()
+                                            ? resolveText(findStatOptionByValue(stat, selectedValue)?.option.description).trim()
                                             : '';
 
                                         const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
@@ -465,7 +462,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                         style={{ fontSize: '13px' }}
                                                     >
                                                         {optionEntries.map((option, optionIndex) => (
-                                                            <option key={`${statName}-option-${optionIndex}`} value={option.name}>
+                                                            <option key={getStatOptionValue(option, optionIndex)} value={getStatOptionValue(option, optionIndex)}>
                                                                 {option.name}
                                                             </option>
                                                         ))}

@@ -21,6 +21,7 @@ export const normalizeLocationListValue = (value: unknown): string[] => (
 export const resolveStatDisplayType = (stat: Stat): StatDisplayType => (stat.type === 'number' ? (stat.displayType || 'straight') : 'straight');
 
 export type StatOption = {
+    id?: string;
     name: string;
     description: string;
 };
@@ -30,6 +31,38 @@ type StatValueOptions = {
 };
 
 const DICE_EXPRESSION_PATTERN = /^\s*[+-]?\s*(?:\d*d\d+|\d+)(?:\s*[+-]\s*(?:\d*d\d+|\d+))*\s*$/i;
+
+const normalizeOptionIdText = (value: string): string => {
+    const normalized = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return normalized || 'option';
+};
+
+export const resolveStatOptionId = (option: StatOption | undefined, index: number): string => {
+    const explicitId = option?.id?.trim();
+    if (explicitId) {
+        return explicitId;
+    }
+    return `${normalizeOptionIdText(option?.name || '')}-${index + 1}`;
+};
+
+export const getStatOptionValue = resolveStatOptionId;
+
+export const findStatOptionByValue = (stat: Stat | undefined, value: unknown): { option: StatOption; index: number; value: string } | undefined => {
+    if (!stat || stat.type !== 'option' || typeof value !== 'string') {
+        return undefined;
+    }
+    const options = stat.options || [];
+    const exactMatch = options
+        .map((option, index) => ({ option, index, value: resolveStatOptionId(option, index) }))
+        .find((entry) => entry.value === value || entry.option.name === value);
+    if (exactMatch) {
+        return exactMatch;
+    }
+    const loweredValue = value.toLowerCase();
+    return options
+        .map((option, index) => ({ option, index, value: resolveStatOptionId(option, index) }))
+        .find((entry) => entry.value.toLowerCase() === loweredValue || entry.option.name.toLowerCase() === loweredValue);
+};
 
 const rollDie = (sides: number): number => Math.floor(Math.random() * sides) + 1;
 
@@ -151,6 +184,7 @@ export const cloneStat = (stat: Stat): Stat => ({
     type: stat.type,
     displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
     options: (stat.options || []).map((option) => ({
+        id: option.id,
         name: option.name,
         description: option.description,
     })),
@@ -164,11 +198,11 @@ export const cloneStat = (stat: Stat): Stat => ({
 
 export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): StatValue => {
     if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
-            return stat.default;
+        const defaultOption = findStatOptionByValue(stat, stat.default);
+        if (defaultOption) {
+            return defaultOption.value;
         }
-        return optionNames[0] || '';
+        return stat.options?.[0] ? resolveStatOptionId(stat.options[0], 0) : '';
     }
 
     if (stat.type === 'locationList') {
@@ -192,11 +226,11 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
 
 export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValueOptions = {}): StatValue => {
     if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        const fallback = resolveStatDefault(stat, options);
-        if (typeof value === 'string' && optionNames.includes(value)) {
-            return value;
+        const selectedOption = findStatOptionByValue(stat, value);
+        if (selectedOption) {
+            return selectedOption.value;
         }
+        const fallback = resolveStatDefault(stat, options);
         return typeof fallback === 'string' ? fallback : '';
     }
 

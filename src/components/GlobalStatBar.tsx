@@ -3,7 +3,7 @@ import { Box, Typography } from "@mui/material";
 import { Bed, Bedtime, EventAvailable, WbSunny, WbTwilight } from "@mui/icons-material";
 import { Stage } from "../Stage";
 import { formatCurrentDate, formatDateLabel } from "../content/Skit";
-import { Stat, resolveStatText } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, Stat, resolveStatText } from '../content/Stat';
 import { resolveIcon } from "./StatRating";
 import { StatValueDisplay } from "./StatDisplay";
 
@@ -30,11 +30,8 @@ const getDateTimeIcon = (timeOfDay?: string) => {
 
 const resolveStatDefaultValue = (stat: Stat): number | string | boolean => {
     if (stat.type === "option") {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof stat.default === "string" && optionNames.includes(stat.default)) {
-            return stat.default;
-        }
-        return optionNames[0] || "";
+        const defaultOption = findStatOptionByValue(stat, stat.default);
+        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : "");
     }
 
     if (stat.type === "text" || stat.type === "location") {
@@ -50,9 +47,9 @@ const resolveStatDefaultValue = (stat: Stat): number | string | boolean => {
 
 const normalizeStatValue = (value: unknown, stat: Stat): number | string | boolean => {
     if (stat.type === "option") {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof value === "string" && optionNames.includes(value)) {
-            return value;
+        const selectedOption = findStatOptionByValue(stat, value);
+        if (selectedOption) {
+            return selectedOption.value;
         }
         return resolveStatDefaultValue(stat);
     }
@@ -81,7 +78,7 @@ const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]
     }
 
     if (stat.type === "option") {
-        return typeof normalized === "string" ? normalized : "";
+        return findStatOptionByValue(stat, normalized)?.option.name || "";
     }
 
     if (stat.type === "text") {
@@ -169,7 +166,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
                 const isNumericStat = stat.type === "number";
                 const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
                 const selectedOptionDescription = stat.type === "option"
-                    ? resolveStatText((stat.options || []).find((option) => option.name === normalizedValue)?.description, stageInstance).trim()
+                    ? resolveStatText(findStatOptionByValue(stat, normalizedValue)?.option.description, stageInstance).trim()
                     : "";
                 const tooltipText = [resolveStatText(stat.description, stageInstance).trim(), selectedOptionDescription]
                     .filter(Boolean)

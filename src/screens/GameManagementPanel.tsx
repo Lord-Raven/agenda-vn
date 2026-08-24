@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { Stage, buildPortableGameConfiguration } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { Stat, StatType, StatValue, cloneStat, isNumericDisplayType, normalizeLocationListValue } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, Stat, StatType, StatValue, cloneStat, isNumericDisplayType, normalizeLocationListValue } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { buildCreatorNotesHtml } from './CreatorNotesHtml';
@@ -13,11 +13,8 @@ interface GameManagementPanelProps {
 
 const resolveStatDefaultValue = (stat: Stat): StatValue => {
     if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof stat.default === 'string' && optionNames.includes(stat.default)) {
-            return stat.default;
-        }
-        return optionNames[0] || '';
+        const defaultOption = findStatOptionByValue(stat, stat.default);
+        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
     }
 
     if (stat.type === 'locationList') {
@@ -37,9 +34,9 @@ const resolveStatDefaultValue = (stat: Stat): StatValue => {
 
 const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
     if (stat.type === 'option') {
-        const optionNames = (stat.options || []).map(option => option.name).filter(Boolean);
-        if (typeof value === 'string' && optionNames.includes(value)) {
-            return value;
+        const selectedOption = findStatOptionByValue(stat, value);
+        if (selectedOption) {
+            return selectedOption.value;
         }
         return resolveStatDefaultValue(stat);
     }

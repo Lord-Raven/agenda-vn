@@ -1,5 +1,5 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
-import type { Stat, StatValue } from './Stat';
+import { normalizeStatValue, type Stat, type StatValue } from './Stat';
 
 export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual';
 export type ActorConditionTarget = 'any' | 'none' | 'variable' | string;
@@ -129,6 +129,14 @@ const resolveConditionValue = (condition: Condition, context: ConditionContext):
     return isDiceNotation(value) ? rollDiceNotation(value, buildDiceSeed(condition, context)) : value;
 };
 
+const normalizeStatConditionValue = (value: string | number | boolean, stat: Stat | undefined): string | number | boolean => {
+    if (!stat || stat.type !== 'option') {
+        return value;
+    }
+    const normalized = normalizeStatValue(value, stat);
+    return typeof normalized === 'string' || typeof normalized === 'number' || typeof normalized === 'boolean' ? normalized : value;
+};
+
 const compareValues = (actual: StatValue | undefined, expected: string | number | boolean, comparison: ConditionComparison): boolean => {
     if (actual === undefined || Array.isArray(actual)) {
         return false;
@@ -218,8 +226,8 @@ const resolveConditionActorSubjects = (actorId: ActorConditionTarget, context: C
 export const evaluateActorStatCondition = (condition: ActorStatCondition, context: ConditionContext): boolean => {
     const { mode, actors } = resolveConditionActorSubjects(condition.actorId, context);
     const stat = context.actorStats?.find(candidate => candidate.id === condition.statId);
-    const resolvedValue = resolveConditionValue(condition, context);
-    const matches = (actor: ConditionActor) => compareValues(getActorStatValue(actor, stat?.id || ''), resolvedValue, condition.comparison);
+    const resolvedValue = normalizeStatConditionValue(resolveConditionValue(condition, context), stat);
+    const matches = (actor: ConditionActor) => compareValues(stat ? normalizeStatValue(getActorStatValue(actor, stat.id), stat) : undefined, resolvedValue, condition.comparison);
 
     if (mode === 'any') return actors.some(matches);
     if (mode === 'none') return !actors.some(matches);
@@ -241,8 +249,8 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
 
     if (condition.type === 'globalStat') {
         const stat = context.globalStats?.find(candidate => candidate.id === condition.statId);
-            const actual = stat ? context.globalStatValues?.[condition.statId] : undefined;
-        return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
+        const actual = stat ? normalizeStatValue(context.globalStatValues?.[condition.statId], stat) : undefined;
+        return compareValues(actual, normalizeStatConditionValue(resolveConditionValue(condition, context), stat), condition.comparison);
     }
 
     if (condition.type === 'actorIdentity') {
@@ -253,15 +261,6 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
 };
 
 export const evaluateConditionCollection = (conditionCollection: ConditionCollection, context: ConditionContext): boolean => {
-    // log all condition evaluations for debugging purposes
-    console.log('Evaluating condition collection:', conditionCollection);
-    console.log('Context:', context);
-    conditionCollection.forEach((condition, index) => {
-        console.log(`Evaluating condition #${index}:`, condition);
-        const result = evaluateCondition(condition, context);
-        console.log(`Result of condition #${index}:`, result);
-    });
-
     return conditionCollection.every((condition) => evaluateCondition(condition, context));
 };
 

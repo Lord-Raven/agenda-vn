@@ -2,7 +2,7 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { Stat, StatValue, StatValueRule, normalizeLocationListValue, resolveStatDefault } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, StatValueRule, normalizeLocationListValue, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ConditionContext } from '../content/Condition';
@@ -952,10 +952,13 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             return <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
         }
         if (stat.type === 'option') {
-            const optionNames = (stat.options || []).map((option) => option.name).filter(Boolean);
+            const selectedOption = findStatOptionByValue(stat, value);
             return (
-                <select className="input-base" value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)}>
-                    {optionNames.map((name) => <option key={name} value={name}>{name}</option>)}
+                <select className="input-base" value={selectedOption?.value || ''} onChange={(e) => onChange(e.target.value)}>
+                    {(stat.options || []).map((option, optionIndex) => {
+                        const optionValue = getStatOptionValue(option, optionIndex);
+                        return <option key={optionValue} value={optionValue}>{option.name}</option>;
+                    })}
                 </select>
             );
         }

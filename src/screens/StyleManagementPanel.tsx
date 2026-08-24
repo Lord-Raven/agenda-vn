@@ -11,6 +11,7 @@ import {
     UI_SETTINGS_GENERATION_FIELDS,
 } from '../content/Style';
 import { formatLoreEntriesAsContext, selectConstantLoreEntries } from '../content/Lore';
+import { findStatOptionByValue } from '../content/Stat';
 import { parseStructuredResponse } from '../utils/StructuredResponse.js';
 import { AlphaColorPickerInput, buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from '../components/UiComponents';
 
@@ -129,17 +130,17 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                 }
 
                 const selectedValue = save.globalStatValues?.[stat.id] ?? stat.default;
-                const valueText = typeof selectedValue === 'number' ? String(selectedValue) : String(selectedValue || '');
+                const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, selectedValue) : undefined;
+                const valueText = selectedOption?.option.name || (typeof selectedValue === 'number' ? String(selectedValue) : String(selectedValue || ''));
                 if (!valueText) {
                     return '';
                 }
 
                 if (stat.type === 'option') {
-                    const selectedOption = (stat.options || []).find(option => option.name === valueText);
                     return [
                         `${statName}: ${valueText}`,
                         stat.description?.trim(),
-                        selectedOption?.description?.trim() || '',
+                        selectedOption?.option.description?.trim() || '',
                     ].filter(Boolean).join('\n');
                 }
 

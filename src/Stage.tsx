@@ -3,7 +3,7 @@ import {StageBase, StageResponse, InitialData, Message, User, Character, AspectR
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, loadSupportedActor, resolveActorSchedule, ScheduleContext } from "./content/Actor";
-import { Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeLocationListValue, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
+import { findStatOptionByValue, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeLocationListValue, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
@@ -1919,13 +1919,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
 
             const value = normalizeStatValue(save.globalStatValues?.[stat.id], stat);
-            const valueText = stat.type === 'location'
+            const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
+            const valueText = selectedOption?.option.name || (stat.type === 'location'
                 ? (save.atlas?.[String(value)]?.name || '')
-                : (typeof value === 'number' ? String(value) : value);
+                : (typeof value === 'number' ? String(value) : value));
 
             if (stat.type === 'option') {
-                const selectedOption = (stat.options || []).find(option => option.name === valueText);
-                const optionDescription = resolveStatText(selectedOption?.description, this).trim();
+                const optionDescription = resolveStatText(selectedOption?.option.description, this).trim();
                 const line = [
                     `${statName}: ${valueText}`,
                     resolveStatText(stat.description, this).trim(),
