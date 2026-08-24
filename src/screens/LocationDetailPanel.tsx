@@ -18,6 +18,31 @@ import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, LocationSe
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from '../components/ConditionEditor';
+
+type LocationAvailabilityState = 'unavailable' | 'disabled';
+
+const LOCATION_AVAILABILITY_STATE_OPTIONS: Array<{ value: LocationAvailabilityState; label: string }> = [
+    { value: 'unavailable', label: 'Unavailable (grayed out)' },
+    { value: 'disabled', label: 'Disabled (hidden from maps)' },
+];
+
+const buildAvailabilityEditState = (location: Location): { availabilityCollections: ConditionCollection[]; availabilityStates: LocationAvailabilityState[] } => {
+    const unavailable = (location.availabilityConditions?.unavailable || []).map((collection) => [...collection]);
+    const disabled = (location.availabilityConditions?.disabled || []).map((collection) => [...collection]);
+    return {
+        availabilityCollections: [...unavailable, ...disabled],
+        availabilityStates: [...unavailable.map(() => 'unavailable' as const), ...disabled.map(() => 'disabled' as const)],
+    };
+};
+
+const splitAvailabilityCollections = (collections: ConditionCollection[], states: LocationAvailabilityState[]): Record<LocationAvailabilityState, ConditionCollection[]> => {
+    const result: Record<LocationAvailabilityState, ConditionCollection[]> = { unavailable: [], disabled: [] };
+    collections.forEach((collection, index) => {
+        const state: LocationAvailabilityState = states[index] === 'disabled' ? 'disabled' : 'unavailable';
+        result[state].push([...collection]);
+    });
+    return result;
+};
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 import { Stat, StatValue } from '../content/Stat';
 import { StatRating } from '../components/StatRating';
@@ -135,7 +160,8 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         imagePrompt: string;
         imageUrl: string;
         alternativeImages: AlternativeImage[];
-        conditionCollections: ConditionCollection[];
+        availabilityCollections: ConditionCollection[];
+        availabilityStates: LocationAvailabilityState[];
         focalX: number;
         focalY: number;
     }>({
@@ -146,7 +172,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         imagePrompt: getLocationImagePrompt(location),
         imageUrl: location.imageUrl,
         alternativeImages: location.alternativeImages?.map(createAlternativeImage) || [],
-        conditionCollections: (location.conditionCollections || []).map(collection => [...collection]),
+        ...buildAvailabilityEditState(location),
         focalX: location.focalPoint?.x ?? 0.5,
         focalY: location.focalPoint?.y ?? 0.5,
     });
@@ -230,7 +256,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.imagePrompt = nextLocation.imagePrompt;
         location.imageUrl = nextLocation.imageUrl;
         location.alternativeImages = nextLocation.alternativeImages.map(createAlternativeImage);
-        location.conditionCollections = nextLocation.conditionCollections.map(collection => [...collection]);
+        location.availabilityConditions = splitAvailabilityCollections(nextLocation.availabilityCollections, nextLocation.availabilityStates);
         location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
         location.statMap = location.statMap && typeof location.statMap === 'object' ? { ...location.statMap } : {};
 
@@ -272,7 +298,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,
             alternativeImages: location.alternativeImages?.map(createAlternativeImage) || [],
-            conditionCollections: (location.conditionCollections || []).map(collection => [...collection]),
+            ...buildAvailabilityEditState(location),
             focalX: location.focalPoint?.x ?? 0.5,
             focalY: location.focalPoint?.y ?? 0.5,
         });
@@ -761,10 +787,13 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             <section>
                                 <h2 style={sectionHeadingStyle}>Availability</h2>
                                 <ConditionEditor
-                                    conditionCollections={editedLocation.conditionCollections}
+                                    conditionCollections={editedLocation.availabilityCollections}
                                     globalStats={stage().getConfiguration().globalStats || []}
                                     actors={Object.values(stage().getSave().actors || {})}
-                                    onChange={(conditionCollections) => setEditedLocation(current => ({ ...current, conditionCollections }))}
+                                    onChange={(availabilityCollections) => setEditedLocation(current => ({ ...current, availabilityCollections }))}
+                                    collectionCategories={LOCATION_AVAILABILITY_STATE_OPTIONS}
+                                    collectionCategoryValues={editedLocation.availabilityStates}
+                                    onCollectionCategoryValuesChange={(availabilityStates) => setEditedLocation(current => ({ ...current, availabilityStates: availabilityStates as LocationAvailabilityState[] }))}
                                 />
                             </section>
 

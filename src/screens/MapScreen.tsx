@@ -46,7 +46,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
 
     const activeLocations = useMemo(
         () => Object.values(save.atlas || {})
-            .filter((location): location is Location => Boolean(location) && location.active !== false)
+            .filter((location): location is Location => Boolean(location) && location.active !== false && stageInstance.isLocationVisible(location.id))
             .sort((left, right) => {
                 const categoryCompare = normalizeCategory(left.category).localeCompare(normalizeCategory(right.category));
                 if (categoryCompare !== 0) {
@@ -54,7 +54,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                 }
                 return sortLocationsByName(left, right);
             }),
-        [save.atlas],
+        [save.atlas, stageInstance],
     );
 
     const categories = useMemo(

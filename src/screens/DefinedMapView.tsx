@@ -1,5 +1,5 @@
 import { FC, Fragment, useEffect, useMemo, useState } from 'react';
-import { EditNote, EventAvailable, MapRounded, MenuRounded, Settings } from '@mui/icons-material';
+import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getMapImageUrl, Map as GameMap } from '../content/Map';
@@ -138,6 +138,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     if (!linkedLocation && !linkedMap) {
                                         return null;
                                     }
+                                    if (linkedLocation && !stage().isLocationVisible(linkedLocation.id)) {
+                                        return null;
+                                    }
                                     const markerKey = `${link.childId}-${index}`;
                                     const isHovered = hoveredLink === markerKey;
                                     const locationImageUrl = getLocationImageUrl(linkedLocation, stage());
@@ -145,7 +148,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
                                     const markerName = currentEvent?.name || linkedLocation?.name || linkedMap?.name || 'Unnamed';
-                                    const markerSize = isVerticalLayout ? 44 : 52;
+                                    const markerSize = isVerticalLayout ? 48 : 57;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 32;
                                     const configuration = stage().getConfiguration();
                                     const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats });
@@ -173,8 +176,13 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             transition={{ duration: 0.2, ease: 'easeOut' }}
                                             style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed', opacity: isInteractive ? 1 : 0.5, zIndex: isHovered ? 2 : 1 }}
                                         >
-                                            <span style={{ width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : (linkedMapImageUrl ? `url(${linkedMapImageUrl})` : 'none'), backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                                            <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : (linkedMapImageUrl ? `url(${linkedMapImageUrl})` : 'none'), backgroundSize: 'cover', backgroundPosition: 'center' }}>
                                                 {!locationImageUrl && !linkedMapImageUrl && <MapRounded fontSize="small" />}
+                                                {isInteractive && (
+                                                    <span style={{ position: 'absolute', top: -4, left: -4, display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
+                                                        {linkedMap ? <ArrowOutward sx={{ fontSize: 11 }} /> : <PlayArrow sx={{ fontSize: 11 }} />}
+                                                    </span>
+                                                )}
                                             </span>
                                             <span style={{ padding: '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700 }}>
                                                 {markerName}
@@ -182,8 +190,13 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             </span>
                                         </motion.button>
                                         {linkedLocation && (
-                                            <div style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `calc(${link.coordinates.y * 100}% + ${markerSize / 2 - actorPortraitSize * 0.35}px)`, transform: 'translateX(-50%)', zIndex: isHovered ? 4 : 3 }}>
-                                                <LocationActorPortraits locationId={linkedLocation.id} stage={stage()} size={actorPortraitSize} />
+                                            <div style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `calc(${link.coordinates.y * 100}% + ${markerSize / 2 - actorPortraitSize * 0.35}px)`, transform: 'translateX(-50%)', zIndex: isHovered ? 5 : 3 }}>
+                                                <LocationActorPortraits
+                                                    locationId={linkedLocation.id}
+                                                    stage={stage()}
+                                                    size={actorPortraitSize}
+                                                    onHoverChange={hovering => setHoveredLink(hovering ? markerKey : null)}
+                                                />
                                             </div>
                                         )}
                                         </Fragment>

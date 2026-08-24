@@ -7,7 +7,7 @@ import { Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateV
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { generateContext, generateSkitScript, Skit } from "./content/Skit";
-import { createDefaultAtlas, isLocationAvailable, Location } from "./content/Location";
+import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
@@ -885,11 +885,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     canVisitLocation(locationId: string): boolean {
         const save = this.getSave();
         const location = save.atlas?.[locationId];
-        if (!location || location.active === false) {
+        if (!location || location.active === false || isLocationDisabled(location, this.getScheduleContext(save))) {
             return false;
         }
 
         return Boolean(this.getCurrentLocationEvent(locationId)) || isLocationAvailable(location, this.getScheduleContext(save));
+    }
+
+    // Disabled locations don't exist yet/anymore and should never appear on maps.
+    isLocationVisible(locationId: string): boolean {
+        const save = this.getSave();
+        const location = save.atlas?.[locationId];
+        if (!location || location.active === false) {
+            return false;
+        }
+        return !isLocationDisabled(location, this.getScheduleContext(save));
     }
 
     startLocationVisit(locationId: string): Skit | null {

@@ -56,16 +56,18 @@ export const normalizeLocationOpenTimes = (openTimes: unknown): Partial<Record<C
 	}, {});
 };
 
-export const getCalendarDayOfWeek = (date: string): CalendarDayOfWeek | null => {
-	const parsedDate = new Date(`${date}T00:00:00Z`);
-	if (Number.isNaN(parsedDate.getTime())) {
-		return null;
-	}
-	return LOCATION_DAY_OF_WEEK_ORDER[(parsedDate.getUTCDay() + 6) % 7];
+// A disabled location is hidden entirely from maps (e.g. a business that doesn't exist yet).
+export const isLocationDisabled = (location: Location, context: ConditionContext): boolean => {
+	return !evaluateConditionCollections(location.availabilityConditions?.disabled, context);
+};
+
+// An inactive location still appears (grayed out) but cannot be visited (e.g. a business closed for the day).
+export const isLocationInactive = (location: Location, context: ConditionContext): boolean => {
+	return !evaluateConditionCollections(location.availabilityConditions?.unavailable, context);
 };
 
 export const isLocationAvailable = (location: Location, context: ConditionContext): boolean => {
-	return location.active !== false && evaluateConditionCollections(location.conditionCollections, context);
+	return location.active !== false && !isLocationDisabled(location, context) && !isLocationInactive(location, context);
 };
 
 
@@ -474,7 +476,7 @@ export class Location {
 	alternativeImages: AlternativeImage[] = [];
     focalPoint?: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Relative image focus used when cropping this location
     themeColor: string = ''; // A color associated with this location, used for UI theming.
-	conditionCollections: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
+	availabilityConditions: Record<'unavailable' | 'disabled', ConditionCollection[]> = { unavailable: [], disabled: [] }; // Any collection may pass; all conditions within a collection must pass.
 	statMap: { [key: string]: StatValue } = {}; // Map of custom location stat id to value for this location
 
     constructor(props: any) {
@@ -485,7 +487,11 @@ export class Location {
         }
 		this.active = this.active !== false;
 		this.alternativeImages = Array.isArray(this.alternativeImages) ? this.alternativeImages.map(createAlternativeImage) : [];
-		this.conditionCollections = (this.conditionCollections || []).map((collection) => [...collection]);
+		const availabilityConditionsSource = (this.availabilityConditions || {}) as Record<string, ConditionCollection[]>;
+		this.availabilityConditions = {
+			unavailable: (availabilityConditionsSource.unavailable || []).map((collection) => [...collection]),
+			disabled: (availabilityConditionsSource.disabled || []).map((collection) => [...collection]),
+		};
 		this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
         if (!this.themeColor) {
             // Pick from the core game theme palette in index.scss.

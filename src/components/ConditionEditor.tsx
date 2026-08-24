@@ -15,6 +15,11 @@ interface ConditionEditorProps {
     locations?: LocationLike[];
     allowVariableActorTarget?: boolean;
     onChange: (conditionCollections: ConditionCollection[]) => void;
+    // When provided, renders a dropdown per condition collection (on its first row) letting the caller
+    // tag each collection with an arbitrary category (e.g. which availability state it applies to).
+    collectionCategories?: Array<{ value: string; label: string }>;
+    collectionCategoryValues?: string[];
+    onCollectionCategoryValuesChange?: (values: string[]) => void;
 }
 
 const COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
@@ -91,7 +96,7 @@ export const buildActorTargetOptions = (actors: Array<{ id: string; name: string
     return options;
 };
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], actors = [], locations = [], allowVariableActorTarget = false, onChange }) => {
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], actors = [], locations = [], allowVariableActorTarget = false, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange }) => {
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
     const actorTargetOptions = buildActorTargetOptions(actors, allowVariableActorTarget);
     const concreteActorOptions = actorTargetOptions.filter((option) => !['variable', 'any', 'none'].includes(option.key));
@@ -104,16 +109,22 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
 
     const toggleLinkedToPrevious = (collectionIndex: number, conditionIndex: number) => {
         const nextCollections = conditionCollections.map((collection) => [...collection]);
+        const nextCategoryValues = collectionCategoryValues ? [...collectionCategoryValues] : undefined;
         if (conditionIndex > 0) {
             const collection = nextCollections[collectionIndex];
             nextCollections.splice(collectionIndex, 1, collection.slice(0, conditionIndex), collection.slice(conditionIndex));
+            nextCategoryValues?.splice(collectionIndex, 0, nextCategoryValues[collectionIndex]);
         } else if (collectionIndex > 0) {
             nextCollections.splice(collectionIndex - 1, 2, [
                 ...nextCollections[collectionIndex - 1],
                 ...nextCollections[collectionIndex],
             ]);
+            nextCategoryValues?.splice(collectionIndex, 1);
         }
         onChange(nextCollections);
+        if (nextCategoryValues) {
+            onCollectionCategoryValuesChange?.(nextCategoryValues);
+        }
     };
 
     const moveCondition = (collectionIndex: number, conditionIndex: number, offset: -1 | 1) => {
@@ -132,11 +143,19 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
     };
 
     const deleteCondition = (collectionIndex: number, conditionIndex: number) => {
-        onChange(conditionCollections
-            .map((collection, currentCollectionIndex) => currentCollectionIndex === collectionIndex
-                ? collection.filter((_, currentConditionIndex) => currentConditionIndex !== conditionIndex)
-                : collection)
-            .filter((collection) => collection.length > 0));
+        const updatedCollections = conditionCollections.map((collection, currentCollectionIndex) => currentCollectionIndex === collectionIndex
+            ? collection.filter((_, currentConditionIndex) => currentConditionIndex !== conditionIndex)
+            : collection);
+        const keptIndices = updatedCollections.reduce<number[]>((indices, collection, index) => {
+            if (collection.length > 0) {
+                indices.push(index);
+            }
+            return indices;
+        }, []);
+        onChange(keptIndices.map((index) => updatedCollections[index]));
+        if (collectionCategoryValues) {
+            onCollectionCategoryValuesChange?.(keptIndices.map((index) => collectionCategoryValues[index]));
+        }
     };
 
     const renderValueInput = (condition: Condition, collectionIndex: number, conditionIndex: number) => {
@@ -185,7 +204,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                 const isLinked = conditionIndex > 0;
                 const isGrouped = collection.length > 1;
                 return (
-                    <div key={`${collectionIndex}-${conditionIndex}`} style={{ display: 'grid', gridTemplateColumns: '32px minmax(110px, 130px) minmax(120px, 1.2fr) minmax(0, 1.3fr) minmax(110px, 1.2fr) minmax(100px, 1fr) auto 8px', gap: 8, alignItems: 'center', width: '100%', minWidth: 0 }}>
+                    <div key={`${collectionIndex}-${conditionIndex}`} style={{ display: 'grid', gridTemplateColumns: collectionCategories ? '32px 150px minmax(110px, 130px) minmax(120px, 1.2fr) minmax(0, 1.3fr) minmax(110px, 1.2fr) minmax(100px, 1fr) auto 8px' : '32px minmax(110px, 130px) minmax(120px, 1.2fr) minmax(0, 1.3fr) minmax(110px, 1.2fr) minmax(100px, 1fr) auto 8px', gap: 8, alignItems: 'center', width: '100%', minWidth: 0 }}>
                         <Button
                             variant="secondary"
                             disabled={currentFlatIndex === 0}
@@ -195,6 +214,24 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         >
                             {isLinked ? <LinkRounded fontSize="small" /> : <LinkOffRounded fontSize="small" />}
                         </Button>
+                        {collectionCategories && (
+                            conditionIndex === 0 ? (
+                                <select
+                                    style={selectStyle}
+                                    value={collectionCategoryValues?.[collectionIndex] ?? collectionCategories[0]?.value}
+                                    onChange={(event) => {
+                                        if (!collectionCategoryValues) {
+                                            return;
+                                        }
+                                        const nextValues = [...collectionCategoryValues];
+                                        nextValues[collectionIndex] = event.target.value;
+                                        onCollectionCategoryValuesChange?.(nextValues);
+                                    }}
+                                >
+                                    {collectionCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+                                </select>
+                            ) : <div />
+                        )}
                         <select
                             style={selectStyle}
                             value={condition.type}
@@ -275,7 +312,12 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             }))}
             <Button
                 variant="secondary"
-                onClick={() => onChange([...conditionCollections, [{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]])}
+                onClick={() => {
+                    onChange([...conditionCollections, [{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]]);
+                    if (collectionCategoryValues) {
+                        onCollectionCategoryValuesChange?.([...collectionCategoryValues, collectionCategories?.[0]?.value || '']);
+                    }
+                }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifySelf: 'start' }}
             >
                 <Add fontSize="small" /> Add condition
