@@ -180,7 +180,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                         onClick={handleMarkerClick}
                                                         onMouseEnter={() => setHoveredLink(markerKey)}
                                                         onMouseLeave={() => setHoveredLink(null)}
-                                                        initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%' }}
+                                                        initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
                                                         animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: '-50%', y: '-50%', width: isHovered ? Math.max(markerSize, Math.min(220, markerName.length * 9 + markerSize)) : markerSize }}
                                                         transition={{ duration: 0.2, ease: 'easeOut' }}
                                                         style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed', zIndex: isHovered ? 2 : 1 }}
