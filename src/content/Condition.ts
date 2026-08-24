@@ -256,9 +256,11 @@ export const evaluateConditionCollection = (conditionCollection: ConditionCollec
     return conditionCollection.every((condition) => evaluateCondition(condition, context));
 };
 
-export const evaluateConditionCollections = (conditionCollections: ConditionCollection[] | undefined, context: ConditionContext): boolean => {
-    return !conditionCollections?.length
-        || conditionCollections.some((collection) => evaluateConditionCollection(collection, context));
+export const evaluateConditionCollections = (conditionCollections: ConditionCollection[] | undefined, context: ConditionContext, returnDefault: boolean = true): boolean => {
+    if (conditionCollections && conditionCollections.length > 0) {
+        return conditionCollections.some((collection) => evaluateConditionCollection(collection, context));
+    }
+    return returnDefault;
 };
 
 export const hasVariableActorTarget = (conditionCollections: ConditionCollection[] | undefined): boolean => {

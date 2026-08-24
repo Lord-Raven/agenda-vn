@@ -60,8 +60,8 @@ export const normalizeLocationOpenTimes = (openTimes: unknown): Partial<Record<C
 export const isLocationDisabled = (location: Location, context: ConditionContext): boolean => {
 	console.log('Checking if location is disabled:', location, 'with context:', context);
 	console.log('Availability conditions:', location.availabilityConditions?.disabled);
-	console.log('Evaluation result:', evaluateConditionCollections(location.availabilityConditions?.disabled, context));
-	return !evaluateConditionCollections(location.availabilityConditions?.disabled, context);
+	console.log('Evaluation result:', evaluateConditionCollections(location.availabilityConditions?.disabled, context, false));
+	return evaluateConditionCollections(location.availabilityConditions?.disabled, context, false);
 };
 
 // An inactive location still appears (grayed out) but cannot be visited (e.g. a business closed for the day).
