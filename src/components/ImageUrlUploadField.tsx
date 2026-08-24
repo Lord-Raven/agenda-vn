@@ -1,5 +1,6 @@
 import { FC, ReactNode, useRef } from 'react';
 import { TextInput } from './UiComponents';
+import { useCachedImageUrl } from '../utils/ImageCache';
 
 type ImageUrlUploadFieldProps = {
     imageUrl: string;
@@ -41,6 +42,7 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
     onInvalidFile,
 }) => {
     const uploadInputRef = useRef<HTMLInputElement>(null);
+    const cachedImageUrl = useCachedImageUrl(imageUrl);
 
     const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -89,7 +91,7 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
                     borderRadius: previewBorderRadius,
                     border: previewBorder,
                     backgroundColor: previewBackgroundColor,
-                    backgroundImage: imageUrl ? `url(${imageUrl})` : 'none',
+                    backgroundImage: cachedImageUrl ? `url(${cachedImageUrl})` : 'none',
                     backgroundSize: 'cover',
                     backgroundPosition: previewBackgroundPosition,
                     display: 'flex',
@@ -101,7 +103,7 @@ export const ImageUrlUploadField: FC<ImageUrlUploadFieldProps> = ({
                     opacity: disabled ? 0.7 : 1,
                 }}
             >
-                {!imageUrl && previewPlaceholder}
+                {!cachedImageUrl && previewPlaceholder}
                 {previewUploadHint && (
                     <div
                         style={{

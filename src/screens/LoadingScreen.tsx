@@ -5,6 +5,7 @@ import { Stage } from '../Stage';
 import { GlassPanel, Title } from '../components/UiComponents';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEFAULT_ATLAS_LOCATIONS, getLocationImageUrl } from '../content/Location';
+import { preloadImage, useCachedImageUrl } from '../utils/ImageCache';
 
 /*
  * Loading screen that displays while content is being loaded.
@@ -44,8 +45,10 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
         );
         bgQueueRef.current = urls;
         bgQueueIndexRef.current = 0;
+        urls.forEach((url) => preloadImage(url));
         return urls[0] ?? '';
     });
+    const cachedBgUrl = useCachedImageUrl(bgUrl);
 
     useEffect(() => {
         const bgInterval = setInterval(() => {
@@ -130,9 +133,9 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
             }}
         >
             <AnimatePresence>
-                {bgUrl && (
+                {cachedBgUrl && (
                     <motion.div
-                        key={bgUrl}
+                        key={cachedBgUrl}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 0.35 }}
                         exit={{ opacity: 0 }}
@@ -140,7 +143,7 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                         style={{
                             position: 'absolute',
                             inset: 0,
-                            backgroundImage: `url(${bgUrl})`,
+                            backgroundImage: `url(${cachedBgUrl})`,
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
                             zIndex: 0,

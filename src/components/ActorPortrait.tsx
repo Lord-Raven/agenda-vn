@@ -2,6 +2,7 @@ import React, { FC } from 'react';
 import { Person } from '@mui/icons-material';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Stage } from '../Stage';
+import { CachedImage } from './CachedImage';
 
 export interface ActorPortraitProps {
     actor?: Pick<Actor, 'id' | 'name' | 'outfitId' | 'outfits' | 'themeColor'> | null;
@@ -68,7 +69,7 @@ export const ActorPortrait: FC<ActorPortraitProps> = ({
             }}
         >
             {imageUrl ? (
-                <img
+                <CachedImage
                     src={imageUrl}
                     alt={actor.name}
                     style={{

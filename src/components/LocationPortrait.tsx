@@ -2,6 +2,7 @@ import React, { FC } from 'react';
 import { Place } from '@mui/icons-material';
 import { Location, getLocationImageUrl } from '../content/Location';
 import { Stage } from '../Stage';
+import { useCachedImageUrl } from '../utils/ImageCache';
 
 export type LocationLike = Pick<Location, 'id' | 'name'>
     & Partial<Pick<Location, 'category' | 'imageUrl' | 'alternativeImages' | 'focalPoint' | 'themeColor'>>;
@@ -35,7 +36,7 @@ export const LocationPortrait: FC<LocationPortraitProps> = ({
         return null;
     }
 
-    const imageUrl = getLocationImageUrl(location as Location, resolveStage(stage));
+    const imageUrl = useCachedImageUrl(getLocationImageUrl(location as Location, resolveStage(stage)));
     const iconSize = typeof height === 'number' ? Math.max(14, Math.round(height * 0.42)) : 20;
 
     return (

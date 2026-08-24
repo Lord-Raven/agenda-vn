@@ -12,6 +12,7 @@ import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, G
 import { StatRating } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
+import { CachedImage } from '../components/CachedImage';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -2824,7 +2825,7 @@ ${indent}}`;
                                                     }}
                                                 >
                                                     {hasImage && (
-                                                        <img
+                                                        <CachedImage
                                                             src={imageUrl}
                                                             alt={`${selectedOutfit?.name || 'Outfit'} ${emotion}`}
                                                             style={{

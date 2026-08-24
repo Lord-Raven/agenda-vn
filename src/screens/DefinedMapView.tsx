@@ -13,6 +13,7 @@ import { Button } from '../components/UiComponents';
 import { evaluateConditionCollections } from '../content/Condition';
 import { LocationActorPortraits } from '../components/LocationActorPortraits';
 import { GlobalStatBar } from '../components/GlobalStatBar';
+import { useCachedImageUrl } from '../utils/ImageCache';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -60,16 +61,16 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
 
     const displayedMap = sortedMaps.find(map => map.id === displayedMapId) || preferredMap;
     const configuredBackgroundImageUrl = stage().getConfiguration().backgroundImageUrl?.trim() || DEFAULT_BACKGROUND_IMAGE_URL;
+    const cachedBackgroundImageUrl = useCachedImageUrl(configuredBackgroundImageUrl);
+    const displayedMapImageUrl = useCachedImageUrl(displayedMap ? getMapImageUrl(displayedMap, stage()) : undefined);
 
     if (!displayedMap) {
         return null;
     }
 
-    const displayedMapImageUrl = getMapImageUrl(displayedMap, stage());
-
     return (
         <>
-            <Box sx={{ width: '100vw', height: '100dvh', boxSizing: 'border-box', p: { xs: '12px', md: '18px' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'hidden', backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${configuredBackgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
+            <Box sx={{ width: '100vw', height: '100dvh', boxSizing: 'border-box', p: { xs: '12px', md: '18px' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'hidden', backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${cachedBackgroundImageUrl || ''})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
                 <Box sx={{ flexShrink: 0 }}>
                     <GlobalStatBar
                         stage={stage}

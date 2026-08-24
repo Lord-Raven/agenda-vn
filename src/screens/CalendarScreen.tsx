@@ -19,6 +19,7 @@ import { useTooltip } from "../components/TooltipContext";
 import { ContentManagementScreen } from "./ContentManagementScreen";
 import { Actor, getEmotionImage } from "../content/Actor";
 import { GlobalStatBar } from "../components/GlobalStatBar";
+import { useCachedImageUrl } from "../utils/ImageCache";
 
 interface CalendarScreenProps {
     stage: () => Stage;
@@ -170,6 +171,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
 
     const stageInstance = stage();
     const configuredBackgroundImageUrl = (stageInstance.getConfiguration().backgroundImageUrl || '').trim() || DEFAULT_BACKGROUND_IMAGE_URL;
+    const cachedBackgroundImageUrl = useCachedImageUrl(configuredBackgroundImageUrl);
     const save = stageInstance.getSave();
     const currentDateKey = save.currentDate || formatDateKey(new Date());
     const currentDate = parseDateKey(currentDateKey);
@@ -268,7 +270,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                     flexDirection: "column",
                     gap: 1.5,
                     overflow: "hidden",
-                    backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${configuredBackgroundImageUrl})`,
+                    backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${cachedBackgroundImageUrl || ''})`,
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                     backgroundRepeat: "no-repeat",

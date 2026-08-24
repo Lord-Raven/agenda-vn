@@ -11,6 +11,7 @@ import { Button, GlassPanel } from "../components/UiComponents";
 import { DefinedMapView } from "./DefinedMapView";
 import { LocationActorPortraits } from "../components/LocationActorPortraits";
 import { GlobalStatBar } from "../components/GlobalStatBar";
+import { useCachedImageUrl } from "../utils/ImageCache";
 
 interface MapScreenProps {
     stage: () => Stage;
@@ -34,6 +35,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
 
     const stageInstance = stage();
     const configuredBackgroundImageUrl = (stageInstance.getConfiguration().backgroundImageUrl || "").trim() || DEFAULT_BACKGROUND_IMAGE_URL;
+    const cachedBackgroundImageUrl = useCachedImageUrl(configuredBackgroundImageUrl);
     const save = stageInstance.getSave();
     const currentTimeOfDay = save.currentTimeOfDay || "morning";
     const activeMaps = useMemo(
@@ -126,7 +128,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                     flexDirection: "column",
                     gap: 1.5,
                     overflow: "hidden",
-                    backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${configuredBackgroundImageUrl})`,
+                    backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${cachedBackgroundImageUrl || ''})`,
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                     backgroundRepeat: "no-repeat",
