@@ -2,7 +2,7 @@ import React, { FC } from 'react';
 import { Place } from '@mui/icons-material';
 import { Location, getLocationImageUrl } from '../content/Location';
 import { Stage } from '../Stage';
-import { useCachedImageUrl } from '../utils/ImageCache';
+import { useThumbnailUrl } from '../utils/ImageCache';
 
 export type LocationLike = Pick<Location, 'id' | 'name'>
     & Partial<Pick<Location, 'category' | 'imageUrl' | 'alternativeImages' | 'focalPoint' | 'themeColor'>>;
@@ -17,6 +17,8 @@ export interface LocationPortraitProps {
     title?: string;
     ariaLabel?: string;
     highlighted?: boolean;
+    /** Longest-edge pixel size of the cached downscale; defaults to twice the rendered size. */
+    thumbnailSize?: number;
 }
 
 const resolveStage = (stage?: Stage | (() => Stage)) => typeof stage === 'function' ? stage() : stage;
@@ -31,12 +33,18 @@ export const LocationPortrait: FC<LocationPortraitProps> = ({
     title,
     ariaLabel,
     highlighted = false,
+    thumbnailSize,
 }) => {
+    const renderedSize = Math.max(typeof width === 'number' ? width : 0, typeof height === 'number' ? height : 0) || 128;
+    const imageUrl = useThumbnailUrl(
+        location ? getLocationImageUrl(location as Location, resolveStage(stage)) : undefined,
+        thumbnailSize ?? Math.round(renderedSize * 2),
+    );
+
     if (!location) {
         return null;
     }
 
-    const imageUrl = useCachedImageUrl(getLocationImageUrl(location as Location, resolveStage(stage)));
     const iconSize = typeof height === 'number' ? Math.max(14, Math.round(height * 0.42)) : 20;
 
     return (

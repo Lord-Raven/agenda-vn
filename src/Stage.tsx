@@ -2003,7 +2003,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const response = await this.generateText(
             this.buildLoreUpdateCandidatePrompt(save, candidateActors),
             20,
-            200,
+            2000,
             LORE_UPDATE_CANDIDATE_FIELDS,
         );
 

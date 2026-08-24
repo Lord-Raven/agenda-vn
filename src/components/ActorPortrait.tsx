@@ -15,6 +15,8 @@ export interface ActorPortraitProps {
     title?: string;
     showInitials?: boolean;
     ariaLabel?: string;
+    /** Longest-edge pixel size of the cached downscale; defaults to twice the rendered size. */
+    thumbnailSize?: number;
 }
 
 const resolveStage = (stage?: Stage | (() => Stage)) => typeof stage === 'function' ? stage() : stage;
@@ -30,6 +32,7 @@ export const ActorPortrait: FC<ActorPortraitProps> = ({
     title,
     showInitials = true,
     ariaLabel,
+    thumbnailSize,
 }) => {
     if (!actor) {
         return null;
@@ -71,6 +74,7 @@ export const ActorPortrait: FC<ActorPortraitProps> = ({
             {imageUrl ? (
                 <CachedImage
                     src={imageUrl}
+                    thumbnailSize={thumbnailSize ?? Math.round(size * 2)}
                     alt={actor.name}
                     style={{
                         width: '100%',

@@ -14,6 +14,7 @@ import { evaluateConditionCollections } from '../content/Condition';
 import { LocationActorPortraits } from '../components/LocationActorPortraits';
 import { GlobalStatBar } from '../components/GlobalStatBar';
 import { useCachedImageUrl } from '../utils/ImageCache';
+import { CachedBackgroundUrl } from '../components/CachedImage';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -177,9 +178,13 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed', opacity: isInteractive ? 1 : 0.5, zIndex: isHovered ? 2 : 1 }}
                                         >
                                             <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
-                                                <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : (linkedMapImageUrl ? `url(${linkedMapImageUrl})` : 'none'), backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                                                    {!locationImageUrl && !linkedMapImageUrl && <MapRounded fontSize="small" />}
-                                                </span>
+                                                <CachedBackgroundUrl url={locationImageUrl || linkedMapImageUrl} thumbnailSize={markerSize * 2}>
+                                                    {(markerImageUrl) => (
+                                                        <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: markerImageUrl ? `url(${markerImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                                                            {!markerImageUrl && <MapRounded fontSize="small" />}
+                                                        </span>
+                                                    )}
+                                                </CachedBackgroundUrl>
                                                 <span style={{ padding: '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700, flex: '1 1 auto', minWidth: 0, overflow: 'hidden' }}>
                                                     {markerName}
                                                     {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 400 }}>{linkedLocation?.name}</span>}
