@@ -418,37 +418,6 @@ export const VOICE_MAP: {[key: string]: string} = {
     'animated_male_20s': 'masculine - hip and lively',
 };
 
-export async function loadSupportedActor(data: Partial<Actor>, stage: Stage): Promise<Actor|null> {
-    // Canon data within the stage:
-    const newActor = new Actor(data);
-    let definition: any = null;
-
-    if (definition) {
-        console.log(`Loaded character definition for ${data.name} from Chub:`);
-        console.log(definition);
-        // Even if nothing else, use the definition voice ID over whatever is in the stage.
-        if (definition.voice_id && !VOICE_MAP[definition.voice_id]) {
-            newActor.voiceId = definition.voice_id;
-        }
-
-        // if newActor is missing critical fields like personality or outfits, distill these details to fill the gaps
-        if (!newActor.profile || !newActor.outfits?.length) {
-            return await distillActor(newActor, definition, stage);
-        }
-    }
-
-    if (!newActor.profile || !newActor.outfits?.length) {
-        const fallbackDefinition = {
-            name: newActor.name,
-            personality: [newActor.description, newActor.background, newActor.profile].filter(Boolean).join('\n').trim() || newActor.name,
-            voice_id: newActor.voiceId,
-        };
-        return await distillActor(newActor, fallbackDefinition, stage);
-    }
-
-    return newActor;
-}
-
 export async function distillActor(actor: Actor, definition: any, stage: Stage): Promise<Actor|null> {
     console.log('Loading reserve actor:', definition.name);
     console.log(definition);

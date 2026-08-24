@@ -2,7 +2,7 @@ import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
-import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, loadSupportedActor, resolveActorSchedule, ScheduleContext } from "./content/Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { findStatOptionByValue, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeLocationListValue, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
@@ -90,6 +90,19 @@ const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
         key: 'participants',
         label: 'PARTICIPANTS',
         description: 'Comma-separated character names selected from Available Characters who should be present in the intro.',
+    },
+];
+
+const LORE_UPDATE_CANDIDATE_FIELDS: StructuredFieldDefinition[] = [
+    {
+        key: 'reasoning',
+        label: 'REASONING',
+        description: 'Brief explanation of which characters, if any, have profile details that should be revised to reflect the player\'s identity, role, or choices.',
+    },
+    {
+        key: 'characters',
+        label: 'CHARACTERS',
+        description: 'Comma-separated names of characters, selected from Available Characters, whose profile should be updated. Leave empty if none apply.',
     },
 ];
 
@@ -598,49 +611,62 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             newSave.currentDate = persistedConfiguration.startingDate;
         }
 
-        this.anticipatedLoadingPromiseCount = 5;//Math.max(this.INITIAL_ACTORS - Object.keys(newSave.actors).length, 0) * 1 + 3;
+        this.anticipatedLoadingPromiseCount = 200; // Set to a large number at first.
 
         // Save the new game
         this.saveData.saves[saveSlotIndex] = newSave;
         this.saveData.lastSaveSlot = saveSlotIndex;
 
         // Generate all characters
-        this.loadActors().finally(async () => {
-            console.log('Finished loading initial actors for new game');
+        this.loadActors()
+        
+        console.log('Finished loading initial actors for new game');
 
-            const generatedIntroSeed = await this.generateIntroSkitSeed(newSave).catch(error => {
-                console.error('Failed to generate intro skit seed for new game', error);
-                return null;
-            });
-            const defaultLocationId = Object.values(newSave.atlas || {})[0]?.id || '';
-            const defaultInitialActors = Object.values(newSave.actors || {})
-                .filter(actor => actor.id !== newSave.playerId)
-                .slice(0, 1)
-                .map(actor => actor.id);
-
-            const introSkit = new Skit({
-                initialLocationId: generatedIntroSeed?.locationId || defaultLocationId,
-                guidance: generatedIntroSeed?.guidance || `${this.getPlayerActor()?.name || 'The player'} is briefly introduced to the concept of the world or setting.`,
-                script: [],
-                initialActors: generatedIntroSeed?.initialActorIds?.length ? generatedIntroSeed.initialActorIds : defaultInitialActors,
-                summary: ''
-            });
-
-            delete this.generationPromises['newGame']; // Clear the dummy promise to allow the loading screen to finish.
-
-            // Push intro to timeline to start the game:
-            newSave.timeline.push({
-                calendarEventId: undefined,
-                date: newSave.currentDate || this.getStartingDate(newSave),
-                skit: introSkit
-            });
-
-            this.rebuildUpcomingEvents(newSave).catch(error => {
-                console.error('Error seeding upcoming events for new game', error);
-            });
-
-            this.saveGame();
+        // Ask the LLM to indicate whether any existing character profile (internally, lore) needs to be updated based upon user's identity/role/choices.
+        const actorsNeedingLoreUpdate = await this.identifyActorsNeedingLoreUpdate(newSave).catch(error => {
+            console.error('Failed to identify actors needing lore updates for new game', error);
+            return [] as Actor[];
         });
+
+        // Once the number is known, we can adjust the anticipated loading promise count accordingly.
+        this.anticipatedLoadingPromiseCount = Math.max(actorsNeedingLoreUpdate.length + 4, 4);
+
+        // Kick off lore updates in batches of three at a time. These each add a promise to the promises array (within updateLoreEntry) to help track the overall progress of the loading process.
+        this.runLoreUpdatesWithConcurrency(actorsNeedingLoreUpdate).catch(error => {
+            console.error('Error running lore updates for new game', error);
+        });
+
+        // Generate the intro skit for the new game.
+        const generatedIntroSeed = await this.generateIntroSkitSeed(newSave).catch(error => {
+            console.error('Failed to generate intro skit seed for new game', error);
+            return null;
+        });
+        const defaultLocationId = Object.values(newSave.atlas || {})[0]?.id || '';
+        const defaultInitialActors = Object.values(newSave.actors || {})
+            .filter(actor => actor.id !== newSave.playerId)
+            .slice(0, 1)
+            .map(actor => actor.id);
+
+        const introSkit = new Skit({
+            initialLocationId: generatedIntroSeed?.locationId || defaultLocationId,
+            guidance: generatedIntroSeed?.guidance || `${this.getPlayerActor()?.name || 'The player'} is briefly introduced to the concept of the world or setting.`,
+            script: [],
+            initialActors: generatedIntroSeed?.initialActorIds?.length ? generatedIntroSeed.initialActorIds : defaultInitialActors,
+            summary: ''
+        });
+
+        delete this.generationPromises['newGame']; // Clear the dummy promise to allow the loading screen to finish.
+
+        // Push intro to timeline to start the game:
+        newSave.timeline.push({
+            calendarEventId: undefined,
+            date: newSave.currentDate || this.getStartingDate(newSave),
+            skit: introSkit
+        });
+
+        this.rebuildUpcomingEvents(newSave);
+
+        this.saveGame();
     }
 
     // Called when the calendar screen displays.
@@ -648,12 +674,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const save = this.getSave();
         this.ensureCalendarState(save);
 
-        if (!this.generationPromises['calendarEvents'] && this.getUpcomingEvents().length === 0) {
-            this.generationPromises['calendarEvents'] = this.rebuildUpcomingEvents(save).then(() => {
-                this.showPriorityMessage('Upcoming events are now available.');
-            }).finally(() => {
-                delete this.generationPromises['calendarEvents'];
-            });
+        if (this.getUpcomingEvents().length === 0) {
+            this.rebuildUpcomingEvents(save)
         }
     }
     
@@ -1644,7 +1666,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return eventStartTimeOrder >= currentTimeOrder;
     }
 
-    async rebuildUpcomingEvents(save: SaveType = this.getSave(), targetEventCount: number = 6): Promise<CalendarEvent[]> {
+    rebuildUpcomingEvents(save: SaveType = this.getSave(), targetEventCount: number = 6): CalendarEvent[] {
         this.ensureCalendarState(save);
 
         const existingUpcomingEvents = (save.upcomingEvents || [])
@@ -1819,14 +1841,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
         }
 
-        if (!this.generationPromises['rebuildCalendarEvents']) {
-            const rebuildEventsPromise = this.rebuildUpcomingEvents(save).then(() => {
-                this.showPriorityMessage('Calendar updated with new upcoming events.');
-            }).catch(error => {
-                console.error('Error rebuilding upcoming events after skit', error);
-            }).finally(() => {delete this.generationPromises['rebuildCalendarEvents']});
-            this.generationPromises['rebuildCalendarEvents'] = rebuildEventsPromise;
-        }
+        this.rebuildUpcomingEvents(save)
+        this.showPriorityMessage('Calendar updated with new upcoming events.');
 
         this.saveGame();
     }
@@ -1943,6 +1959,84 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         return lines.length > 0 ? lines.join('\n\n') : 'No player stat context is active.';
+    }
+
+    private buildLoreUpdateCandidatePrompt(save: SaveType, candidateActors: Actor[]): string {
+        const playerActor = this.getPlayerActor();
+        const playerIdentity = [playerActor?.name, playerActor?.profile || playerActor?.description]
+            .filter(Boolean)
+            .join(': ') || 'No player identity established yet.';
+
+        return buildPrompt()
+            .addBlock('Instructions',
+                `This is a preparatory request to review existing character profiles for a narrative game. ` +
+                `Determine which characters, if any, have background details that should be revised to account for the player's identity, role, or choices established below. ` +
+                `Most characters should require no change; only select ones whose profile plausibly conflicts with or ignores this context.`)
+            .addBlock('Player Identity', playerIdentity)
+            .addBlock('Active Configuration Context', this.buildActiveSettingContextSummary(save))
+            .addBlock('Available Characters', candidateActors.map(actor =>
+                `${actor.name}: ${actor.profile || actor.description || 'No profile available.'}`,
+            ))
+            .addBlock('Response Format', buildStructuredResponseFormat(LORE_UPDATE_CANDIDATE_FIELDS, { includeEndTag: true }))
+            .addBlock('Example Response',
+                buildStructuredExampleResponse(
+                    LORE_UPDATE_CANDIDATE_FIELDS,
+                    {
+                        reasoning: 'Mirel\'s profile treats the player as a stranger, but the player is established as her employer, so her profile should be updated to reflect that relationship.',
+                        characters: 'Mirel',
+                    },
+                    { includeEndTag: true },
+                ))
+            .format();
+    }
+
+    // Identifies which existing characters' lore/profile should be revised to reflect the player's established identity, role, or choices.
+    private async identifyActorsNeedingLoreUpdate(save: SaveType): Promise<Actor[]> {
+        const candidateActors = Object.values(save.actors || {})
+            .filter(actor => actor.id !== save.playerId)
+            .filter(actor => getLinkedActorLore(actor, this)?.updatable);
+
+        if (candidateActors.length === 0) {
+            return [];
+        }
+
+        const response = await this.generateText(
+            this.buildLoreUpdateCandidatePrompt(save, candidateActors),
+            20,
+            200,
+            LORE_UPDATE_CANDIDATE_FIELDS,
+        );
+
+        const parsed = parseStructuredResponse(response, LORE_UPDATE_CANDIDATE_FIELDS);
+        const names = (parsed['characters'] || '').split(',').map(name => name.trim()).filter(Boolean);
+
+        const matchedActors: Actor[] = [];
+        for (const name of names) {
+            const matchedActor = findBestNameMatch(name, candidateActors, ['name']);
+            if (matchedActor && !matchedActors.includes(matchedActor)) {
+                matchedActors.push(matchedActor);
+            }
+        }
+
+        return matchedActors;
+    }
+
+    // Runs updateLoreEntry() for the given actors' linked lore, limiting how many run concurrently.
+    private async runLoreUpdatesWithConcurrency(actors: Actor[], concurrency: number = 3): Promise<void> {
+        const queue = [...actors];
+        const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+            let actor: Actor | undefined;
+            while ((actor = queue.shift())) {
+                const loreEntry = getLinkedActorLore(actor, this);
+                if (!loreEntry) {
+                    continue;
+                }
+                await updateLoreEntry(loreEntry, this).catch(error => {
+                    console.error(`Error updating lore entry for actor ${actor?.name}`, error);
+                });
+            }
+        });
+        await Promise.all(workers);
     }
 
     private buildActorSeedPrompt(save: SaveType, existingActorNames: string[]): string {
@@ -2100,59 +2194,33 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return imageUrl;
     }
 
-    async loadActors() {
+    loadActors() {
         if (Object.keys(this.generationPromises).includes('loadActors')) {
             return this.generationPromises['loadActors'];
         }
 
-        const promise = (async () => {
-            const save = this.getSave();
-            const configuredActors = this.getConfiguration().actors || [];
-            const configuredActorStats = this.getConfiguration().actorStats || [];
+        const save = this.getSave();
+        const configuredActors = this.getConfiguration().actors || [];
+        const configuredActorStats = this.getConfiguration().actorStats || [];
 
-            // Seed actors from the game configuration first.
-            for (const configuredActor of configuredActors) {
-                const seededActor = new Actor({
-                    ...configuredActor,
-                    statMap: configuredActor?.statMap && typeof configuredActor.statMap === 'object'
-                        ? { ...configuredActor.statMap }
-                        : {},
-                });
+        // Seed actors from the game configuration first.
+        for (const configuredActor of configuredActors) {
+            const newActor = new Actor({
+                ...configuredActor,
+                statMap: configuredActor?.statMap && typeof configuredActor.statMap === 'object'
+                    ? { ...configuredActor.statMap }
+                    : {},
+            });
 
-                if (!save.actors[seededActor.id]) {
-                    applyActorInitialStats(seededActor, configuredActorStats, this.getScheduleContext(save));
-                    save.actors[seededActor.id] = seededActor;
-                }
+            if (!save.actors[newActor.id]) {
+                applyActorInitialStats(newActor, configuredActorStats, this.getScheduleContext(save));
+                save.actors[newActor.id] = newActor;
             }
+        }
 
-            this.syncActorStats(save);
+        this.syncActorStats(save);
 
-            // Distill seeded actors with incomplete details.
-            const seededCandidates = Object.values(save.actors).filter(actor =>
-                actor.id !== save.playerId && (!actor.profile?.trim() || !actor.description?.trim() || !actor.outfits?.length),
-            );
-
-            for (const seededActor of seededCandidates) {
-                try {
-                    const enrichedActor = await loadSupportedActor(seededActor, this);
-                    if (enrichedActor) {
-                        applyActorInitialStats(enrichedActor, configuredActorStats, this.getScheduleContext(save));
-                        save.actors[enrichedActor.id] = enrichedActor;
-                        this.syncActorStats(save);
-                    }
-                } catch (error) {
-                    console.warn(`Failed to load configured actor ${seededActor.name || seededActor.id}`, error);
-                }
-            }
-    
-            this.saveGame();
-        })().finally(() => {
-            delete this.generationPromises['loadActors'];
-        });
-
-        console.log('Set promise');
-        this.generationPromises['loadActors'] = promise;
-        return promise;
+        this.saveGame();
     }
 
     isVerticalLayout(): boolean {
