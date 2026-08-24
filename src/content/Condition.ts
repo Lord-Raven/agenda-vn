@@ -253,6 +253,15 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
 };
 
 export const evaluateConditionCollection = (conditionCollection: ConditionCollection, context: ConditionContext): boolean => {
+    // log all condition evaluations for debugging purposes
+    console.log('Evaluating condition collection:', conditionCollection);
+    console.log('Context:', context);
+    conditionCollection.forEach((condition, index) => {
+        console.log(`Evaluating condition #${index}:`, condition);
+        const result = evaluateCondition(condition, context);
+        console.log(`Result of condition #${index}:`, result);
+    });
+
     return conditionCollection.every((condition) => evaluateCondition(condition, context));
 };
 
