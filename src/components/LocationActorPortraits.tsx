@@ -51,6 +51,8 @@ export const LocationActorPortraits: FC<LocationActorPortraitsProps> = ({ locati
                             size={size}
                             borderRadius="50%"
                             objectPosition="center 20%"
+                            hideUntilImageLoaded
+                            fadeInWhenLoaded
                             style={{
                                 border: '2px solid var(--agenda-text-primary)',
                                 boxShadow: isHovered ? '0 3px 14px rgba(0,0,0,.7)' : '0 3px 10px rgba(0,0,0,.55)',

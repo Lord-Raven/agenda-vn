@@ -1,8 +1,9 @@
 import React, { FC } from 'react';
 import { Person } from '@mui/icons-material';
+import { motion } from 'framer-motion';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Stage } from '../Stage';
-import { CachedImage } from './CachedImage';
+import { CachedBackgroundUrl } from './CachedImage';
 
 export interface ActorPortraitProps {
     actor?: Pick<Actor, 'id' | 'name' | 'outfitId' | 'outfits' | 'themeColor'> | null;
@@ -17,6 +18,8 @@ export interface ActorPortraitProps {
     ariaLabel?: string;
     /** Longest-edge pixel size of the cached downscale; defaults to twice the rendered size. */
     thumbnailSize?: number;
+    hideUntilImageLoaded?: boolean;
+    fadeInWhenLoaded?: boolean;
 }
 
 const resolveStage = (stage?: Stage | (() => Stage)) => typeof stage === 'function' ? stage() : stage;
@@ -33,6 +36,8 @@ export const ActorPortrait: FC<ActorPortraitProps> = ({
     showInitials = true,
     ariaLabel,
     thumbnailSize,
+    hideUntilImageLoaded = false,
+    fadeInWhenLoaded = false,
 }) => {
     if (!actor) {
         return null;
@@ -50,45 +55,47 @@ export const ActorPortrait: FC<ActorPortraitProps> = ({
         .join('') || '?';
 
     return (
-        <div
-            title={title ?? actor.name}
-            aria-label={ariaLabel ?? actor.name}
-            style={{
-                width: size,
-                height: size,
-                display: 'grid',
-                placeItems: 'center',
-                overflow: 'hidden',
-                borderRadius,
-                border: `2px solid ${actor.themeColor || 'var(--agenda-line-strong)'}`,
-                background: actor.themeColor || 'var(--agenda-surface-base)',
-                boxShadow: '0 3px 10px rgba(0, 0, 0, 0.38)',
-                color: 'var(--agenda-text-primary)',
-                fontSize: Math.max(11, Math.round(size * 0.34)),
-                fontWeight: 700,
-                flex: '0 0 auto',
-                position: 'relative',
-                ...style,
+        <CachedBackgroundUrl url={imageUrl} thumbnailSize={thumbnailSize ?? Math.round(size * 2)}>
+            {(cachedImageUrl) => {
+                if (imageUrl && hideUntilImageLoaded && !cachedImageUrl) {
+                    return null;
+                }
+
+                return (
+                    <motion.div
+                        title={title ?? actor.name}
+                        aria-label={ariaLabel ?? actor.name}
+                        initial={fadeInWhenLoaded ? { opacity: 0 } : false}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.22, ease: 'easeOut' }}
+                        style={{
+                            width: size,
+                            height: size,
+                            display: 'grid',
+                            placeItems: 'center',
+                            overflow: 'hidden',
+                            borderRadius,
+                            border: `2px solid ${actor.themeColor || 'var(--agenda-line-strong)'}`,
+                            background: cachedImageUrl ? `url(${cachedImageUrl})` : actor.themeColor || 'var(--agenda-surface-base)',
+                            backgroundSize: 'cover',
+                            backgroundPosition: objectPosition,
+                            boxShadow: '0 3px 10px rgba(0, 0, 0, 0.38)',
+                            color: 'var(--agenda-text-primary)',
+                            fontSize: Math.max(11, Math.round(size * 0.34)),
+                            fontWeight: 700,
+                            flex: '0 0 auto',
+                            position: 'relative',
+                            ...style,
+                        }}
+                    >
+                        {!cachedImageUrl && (showInitials ? (
+                            <span>{initials}</span>
+                        ) : (
+                            <Person style={{ fontSize: Math.max(18, size * 0.5), color: 'var(--agenda-text-primary)' }} />
+                        ))}
+                    </motion.div>
+                );
             }}
-        >
-            {imageUrl ? (
-                <CachedImage
-                    src={imageUrl}
-                    thumbnailSize={thumbnailSize ?? Math.round(size * 2)}
-                    alt={actor.name}
-                    style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        objectPosition,
-                        display: 'block',
-                    }}
-                />
-            ) : showInitials ? (
-                <span>{initials}</span>
-            ) : (
-                <Person style={{ fontSize: Math.max(18, size * 0.5), color: 'var(--agenda-text-primary)' }} />
-            )}
-        </div>
+        </CachedBackgroundUrl>
     );
 };

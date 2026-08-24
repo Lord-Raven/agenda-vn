@@ -166,36 +166,43 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
 
                                     return (
                                         <Fragment key={markerKey}>
-                                        <motion.button
-                                            type="button"
-                                            aria-label={linkedMap ? `Open map ${markerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : markerName}
-                                            disabled={!isInteractive}
-                                            onClick={handleMarkerClick}
-                                            onMouseEnter={() => setHoveredLink(markerKey)}
-                                            onMouseLeave={() => setHoveredLink(null)}
-                                            animate={{ width: isHovered ? Math.max(markerSize, Math.min(220, markerName.length * 9 + markerSize)) : markerSize }}
-                                            transition={{ duration: 0.2, ease: 'easeOut' }}
-                                            style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed', opacity: isInteractive ? 1 : 0.5, zIndex: isHovered ? 2 : 1 }}
-                                        >
-                                            <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
-                                                <CachedBackgroundUrl url={locationImageUrl || linkedMapImageUrl} thumbnailSize={markerSize * 2}>
-                                                    {(markerImageUrl) => (
+                                        <CachedBackgroundUrl url={locationImageUrl || linkedMapImageUrl} thumbnailSize={markerSize * 2}>
+                                            {(markerImageUrl) => {
+                                                if ((locationImageUrl || linkedMapImageUrl) && !markerImageUrl) {
+                                                    return null;
+                                                }
+
+                                                return (
+                                                    <motion.button
+                                                        type="button"
+                                                        aria-label={linkedMap ? `Open map ${markerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : markerName}
+                                                        disabled={!isInteractive}
+                                                        onClick={handleMarkerClick}
+                                                        onMouseEnter={() => setHoveredLink(markerKey)}
+                                                        onMouseLeave={() => setHoveredLink(null)}
+                                                        initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%' }}
+                                                        animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: '-50%', y: '-50%', width: isHovered ? Math.max(markerSize, Math.min(220, markerName.length * 9 + markerSize)) : markerSize }}
+                                                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                                                        style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed', zIndex: isHovered ? 2 : 1 }}
+                                                    >
+                                                        <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
                                                         <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: markerImageUrl ? `url(${markerImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                                                             {!markerImageUrl && <MapRounded fontSize="small" />}
                                                         </span>
-                                                    )}
-                                                </CachedBackgroundUrl>
-                                                <span style={{ padding: '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700, flex: '1 1 auto', minWidth: 0, overflow: 'hidden' }}>
-                                                    {markerName}
-                                                    {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 400 }}>{linkedLocation?.name}</span>}
-                                                </span>
-                                            </span>
-                                            {isInteractive && (
-                                                <span style={{ position: 'absolute', top: -2, left: -2, display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
-                                                    {linkedMap ? <ArrowOutward sx={{ fontSize: 11 }} /> : <PlayArrow sx={{ fontSize: 11 }} />}
-                                                </span>
-                                            )}
-                                        </motion.button>
+                                                            <span style={{ padding: '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700, flex: '1 1 auto', minWidth: 0, overflow: 'hidden' }}>
+                                                                {markerName}
+                                                                {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 400 }}>{linkedLocation?.name}</span>}
+                                                            </span>
+                                                        </span>
+                                                        {isInteractive && (
+                                                            <span style={{ position: 'absolute', top: -2, left: -2, display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
+                                                                {linkedMap ? <ArrowOutward sx={{ fontSize: 11 }} /> : <PlayArrow sx={{ fontSize: 11 }} />}
+                                                            </span>
+                                                        )}
+                                                    </motion.button>
+                                                );
+                                            }}
+                                        </CachedBackgroundUrl>
                                         {linkedLocation && (
                                             <div style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `calc(${link.coordinates.y * 100}% + ${markerSize / 2 - actorPortraitSize * 0.35}px)`, transform: 'translateX(-50%)', zIndex: isHovered ? 5 : 3 }}>
                                                 <LocationActorPortraits
