@@ -3,7 +3,7 @@ import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
 import { Stat, StatDisplayType, StatType, StatValue, StatValueRule, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, findStatOptionByValue, getStatOptionValue, isNumericDisplayType, normalizeLocationListValue, cloneStat } from '../content/Stat';
-import { Button, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
+import { Button, ColorPickerInput, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
@@ -834,6 +834,18 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
+                                            {normalizedStat.type === 'number' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Display Color</label>
+                                                    <ColorPickerInput
+                                                        value={normalizedStat.displayColor || ''}
+                                                        onChange={(displayColor) => updateGlobalStat(statIndex, { displayColor })}
+                                                        popoverTitle="Choose Display Color"
+                                                        inputStyle={{ width: '100%' }}
+                                                    />
+                                                </div>
+                                            )}
+
                                             {normalizedStat.type === 'option' && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
                                                     <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
@@ -1213,6 +1225,18 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         <option value="rating">Rating</option>
                                                         <option value="letter grade">Letter Grade</option>
                                                     </select>
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.type === 'number' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Display Color</label>
+                                                    <ColorPickerInput
+                                                        value={normalizedStat.displayColor || ''}
+                                                        onChange={(displayColor) => updateActorStat(statIndex, { displayColor })}
+                                                        popoverTitle="Choose Display Color"
+                                                        inputStyle={{ width: '100%' }}
+                                                    />
                                                 </div>
                                             )}
 
@@ -1642,6 +1666,18 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                         <option value="rating">Rating</option>
                                                         <option value="letter grade">Letter Grade</option>
                                                     </select>
+                                                </div>
+                                            )}
+
+                                            {normalizedStat.type === 'number' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Display Color</label>
+                                                    <ColorPickerInput
+                                                        value={normalizedStat.displayColor || ''}
+                                                        onChange={(displayColor) => updateLocationStat(statIndex, { displayColor })}
+                                                        popoverTitle="Choose Display Color"
+                                                        inputStyle={{ width: '100%' }}
+                                                    />
                                                 </div>
                                             )}
 

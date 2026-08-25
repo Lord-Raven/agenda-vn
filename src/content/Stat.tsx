@@ -179,6 +179,7 @@ export type Stat = {
     exposed: ConditionalFlag;
     iconName?: string;
     labelIconName?: string;
+    displayColor?: string; // HTML color to use for display of this stat (stat bar or stat icons in a rating display; not for the label of the stat itself).
 };
 
 type StatTextContext = {
@@ -229,6 +230,7 @@ export const cloneStat = (stat: Stat): Stat => ({
     exposed: cloneConditionalFlag(stat.exposed, false),
     iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
     labelIconName: stat.labelIconName || undefined,
+    displayColor: stat.displayColor || undefined,
 });
 
 export const isStatExposed = (stat: Stat, context: ConditionContext): boolean => resolveConditionalFlag(stat.exposed, context, false);

@@ -434,9 +434,9 @@ const renderStatIcon = (
 ) => {
     const IconComponent = resolveIcon(stat.iconName);
     const label = `${stat.name} ${pipValue} of ${resolvePipCount(stat)}`;
-    const fillColor = filled ? 'var(--agenda-highlight)' : 'rgba(11, 17, 28, 0.9)';
+    const fillColor = filled ? (stat.displayColor || 'var(--agenda-highlight)') : 'rgba(11, 17, 28, 0.9)';
     const shadow = filled
-        ? 'drop-shadow(0 0 2px color-mix(in srgb, var(--agenda-highlight) 35%, transparent))'
+        ? `drop-shadow(0 0 2px color-mix(in srgb, ${fillColor} 35%, transparent))`
         : 'drop-shadow(0 0 7px rgba(0, 0, 0, 0.85))';
 
     return (

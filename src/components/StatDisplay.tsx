@@ -76,14 +76,14 @@ export const StatValueDisplay: FC<StatValueDisplayProps> = ({ stat, value, style
                             width: `${percent}%`,
                             height: '100%',
                             borderRadius: 'inherit',
-                            background: 'linear-gradient(90deg, var(--agenda-highlight), var(--agenda-accent-primary))',
+                            background: stat.displayColor || 'linear-gradient(90deg, var(--agenda-highlight), var(--agenda-accent-primary))',
                         }}
                     />
                 </Box>
                 {showText && (
                     <Typography
                         sx={{
-                            color: 'var(--agenda-text-primary)',
+                            color: stat.displayColor || 'var(--agenda-text-primary)',
                             fontSize: '0.75rem',
                             fontWeight: 700,
                             minWidth: '2.5em',
@@ -100,7 +100,7 @@ export const StatValueDisplay: FC<StatValueDisplayProps> = ({ stat, value, style
     return (
         <Typography
             sx={{
-                color: 'var(--agenda-text-primary)',
+                color: stat.displayColor || 'var(--agenda-text-primary)',
                 fontSize: '0.8rem',
                 fontWeight: 700,
                 lineHeight: 1.2,
