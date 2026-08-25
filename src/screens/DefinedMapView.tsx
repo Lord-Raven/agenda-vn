@@ -50,6 +50,10 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
         }
     }, [isHovered]);
 
+    // A marker still collapsing (elevated but no longer hovered) must render above a freshly
+    // hovered neighbor that's growing, otherwise the growing marker covers its shrink animation.
+    const zIndex = isElevated && !isHovered ? 3 : isHovered ? 2 : 1;
+
     return (
         <motion.button
             type="button"
@@ -62,7 +66,7 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
                     setIsElevated(false);
                 }
             }}
-            style={{ ...style, zIndex: isElevated ? 2 : 1 }}
+            style={{ ...style, zIndex }}
         >
             {children}
         </motion.button>

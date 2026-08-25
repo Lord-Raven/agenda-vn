@@ -3,7 +3,7 @@ import { Box, Typography } from "@mui/material";
 import { Bed, Bedtime, EventAvailable, WbSunny, WbTwilight } from "@mui/icons-material";
 import { Stage } from "../Stage";
 import { formatCurrentDate, formatDateLabel } from "../content/Skit";
-import { findStatOptionByValue, getStatOptionValue, Stat, resolveStatText } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, isStatExposed, Stat, resolveStatText } from '../content/Stat';
 import { resolveIcon } from "./StatRating";
 import { StatValueDisplay } from "./StatDisplay";
 
@@ -96,7 +96,8 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
     const stats = useMemo(() => {
         const stageInstance = stage();
         const allStats = stageInstance.getConfiguration()?.globalStats || [];
-        return allStats.filter((stat) => stat?.name?.trim() && stat.exposed === true);
+        const context = stageInstance.getScheduleContext(stageInstance.getSave());
+        return allStats.filter((stat) => stat?.name?.trim() && isStatExposed(stat, context));
     }, [stage]);
     const stageInstance = stage();
     const save = stageInstance.getSave();

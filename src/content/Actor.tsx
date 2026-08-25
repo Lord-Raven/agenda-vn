@@ -1,7 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emotion';
 import { Stage } from '../Stage';
-import { Stat, StatValue, StatValueRule, cloneStatValueRules, isNumericDisplayType, normalizeLocationListValue, normalizeStatValue, resolveStatDefault, resolvePerActorValueRule, resolveStatText } from './Stat';
+import { Stat, StatValue, StatValueRule, cloneStatValueRules, isNumericDisplayType, isStatLlmSeen, normalizeLocationListValue, normalizeStatValue, resolveStatDefault, resolvePerActorValueRule, resolveStatText } from './Stat';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -935,7 +935,16 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
     }
 
     if (options.includes('stats')) {
-        const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim() && stat.llmSees !== false);
+        const actorStatContext: ConditionContext = {
+            currentDate: save.currentDate,
+            currentTimeOfDay: save.currentTimeOfDay,
+            globalStatValues: save.globalStatValues,
+            globalStats: stage.getConfiguration().globalStats,
+            actorStats: stage.getConfiguration().actorStats,
+            actors: save.actors,
+            currentActor: { id: actor.id, name: actor.name, statMap: actor.statMap },
+        };
+        const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim() && isStatLlmSeen(stat, actorStatContext));
         const scalarStatLines = actorStats
             .filter(stat => !stat.perActor && actor.statMap?.[stat.id] !== undefined)
             .map(stat => `${stat.name}: ${formatActorStatValue(normalizeStatValue(actor.statMap[stat.id], stat), stat, save.atlas)}`);

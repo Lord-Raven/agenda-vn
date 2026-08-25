@@ -1,7 +1,7 @@
 import { FC, useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Stage } from '../Stage';
-import { Stat, StatValue } from '../content/Stat';
+import { isStatExposed, Stat, StatValue } from '../content/Stat';
 import { Actor } from '../content/Actor';
 import { NamePlate } from './UiComponents';
 import { resolveIcon } from './StatRating';
@@ -54,8 +54,13 @@ const StatValueContainer: FC<{ stat: Stat; value: StatValue; atlas?: { [key: str
 
 export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className = '' }) => {
     const exposedStats = useMemo(() => {
-        const configured = stage().getConfiguration().actorStats || [];
-        return configured.filter(stat => stat?.exposed && stat?.name?.trim());
+        const stageInstance = stage();
+        const configured = stageInstance.getConfiguration().actorStats || [];
+        const context = {
+            ...stageInstance.getScheduleContext(stageInstance.getSave()),
+            currentActor: actor ? { id: actor.id, name: actor.name, statMap: actor.statMap } : undefined,
+        };
+        return configured.filter(stat => stat?.name?.trim() && isStatExposed(stat, context));
     }, [stage, actor?.id]);
 
     const actorAge = useMemo(() => {

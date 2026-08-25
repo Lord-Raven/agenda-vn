@@ -7,6 +7,7 @@ import { Button, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, Text
 import { IconPicker } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
+import { ConditionalFlagEditor } from '../components/ConditionalFlagEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
 import { StatValueInput } from '../components/StatValueInput';
 import { Add, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-material';
@@ -89,9 +90,9 @@ const defaultGlobalStat = (): Stat => ({
         description: 'Default option behavior for this setting.',
     }],
     setByPlayer: true,
-    exposed: true,
-    llmSees: true,
-    llmMaintained: true,
+    exposed: { value: true, conditions: [] },
+    llmSees: { value: true, conditions: [] },
+    llmMaintained: { value: true, conditions: [] },
     iconName: 'star',
 });
 
@@ -109,9 +110,9 @@ const defaultActorStat = (): Stat => ({
     max: 100,
     options: [],
     setByPlayer: false,
-    exposed: false,
-    llmSees: true,
-    llmMaintained: true,
+    exposed: { value: false, conditions: [] },
+    llmSees: { value: true, conditions: [] },
+    llmMaintained: { value: true, conditions: [] },
     iconName: 'star',
 });
 
@@ -127,9 +128,9 @@ const defaultLocationStat = (): Stat => ({
     max: 100,
     options: [],
     setByPlayer: false,
-    exposed: false,
-    llmSees: true,
-    llmMaintained: true,
+    exposed: { value: false, conditions: [] },
+    llmSees: { value: true, conditions: [] },
+    llmMaintained: { value: true, conditions: [] },
     iconName: 'star',
 });
 
@@ -710,18 +711,20 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 />
                                             </div>
 
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Visible In UI</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.exposed === true}
-                                                        onChange={(e) => updateGlobalStat(statIndex, { exposed: e.target.checked })}
-                                                    />
-                                                    Exposed
-                                                </label>
-                                            </div>
-                                            
+                                            <ConditionalFlagEditor
+                                                label="Visible In UI"
+                                                enabledLabel="Exposed"
+                                                disabledLabel="Hidden"
+                                                flag={stat.exposed}
+                                                onChange={(exposed) => updateGlobalStat(statIndex, { exposed })}
+                                                globalStats={[...globalStats, ...actorStats]}
+                                                actorStats={actorStats}
+                                                actors={Object.values(stageInstance.getSave().actors || {})}
+                                                locations={locationOptions}
+                                                fieldLabelStyle={fieldLabelStyle}
+                                                inlineFieldStyle={inlineFieldStyle}
+                                            />
+
                                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                                 <label style={fieldLabelStyle}>Editable In Settings</label>
                                                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
@@ -734,33 +737,37 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </label>
                                             </div>
 
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Send to LLM</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.llmSees !== false}
-                                                        onChange={(e) => updateGlobalStat(statIndex, { llmSees: e.target.checked, llmMaintained: e.target.checked ? stat.llmMaintained : false })}
-                                                    />
-                                                    Included in LLM context
-                                                </label>
-                                            </div>
+                                            <ConditionalFlagEditor
+                                                label="Send to LLM"
+                                                enabledLabel="Included in LLM context"
+                                                disabledLabel="Omitted from LLM context"
+                                                flag={stat.llmSees}
+                                                onChange={(llmSees) => updateGlobalStat(statIndex, { llmSees })}
+                                                globalStats={[...globalStats, ...actorStats]}
+                                                actorStats={actorStats}
+                                                actors={Object.values(stageInstance.getSave().actors || {})}
+                                                locations={locationOptions}
+                                                fieldLabelStyle={fieldLabelStyle}
+                                                inlineFieldStyle={inlineFieldStyle}
+                                            />
 
-                                            {stat.llmSees !== false && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Generatively Maintained</label>
-                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={stat.llmMaintained !== false}
-                                                            onChange={(e) => updateGlobalStat(statIndex, { llmMaintained: e.target.checked })}
-                                                        />
-                                                        LLM may update this stat via outcomes
-                                                    </label>
-                                                </div>
+                                            {stat.llmSees.value !== false && (
+                                                <ConditionalFlagEditor
+                                                    label="Generatively Maintained"
+                                                    enabledLabel="LLM may update this stat via outcomes"
+                                                    disabledLabel="LLM may not update this stat"
+                                                    flag={stat.llmMaintained}
+                                                    onChange={(llmMaintained) => updateGlobalStat(statIndex, { llmMaintained })}
+                                                    globalStats={[...globalStats, ...actorStats]}
+                                                    actorStats={actorStats}
+                                                    actors={Object.values(stageInstance.getSave().actors || {})}
+                                                    locations={locationOptions}
+                                                    fieldLabelStyle={fieldLabelStyle}
+                                                    inlineFieldStyle={inlineFieldStyle}
+                                                />
                                             )}
 
-                                            {(stat.exposed === true || stat.setByPlayer === true) && (
+                                            {(stat.exposed.value === true || stat.setByPlayer === true) && (
                                                 <div style={inlineFieldTopStyle}>
                                                     <label style={fieldLabelStyle}>Description</label>
                                                     <TextArea
@@ -855,7 +862,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                     placeholder="Option name"
                                                                 />
                                                             </div>
-                                                            {(stat.exposed === true || stat.setByPlayer === true) && (
+                                                            {(stat.exposed.value === true || stat.setByPlayer === true) && (
                                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                                                     <label style={fieldLabelStyle}>Option Description</label>
                                                                     <TextArea
@@ -1081,17 +1088,20 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 />
                                             </div>
 
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Visible In UI</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.exposed === true}
-                                                        onChange={(e) => updateActorStat(statIndex, { exposed: e.target.checked })}
-                                                    />
-                                                    Exposed
-                                                </label>
-                                            </div>
+                                            <ConditionalFlagEditor
+                                                label="Visible In UI"
+                                                enabledLabel="Exposed"
+                                                disabledLabel="Hidden"
+                                                flag={stat.exposed}
+                                                onChange={(exposed) => updateActorStat(statIndex, { exposed })}
+                                                globalStats={[...actorStats, ...globalStats]}
+                                                actorStats={actorStats}
+                                                actors={Object.values(stageInstance.getSave().actors || {})}
+                                                locations={locationOptions}
+                                                allowVariableActorTarget
+                                                fieldLabelStyle={fieldLabelStyle}
+                                                inlineFieldStyle={inlineFieldStyle}
+                                            />
 
                                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                                 <label style={fieldLabelStyle}>Per Actor</label>
@@ -1105,33 +1115,39 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </label>
                                             </div>
 
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Send to LLM</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.llmSees !== false}
-                                                        onChange={(e) => updateActorStat(statIndex, { llmSees: e.target.checked, llmMaintained: e.target.checked ? stat.llmMaintained : false })}
-                                                    />
-                                                    Included in LLM context
-                                                </label>
-                                            </div>
+                                            <ConditionalFlagEditor
+                                                label="Send to LLM"
+                                                enabledLabel="Included in LLM context"
+                                                disabledLabel="Omitted from LLM context"
+                                                flag={stat.llmSees}
+                                                onChange={(llmSees) => updateActorStat(statIndex, { llmSees })}
+                                                globalStats={[...actorStats, ...globalStats]}
+                                                actorStats={actorStats}
+                                                actors={Object.values(stageInstance.getSave().actors || {})}
+                                                locations={locationOptions}
+                                                allowVariableActorTarget
+                                                fieldLabelStyle={fieldLabelStyle}
+                                                inlineFieldStyle={inlineFieldStyle}
+                                            />
 
-                                            {stat.llmSees !== false && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Generatively Maintained</label>
-                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={stat.llmMaintained !== false}
-                                                            onChange={(e) => updateActorStat(statIndex, { llmMaintained: e.target.checked })}
-                                                        />
-                                                        LLM may update this stat via outcomes
-                                                    </label>
-                                                </div>
+                                            {stat.llmSees.value !== false && (
+                                                <ConditionalFlagEditor
+                                                    label="Generatively Maintained"
+                                                    enabledLabel="LLM may update this stat via outcomes"
+                                                    disabledLabel="LLM may not update this stat"
+                                                    flag={stat.llmMaintained}
+                                                    onChange={(llmMaintained) => updateActorStat(statIndex, { llmMaintained })}
+                                                    globalStats={[...actorStats, ...globalStats]}
+                                                    actorStats={actorStats}
+                                                    actors={Object.values(stageInstance.getSave().actors || {})}
+                                                    locations={locationOptions}
+                                                    allowVariableActorTarget
+                                                    fieldLabelStyle={fieldLabelStyle}
+                                                    inlineFieldStyle={inlineFieldStyle}
+                                                />
                                             )}
 
-                                            {stat.exposed === true && (
+                                            {stat.exposed.value === true && (
                                                 <div style={inlineFieldTopStyle}>
                                                     <label style={fieldLabelStyle}>Description</label>
                                                     <TextArea
@@ -1240,7 +1256,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                     placeholder="Option name"
                                                                 />
                                                             </div>
-                                                            {stat.exposed === true && (
+                                                            {stat.exposed.value === true && (
                                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                                                     <label style={fieldLabelStyle}>Option Description</label>
                                                                     <TextArea
@@ -1516,45 +1532,51 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 />
                                             </div>
 
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Visible In UI</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.exposed === true}
-                                                        onChange={(e) => updateLocationStat(statIndex, { exposed: e.target.checked })}
-                                                    />
-                                                    Exposed
-                                                </label>
-                                            </div>
+                                            <ConditionalFlagEditor
+                                                label="Visible In UI"
+                                                enabledLabel="Exposed"
+                                                disabledLabel="Hidden"
+                                                flag={stat.exposed}
+                                                onChange={(exposed) => updateLocationStat(statIndex, { exposed })}
+                                                globalStats={[...locationStats, ...globalStats]}
+                                                actorStats={actorStats}
+                                                actors={Object.values(stageInstance.getSave().actors || {})}
+                                                locations={locationOptions}
+                                                fieldLabelStyle={fieldLabelStyle}
+                                                inlineFieldStyle={inlineFieldStyle}
+                                            />
 
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Send to LLM</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.llmSees !== false}
-                                                        onChange={(e) => updateLocationStat(statIndex, { llmSees: e.target.checked, llmMaintained: e.target.checked ? stat.llmMaintained : false })}
-                                                    />
-                                                    Included in LLM context
-                                                </label>
-                                            </div>
+                                            <ConditionalFlagEditor
+                                                label="Send to LLM"
+                                                enabledLabel="Included in LLM context"
+                                                disabledLabel="Omitted from LLM context"
+                                                flag={stat.llmSees}
+                                                onChange={(llmSees) => updateLocationStat(statIndex, { llmSees })}
+                                                globalStats={[...locationStats, ...globalStats]}
+                                                actorStats={actorStats}
+                                                actors={Object.values(stageInstance.getSave().actors || {})}
+                                                locations={locationOptions}
+                                                fieldLabelStyle={fieldLabelStyle}
+                                                inlineFieldStyle={inlineFieldStyle}
+                                            />
 
-                                            {stat.llmSees !== false && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Generatively Maintained</label>
-                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={stat.llmMaintained !== false}
-                                                            onChange={(e) => updateLocationStat(statIndex, { llmMaintained: e.target.checked })}
-                                                        />
-                                                        LLM may update this stat via outcomes
-                                                    </label>
-                                                </div>
+                                            {stat.llmSees.value !== false && (
+                                                <ConditionalFlagEditor
+                                                    label="Generatively Maintained"
+                                                    enabledLabel="LLM may update this stat via outcomes"
+                                                    disabledLabel="LLM may not update this stat"
+                                                    flag={stat.llmMaintained}
+                                                    onChange={(llmMaintained) => updateLocationStat(statIndex, { llmMaintained })}
+                                                    globalStats={[...locationStats, ...globalStats]}
+                                                    actorStats={actorStats}
+                                                    actors={Object.values(stageInstance.getSave().actors || {})}
+                                                    locations={locationOptions}
+                                                    fieldLabelStyle={fieldLabelStyle}
+                                                    inlineFieldStyle={inlineFieldStyle}
+                                                />
                                             )}
 
-                                            {stat.exposed === true && (
+                                            {stat.exposed.value === true && (
                                                 <div style={inlineFieldTopStyle}>
                                                     <label style={fieldLabelStyle}>Description</label>
                                                     <TextArea
@@ -1663,7 +1685,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                                     placeholder="Option name"
                                                                 />
                                                             </div>
-                                                            {stat.exposed === true && (
+                                                            {stat.exposed.value === true && (
                                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                                                     <label style={fieldLabelStyle}>Option Description</label>
                                                                     <TextArea

@@ -1,6 +1,37 @@
 import { v4 as generateUuid } from 'uuid';
 import { ActorConditionTarget, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
+// A boolean field whose effective value can be gated by conditions instead of always being fixed. With no
+// conditions, `value` always applies. With conditions, `value` applies only while at least one collection is
+// satisfied; otherwise the opposite of `value` applies (e.g. used for a stat's exposed/llmSees/llmMaintained
+// flags, letting them flip on/off based on other stats, calendar state, etc.).
+export type ConditionalFlag = {
+    value: boolean;
+    conditions: ConditionCollection[];
+};
+
+export const cloneConditionalFlag = (source: unknown, fallback: boolean): ConditionalFlag => {
+    if (typeof source === 'boolean') {
+        return { value: source, conditions: [] };
+    }
+    const flag = (source && typeof source === 'object') ? source as Partial<ConditionalFlag> : undefined;
+    return {
+        value: typeof flag?.value === 'boolean' ? flag.value : fallback,
+        conditions: Array.isArray(flag?.conditions) ? flag.conditions.map((collection) => Array.isArray(collection) ? [...collection] : []) : [],
+    };
+};
+
+// Resolves a conditional flag's effective boolean for the given context; see ConditionalFlag for semantics.
+export const resolveConditionalFlag = (flag: ConditionalFlag | undefined, context: ConditionContext, fallback: boolean): boolean => {
+    if (!flag) {
+        return fallback;
+    }
+    if (!flag.conditions || flag.conditions.length === 0) {
+        return flag.value;
+    }
+    return evaluateConditionCollections(flag.conditions, context) ? flag.value : !flag.value;
+};
+
 // 'location' stats hold a location ID (a key into the save's atlas) rather than a display value.
 // 'locationList' stats hold a set of location IDs (chosen via a multi-select picker) rather than a single value.
 export type StatType = 'number' | 'option' | 'text' | 'checkbox' | 'location' | 'locationList';
@@ -134,8 +165,8 @@ export type Stat = {
     // For global stats: rules used to resolve this stat's initial value when a new game starts, evaluated in
     // order (first matching wins); falls back to `default` if none match. See applyGlobalStatDefaults.
     defaultValueRules?: StatValueRule[];
-    llmSees?: boolean; // If true, this stat can be included in context provided to the LLM; if false, this stat is omitted from context (intended for purely mechanical use); if false, the below is also false.
-    llmMaintained?: boolean; // If true, this stat can be updated by the LLM in skit outcomes (see Skit.tsx).
+    llmSees: ConditionalFlag; // If true (the resolved value), this stat can be included in context provided to the LLM; if false, this stat is omitted from context (intended for purely mechanical use); if false, llmMaintained is also treated as false.
+    llmMaintained: ConditionalFlag; // If true (the resolved value), this stat can be updated by the LLM in skit outcomes (see Skit.tsx).
     guidance: string; // Guidance for the LLM on how to handle this stat. If llmSees is false, the blank for editing this can be omitted from StatManagementPanel.
     default: StatValue;
     type: StatType;
@@ -145,7 +176,7 @@ export type Stat = {
     min?: number;
     max?: number;
     setByPlayer: boolean;
-    exposed: boolean;
+    exposed: ConditionalFlag;
     iconName?: string;
     labelIconName?: string;
 };
@@ -179,8 +210,8 @@ export const cloneStat = (stat: Stat): Stat => ({
     perActor: stat.perActor === true,
     perActorDefaultRules: cloneStatValueRules(stat.perActorDefaultRules),
     defaultValueRules: cloneStatValueRules(stat.defaultValueRules),
-    llmSees: stat.llmSees !== false,
-    llmMaintained: stat.llmMaintained !== false,
+    llmSees: cloneConditionalFlag(stat.llmSees, true),
+    llmMaintained: cloneConditionalFlag(stat.llmMaintained, true),
     guidance: stat.guidance,
     default: stat.type === 'locationList'
         ? normalizeLocationListValue(stat.default)
@@ -195,10 +226,16 @@ export const cloneStat = (stat: Stat): Stat => ({
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true,
-    exposed: stat.exposed === true,
+    exposed: cloneConditionalFlag(stat.exposed, false),
     iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
     labelIconName: stat.labelIconName || undefined,
 });
+
+export const isStatExposed = (stat: Stat, context: ConditionContext): boolean => resolveConditionalFlag(stat.exposed, context, false);
+export const isStatLlmSeen = (stat: Stat, context: ConditionContext): boolean => resolveConditionalFlag(stat.llmSees, context, true);
+export const isStatLlmMaintained = (stat: Stat, context: ConditionContext): boolean => (
+    isStatLlmSeen(stat, context) && resolveConditionalFlag(stat.llmMaintained, context, true)
+);
 
 export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): StatValue => {
     if (stat.type === 'option') {

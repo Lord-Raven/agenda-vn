@@ -113,12 +113,14 @@ export const collectFontFamilies = (fontStacks: Array<string | undefined>): stri
 	const fontFamilies = new Map<string, string>();
 
 	fontStacks.forEach((fontStack) => {
-		extractFontFamiliesFromStack(fontStack || '').forEach((fontFamily) => {
-			const key = fontFamily.toLowerCase();
+		// Only the first importable font in each stack is needed; the rest are fallbacks.
+		const [firstFontFamily] = extractFontFamiliesFromStack(fontStack || '');
+		if (firstFontFamily) {
+			const key = firstFontFamily.toLowerCase();
 			if (!fontFamilies.has(key)) {
-				fontFamilies.set(key, fontFamily);
+				fontFamilies.set(key, firstFontFamily);
 			}
-		});
+		}
 	});
 
 	return Array.from(fontFamilies.values()).sort((left, right) => left.localeCompare(right));

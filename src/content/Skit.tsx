@@ -14,7 +14,7 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
-import { findStatOptionByValue } from './Stat';
+import { findStatOptionByValue, isStatLlmMaintained, isStatLlmSeen } from './Stat';
 import { build } from "vite";
 
 const getDayDifference = (startDate: string, endDate: string): number => {
@@ -215,7 +215,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Exposed settings are conscious choices player's made; present them as settings.
     const playerSettingContext = (agendaConfig?.globalStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
-        if (!statName || !stat.setByPlayer || stat.llmSees === false) {
+        if (!statName || !stat.setByPlayer || !isStatLlmSeen(stat, conditionContext)) {
             return '';
         }
 
@@ -245,7 +245,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Unexposed settings are more like stats beyond their control; present them that way.
     const globalStatContext = (agendaConfig?.globalStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
-        if (!statName || stat.setByPlayer || stat.llmSees === false) {
+        if (!statName || stat.setByPlayer || !isStatLlmSeen(stat, conditionContext)) {
             return '';
         }
 
@@ -806,7 +806,11 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             const matchedActor = findBestNameMatch(actorName, Object.values(save.actors), ['name']);
                             const normalizedStatName = `${statName || ''}`.trim();
                             const matchedStat = findBestNameMatch(normalizedStatName, stage.getConfiguration().actorStats || [], ['name']);
-                            if (matchedActor && normalizedStatName && matchedStat && matchedStat.llmMaintained !== false && !isNaN(changeValue) && changeValue !== 0) {
+                            const matchedStatContext: ConditionContext = {
+                                ...stage.getScheduleContext(save),
+                                currentActor: matchedActor ? { id: matchedActor.id, name: matchedActor.name, statMap: matchedActor.statMap } : undefined,
+                            };
+                            if (matchedActor && normalizedStatName && matchedStat && isStatLlmMaintained(matchedStat, matchedStatContext) && !isNaN(changeValue) && changeValue !== 0) {
                                 outcomes.push(new Outcome({
                                     type: OutcomeType.ACTOR_STAT,
                                     description: `${matchedActor.name}'s ${normalizedStatName} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
