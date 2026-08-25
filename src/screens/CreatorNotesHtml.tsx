@@ -91,13 +91,13 @@ export const buildCreatorNotesHtml = ({
       <p>${escapeHtml(gameDescription)}</p>
     </div>
   </section>
-    <section class="panel panel-with-slideshow">
+    <section class="panel">
     <div class="panel-content">
       <h2>The cast</h2>
       <div class="cast-grid">${castItems || '<div class="cast-intro">No active actors are configured for this game yet.</div>'}</div>
     </div>
   </section>
-  <section class="panel">
+  <section class="panel panel-with-slideshow">
     ${locationSlideshowB}
     <div class="panel-content">
       <h2>Stage Details</h2>

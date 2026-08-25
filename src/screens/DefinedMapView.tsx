@@ -1,4 +1,4 @@
-import { FC, Fragment, useEffect, useMemo, useState } from 'react';
+import { CSSProperties, FC, Fragment, ReactNode, useEffect, useMemo, useState } from 'react';
 import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -24,6 +24,50 @@ interface DefinedMapViewProps {
 }
 
 const DEFAULT_BACKGROUND_IMAGE_URL = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
+
+interface MapMarkerButtonProps {
+    isHovered: boolean;
+    isInteractive: boolean;
+    markerSize: number;
+    expandedMarkerWidth: number;
+    disabled: boolean;
+    onClick: () => void;
+    onMouseEnter: () => void;
+    onMouseLeave: () => void;
+    style: CSSProperties;
+    'aria-label': string;
+    children: ReactNode;
+}
+
+const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, markerSize, expandedMarkerWidth, style, children, ...buttonProps }) => {
+    // Stay elevated through its own collapse animation so a newly hovered neighbor doesn't
+    // cut off the shrink transition mid-flight, which otherwise reads as an instant snap.
+    const [isElevated, setIsElevated] = useState(isHovered);
+
+    useEffect(() => {
+        if (isHovered) {
+            setIsElevated(true);
+        }
+    }, [isHovered]);
+
+    return (
+        <motion.button
+            type="button"
+            {...buttonProps}
+            initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
+            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: '-50%', y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onAnimationComplete={() => {
+                if (!isHovered) {
+                    setIsElevated(false);
+                }
+            }}
+            style={{ ...style, zIndex: isElevated ? 2 : 1 }}
+        >
+            {children}
+        </motion.button>
+    );
+};
 
 export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreenType, isVerticalLayout }) => {
     const { setTooltip, clearTooltip } = useTooltip();
@@ -176,17 +220,17 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                 }
 
                                                 return (
-                                                    <motion.button
-                                                        type="button"
+                                                    <MapMarkerButton
+                                                        isHovered={isHovered}
                                                         aria-label={linkedMap ? `Open map ${markerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : markerName}
                                                         disabled={!isInteractive}
                                                         onClick={handleMarkerClick}
                                                         onMouseEnter={() => setHoveredLink(markerKey)}
                                                         onMouseLeave={() => setHoveredLink(null)}
-                                                        initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
-                                                        animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: '-50%', y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
-                                                        transition={{ duration: 0.2, ease: 'easeOut' }}
-                                                        style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed', zIndex: isHovered ? 2 : 1 }}
+                                                        isInteractive={isInteractive}
+                                                        markerSize={markerSize}
+                                                        expandedMarkerWidth={expandedMarkerWidth}
+                                                        style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed' }}
                                                     >
                                                         <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
                                                         <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: markerImageUrl ? `url(${markerImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
@@ -202,7 +246,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                                 {linkedMap ? <ArrowOutward sx={{ fontSize: 11 }} /> : <PlayArrow sx={{ fontSize: 11 }} />}
                                                             </span>
                                                         )}
-                                                    </motion.button>
+                                                    </MapMarkerButton>
                                                 );
                                             }}
                                         </CachedBackgroundUrl>
