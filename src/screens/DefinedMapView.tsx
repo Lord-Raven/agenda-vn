@@ -3,7 +3,7 @@ import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayAr
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getMapImageUrl, Map as GameMap } from '../content/Map';
-import { getLocationImageUrl } from '../content/Location';
+import { getLocationImageUrl, getLocationName } from '../content/Location';
 import { getCurrentLocation } from '../content/Skit';
 import { Stage } from '../Stage';
 import { ScreenType } from './BaseScreen';
@@ -97,9 +97,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={`${displayedMap.id}-label`}
-                                initial={{ x: -48, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
-                                exit={{ x: -48, opacity: 0 }}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
                                 transition={{ duration: 0.28, ease: 'easeInOut' }}
                                 style={{ position: 'absolute', top: 0, left: 0, zIndex: 3, maxWidth: 'min(72%, 460px)', pointerEvents: 'none' }}
                             >
@@ -127,9 +127,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                         <AnimatePresence initial={false}>
                             <motion.div
                                 key={displayedMap.id}
-                                initial={{ x: '100%' }}
-                                animate={{ x: '0%' }}
-                                exit={{ x: '-100%' }}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
                                 transition={{ duration: 0.45, ease: 'easeInOut' }}
                                 style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
                             >
@@ -148,7 +148,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const linkedMapImageUrl = getMapImageUrl(linkedMap, stage());
                                     const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
-                                    const markerName = currentEvent?.name || linkedLocation?.name || linkedMap?.name || 'Unnamed';
+                                    const markerName = currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
                                     const markerSize = isVerticalLayout ? 48 : 57;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 32;
                                     const configuration = stage().getConfiguration();

@@ -164,7 +164,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
                     ?? stat.default;
                 const normalizedValue = normalizeStatValue(rawValue, stat);
                 const isNumericStat = stat.type === "number";
-                const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
+                const StatIcon = stat.labelIconName ? resolveIcon(stat.labelIconName) : null;
                 const selectedOptionDescription = stat.type === "option"
                     ? resolveStatText(findStatOptionByValue(stat, normalizedValue)?.option.description, stageInstance).trim()
                     : "";

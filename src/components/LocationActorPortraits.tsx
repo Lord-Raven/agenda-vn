@@ -35,7 +35,7 @@ export const LocationActorPortraits: FC<LocationActorPortraitsProps> = ({ locati
     };
 
     return (
-        <div aria-label={`Characters at this location: ${actors.map(actor => actor.name).join(', ')}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div aria-label={`Characters at this location: ${actors.map(actor => actor.displayName ?? actor.name).join(', ')}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {actors.map((actor, index) => {
                 const isHovered = hoveredActorId === actor.id;
                 return (
@@ -59,7 +59,7 @@ export const LocationActorPortraits: FC<LocationActorPortraitsProps> = ({ locati
                                 transform: isHovered ? 'scale(1.12)' : 'scale(1)',
                                 transition: 'transform 0.15s ease-out, box-shadow 0.15s ease-out',
                             }}
-                            title={actor.name}
+                            title={actor.displayName ?? actor.name}
                         />
                         {isHovered && (
                             <span
@@ -79,7 +79,7 @@ export const LocationActorPortraits: FC<LocationActorPortraitsProps> = ({ locati
                                     pointerEvents: 'none',
                                 }}
                             >
-                                {actor.name}
+                                {actor.displayName ?? actor.name}
                             </span>
                         )}
                     </div>

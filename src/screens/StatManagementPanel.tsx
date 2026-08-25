@@ -923,6 +923,11 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
+                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                <label style={fieldLabelStyle}>Label Icon</label>
+                                                {renderIconPicker(stat.labelIconName, (iconName) => updateActorStat(statIndex, { labelIconName: iconName || undefined }), true)}
+                                            </div>
+
                                             {isNumericDisplayType(normalizedStat.type) && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                                     <label style={fieldLabelStyle}>Properties</label>
