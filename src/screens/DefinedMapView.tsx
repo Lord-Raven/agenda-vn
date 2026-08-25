@@ -154,6 +154,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const configuration = stage().getConfiguration();
                                     const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats });
                                     const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
+                                    // Text space needed on top of the padding/icon that always occupies the button.
+                                    const longestLabelLength = Math.max(markerName.length, currentEvent && linkedLocation?.name ? linkedLocation.name.length : 0);
+                                    const expandedMarkerWidth = Math.max(markerSize, Math.min(220, markerSize + longestLabelLength * 8 + 18));
                                     const handleMarkerClick = () => {
                                         if (linkedMap) {
                                             setDisplayedMapId(linkedMap.id);
@@ -181,7 +184,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                         onMouseEnter={() => setHoveredLink(markerKey)}
                                                         onMouseLeave={() => setHoveredLink(null)}
                                                         initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
-                                                        animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: '-50%', y: '-50%', width: isHovered ? Math.max(markerSize, Math.min(220, markerName.length * 9 + markerSize)) : markerSize }}
+                                                        animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: '-50%', y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
                                                         transition={{ duration: 0.2, ease: 'easeOut' }}
                                                         style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed', zIndex: isHovered ? 2 : 1 }}
                                                     >
