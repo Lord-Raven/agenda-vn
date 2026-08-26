@@ -140,6 +140,17 @@ export const buildGoogleFontLinkTags = (fontStacks: Array<string | undefined>): 
 	return `${preconnectTags}${stylesheetTags}`;
 };
 
+export const buildGoogleFontImportRules = (fontStacks: Array<string | undefined>): string => {
+	const fontFamilies = collectFontFamilies(fontStacks);
+	if (fontFamilies.length === 0) {
+		return '';
+	}
+
+	return fontFamilies
+		.map(fontFamily => `@import url("${buildGoogleFontHref(fontFamily)}");`)
+		.join(' ');
+};
+
 const collectStageFontFamilies = (stageInstance: Stage): string[] => {
 	const uiSettings = stageInstance.getUiSettings();
 	const save = stageInstance.getSave();

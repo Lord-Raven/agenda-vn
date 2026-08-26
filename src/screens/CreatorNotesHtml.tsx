@@ -2,7 +2,7 @@ import React, { FC, useEffect, useMemo } from 'react';
 import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Location, getLocationImageUrl } from '../content/Location';
-import { buildGoogleFontLinkTags } from '../components/FontHandler';
+import { buildGoogleFontImportRules } from '../components/FontHandler';
 
 export interface CreatorNotesHtmlProps {
     stage: Stage;
@@ -36,7 +36,6 @@ export const buildCreatorNotesHtml = ({
     activeLocations,
     castActorIds,
 }: CreatorNotesHtmlProps): string => {
-    const titleText = (title || 'Untitled Game').trim() || 'Untitled Game';
     const gameDescription = creatorNotes?.trim() || 'A story-driven visual novel where lives, choices, and memory reshape the world.';
 
     const castActors = castActorIds && castActorIds.length > 0
@@ -83,11 +82,13 @@ export const buildCreatorNotesHtml = ({
     const locationSlideshowB = slideshowMarkup(secondLocationImages, 'b', slideshowPhaseOffsetSeconds);
 
     const uiSettings = stage.getUiSettings();
-    const googleFontLinks = buildGoogleFontLinkTags([
+    const googleFontImports = buildGoogleFontImportRules([
         uiSettings.primaryFontFamily,
         uiSettings.flavorFontFamily,
     ]);
     const creatorNotesStyle = `
+        ${googleFontImports}
+        h3.ant-typography{display:none!important;font-family: var(--mem-font-flavor); }
         .creator-notes {
             --mem-bg-deep: ${uiSettings.surfaceBaseColor};
             --mem-bg-mid: ${uiSettings.surfaceBaseColor};
@@ -217,12 +218,11 @@ export const buildCreatorNotesHtml = ({
         }
     `.replace(/\s+/g, ' ').trim();
 
-    return `${googleFontLinks}<div class="creator-notes">
+        return `<div class="creator-notes">
     <section class="panel panel-with-slideshow">
     ${locationSlideshowA}
     <div class="panel-content">
-      <h2>${escapeHtml(titleText)}</h2>
-      <p>${escapeHtml(gameDescription)}</p>
+      <p>${gameDescription}</p>
     </div>
   </section>
     <section class="panel">
