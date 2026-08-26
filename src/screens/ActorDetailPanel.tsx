@@ -8,7 +8,7 @@ import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStat
 import { ConditionContext } from '../content/Condition';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { StatRating } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
@@ -281,7 +281,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         return age >= 0 ? `Birth Date (${age} years old)` : 'Birth Date';
     }, [editedActor.birthDate, stage]);
 
-    const categoryInputListId = `actor-category-options-${actor.id}`;
     const categorySuggestions = useMemo(() => {
         const seenCategories = new Set<string>();
         let hasUncategorized = false;
@@ -311,6 +310,11 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
             values,
         };
     }, [actor.id, stage]);
+
+    const categoryOptions = useMemo(() => [
+        ...(categorySuggestions.hasUncategorized ? [{ value: '', label: 'Uncategorized' }] : []),
+        ...categorySuggestions.values.map((category) => ({ value: category })),
+    ], [categorySuggestions]);
     const [editedOutfits, setEditedOutfits] = useState<Outfit[]>(() => getClonedOutfits());
     const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: StatValue }>(() =>
         createInitialActorStatMap(actor, actorStats),
@@ -1861,21 +1865,13 @@ ${indent}}`;
                                         >
                                             Category
                                         </label>
-                                        <TextInput
+                                        <TextInputWithOptions
                                             fullWidth
                                             value={editedActor.category}
-                                            onChange={(e) => handleInputChange('category', e.target.value)}
+                                            onValueChange={(value) => handleInputChange('category', value)}
                                             placeholder="Choose or type a category (leave blank for Uncategorized)"
-                                            list={categoryInputListId}
+                                            options={categoryOptions}
                                         />
-                                        <datalist id={categoryInputListId}>
-                                            {categorySuggestions.hasUncategorized && (
-                                                <option value="">Uncategorized</option>
-                                            )}
-                                            {categorySuggestions.values.map((category) => (
-                                                <option key={category} value={category} />
-                                            ))}
-                                        </datalist>
                                     </div>
 
                                     <div>

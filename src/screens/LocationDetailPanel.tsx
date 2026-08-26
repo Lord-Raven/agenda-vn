@@ -14,7 +14,7 @@ import {
     upsertLocationLoreEntry,
 } from '../content/Location';
 import { Add, ArrowDownward, ArrowUpward, Delete, ExpandLess, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
-import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, LocationSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from '../components/ConditionEditor';
@@ -178,7 +178,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         focalY: location.focalPoint?.y ?? 0.5,
     });
 
-    const categoryInputListId = `location-category-options-${location.id}`;
     const categorySuggestions = useMemo(() => {
         const seenCategories = new Set<string>();
         let hasUncategorized = false;
@@ -209,6 +208,11 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             values,
         };
     }, [location.id, stage]);
+
+    const categoryOptions = useMemo(() => [
+        ...(categorySuggestions.hasUncategorized ? [{ value: '', label: 'Uncategorized' }] : []),
+        ...categorySuggestions.values.map((category) => ({ value: category })),
+    ], [categorySuggestions]);
 
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [isUploadingAlternativeImages, setIsUploadingAlternativeImages] = useState<Record<number, boolean>>({});
@@ -755,21 +759,13 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                     </div>
                                     <div>
                                         <label style={labelStyle}>Category</label>
-                                        <TextInput
+                                        <TextInputWithOptions
                                             fullWidth
                                             value={editedLocation.category}
-                                            onChange={(e) => handleInputChange('category', e.target.value)}
+                                            onValueChange={(value) => handleInputChange('category', value)}
                                             placeholder="Choose or type a category (leave blank for Uncategorized)"
-                                            list={categoryInputListId}
+                                            options={categoryOptions}
                                         />
-                                        <datalist id={categoryInputListId}>
-                                            {categorySuggestions.hasUncategorized && (
-                                                <option value="">Uncategorized</option>
-                                            )}
-                                            {categorySuggestions.values.map((category) => (
-                                                <option key={category} value={category} />
-                                            ))}
-                                        </datalist>
                                     </div>
                                     <div>
                                         <label style={labelStyle}>

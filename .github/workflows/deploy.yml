@@ -120,7 +120,7 @@ jobs:
           curl \
             -H "CH-API-KEY: ${{ secrets.CHUB_AUTH_TOKEN }}" \
             -F "file=@build.zip" \
-            https://chub-relay.lordraven31.workers.dev/${{ env.STAGE_ID }}/
+            https://chub-relay.jake-h.workers.dev/${{ env.STAGE_ID }}/
       - name: Setup .npmrc
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

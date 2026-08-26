@@ -302,6 +302,140 @@ export const TextInput: FC<TextInputProps> = ({
 	);
 };
 
+interface TextInputOption {
+	value: string;
+	label?: string;
+}
+
+interface TextInputWithOptionsProps extends Omit<TextInputProps, 'onChange' | 'value'> {
+	value: string;
+	onValueChange: (value: string) => void;
+	options: TextInputOption[];
+	emptyMessage?: string;
+}
+
+export const TextInputWithOptions: FC<TextInputWithOptionsProps> = ({
+	value,
+	onValueChange,
+	options,
+	emptyMessage = 'No options',
+	fullWidth = false,
+	style,
+	...props
+}) => {
+	const [isOpen, setIsOpen] = React.useState(false);
+	const [showAllOptions, setShowAllOptions] = React.useState(false);
+	const query = value.trim().toLowerCase();
+	const visibleOptions = React.useMemo(() => {
+		if (showAllOptions || !query) {
+			return options;
+		}
+
+		return options.filter((option) => {
+			const label = option.label || option.value;
+			return `${label} ${option.value}`.toLowerCase().includes(query);
+		});
+	}, [options, query, showAllOptions]);
+
+	const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+		const nextFocus = event.relatedTarget as Node | null;
+		if (!event.currentTarget.contains(nextFocus)) {
+			setIsOpen(false);
+		}
+	};
+
+	return (
+		<div
+			style={{ position: 'relative', width: fullWidth ? '100%' : 'auto' }}
+			onBlur={handleBlur}
+		>
+			<TextInput
+				{...props}
+				fullWidth
+				value={value}
+				onChange={(event) => {
+					setShowAllOptions(false);
+					setIsOpen(true);
+					onValueChange(event.target.value);
+				}}
+				onFocus={() => setIsOpen(true)}
+				style={{ paddingRight: '34px', ...style }}
+			/>
+			<button
+				type="button"
+				onMouseDown={(event) => {
+					event.preventDefault();
+					setShowAllOptions(true);
+					setIsOpen((current) => !current || !showAllOptions);
+				}}
+				style={{
+					position: 'absolute',
+					top: 0,
+					right: 0,
+					width: '34px',
+					height: '100%',
+					border: 0,
+					borderLeft: '1px solid var(--agenda-line-subtle)',
+					borderRadius: '0 8px 8px 0',
+					background: 'color-mix(in srgb, var(--agenda-surface-raised) 80%, transparent)',
+					color: 'var(--agenda-text-muted)',
+					cursor: 'pointer',
+					fontSize: '14px',
+				}}
+				aria-label="Show all options"
+			>
+				v
+			</button>
+			{isOpen && (
+				<div
+					style={{
+						position: 'absolute',
+						top: 'calc(100% + 4px)',
+						left: 0,
+						right: 0,
+						zIndex: 20,
+						maxHeight: '220px',
+						overflowY: 'auto',
+						padding: '6px',
+						borderRadius: '8px',
+						border: '1px solid var(--agenda-line-subtle)',
+						background: 'var(--agenda-surface-elevated)',
+						boxShadow: 'var(--agenda-shadow)',
+					}}
+				>
+					{visibleOptions.length > 0 ? visibleOptions.map((option) => (
+						<button
+							key={`text-option-${option.label || option.value}-${option.value}`}
+							type="button"
+							onClick={() => {
+								onValueChange(option.value);
+								setIsOpen(false);
+								setShowAllOptions(false);
+							}}
+							style={{
+								display: 'block',
+								width: '100%',
+								padding: '8px 10px',
+								border: 0,
+								borderRadius: '6px',
+								background: option.value === value ? 'color-mix(in srgb, var(--agenda-highlight) 18%, transparent)' : 'transparent',
+								color: 'var(--agenda-text-primary)',
+								cursor: 'pointer',
+								font: 'inherit',
+								textAlign: 'left',
+							}}
+						>
+							{option.label || option.value}
+						</button>
+					)) : (
+						<div style={{ padding: '8px 10px', color: 'var(--agenda-text-muted)', fontSize: '13px' }}>{emptyMessage}</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
+};
+
 interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
 	fullWidth?: boolean;
 	style?: React.CSSProperties;

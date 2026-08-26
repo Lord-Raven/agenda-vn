@@ -1,9 +1,9 @@
-import { FC, PointerEvent, useEffect, useRef, useState } from 'react';
+import { FC, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, ArrowDownward, ArrowUpward, AutoAwesome, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place } from '@mui/icons-material';
 import { generateMapAlternativeImage, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
-import { Button, TextArea, TextInput } from '../components/UiComponents';
+import { Button, TextArea, TextInput, TextInputWithOptions } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -52,6 +52,26 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
     const save = stageInstance.getSave();
     const activeMaps = (save.maps || []).filter(candidate => candidate.active !== false && candidate.id !== map.id);
     const activeLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
+    const categoryOptions = useMemo(() => {
+        const seenCategories = new Set<string>();
+        let hasUncategorized = false;
+
+        activeMaps.forEach((candidate) => {
+            const normalizedCategory = (candidate.category || '').trim();
+            if (!normalizedCategory) {
+                hasUncategorized = true;
+                return;
+            }
+
+            seenCategories.add(normalizedCategory);
+        });
+
+        const values = Array.from(seenCategories).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        return [
+            ...(hasUncategorized ? [{ value: '', label: 'Uncategorized' }] : []),
+            ...values.map((category) => ({ value: category })),
+        ];
+    }, [activeMaps]);
 
     const syncConfiguration = () => {
         stageInstance.updateConfiguration({ maps: save.maps || [] });
@@ -327,7 +347,13 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
             </div>
             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
                 Category
-                <TextInput fullWidth value={draft.category} onChange={event => updateDraft('category', event.target.value)} />
+                <TextInputWithOptions
+                    fullWidth
+                    value={draft.category}
+                    onValueChange={value => updateDraft('category', value)}
+                    options={categoryOptions}
+                    placeholder="Choose or type a category"
+                />
             </label>
             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
                 Description
