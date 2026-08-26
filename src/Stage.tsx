@@ -137,6 +137,7 @@ export type GameConfiguration = {
     creatorNotes: string; // Optional notes from the creator about the game, its world, or its characters; this is displayed in the Creator Notes HTML.
     versionNotes: string; // Optional notes about the current version of the game, its world, or its characters; this replaces version details in MenuScreen and is inserted after creator notes in Creator Notes HTML.
     castActorIds: string[]; // Optional allowlist of actor ids for the Creator Notes HTML cast section; if empty, all active actors are included.
+    slideshowLocationIds: string[]; // Optional allowlist of location ids for the Creator Notes HTML slideshow; if empty, active locations are used in their existing order.
 
 }
 
@@ -213,6 +214,7 @@ export type PortableGameConfiguration = {
     calendarEvents: CalendarEvent[];
     uiSettings: UiSettings;
     castActorIds: string[];
+    slideshowLocationIds: string[];
 };
 
 // Shared by the GameManagementPanel's JSON export/preview and Stage's storage sync so both always agree on shape.
@@ -236,6 +238,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     calendarEvents: (input.calendarEvents || []).map(cloneCalendarEvent),
     uiSettings: cloneUiSettings(input.uiSettings || DEFAULT_UI_SETTINGS),
     castActorIds: [...(input.castActorIds || [])],
+    slideshowLocationIds: [...(input.slideshowLocationIds || [])],
 });
 
 export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateType, ConfigType> {
@@ -308,6 +311,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             creatorNotes: '',
             versionNotes: '',
             castActorIds: [],
+            slideshowLocationIds: [],
         };
     }
 
@@ -372,6 +376,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             creatorNotes: this.saveData.configuration.creatorNotes || defaultConfiguration.creatorNotes,
             versionNotes: this.saveData.configuration.versionNotes || defaultConfiguration.versionNotes,
             castActorIds: [...(this.saveData.configuration.castActorIds || defaultConfiguration.castActorIds)],
+            slideshowLocationIds: [...(this.saveData.configuration.slideshowLocationIds || defaultConfiguration.slideshowLocationIds)],
         };
 
         this.syncUniversalSchedule();
@@ -2275,6 +2280,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             calendarEvents: this.getManagedCalendarEvents(),
             uiSettings: this.getUiSettings(),
             castActorIds: configuration.castActorIds || [],
+            slideshowLocationIds: configuration.slideshowLocationIds || [],
         });
     }
 

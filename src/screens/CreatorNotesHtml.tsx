@@ -13,6 +13,7 @@ export interface CreatorNotesHtmlProps {
     activeActors: Actor[];
     activeLocations: Location[];
     castActorIds?: string[];
+    slideshowLocationIds?: string[];
 }
 
 const defaultBackgroundImageUrl = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
@@ -35,6 +36,7 @@ export const buildCreatorNotesHtml = ({
     activeActors,
     activeLocations,
     castActorIds,
+    slideshowLocationIds,
 }: CreatorNotesHtmlProps): string => {
     const gameDescription = creatorNotes?.trim() || 'A story-driven visual novel where lives, choices, and memory reshape the world.';
 
@@ -54,12 +56,15 @@ export const buildCreatorNotesHtml = ({
         })
         .join('');
 
-    const locationCount = Math.min(activeLocations.length, 12);
-    const firstLocationImages = activeLocations
+    const slideshowLocations = slideshowLocationIds && slideshowLocationIds.length > 0
+        ? activeLocations.filter(location => slideshowLocationIds.includes(location.id))
+        : activeLocations;
+    const locationCount = Math.min(slideshowLocations.length, 12);
+    const firstLocationImages = slideshowLocations
         .map((location) => getLocationImageUrl(location, stage))
         .filter(Boolean)
         .slice(0, Math.floor(locationCount / 2));
-    const secondLocationImages = activeLocations
+    const secondLocationImages = slideshowLocations
         .map((location) => getLocationImageUrl(location, stage))
         .filter(Boolean)
         .slice(Math.floor(locationCount / 2), Math.floor((locationCount / 2) * 2));

@@ -8,6 +8,7 @@ import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { buildCreatorNotesHtml } from './CreatorNotesHtml';
 import { getEmotionImage } from '../content/Actor';
+import { getLocationImageUrl } from '../content/Location';
 
 interface GameManagementPanelProps {
     stage: () => Stage;
@@ -103,6 +104,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [creatorNotes, setCreatorNotes] = useState<string>(() => configuration.creatorNotes || '');
     const [versionNotes, setVersionNotes] = useState<string>(() => configuration.versionNotes || '');
     const [castActorIds, setCastActorIds] = useState<string[]>(() => [...(configuration.castActorIds || [])]);
+    const [slideshowLocationIds, setSlideshowLocationIds] = useState<string[]>(() => [...(configuration.slideshowLocationIds || [])]);
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
     const [artStyle, setArtStyle] = useState<string>(() => configuration.artStyle || '');
     const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
@@ -159,6 +161,15 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             .map(location => JSON.parse(JSON.stringify(location)));
     }, [save.atlas]);
 
+    const slideshowLocationOptions = useMemo(() => {
+        return activeLocations.map(location => ({
+            key: location.id,
+            label: location.name,
+            category: location.category?.trim() || 'Uncategorized',
+            imageUrl: getLocationImageUrl(location, stageInstance),
+        }));
+    }, [activeLocations, stageInstance]);
+
     const activeMaps = useMemo(() => {
         return (save.maps || [])
             .filter(map => map.active !== false)
@@ -190,6 +201,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             calendarEvents: managedCalendarEvents,
             uiSettings: stageInstance.getUiSettings(),
             castActorIds,
+            slideshowLocationIds,
         });
     }, [
         activeActors,
@@ -203,6 +215,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         managedCalendarEvents,
         globalStats,
         locationStats,
+        slideshowLocationIds,
         validGlobalStatValues,
         save.lorebook,
         stageInstance,
@@ -227,8 +240,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             activeActors,
             activeLocations,
             castActorIds,
+            slideshowLocationIds,
         }),
-        [activeActors, activeLocations, castActorIds, creatorNotes, versionNotes, backgroundImageUrl, stageInstance, title, titleImageUrl],
+        [activeActors, activeLocations, castActorIds, creatorNotes, versionNotes, backgroundImageUrl, slideshowLocationIds, stageInstance, title, titleImageUrl],
     );
 
 
@@ -288,6 +302,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             startingDate,
             artStyle,
             castActorIds,
+            slideshowLocationIds,
         });
 
         const currentSave = stageInstance.getSave();
@@ -346,7 +361,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             });
         });
 
-    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, creatorNotes, managedCalendarEvents, globalStats, locationStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
+    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, creatorNotes, managedCalendarEvents, globalStats, locationStats, save, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;
@@ -636,6 +651,22 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         emptyLabel="All actors"
                         title="Choose cast members"
                         placeholder="Search actors"
+                    />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                    <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginBottom: '6px' }}>
+                        Slideshow locations to include (leave empty to use the current active-location order):
+                    </div>
+                    <SearchableOptionPicker
+                        multiple
+                        values={slideshowLocationIds}
+                        onChange={(nextValue) => setSlideshowLocationIds(Array.isArray(nextValue) ? nextValue : [])}
+                        options={slideshowLocationOptions}
+                        allowClear
+                        emptyLabel="Default locations"
+                        title="Choose slideshow locations"
+                        placeholder="Search locations"
                     />
                 </div>
 
