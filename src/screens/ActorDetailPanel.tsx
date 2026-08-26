@@ -2462,7 +2462,8 @@ ${indent}}`;
                                                     disabled={isGeneratingDemoSpeech || !editedActor.voiceId}
                                                     style={{
                                                         alignSelf: 'stretch',
-                                                        minWidth: '60px',
+                                                        width: '50px',
+						                                height: '38px',
                                                         display: 'inline-flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',

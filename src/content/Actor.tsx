@@ -568,6 +568,8 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
         const currentOutfit = getActiveOutfit(actor);
         if (!currentOutfit.emotionPack['base']) {
             // Kick off base image generation:
+            currentOutfit.name = parsedData['outfit_name'] || currentOutfit.name;
+            currentOutfit.description = parsedData['outfit_description'] || currentOutfit.description;
             await generateBaseActorImage(actor, stage, false, true, actor.outfitId);
         } else if (!currentOutfit.emotionPack['neutral']) {
             // Kick off neutral image generation:
