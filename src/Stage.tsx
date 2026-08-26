@@ -136,6 +136,7 @@ export type GameConfiguration = {
     artStyle: string; // Describes the art style used for image generation
     creatorNotes: string; // Optional notes from the creator about the game, its world, or its characters; this is displayed in the Creator Notes HTML.
     versionNotes: string; // Optional notes about the current version of the game, its world, or its characters; this replaces version details in MenuScreen and is inserted after creator notes in Creator Notes HTML.
+    castActorIds: string[]; // Optional allowlist of actor ids for the Creator Notes HTML cast section; if empty, all active actors are included.
 
 }
 
@@ -211,6 +212,7 @@ export type PortableGameConfiguration = {
     lorebook: Lore[];
     calendarEvents: CalendarEvent[];
     uiSettings: UiSettings;
+    castActorIds: string[];
 };
 
 // Shared by the GameManagementPanel's JSON export/preview and Stage's storage sync so both always agree on shape.
@@ -233,6 +235,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     lorebook: (input.lorebook || []).map(cloneLore),
     calendarEvents: (input.calendarEvents || []).map(cloneCalendarEvent),
     uiSettings: cloneUiSettings(input.uiSettings || DEFAULT_UI_SETTINGS),
+    castActorIds: [...(input.castActorIds || [])],
 });
 
 export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateType, ConfigType> {
@@ -304,6 +307,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             artStyle: 'Anime-inspired concept art with thick brush strokes and vibrant colors, emphasizing expression and dynamic composition.',
             creatorNotes: '',
             versionNotes: '',
+            castActorIds: [],
         };
     }
 
@@ -367,6 +371,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             artStyle: this.saveData.configuration.artStyle || defaultConfiguration.artStyle,
             creatorNotes: this.saveData.configuration.creatorNotes || defaultConfiguration.creatorNotes,
             versionNotes: this.saveData.configuration.versionNotes || defaultConfiguration.versionNotes,
+            castActorIds: [...(this.saveData.configuration.castActorIds || defaultConfiguration.castActorIds)],
         };
 
         this.syncUniversalSchedule();
@@ -2269,6 +2274,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             lorebook: save.lorebook || [],
             calendarEvents: this.getManagedCalendarEvents(),
             uiSettings: this.getUiSettings(),
+            castActorIds: configuration.castActorIds || [],
         });
     }
 

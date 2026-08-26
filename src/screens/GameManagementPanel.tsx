@@ -5,7 +5,9 @@ import { v4 as generateUuid } from 'uuid';
 import { findStatOptionByValue, getStatOptionValue, Stat, StatType, StatValue, cloneStat, isNumericDisplayType, normalizeLocationListValue } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
+import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { buildCreatorNotesHtml } from './CreatorNotesHtml';
+import { getEmotionImage } from '../content/Actor';
 
 interface GameManagementPanelProps {
     stage: () => Stage;
@@ -100,6 +102,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [isGeneratingBackgroundImage, setIsGeneratingBackgroundImage] = useState(false);
     const [creatorNotes, setCreatorNotes] = useState<string>(() => configuration.creatorNotes || '');
     const [versionNotes, setVersionNotes] = useState<string>(() => configuration.versionNotes || '');
+    const [castActorIds, setCastActorIds] = useState<string[]>(() => [...(configuration.castActorIds || [])]);
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
     const [artStyle, setArtStyle] = useState<string>(() => configuration.artStyle || '');
     const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
@@ -142,6 +145,14 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             .map(actor => JSON.parse(JSON.stringify(actor)));
     }, [save.actors, save.playerId]);
 
+    const castActorOptions = useMemo(() => {
+        return activeActors.map(actor => ({
+            key: actor.id,
+            label: actor.name,
+            imageUrl: getEmotionImage(actor, 'neutral', stageInstance, actor.outfitId) || getEmotionImage(actor, 'base', stageInstance, actor.outfitId) || '',
+        }));
+    }, [activeActors, stageInstance]);
+
     const activeLocations = useMemo(() => {
         return Object.values(save.atlas || {})
             .filter(location => location.active !== false)
@@ -178,6 +189,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             lorebook: save.lorebook || [],
             calendarEvents: managedCalendarEvents,
             uiSettings: stageInstance.getUiSettings(),
+            castActorIds,
         });
     }, [
         activeActors,
@@ -186,6 +198,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         actorStats,
         backgroundImagePrompt,
         backgroundImageUrl,
+        castActorIds,
         creatorNotes,
         managedCalendarEvents,
         globalStats,
@@ -213,8 +226,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             titleImageUrl,
             activeActors,
             activeLocations,
+            castActorIds,
         }),
-        [activeActors, activeLocations, creatorNotes, versionNotes, backgroundImageUrl, stageInstance, title, titleImageUrl],
+        [activeActors, activeLocations, castActorIds, creatorNotes, versionNotes, backgroundImageUrl, stageInstance, title, titleImageUrl],
     );
 
 
@@ -273,6 +287,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             versionNotes,
             startingDate,
             artStyle,
+            castActorIds,
         });
 
         const currentSave = stageInstance.getSave();
@@ -331,7 +346,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             });
         });
 
-    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, creatorNotes, managedCalendarEvents, globalStats, locationStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
+    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, creatorNotes, managedCalendarEvents, globalStats, locationStats, save, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;
@@ -606,6 +621,22 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
                 <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginBottom: '8px' }}>
                     Generates a creator-notes layout from active actors and location images, using hover tooltips for character backgrounds.
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                    <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginBottom: '6px' }}>
+                        Cast members to include (leave empty to include all active actors):
+                    </div>
+                    <SearchableOptionPicker
+                        multiple
+                        values={castActorIds}
+                        onChange={(nextValue) => setCastActorIds(Array.isArray(nextValue) ? nextValue : [])}
+                        options={castActorOptions}
+                        allowClear
+                        emptyLabel="All actors"
+                        title="Choose cast members"
+                        placeholder="Search actors"
+                    />
                 </div>
 
                 <TextArea

@@ -12,6 +12,7 @@ export interface CreatorNotesHtmlProps {
     titleImageUrl?: string;
     activeActors: Actor[];
     activeLocations: Location[];
+    castActorIds?: string[];
 }
 
 const defaultBackgroundImageUrl = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
@@ -33,11 +34,16 @@ export const buildCreatorNotesHtml = ({
     titleImageUrl,
     activeActors,
     activeLocations,
+    castActorIds,
 }: CreatorNotesHtmlProps): string => {
     const titleText = (title || 'Untitled Game').trim() || 'Untitled Game';
     const gameDescription = creatorNotes?.trim() || 'A story-driven visual novel where lives, choices, and memory reshape the world.';
 
-    const castItems = activeActors
+    const castActors = castActorIds && castActorIds.length > 0
+        ? activeActors.filter(actor => castActorIds.includes(actor.id))
+        : activeActors;
+
+    const castItems = castActors
         .filter(actor => actor?.name && actor !== stage?.getPlayerActor())
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         .slice(0, 100)
