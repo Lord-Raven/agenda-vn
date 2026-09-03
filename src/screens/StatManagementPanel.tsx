@@ -699,7 +699,19 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Global Stats</Title>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                    <Title variant="glow" style={{ fontSize: '20px', margin: 0 }}>Global Stats</Title>
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setGlobalStats(prev => [...prev, defaultGlobalStat()]);
+                            setCollapsedGlobalStats(prev => [...prev, false]);
+                        }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        <Add fontSize="small" /> Add
+                    </Button>
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {globalStats.map((stat, statIndex) => {
                         const normalizedStat = normalizeGlobalStatShape(stat);
@@ -1091,20 +1103,23 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                         );
                     })}
 
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            setGlobalStats(prev => [...prev, defaultGlobalStat()]);
-                            setCollapsedGlobalStats(prev => [...prev, false]);
-                        }}
-                    >
-                        Add Global Stat
-                    </Button>
                 </div>
             </GlassPanel>
 
             <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Actor Stats</Title>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                    <Title variant="glow" style={{ fontSize: '20px', margin: 0 }}>Actor Stats</Title>
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setActorStats(prev => [...prev, defaultActorStat()]);
+                            setCollapsedActorStats(prev => [...prev, false]);
+                        }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        <Add fontSize="small" /> Add
+                    </Button>
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {actorStats.map((stat, statIndex) => {
                         const normalizedStat = normalizeActorStatShape(stat);
@@ -1563,20 +1578,23 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                         );
                     })}
 
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            setActorStats(prev => [...prev, defaultActorStat()]);
-                            setCollapsedActorStats(prev => [...prev, false]);
-                        }}
-                    >
-                        Add Actor Stat
-                    </Button>
                 </div>
             </GlassPanel>
 
             <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Location Stats</Title>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                    <Title variant="glow" style={{ fontSize: '20px', margin: 0 }}>Location Stats</Title>
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setLocationStats(prev => [...prev, defaultLocationStat()]);
+                            setCollapsedLocationStats(prev => [...prev, false]);
+                        }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        <Add fontSize="small" /> Add
+                    </Button>
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {locationStats.map((stat, statIndex) => {
                         const normalizedStat = normalizeActorStatShape(stat);
@@ -1960,15 +1978,6 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                         );
                     })}
 
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            setLocationStats(prev => [...prev, defaultLocationStat()]);
-                            setCollapsedLocationStats(prev => [...prev, false]);
-                        }}
-                    >
-                        Add Location Stat
-                    </Button>
                 </div>
             </GlassPanel>
 
