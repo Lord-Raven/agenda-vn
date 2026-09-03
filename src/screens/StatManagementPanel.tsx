@@ -151,6 +151,8 @@ const clampStatValue = (value: number, stat: Stat): number => {
     return resolved;
 };
 
+const canBeVisibleInUi = (stat: Stat): boolean => stat.exposed.value === true || stat.exposed.conditions.length > 0;
+
 const normalizeGlobalStatShape = (stat: Stat): Stat => {
     if (stat.type === 'option') {
         const options = (stat.options || [])
@@ -184,6 +186,18 @@ const normalizeGlobalStatShape = (stat: Stat): Stat => {
         return {
             ...stat,
             default: typeof stat.default === 'string' ? stat.default : '',
+            options: [],
+            min: undefined,
+            max: undefined,
+            displayType: undefined,
+            iconName: stat.iconName || 'star',
+        };
+    }
+
+    if (stat.type === 'checkbox') {
+        return {
+            ...stat,
+            default: typeof stat.default === 'boolean' ? stat.default : false,
             options: [],
             min: undefined,
             max: undefined,
@@ -234,6 +248,18 @@ const normalizeActorStatShape = (stat: Stat): Stat => {
         return {
             ...stat,
             default: typeof stat.default === 'string' ? stat.default : '',
+            options: [],
+            min: undefined,
+            max: undefined,
+            displayType: undefined,
+            iconName: stat.iconName || 'star',
+        };
+    }
+
+    if (stat.type === 'checkbox') {
+        return {
+            ...stat,
+            default: typeof stat.default === 'boolean' ? stat.default : false,
             options: [],
             min: undefined,
             max: undefined,
@@ -935,6 +961,20 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
+                                            {normalizedStat.type === 'checkbox' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Value</label>
+                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={normalizedStat.default === true}
+                                                            onChange={(e) => updateGlobalStat(statIndex, { default: e.target.checked })}
+                                                        />
+                                                        Checked
+                                                    </label>
+                                                </div>
+                                            )}
+
                                             {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
@@ -942,10 +982,12 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Label Icon</label>
-                                                {renderIconPicker(stat.labelIconName, (iconName) => updateActorStat(statIndex, { labelIconName: iconName || undefined }), true)}
-                                            </div>
+                                            {canBeVisibleInUi(stat) && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Label Icon</label>
+                                                    {renderIconPicker(stat.labelIconName, (iconName) => updateActorStat(statIndex, { labelIconName: iconName || undefined }), true)}
+                                                </div>
+                                            )}
 
                                             {isNumericDisplayType(normalizedStat.type) && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
@@ -1388,6 +1430,20 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
+                                            {normalizedStat.type === 'checkbox' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Value</label>
+                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={normalizedStat.default === true}
+                                                            onChange={(e) => updateActorStat(statIndex, { default: e.target.checked })}
+                                                        />
+                                                        Checked
+                                                    </label>
+                                                </div>
+                                            )}
+
                                             {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
@@ -1395,10 +1451,12 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Label Icon</label>
-                                                {renderIconPicker(stat.labelIconName, (iconName) => updateActorStat(statIndex, { labelIconName: iconName || undefined }), true)}
-                                            </div>
+                                            {canBeVisibleInUi(stat) && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Label Icon</label>
+                                                    {renderIconPicker(stat.labelIconName, (iconName) => updateActorStat(statIndex, { labelIconName: iconName || undefined }), true)}
+                                                </div>
+                                            )}
 
                                             {isNumericDisplayType(normalizedStat.type) && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
@@ -1829,6 +1887,20 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
+                                            {normalizedStat.type === 'checkbox' && (
+                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Default Value</label>
+                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={normalizedStat.default === true}
+                                                            onChange={(e) => updateLocationStat(statIndex, { default: e.target.checked })}
+                                                        />
+                                                        Checked
+                                                    </label>
+                                                </div>
+                                            )}
+
                                             {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Rating Icon</label>
@@ -1836,10 +1908,12 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Label Icon</label>
-                                                {renderIconPicker(stat.labelIconName, (iconName) => updateLocationStat(statIndex, { labelIconName: iconName || undefined }), true)}
-                                            </div>
+                                            {canBeVisibleInUi(stat) && (
+                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
+                                                    <label style={fieldLabelStyle}>Label Icon</label>
+                                                    {renderIconPicker(stat.labelIconName, (iconName) => updateLocationStat(statIndex, { labelIconName: iconName || undefined }), true)}
+                                                </div>
+                                            )}
 
                                             {isNumericDisplayType(normalizedStat.type) && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>

@@ -233,7 +233,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const creatorNotesHtml = useMemo(
         () => buildCreatorNotesHtml({
             stage: stageInstance,
-            title,
             creatorNotes: `${creatorNotes || ''}${versionNotes ? '<br><br><h3>Version Notes</h3><br>' + versionNotes : ''}`.trim(),
             backgroundImageUrl,
             titleImageUrl,

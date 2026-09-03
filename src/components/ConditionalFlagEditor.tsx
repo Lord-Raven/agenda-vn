@@ -1,8 +1,11 @@
 import { FC } from 'react';
+import { AddCircleOutline } from '@mui/icons-material';
 import { Stat } from '../content/Stat';
 import { ConditionalFlag } from '../content/Stat';
 import { ConditionEditor } from './ConditionEditor';
 import { LocationLike } from './LocationPortrait';
+import { Button } from './UiComponents';
+import { useTooltip } from './TooltipContext';
 
 interface ConditionalFlagEditorProps {
     label: string;
@@ -36,10 +39,11 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
     inlineFieldStyle,
 }) => {
     const hasConditions = flag.conditions.length > 0;
+    const { setTooltip, clearTooltip } = useTooltip();
 
     return (
         <div style={{ marginBottom: 10 }}>
-            <div style={inlineFieldStyle}>
+            <div style={inlineFieldStyle ? { ...inlineFieldStyle, gridTemplateColumns: '120px minmax(0, 1fr) auto' } : undefined}>
                 <label style={fieldLabelStyle}>{label}</label>
                 <select
                     className="input-base"
@@ -49,6 +53,19 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
                     <option value="enable">{enabledLabel}</option>
                     <option value="disable">{disabledLabel}</option>
                 </select>
+                <Button
+                    variant="secondary"
+                    onClick={() => onChange({
+                        ...flag,
+                        conditions: [...flag.conditions, [{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]],
+                    })}
+                    onMouseEnter={() => setTooltip(`Add a Condition for ${label}`, AddCircleOutline)}
+                    onMouseLeave={clearTooltip}
+                    style={{ minWidth: 32, minHeight: 32, padding: 0, display: 'grid', placeItems: 'center' }}
+                    aria-label={`Add a Condition for ${label}`}
+                >
+                    <AddCircleOutline fontSize="small" />
+                </Button>
             </div>
             <div style={{ marginTop: 6, marginLeft: fieldLabelStyle ? undefined : 0 }}>
                 <ConditionEditor
@@ -59,6 +76,7 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
                     locations={locations}
                     allowVariableActorTarget={allowVariableActorTarget}
                     onChange={(conditions) => onChange({ ...flag, conditions })}
+                    showAddConditionButton={false}
                 />
                 {hasConditions && (
                     <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>

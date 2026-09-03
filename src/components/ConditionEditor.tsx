@@ -20,6 +20,7 @@ interface ConditionEditorProps {
     collectionCategories?: Array<{ value: string; label: string }>;
     collectionCategoryValues?: string[];
     onCollectionCategoryValuesChange?: (values: string[]) => void;
+    showAddConditionButton?: boolean;
 }
 
 const COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
@@ -115,7 +116,7 @@ export const buildActorTargetOptions = (actors: Array<{ id: string; name: string
     return options;
 };
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], actors = [], locations = [], allowVariableActorTarget = false, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange }) => {
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], actors = [], locations = [], allowVariableActorTarget = false, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true }) => {
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
     const actorTargetOptions = buildActorTargetOptions(actors, allowVariableActorTarget);
     const concreteActorOptions = actorTargetOptions.filter((option) => !['variable', 'any', 'none'].includes(option.key));
@@ -329,18 +330,20 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                     </div>
                 );
             }))}
-            <Button
-                variant="secondary"
-                onClick={() => {
-                    onChange([...conditionCollections, [{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]]);
-                    if (collectionCategoryValues) {
-                        onCollectionCategoryValuesChange?.([...collectionCategoryValues, collectionCategories?.[0]?.value || '']);
-                    }
-                }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifySelf: 'start' }}
-            >
-                <Add fontSize="small" /> Add condition
-            </Button>
+            {showAddConditionButton && (
+                <Button
+                    variant="secondary"
+                    onClick={() => {
+                        onChange([...conditionCollections, [{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]]);
+                        if (collectionCategoryValues) {
+                            onCollectionCategoryValuesChange?.([...collectionCategoryValues, collectionCategories?.[0]?.value || '']);
+                        }
+                    }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifySelf: 'start' }}
+                >
+                    <Add fontSize="small" /> Add condition
+                </Button>
+            )}
         </div>
     );
 };

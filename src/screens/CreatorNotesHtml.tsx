@@ -6,7 +6,6 @@ import { buildGoogleFontImportRules } from '../components/FontHandler';
 
 export interface CreatorNotesHtmlProps {
     stage: Stage;
-    title: string;
     creatorNotes?: string;
     backgroundImageUrl?: string;
     titleImageUrl?: string;
@@ -29,7 +28,6 @@ const escapeHtml = (value: string) => {
 
 export const buildCreatorNotesHtml = ({
     stage,
-    title,
     creatorNotes,
     backgroundImageUrl,
     titleImageUrl,
@@ -93,7 +91,7 @@ export const buildCreatorNotesHtml = ({
     ]);
     const creatorNotesStyle = `
         ${googleFontImports}
-        h3.ant-typography{display:none!important;font-family: var(--mem-font-flavor); }
+        h3.ant-typography{!important;font-family: var(--mem-font-flavor); }
         .creator-notes {
             --mem-bg-deep: ${uiSettings.surfaceBaseColor};
             --mem-bg-mid: ${uiSettings.surfaceBaseColor};
@@ -157,7 +155,7 @@ export const buildCreatorNotesHtml = ({
             left: calc(50% + var(--cast-tooltip-shift, 0px));
             bottom: calc(100% + 8px);
             transform: translateX(-50%);
-            width: min(900px, 80vw);
+            width: min(900px, var(--cast-tooltip-width, 80vw));
             padding: 10px 12px;
             line-height: 1.4;
             background: ${uiSettings.surfaceBaseColor};
@@ -259,7 +257,12 @@ export const CreatorNotesHtml: FC<CreatorNotesHtmlProps> = (props) => {
                 return;
             }
 
-            const notesRect = notesContainer.getBoundingClientRect();
+            const castGrid = notesContainer.querySelector('.cast-grid');
+            if (!castGrid) {
+                return;
+            }
+
+            const castGridRect = castGrid.getBoundingClientRect();
             const items = notesContainer.querySelectorAll('[data-cast-item]');
 
             items.forEach((item) => {
@@ -269,11 +272,13 @@ export const CreatorNotesHtml: FC<CreatorNotesHtmlProps> = (props) => {
                 }
 
                 const itemRect = item.getBoundingClientRect();
-                const tooltipWidth = tooltip.offsetWidth || 900;
-                const itemCenterOffset = (itemRect.left + itemRect.width / 2) - (notesRect.left + notesRect.width / 2);
-                const halfAvailableSpace = Math.max(0, (notesRect.width - tooltipWidth) / 2 - 12);
-                const clampShift = Math.max(-halfAvailableSpace, Math.min(halfAvailableSpace, -itemCenterOffset));
+                const tooltipWidth = Math.min(900, Math.max(0, castGridRect.width - 24));
+                const itemCenter = itemRect.left + itemRect.width / 2;
+                const minShift = castGridRect.left + 12 + tooltipWidth / 2 - itemCenter;
+                const maxShift = castGridRect.right - 12 - tooltipWidth / 2 - itemCenter;
+                const clampShift = Math.max(minShift, Math.min(maxShift, 0));
 
+                tooltip.style.setProperty('--cast-tooltip-width', `${tooltipWidth}px`);
                 tooltip.style.setProperty('--cast-tooltip-shift', `${clampShift}px`);
             });
         };
