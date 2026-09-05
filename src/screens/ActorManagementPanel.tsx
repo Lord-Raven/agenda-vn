@@ -14,9 +14,10 @@ import {
 
 interface ActorManagementPanelProps {
     stage: () => Stage;
+    isCreatorMode: boolean;
 }
 
-export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) => {
+export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage, isCreatorMode }) => {
     const UNCATEGORIZED_LABEL = 'Uncategorized';
     const [selectedActorId, setSelectedActorId] = useState<string | null>(null);
     const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('actor-management');
@@ -49,11 +50,14 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
 
     const actors = useMemo(() => {
         const save = stage().getSave();
-        return Object.values(save.actors || {})
-            .filter((actor) => actor.id !== save.playerId)
+        const source = isCreatorMode
+            ? stage().getConfiguration().actors || []
+            : Object.values(save.actors || {});
+        return source
+            .filter((actor) => !(!isCreatorMode && actor.id === save.playerId))
             .filter((actor) => actor.active !== false)
             .sort(sortByName);
-    }, [stage, actorRevision]);
+    }, [stage, actorRevision, isCreatorMode]);
 
     const actorsByCategory = useMemo<CategorizedEntrySection<Actor>[]>(() => {
         const categoryMap: Record<string, Actor[]> = {};
@@ -88,8 +92,10 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
 
     const handleCreateActor = (category: string) => {
         const save = stage().getSave();
+        const configuredActors = stage().getConfiguration().actors || [];
+        const actors = isCreatorMode ? configuredActors : Object.values(save.actors || {});
         const baseName = 'New Actor';
-        const usedNames = new Set(Object.values(save.actors || {}).map((actor) => actor.name?.trim().toLowerCase()));
+        const usedNames = new Set(actors.map((actor) => actor.name?.trim().toLowerCase()));
 
         let candidateName = baseName;
         let counter = 1;
@@ -112,8 +118,12 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
             statMap: {},
         });
 
-        save.actors[actor.id] = actor;
-        stage().saveGame();
+        if (isCreatorMode) {
+            stage().updateConfiguration({ actors: [...configuredActors, actor] });
+        } else {
+            save.actors[actor.id] = actor;
+            stage().saveGame();
+        }
         setActorRevision((current) => current + 1);
         setSelectedActorId(actor.id);
     };
@@ -197,6 +207,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage }) =
                         key={selectedActor.id}
                         actor={selectedActor}
                         stage={stage}
+                        isCreatorMode={isCreatorMode}
                         onUpdate={() => setActorRevision((current) => current + 1)}
                         onDeactivate={(actorId) => {
                             setActorRevision((current) => current + 1);

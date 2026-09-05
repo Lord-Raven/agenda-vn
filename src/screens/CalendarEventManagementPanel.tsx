@@ -15,6 +15,7 @@ import {
 
 interface CalendarEventManagementPanelProps {
     stage: () => Stage;
+    isCreatorMode: boolean;
 }
 
 const TIME_OF_DAY_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
@@ -101,30 +102,30 @@ const eventSortKey = (event: CalendarEvent): number => {
     return (day * 10) + (slotOrder < 0 ? TIME_OF_DAY_ORDER.length : slotOrder);
 };
 
-export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps> = ({ stage }) => {
+export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps> = ({ stage, isCreatorMode }) => {
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const shouldReduceMotion = useReducedMotion();
 
     const actors = useMemo(
-        () => Object.values(save.actors || {})
-            .filter(actor => actor.id !== save.playerId)
+        () => (isCreatorMode ? stageInstance.getConfiguration().actors || [] : Object.values(save.actors || {}))
+            .filter(actor => isCreatorMode || actor.id !== save.playerId)
             .filter(actor => actor.active !== false)
             .sort((a, b) => a.name.localeCompare(b.name)),
-        [save.actors, save.playerId],
+        [save.actors, save.playerId, isCreatorMode, stageInstance],
     );
     const locations = useMemo(
-        () => Object.values(save.atlas || {})
+        () => (isCreatorMode ? stageInstance.getConfiguration().locations || [] : Object.values(save.atlas || {}))
             .filter(location => location.active !== false)
             .sort((a, b) => a.name.localeCompare(b.name)),
-        [save.atlas],
+        [save.atlas, isCreatorMode, stageInstance],
     );
 
     const [events, setEvents] = useState<CalendarEvent[]>(() =>
-        stageInstance.getManagedCalendarEvents().map(cloneEvent),
+        stageInstance.getManagedCalendarEvents(isCreatorMode).map(cloneEvent),
     );
     const [selectedEventId, setSelectedEventId] = useState<string | null>(() => events[0]?.id || null);
-    const [draft, setDraft] = useState<CalendarEvent>(() => cloneEvent(events[0] || stageInstance.createCalendarEventDraft()));
+    const [draft, setDraft] = useState<CalendarEvent>(() => cloneEvent(events[0] || stageInstance.createCalendarEventDraft(isCreatorMode)));
     const [isNewDraft, setIsNewDraft] = useState<boolean>(() => events.length === 0);
     const [collapsedSections, setCollapsedSections] = useCachedSidebarCollapseState('calendar-event-management');
 
@@ -167,7 +168,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
     }, [events]);
 
     const refreshEvents = (nextSelectedId?: string) => {
-        const refreshed = stageInstance.getManagedCalendarEvents().map(cloneEvent);
+        const refreshed = stageInstance.getManagedCalendarEvents(isCreatorMode).map(cloneEvent);
         setEvents(refreshed);
 
         const preferredId = nextSelectedId || selectedEventId;
@@ -186,14 +187,14 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
             return;
         }
 
-        const freshDraft = stageInstance.createCalendarEventDraft();
+        const freshDraft = stageInstance.createCalendarEventDraft(isCreatorMode);
         setSelectedEventId(null);
         setDraft(cloneEvent(freshDraft));
         setIsNewDraft(true);
     };
 
     const startNewDraft = () => {
-        const freshDraft = stageInstance.createCalendarEventDraft();
+        const freshDraft = stageInstance.createCalendarEventDraft(isCreatorMode);
         setSelectedEventId(null);
         setDraft(cloneEvent(freshDraft));
         setIsNewDraft(true);
@@ -260,7 +261,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
             ...draft,
             actorIds: [...(draft.actorIds || [])],
             participantActorIds: [...(draft.actorIds || [])],
-        });
+        }, isCreatorMode);
         refreshEvents(savedEvent.id);
     };
 
@@ -274,7 +275,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
             return;
         }
 
-        stageInstance.deleteCalendarEventSeries(draft.id);
+        stageInstance.deleteCalendarEventSeries(draft.id, isCreatorMode);
         refreshEvents();
     };
 

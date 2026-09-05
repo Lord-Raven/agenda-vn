@@ -123,12 +123,13 @@ const createInitialLocationStatMap = (location: Location, locationStats: Stat[])
 interface LocationDetailPanelProps {
     location: Location;
     stage: () => Stage;
+    isCreatorMode: boolean;
     onUpdate?: () => void;
     onDeactivate?: (locationId: string) => void;
 }
 
-export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, onUpdate, onDeactivate }) => {
-    const linkedLoreEntry = getLinkedLocationLore(location, stage());
+export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, stage, isCreatorMode, onUpdate, onDeactivate }) => {
+    const linkedLoreEntry = getLinkedLocationLore(location, stage(), isCreatorMode);
     const isDescriptionBackedByLore = !!linkedLoreEntry;
 
     const locationStats = useMemo(() => {
@@ -150,7 +151,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         return Object.values(uniqueStatMap);
     }, [stage]);
 
-    const locationOptions = useMemo(() => Object.values(stage().getSave().atlas || {})
+    const locationOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().locations || [] : Object.values(stage().getSave().atlas || {}))
         .filter((candidate) => candidate.active !== false), [stage]);
 
     const [editedLocation, setEditedLocation] = useState<{
@@ -182,7 +183,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         const seenCategories = new Set<string>();
         let hasUncategorized = false;
 
-        for (const candidate of Object.values(stage().getSave().atlas || {})) {
+        for (const candidate of (isCreatorMode ? stage().getConfiguration().locations || [] : Object.values(stage().getSave().atlas || {}))) {
             if (candidate.id === location.id) {
                 continue;
             }
@@ -207,7 +208,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             hasUncategorized,
             values,
         };
-    }, [location.id, stage]);
+    }, [location.id, stage, isCreatorMode]);
 
     const categoryOptions = useMemo(() => [
         ...(categorySuggestions.hasUncategorized ? [{ value: '', label: 'Uncategorized' }] : []),
@@ -254,9 +255,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         location.category = nextLocation.category.trim();
         if (location.name !== oldName) {
             console.log(`Location name changed from "${oldName}" to "${location.name}". Updating linked lore entry.`);
-            upsertLocationLoreEntry(location, oldName, stage());
+            upsertLocationLoreEntry(location, oldName, stage(), isCreatorMode);
         }
-        updateLocationDescription(location.id, nextLocation.description, stage());
+        updateLocationDescription(location.id, nextLocation.description, stage(), isCreatorMode);
         location.themeColor = nextLocation.themeColor;
         location.imagePrompt = nextLocation.imagePrompt;
         location.imageUrl = nextLocation.imageUrl;
@@ -533,7 +534,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         const nextLocation = editedLocationRef.current;
         persistLocation(nextLocation, editedStatMapRef.current);
 
-        const linkedLore = getLinkedLocationLore(location, stage());
+        const linkedLore = getLinkedLocationLore(location, stage(), isCreatorMode);
         const previousState = {
             name: location.name,
             category: location.category,
@@ -559,7 +560,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                 category: nextLocation.category,
                 description: nextLocation.description,
                 themeColor: nextLocation.themeColor,
-            }, stage());
+            }, stage(), isCreatorMode);
 
             if (!distilledLocation) {
                 throw new Error('Location distillation returned no location.');
@@ -577,7 +578,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             location.alternativeImages = previousState.alternativeImages.map(createAlternativeImage);
             location.focalPoint = previousState.focalPoint;
 
-            const restoredLore = getLinkedLocationLore(location, stage());
+            const restoredLore = getLinkedLocationLore(location, stage(), isCreatorMode);
             if (restoredLore && previousState.linkedLore) {
                 restoredLore.title = previousState.linkedLore.title;
                 restoredLore.content = previousState.linkedLore.content;
@@ -592,15 +593,20 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     };
 
     const handleDeactivateLocation = () => {
-        const linkedLore = getLinkedLocationLore(location, stage());
+        const linkedLore = getLinkedLocationLore(location, stage(), isCreatorMode);
         location.active = false;
     
         // Want to be certain we aren't deleting a lore entry that has erroneously become shared across actors.
-        const locationsWithLoreId = Object.values(stage().getSave().atlas || {}).filter((a) => a !== location && a.loreId === linkedLore?.id);
+        const locationsWithLoreId = (isCreatorMode ? stage().getConfiguration().locations || [] : Object.values(stage().getSave().atlas || {})).filter((a) => a !== location && a.loreId === linkedLore?.id);
 
         if (linkedLore && locationsWithLoreId.length === 0) {
-            const save = stage().getSave();
-            save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
+            if (isCreatorMode) {
+                stage().updateConfiguration({ lorebook: (stage().getConfiguration().lorebook || []).filter((entry) => entry.id !== linkedLore.id) });
+            } else {
+                const save = stage().getSave();
+                save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
+                stage().saveGame();
+            }
         }
 
         stage().showPriorityMessage(`${location.name || 'Location'} is now inactive and hidden from management.`);
@@ -794,7 +800,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                 />
                             </section>
 
-                            {locationStats.length > 0 && (
+                            {isCreatorMode && locationStats.length > 0 && (
                                 <section>
                                     <h2 style={sectionHeadingStyle}>Location Stats</h2>
                                     <div style={{

@@ -702,6 +702,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     saveGame() {
+        const currentSave = this.saveData.saves[this.saveData.lastSaveSlot];
+        if (currentSave) {
+            currentSave.timestamp = Date.now();
+        }
         this.messenger.updateChatState(this.saveData);
         // Save configuration to storage (this will only do something if the user has storage access, which is only true for the owner of the bot.)
         this.updateStageConfiguration();
@@ -720,12 +724,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .sort((a, b) => this.compareCalendarEvents(a, b));
     }
 
-    getManagedCalendarEvents(): CalendarEvent[] {
+    getManagedCalendarEvents(useConfiguration: boolean = false): CalendarEvent[] {
         const save = this.getSave();
         this.ensureCalendarState(save);
+        const events = useConfiguration ? this.getConfiguration().calendarEvents || [] : save.upcomingEvents || [];
 
         const groupedBySeries = new Map<string, CalendarEvent[]>();
-        (save.upcomingEvents || []).forEach((event) => {
+        events.forEach((event) => {
             const seriesId = event.recurrenceParentId || event.id;
             const existing = groupedBySeries.get(seriesId) || [];
             existing.push(event);
@@ -748,13 +753,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .sort((a, b) => this.compareCalendarEvents(a, b));
     }
 
-    createCalendarEventDraft(): CalendarEvent {
+    createCalendarEventDraft(useConfiguration: boolean = false): CalendarEvent {
         const save = this.getSave();
         this.ensureCalendarState(save);
+        const configuration = this.getConfiguration();
 
-        const locations = Object.values(save.atlas || {}).filter(location => location.active !== false);
+        const locations = useConfiguration
+            ? (configuration.locations || []).filter(location => location.active !== false)
+            : Object.values(save.atlas || {}).filter(location => location.active !== false);
         const fallbackLocation = locations[0];
-        const actorIds = Object.values(save.actors || {})
+        const actors = useConfiguration ? configuration.actors || [] : Object.values(save.actors || {});
+        const actorIds = actors
             .filter(actor => actor.id !== save.playerId)
             .filter(actor => actor.active !== false)
             .slice(0, 1)
@@ -774,9 +783,27 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
     }
 
-    upsertCalendarEventSeries(event: CalendarEvent): CalendarEvent {
+    upsertCalendarEventSeries(event: CalendarEvent, useConfiguration: boolean = false): CalendarEvent {
         const save = this.getSave();
         this.ensureCalendarState(save);
+        const configuration = this.getConfiguration();
+
+        if (useConfiguration) {
+            const normalizedBaseEvent = this.normalizeCalendarEventForSave({
+                ...event,
+                id: `${event.recurrenceParentId || event.id || this.createCalendarEventId()}`.trim() || this.createCalendarEventId(),
+                recurrenceParentId: undefined,
+                recurrenceInstanceIndex: undefined,
+            }, save, true);
+            const seriesId = normalizedBaseEvent.id;
+            const remainingEvents = (configuration.calendarEvents || []).filter((candidate) => {
+                const candidateSeriesId = candidate.recurrenceParentId || candidate.id;
+                return candidateSeriesId !== seriesId;
+            });
+            configuration.calendarEvents = [...remainingEvents, ...this.expandRecurringEvent(normalizedBaseEvent)]
+                .sort((left, right) => this.compareCalendarEvents(left, right));
+            return normalizedBaseEvent;
+        }
 
         const seriesId = `${event.recurrenceParentId || event.id || this.createCalendarEventId()}`.trim() || this.createCalendarEventId();
         const normalizedBaseEvent = this.normalizeCalendarEventForSave({
@@ -794,9 +821,27 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return normalizedBaseEvent;
     }
 
-    deleteCalendarEventSeries(eventId: string): boolean {
+    deleteCalendarEventSeries(eventId: string, useConfiguration: boolean = false): boolean {
         const save = this.getSave();
         this.ensureCalendarState(save);
+
+        if (useConfiguration) {
+            const configuration = this.getConfiguration();
+            const matchedEvent = (configuration.calendarEvents || []).find(event => event.id === eventId);
+            if (!matchedEvent) {
+                return false;
+            }
+            const seriesId = matchedEvent.recurrenceParentId || matchedEvent.id;
+            const remainingEvents = (configuration.calendarEvents || []).filter((event) => {
+                const candidateSeriesId = event.recurrenceParentId || event.id;
+                return candidateSeriesId !== seriesId;
+            });
+            if (remainingEvents.length === configuration.calendarEvents.length) {
+                return false;
+            }
+            configuration.calendarEvents = remainingEvents;
+            return true;
+        }
 
         const matchedEvent = (save.upcomingEvents || []).find(event => event.id === eventId);
         if (!matchedEvent) {
@@ -1227,8 +1272,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             });
     }
 
-    private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType): CalendarEvent {
-        const allLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
+    private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType, useConfiguration: boolean = false): CalendarEvent {
+        const configuration = this.getConfiguration();
+        const allLocations = useConfiguration
+            ? (configuration.locations || []).filter(location => location.active !== false)
+            : Object.values(save.atlas || {}).filter(location => location.active !== false);
+        const allActors = useConfiguration
+            ? configuration.actors || []
+            : Object.values(save.actors || {});
         const fallbackLocationId = allLocations[0]?.id || '';
         const locationId = allLocations.some(location => location.id === event.locationId)
             ? event.locationId
@@ -1237,11 +1288,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const date = `${event.date || ''}`.trim() || (save.currentDate || this.getStartingDate(save));
         const actorIds = Array.from(new Set(
             (event.actorIds || event.participantActorIds || [])
-                .filter(actorId => Boolean(save.actors?.[actorId]))
-                .filter(actorId => save.actors?.[actorId]?.active !== false)
+                .filter(actorId => allActors.some(actor => actor.id === actorId && actor.active !== false))
                 .map(actorId => `${actorId}`),
         ));
-        const locationName = save.atlas[locationId]?.name || 'an unknown location';
+            const locationName = allLocations.find(location => location.id === locationId)?.name || 'an unknown location';
         const description = `${event.description || ''}`.trim() || `${name} at ${locationName}.`;
         const guidance = `${event.guidance || description || name}`.trim();
 
@@ -2244,20 +2294,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // pushed to or pulled from storage.
     private buildPortableConfiguration(): PortableGameConfiguration {
         const configuration = this.getConfiguration();
-        const save = this.getSave();
-
-        const activeActors = Object.values(save.actors || {})
-            .filter(actor => actor.id !== save.playerId)
-            .filter(actor => actor.active !== false);
-        const activeLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
-        const activeMaps = (save.maps || []).filter(map => map.active !== false);
 
         const globalStatValues: { [key: string]: StatValue } = {};
         (configuration.globalStats || []).forEach((stat) => {
             if (!stat.id || !(stat.name || '').trim()) {
                 return;
             }
-            globalStatValues[stat.id] = normalizeStatValue(save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id], stat);
+            globalStatValues[stat.id] = normalizeStatValue(configuration.globalStatValues?.[stat.id], stat);
         });
 
         return buildPortableGameConfiguration({
@@ -2273,12 +2316,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locationStats: configuration.locationStats,
             globalStats: configuration.globalStats,
             globalStatValues,
-            actors: activeActors,
-            locations: activeLocations,
-            maps: activeMaps,
-            lorebook: save.lorebook || [],
-            calendarEvents: this.getManagedCalendarEvents(),
-            uiSettings: this.getUiSettings(),
+            actors: (configuration.actors || []).filter(actor => actor.active !== false),
+            locations: (configuration.locations || []).filter(location => location.active !== false),
+            maps: (configuration.maps || []).filter(map => map.active !== false),
+            lorebook: configuration.lorebook || [],
+            calendarEvents: configuration.calendarEvents || [],
+            uiSettings: configuration.uiSettings,
             castActorIds: configuration.castActorIds || [],
             slideshowLocationIds: configuration.slideshowLocationIds || [],
         });

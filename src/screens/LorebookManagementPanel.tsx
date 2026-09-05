@@ -18,6 +18,7 @@ import { ConditionEditor } from '../components/ConditionEditor';
 
 interface LorebookManagementPanelProps {
     stage: () => Stage;
+    isCreatorMode: boolean;
 }
 
 type LoreCategory = Lore['type'];
@@ -97,11 +98,11 @@ const NumberStepperInput: FC<NumberStepperInputProps> = ({ value, onChange, aria
     );
 };
 
-export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stage }) => {
+export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stage, isCreatorMode }) => {
     const shouldReduceMotion = useReducedMotion();
     const save = stage().getSave();
-    const activeActors = useMemo(() => Object.values(save.actors || {}).filter((actor) => actor.active !== false), [save]);
-    const activeLocations = useMemo(() => Object.values(save.atlas || {}).filter((location) => location.active !== false), [save]);
+    const activeActors = useMemo(() => (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(save.actors || {})).filter((actor) => actor.active !== false), [save, stage, isCreatorMode]);
+    const activeLocations = useMemo(() => (isCreatorMode ? stage().getConfiguration().locations || [] : Object.values(save.atlas || {})).filter((location) => location.active !== false), [save, stage, isCreatorMode]);
     const actorLoreIdToCategory = useMemo(() => {
         const map = new Map<string, string>();
         for (const actor of activeActors) {
@@ -125,9 +126,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
         }
         return map;
     }, [activeLocations]);
-    const [loreEntries, setLoreEntries] = useState<Lore[]>(() => sortLoreEntries(save.lorebook || []));
+    const [loreEntries, setLoreEntries] = useState<Lore[]>(() => sortLoreEntries(isCreatorMode ? stage().getConfiguration().lorebook || [] : save.lorebook || []));
     const [selectedLoreId, setSelectedLoreId] = useState<string | null>(() => {
-        const initialEntries = sortLoreEntries(save.lorebook || []);
+        const initialEntries = sortLoreEntries(isCreatorMode ? stage().getConfiguration().lorebook || [] : save.lorebook || []);
         return initialEntries[0]?.id || null;
     });
     const [editingTriggerIndex, setEditingTriggerIndex] = useState<number | 'new' | null>(null);
@@ -235,8 +236,12 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
     const applyLorebookChange = (updater: (entries: Lore[]) => Lore[]) => {
         setLoreEntries((currentEntries) => {
             const nextEntries = sortLoreEntries(updater(currentEntries));
-            const save = stage().getSave();
-            save.lorebook = nextEntries;
+            if (isCreatorMode) {
+                stage().updateConfiguration({ lorebook: nextEntries });
+            } else {
+                stage().getSave().lorebook = nextEntries;
+                stage().saveGame();
+            }
             return nextEntries;
         });
     };
@@ -315,21 +320,23 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
     };
 
     const getLinkedActorByLoreId = (loreId: string) => {
-        return Object.values(stage().getSave().actors || {}).find((actor) => {
+        const actors = isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {});
+        return actors.find((actor) => {
             if (actor.active === false) {
                 return false;
             }
-            const linkedLore = getLinkedActorLore(actor, stage());
+            const linkedLore = getLinkedActorLore(actor, stage(), isCreatorMode);
             return linkedLore?.id === loreId;
         }) || null;
     };
 
     const getLinkedLocationByLoreId = (loreId: string) => {
-        return Object.values(stage().getSave().atlas || {}).find((location) => {
+        const locations = isCreatorMode ? stage().getConfiguration().locations || [] : Object.values(stage().getSave().atlas || {});
+        return locations.find((location) => {
             if (location.active === false) {
                 return false;
             }
-            const linkedLore = getLinkedLocationLore(location, stage());
+            const linkedLore = getLinkedLocationLore(location, stage(), isCreatorMode);
             return linkedLore?.id === loreId;
         }) || null;
     };
@@ -367,8 +374,8 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             const linkedActor = getLinkedActorByLoreId(selectedLore.id);
 
             if (linkedActor) {
-                updateActorLore(linkedActor.id, content, stage());
-                setLoreEntries(sortLoreEntries([...(stage().getSave().lorebook || [])]));
+                updateActorLore(linkedActor.id, content, stage(), isCreatorMode);
+                setLoreEntries(sortLoreEntries([...(isCreatorMode ? stage().getConfiguration().lorebook || [] : stage().getSave().lorebook || [])]));
                 return;
             }
         }
@@ -377,8 +384,8 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             const linkedLocation = getLinkedLocationByLoreId(selectedLore.id);
 
             if (linkedLocation) {
-                updateLocationDescription(linkedLocation.id, content, stage());
-                setLoreEntries(sortLoreEntries([...(stage().getSave().lorebook || [])]));
+                updateLocationDescription(linkedLocation.id, content, stage(), isCreatorMode);
+                setLoreEntries(sortLoreEntries([...(isCreatorMode ? stage().getConfiguration().lorebook || [] : stage().getSave().lorebook || [])]));
                 return;
             }
         }

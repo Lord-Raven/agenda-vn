@@ -418,7 +418,7 @@ export const VOICE_MAP: {[key: string]: string} = {
     'animated_male_20s': 'masculine - hip and lively',
 };
 
-export async function distillActor(actor: Actor, definition: any, stage: Stage): Promise<Actor|null> {
+export async function distillActor(actor: Actor, definition: any, stage: Stage, isCreatorMode: boolean = stage.isOwner): Promise<Actor|null> {
     console.log('Loading reserve actor:', definition.name);
     console.log(definition);
 
@@ -552,7 +552,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
             actor.statMap[stat.id] = clampActorStatValue(resolvedValue, stat);
         });
 
-        upsertActorLoreEntry(actor, oldName, stage);
+        upsertActorLoreEntry(actor, oldName, stage, isCreatorMode);
 
         if (parsedData['outfit_description'] && parsedData['outfit_name']) {
             const outfit: Outfit = {
@@ -584,9 +584,9 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage):
     }
 }
 
-export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage): void {
+export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage, isCreatorMode: boolean = stage.isOwner): void {
     console.log(`Upserting lore entry for actor ${actor.name} (ID: ${actor.id})`);
-    let loreEntry = getLinkedActorLore(actor, stage);
+    let loreEntry = getLinkedActorLore(actor, stage, isCreatorMode);
     // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
     if (!loreEntry) {
         loreEntry = createLoreEntry({
@@ -600,7 +600,11 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
             priority: 0,
             probability: 100
         });
-        stage.getSave().lorebook?.push(loreEntry);
+        if (isCreatorMode) {
+            stage.updateConfiguration({ lorebook: [...(stage.getConfiguration().lorebook || []), loreEntry] });
+        } else {
+            stage.getSave().lorebook?.push(loreEntry);
+        }
     }
     loreEntry.title = actor.name;
     loreEntry.content = actor.profile;
@@ -828,16 +832,19 @@ export async function generateEmotionImage(actor: Actor, emotion: Emotion, stage
     return '';
 }
 
-export function getLinkedActorLore(actor: Actor, stage: Stage) {
+export function getLinkedActorLore(actor: Actor, stage: Stage, isCreatorMode: boolean = stage.isOwner) {
+    const save = stage.getSave();
+    const lorebook = isCreatorMode ? stage.getConfiguration().lorebook : save.lorebook;
+    const actors = isCreatorMode ? stage.getConfiguration().actors : Object.values(save.actors);
     if (actor && actor.loreId) {
-        const loreEntry = stage.getSave().lorebook?.find(lore => lore.id === actor.loreId);
+        const loreEntry = lorebook?.find(lore => lore.id === actor.loreId);
         if (loreEntry) {
             return loreEntry;
         }
         actor.loreId = ''; // Clear the loreId if it no longer exists
     }
     // Don't pick something that another actor is already linked to; only consider unassociated lore entries.
-    const unassociatedLoreEntries = stage.getSave().lorebook?.filter(lore => lore.type === 'character' && !Object.values(stage.getSave().actors).some(a => a.loreId === lore.id)) ?? [];
+    const unassociatedLoreEntries = lorebook?.filter(lore => lore.type === 'character' && !actors.some(a => a.loreId === lore.id)) ?? [];
     const bestMatch = findBestNameMatch(actor.name, unassociatedLoreEntries, ['title']);
     if (bestMatch) {
         actor.loreId = bestMatch.id; // Link the actor to the best matching lore entry
@@ -878,13 +885,14 @@ export function updateActorProfile(actorId: string, profile: string, stage: Stag
     actor.profile = profile;
 }
 
-export function updateActorLore(actorId: string, lore: string, stage: Stage) {
-	const actor = stage.getSave().actors[actorId];
+export function updateActorLore(actorId: string, lore: string, stage: Stage, isCreatorMode: boolean = stage.isOwner) {
+    const actors = isCreatorMode ? stage.getConfiguration().actors : Object.values(stage.getSave().actors);
+    const actor = actors.find(candidate => candidate.id === actorId);
 	if (!actor) {
 		return;
 	}
 
-    const linkedLore = getLinkedActorLore(actor, stage);
+    const linkedLore = getLinkedActorLore(actor, stage, isCreatorMode);
 	if (linkedLore) {
 		linkedLore.content = lore;
 		return;

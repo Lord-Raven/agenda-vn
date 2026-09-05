@@ -91,7 +91,7 @@ export const buildCreatorNotesHtml = ({
     ]);
     const creatorNotesStyle = `
         ${googleFontImports}
-        h3.ant-typography{!important;font-family: var(--mem-font-flavor); }
+        h3.ant-typography{ font-family: ${uiSettings.flavorFontFamily} !important; }
         .creator-notes {
             --mem-bg-deep: ${uiSettings.surfaceBaseColor};
             --mem-bg-mid: ${uiSettings.surfaceBaseColor};

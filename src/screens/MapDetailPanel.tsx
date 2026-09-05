@@ -13,6 +13,7 @@ import { getLocationName } from '../content/Location';
 interface MapDetailPanelProps {
     map: GameMap;
     stage: () => Stage;
+    isCreatorMode: boolean;
     onChange: () => void;
     onDeactivate: () => void;
 }
@@ -31,7 +32,7 @@ const createMapDraft = (map: GameMap): MapDraft => ({
     alternativeImages: map.alternativeImages?.map(createAlternativeImage) || [],
 });
 
-export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, onDeactivate }) => {
+export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorMode, onChange, onDeactivate }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [collapsedAlternativeImages, setCollapsedAlternativeImages] = useState<boolean[]>(() =>
@@ -50,8 +51,11 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
     const didMountRef = useRef(false);
     const stageInstance = stage();
     const save = stageInstance.getSave();
-    const activeMaps = (save.maps || []).filter(candidate => candidate.active !== false && candidate.id !== map.id);
-    const activeLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
+    const configuredMaps = stageInstance.getConfiguration().maps || [];
+    const configuredLocations = stageInstance.getConfiguration().locations || [];
+    const sourceMaps = isCreatorMode ? configuredMaps : save.maps || [];
+    const activeMaps = sourceMaps.filter(candidate => candidate.active !== false && candidate.id !== map.id);
+    const activeLocations = (isCreatorMode ? configuredLocations : Object.values(save.atlas || {})).filter(location => location.active !== false);
     const categoryOptions = useMemo(() => {
         const seenCategories = new Set<string>();
         let hasUncategorized = false;
@@ -74,7 +78,11 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
     }, [activeMaps]);
 
     const syncConfiguration = () => {
-        stageInstance.updateConfiguration({ maps: save.maps || [] });
+        if (isCreatorMode) {
+            stageInstance.updateConfiguration({ maps: sourceMaps });
+        } else {
+            stageInstance.saveGame();
+        }
     };
     structuralSyncRef.current = () => {
         syncConfiguration();
@@ -103,7 +111,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, onChange, 
         map.alternativeImages = nextDraft.alternativeImages.map(createAlternativeImage);
 
         const nextPriority = Number.isFinite(nextDraft.priority) ? nextDraft.priority : 0;
-        const conflict = (save.maps || []).find(candidate => candidate.id !== map.id && candidate.active !== false && candidate.priority === nextPriority);
+        const conflict = sourceMaps.find(candidate => candidate.id !== map.id && candidate.active !== false && candidate.priority === nextPriority);
         if (conflict) {
             conflict.priority = map.priority;
         }

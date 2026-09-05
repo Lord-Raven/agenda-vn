@@ -88,7 +88,6 @@ const clampStatValue = (value: number, stat: Stat): number => {
 
 export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => {
     const stageInstance = stage();
-    const save = stageInstance.getSave();
     const configuration = stageInstance.getConfiguration();
     const defaultBackgroundImageUrl = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
 
@@ -118,7 +117,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     );
     const [globalStatValues, setGlobalStatValues] = useState<{ [key: string]: StatValue }>(() => ({
         ...configuration.globalStatValues,
-        ...save.globalStatValues,
     }));
     const [isCopyingConfigurationJson, setIsCopyingConfigurationJson] = useState(false);
     const [isCopyingCreatorNotesHtml, setIsCopyingCreatorNotesHtml] = useState(false);
@@ -141,11 +139,10 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     }, [globalStatValues, globalStats]);
 
     const activeActors = useMemo(() => {
-        return Object.values(save.actors || {})
-            .filter(actor => actor.id !== save.playerId)
+        return (configuration.actors || [])
             .filter(actor => actor.active !== false)
             .map(actor => JSON.parse(JSON.stringify(actor)));
-    }, [save.actors, save.playerId]);
+    }, [configuration.actors]);
 
     const castActorOptions = useMemo(() => {
         return activeActors.map(actor => ({
@@ -156,10 +153,10 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     }, [activeActors, stageInstance]);
 
     const activeLocations = useMemo(() => {
-        return Object.values(save.atlas || {})
+        return (configuration.locations || [])
             .filter(location => location.active !== false)
             .map(location => JSON.parse(JSON.stringify(location)));
-    }, [save.atlas]);
+    }, [configuration.locations]);
 
     const slideshowLocationOptions = useMemo(() => {
         return activeLocations.map(location => ({
@@ -171,14 +168,14 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     }, [activeLocations, stageInstance]);
 
     const activeMaps = useMemo(() => {
-        return (save.maps || [])
+        return (configuration.maps || [])
             .filter(map => map.active !== false)
             .map(map => JSON.parse(JSON.stringify(map)));
-    }, [save.maps]);
+    }, [configuration.maps]);
 
     const managedCalendarEvents = useMemo(() => {
-        return stageInstance.getManagedCalendarEvents().map(event => JSON.parse(JSON.stringify(event)));
-    }, [stageInstance, save.upcomingEvents, save.currentDate, save.currentTimeOfDay]);
+        return (configuration.calendarEvents || []).map(event => JSON.parse(JSON.stringify(event)));
+    }, [configuration.calendarEvents]);
 
     const portableGameConfiguration = useMemo(() => {
         return buildPortableGameConfiguration({
@@ -197,7 +194,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             actors: activeActors,
             locations: activeLocations,
             maps: activeMaps,
-            lorebook: save.lorebook || [],
+            lorebook: configuration.lorebook || [],
             calendarEvents: managedCalendarEvents,
             uiSettings: stageInstance.getUiSettings(),
             castActorIds,
@@ -217,7 +214,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         locationStats,
         slideshowLocationIds,
         validGlobalStatValues,
-        save.lorebook,
+        configuration.lorebook,
         stageInstance,
         startingDate,
         title,
@@ -284,13 +281,13 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             actors: activeActors,
             locations: activeLocations,
             maps: activeMaps,
-            lorebook: (save.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
+            lorebook: (configuration.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
             calendarEvents: managedCalendarEvents,
             actorStats,
             locationStats,
             globalStats: globalStats,
             globalStatValues: validGlobalStatValues,
-            uiSettings: stageInstance.getUiSettings(),
+            uiSettings: configuration.uiSettings,
             title,
             titleImageUrl,
             titleImagePrompt: titleImagePrompt,
@@ -304,63 +301,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             slideshowLocationIds,
         });
 
-        const currentSave = stageInstance.getSave();
-
-        const statIds = new Set(
-            actorStats
-                .filter(stat => isNumericDisplayType(stat.type) && !stat.perActor)
-                .map(stat => stat.id),
-        );
-        Object.values(currentSave.actors || {}).forEach(actor => {
-            if (!actor.statMap || typeof actor.statMap !== 'object') {
-                actor.statMap = {};
-            }
-
-            actorStats.filter(stat => isNumericDisplayType(stat.type) && !stat.perActor).forEach(stat => {
-                if (!stat.id || !stat.name.trim()) {
-                    return;
-                }
-                const existing = actor.statMap[stat.id];
-                const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
-                const value = Number.isFinite(existing) ? Number(existing) : fallback;
-                actor.statMap[stat.id] = clampStatValue(value, stat);
-            });
-
-            Object.keys(actor.statMap).forEach(statId => {
-                if (!statIds.has(statId)) {
-                    delete actor.statMap[statId];
-                }
-            });
-        });
-
-        const locationStatIds = new Set(
-            locationStats
-                .filter(stat => isNumericDisplayType(stat.type))
-                .map(stat => stat.id),
-        );
-        Object.values(currentSave.atlas || {}).forEach(location => {
-            if (!location.statMap || typeof location.statMap !== 'object') {
-                location.statMap = {};
-            }
-
-            locationStats.filter(stat => isNumericDisplayType(stat.type)).forEach(stat => {
-                if (!stat.id || !stat.name.trim()) {
-                    return;
-                }
-                const existing = location.statMap[stat.id];
-                const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
-                const value = Number.isFinite(existing) ? Number(existing) : fallback;
-                location.statMap[stat.id] = clampStatValue(value, stat);
-            });
-
-            Object.keys(location.statMap).forEach(statId => {
-                if (!locationStatIds.has(statId)) {
-                    delete location.statMap[statId];
-                }
-            });
-        });
-
-    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, creatorNotes, managedCalendarEvents, globalStats, locationStats, save, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
+    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, managedCalendarEvents, globalStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;

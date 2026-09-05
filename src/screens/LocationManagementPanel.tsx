@@ -15,9 +15,10 @@ import {
 
 interface LocationManagementPanelProps {
     stage: () => Stage;
+    isCreatorMode: boolean;
 }
 
-export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stage }) => {
+export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stage, isCreatorMode }) => {
     const UNCATEGORIZED_LABEL = 'Uncategorized';
     const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
     const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('location-management');
@@ -49,10 +50,13 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
         (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), undefined, { sensitivity: 'base' });
 
     const locations = useMemo(() => {
-        return Object.values(stage().getSave().atlas || {})
+        const source = isCreatorMode
+            ? stage().getConfiguration().locations || []
+            : Object.values(stage().getSave().atlas || {});
+        return source
             .filter((location) => location.active !== false)
             .sort(sortByName);
-    }, [stage, locationRevision]);
+    }, [stage, locationRevision, isCreatorMode]);
 
     // Create a map of locations by their category property. locationsByCategory[category] = array of locations in that category.
     const locationsByCategory = useMemo<CategorizedEntrySection<Location>[]>(() => {
@@ -88,8 +92,10 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
 
     const handleCreateLocation = (category: string) => {
         const save = stage().getSave();
+        const configuredLocations = stage().getConfiguration().locations || [];
+        const locations = isCreatorMode ? configuredLocations : Object.values(save.atlas || {});
         const baseName = 'New Location';
-        const usedNames = new Set(Object.values(save.atlas || {}).map((location) => location.name?.trim().toLowerCase()));
+        const usedNames = new Set(locations.map((location) => location.name?.trim().toLowerCase()));
 
         let candidateName = baseName;
         let counter = 1;
@@ -108,11 +114,16 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
             themeColor: '',
         });
 
-        save.atlas = save.atlas || {};
-        save.atlas[location.id] = location;
+        if (isCreatorMode) {
+            stage().updateConfiguration({ locations: [...configuredLocations, location] });
+        } else {
+            save.atlas = save.atlas || {};
+            save.atlas[location.id] = location;
+        }
 
         // If the location has no lorebook entry, create one with the same name and description.
-        const existingLore = save.lorebook?.find((lore) => lore.type === 'location' && lore.title?.trim().toLowerCase() === location.name?.trim().toLowerCase());
+        const lorebook = isCreatorMode ? stage().getConfiguration().lorebook : save.lorebook;
+        const existingLore = lorebook?.find((lore) => lore.type === 'location' && lore.title?.trim().toLowerCase() === location.name?.trim().toLowerCase());
         if (!existingLore) {
             const newLore = createLoreEntry({
                 type: 'location',
@@ -125,11 +136,17 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                 priority: 0,
                 probability: 100
             });
-            save.lorebook = save.lorebook || [];
-            save.lorebook.push(newLore);
+            if (isCreatorMode) {
+                stage().updateConfiguration({ lorebook: [...(lorebook || []), newLore] });
+            } else {
+                save.lorebook = save.lorebook || [];
+                save.lorebook.push(newLore);
+            }
         }
 
-        stage().saveGame();
+        if (!isCreatorMode) {
+            stage().saveGame();
+        }
         setLocationRevision((current) => current + 1);
         setSelectedLocationId(location.id);
     };
@@ -201,6 +218,7 @@ export const LocationManagementPanel: FC<LocationManagementPanelProps> = ({ stag
                         key={selectedLocation.id}
                         location={selectedLocation}
                         stage={stage}
+                        isCreatorMode={isCreatorMode}
                         onUpdate={() => setLocationRevision((current) => current + 1)}
                         onDeactivate={(locationId) => {
                             setLocationRevision((current) => current + 1);

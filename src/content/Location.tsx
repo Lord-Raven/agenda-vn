@@ -83,16 +83,19 @@ export const createDefaultAtlas = () => {
 	return atlas;
 };
 
-export function getLinkedLocationLore(location: Location, stage: Stage) {
+export function getLinkedLocationLore(location: Location, stage: Stage, isCreatorMode: boolean = stage.isOwner) {
+	const save = stage.getSave();
+	const lorebook = isCreatorMode ? stage.getConfiguration().lorebook : save.lorebook;
+	const locations = isCreatorMode ? stage.getConfiguration().locations : Object.values(save.atlas);
 	if (location && location.loreId) {
-		const loreEntry = stage.getSave().lorebook?.find(lore => lore.id === location.loreId);
+		const loreEntry = lorebook?.find(lore => lore.id === location.loreId);
 		if (loreEntry) {
 			return loreEntry;
 		}
 		location.loreId = ''; // Clear the loreId if it no longer exists
 	}
 
-	const unassociatedLoreEntries = stage.getSave().lorebook?.filter(lore => lore.type === 'location' && !Object.values(stage.getSave().atlas).some(a => a.loreId === lore.id)) ?? [];
+	const unassociatedLoreEntries = lorebook?.filter(lore => lore.type === 'location' && !locations.some(a => a.loreId === lore.id)) ?? [];
 
 	const bestMatch = findBestNameMatch(location.name, unassociatedLoreEntries, ['title']);
 	if (bestMatch) {
@@ -102,13 +105,14 @@ export function getLinkedLocationLore(location: Location, stage: Stage) {
 }
 
 
-export function updateLocationDescription(locationId: string, description: string, stage: Stage) {
-	const location = stage.getSave().atlas[locationId];
+export function updateLocationDescription(locationId: string, description: string, stage: Stage, isCreatorMode: boolean = stage.isOwner) {
+	const locations = isCreatorMode ? stage.getConfiguration().locations : Object.values(stage.getSave().atlas);
+	const location = locations.find(candidate => candidate.id === locationId);
 	if (!location) {
 		return;
 	}
 
-	const lore = getLinkedLocationLore(location, stage);
+	const lore = getLinkedLocationLore(location, stage, isCreatorMode);
 	if (lore) {
 		lore.content = description;
 	}
@@ -116,8 +120,8 @@ export function updateLocationDescription(locationId: string, description: strin
 	location.description = description;
 }
 
-export function upsertLocationLoreEntry(location: Location, oldName: string, stage: Stage): void {
-	let loreEntry = getLinkedLocationLore(location, stage);
+export function upsertLocationLoreEntry(location: Location, oldName: string, stage: Stage, isCreatorMode: boolean = stage.isOwner): void {
+	let loreEntry = getLinkedLocationLore(location, stage, isCreatorMode);
 	if (!loreEntry) {
 		loreEntry = createLoreEntry({
 			type: 'location',
@@ -130,7 +134,11 @@ export function upsertLocationLoreEntry(location: Location, oldName: string, sta
 			priority: 0,
 			probability: 100,
 		});
-		stage.getSave().lorebook?.push(loreEntry);
+		if (isCreatorMode) {
+			stage.updateConfiguration({ lorebook: [...(stage.getConfiguration().lorebook || []), loreEntry] });
+		} else {
+			stage.getSave().lorebook?.push(loreEntry);
+		}
 	}
 
 	loreEntry.title = location.name;
@@ -384,7 +392,7 @@ const LOCATION_DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
 	{ key: 'light_color', label: 'LIGHT COLOR', description: 'A hex lighting tint for the location, like #ffffff.' },
 ];
 
-export async function distillLocation(location: Location, definition: any, stage: Stage): Promise<Location | null> {
+export async function distillLocation(location: Location, definition: any, stage: Stage, isCreatorMode: boolean = stage.isOwner): Promise<Location | null> {
 	console.log('Distilling location:', definition?.name || location.name);
 	console.log(definition);
 
@@ -453,7 +461,7 @@ export async function distillLocation(location: Location, definition: any, stage
 		location.description = nextDescription;
 		location.themeColor = nextThemeColor;
 
-		upsertLocationLoreEntry(location, oldName, stage);
+		upsertLocationLoreEntry(location, oldName, stage, isCreatorMode);
 
 		return location;
 	}).finally(() => {

@@ -17,6 +17,7 @@ import { CachedImage } from '../components/CachedImage';
 interface ActorDetailPanelProps {
     actor: Actor;
     stage: () => Stage;
+    isCreatorMode: boolean;
     onDeactivate?: (actorId: string) => void;
     onUpdate?: () => void;
 }
@@ -158,10 +159,10 @@ const createInitialActorStatInitialMap = (actor: Actor, actorStats: Stat[]): { [
     return nextMap;
 };
 
-export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDeactivate, onUpdate }) => {
+export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCreatorMode, onDeactivate, onUpdate }) => {
     type ImageTarget = 'base' | Emotion;
     type BaseRegenSource = 'description' | `outfit:${string}`;
-    const linkedLoreEntry = getLinkedActorLore(actor, stage());
+    const linkedLoreEntry = getLinkedActorLore(actor, stage(), isCreatorMode);
     const isProfileBackedByLore = !!linkedLoreEntry;
     const actorStats = useMemo(() => {
         const configured = stage().getConfiguration().actorStats || [];
@@ -184,7 +185,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         return Object.values(uniqueStatMap);
     }, [stage]);
 
-    const locationOptions = useMemo(() => Object.values(stage().getSave().atlas || {})
+    const locationOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().locations || [] : Object.values(stage().getSave().atlas || {}))
         .filter((location) => location.active !== false), [stage]);
 
     const perActorStats = useMemo(() => {
@@ -201,11 +202,11 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     }, [stage]);
 
     const otherActiveActors = useMemo(() => {
-        return Object.values(stage().getSave().actors || {})
+        return (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {}))
             .filter((candidate) => candidate.id !== actor.id)
             .filter((candidate) => candidate.active !== false)
             .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
-    }, [actor.id, stage]);
+    }, [actor.id, stage, isCreatorMode]);
 
     const getClonedOutfits = (): Outfit[] => {
         const sourceOutfits: Outfit[] = Array.isArray(actor.outfits) && actor.outfits.length > 0
@@ -539,7 +540,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.description = nextEditedActor.description;
         actor.background = nextEditedActor.background;
         if (isProfileBackedByLore) {
-            updateActorLore(actor.id, nextEditedActor.lore, stage());
+            updateActorLore(actor.id, nextEditedActor.lore, stage(), isCreatorMode);
         } else {
             actor.profile = nextEditedActor.profile;
         }
@@ -551,7 +552,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
         actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
 
         if (actor.name !== oldName) {
-            upsertActorLoreEntry(actor, oldName, stage());
+            upsertActorLoreEntry(actor, oldName, stage(), isCreatorMode);
         }
 
         const activeStatIds = new Set<string>();
@@ -725,7 +726,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, onDe
     };
 
     const syncEditedFieldsFromActor = () => {
-        const latestLinkedLoreEntry = getLinkedActorLore(actor, stage());
+        const latestLinkedLoreEntry = getLinkedActorLore(actor, stage(), isCreatorMode);
         setEditedActor({
             name: actor.name,
             displayName: actor.displayName || '',
@@ -1235,7 +1236,7 @@ ${indent}}`;
         };
 
         try {
-            const lore = getLinkedActorLore(actor, stage());
+            const lore = getLinkedActorLore(actor, stage(), isCreatorMode);
             const tempActor = new Actor({
                 ...actor,
                 name: actor.name,
@@ -1254,7 +1255,7 @@ ${indent}}`;
                 schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
             });
 
-            const distilledActor = await distillActor(tempActor, generationDefinition, stage());
+            const distilledActor = await distillActor(tempActor, generationDefinition, stage(), isCreatorMode);
             if (!distilledActor) {
                 throw new Error('Actor distillation returned no actor.');
             }
@@ -1332,15 +1333,20 @@ ${indent}}`;
     };
 
     const handleDeactivateActor = () => {
-        const linkedLore = getLinkedActorLore(actor, stage());
+        const linkedLore = getLinkedActorLore(actor, stage(), isCreatorMode);
         actor.active = false;
 
         // Want to be certain we aren't deleting a lore entry that has erroneously become shared across actors.
-        const actorsWithLoreId = Object.values(stage().getSave().actors || {}).filter((a) => a !== actor && a.loreId === linkedLore?.id);
+        const actorsWithLoreId = (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {})).filter((a) => a !== actor && a.loreId === linkedLore?.id);
 
         if (linkedLore && actorsWithLoreId.length === 0) {
-            const save = stage().getSave();
-            save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
+            if (isCreatorMode) {
+                stage().updateConfiguration({ lorebook: (stage().getConfiguration().lorebook || []).filter((entry) => entry.id !== linkedLore.id) });
+            } else {
+                const save = stage().getSave();
+                save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
+                stage().saveGame();
+            }
         }
 
         stage().showPriorityMessage(`${actor.name || 'Actor'} is now inactive and hidden from management.`);
@@ -2234,7 +2240,7 @@ ${indent}}`;
                             </section>
 
                             {/* Per-Actor Stats Section */}
-                            {perActorStats.length > 0 && (
+                            {isCreatorMode && perActorStats.length > 0 && (
                                 <section>
                                     <h2 style={{
                                         color: 'var(--agenda-highlight)',

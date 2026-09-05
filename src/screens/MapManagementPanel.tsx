@@ -13,16 +13,17 @@ import { MapDetailPanel } from './MapDetailPanel';
 
 interface MapManagementPanelProps {
     stage: () => Stage;
+    isCreatorMode: boolean;
 }
 
 const UNCATEGORIZED_LABEL = 'Uncategorized';
 
-export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
+export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage, isCreatorMode }) => {
     const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
     const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('map-management');
     const [revision, setRevision] = useState(0);
     const shouldReduceMotion = useReducedMotion();
-    const maps = (stage().getSave().maps || []).filter(map => map.active !== false);
+    const maps = (isCreatorMode ? stage().getConfiguration().maps : stage().getSave().maps || []).filter(map => map.active !== false);
 
     const shellStyle: React.CSSProperties = {
         display: 'grid',
@@ -61,16 +62,22 @@ export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
 
     const createMap = (category: string) => {
         const save = stage().getSave();
-        const usedNames = new Set((save.maps || []).map(map => map.name.toLowerCase()));
+        const configuredMaps = stage().getConfiguration().maps || [];
+        const sourceMaps = isCreatorMode ? configuredMaps : save.maps || [];
+        const usedNames = new Set(sourceMaps.map(map => map.name.toLowerCase()));
         let name = 'New Map';
         let suffix = 1;
         while (usedNames.has(name.toLowerCase())) {
             name = `New Map ${suffix++}`;
         }
-        const priority = Math.max(-1, ...(save.maps || []).filter(map => map.active !== false).map(map => map.priority)) + 1;
+        const priority = Math.max(-1, ...sourceMaps.filter(map => map.active !== false).map(map => map.priority)) + 1;
         const map = new GameMap({ name, category: category === UNCATEGORIZED_LABEL ? '' : category, priority });
-        save.maps = [...(save.maps || []), map];
-        stage().updateConfiguration({ maps: save.maps });
+        if (isCreatorMode) {
+            stage().updateConfiguration({ maps: [...sourceMaps, map] });
+        } else {
+            save.maps = [...sourceMaps, map];
+            stage().saveGame();
+        }
         setSelectedMapId(map.id);
         setRevision(current => current + 1);
     };
@@ -100,7 +107,7 @@ export const MapManagementPanel: FC<MapManagementPanelProps> = ({ stage }) => {
             />
             <div style={detailPaneStyle}>
                 {selectedMap ? (
-                    <MapDetailPanel key={selectedMap.id} map={selectedMap} stage={stage} onChange={() => setRevision(current => current + 1)} onDeactivate={() => setSelectedMapId(null)} />
+                    <MapDetailPanel key={selectedMap.id} map={selectedMap} stage={stage} isCreatorMode={isCreatorMode} onChange={() => setRevision(current => current + 1)} onDeactivate={() => setSelectedMapId(null)} />
                 ) : (
                     <div style={{ color: 'var(--agenda-text-muted)', textAlign: 'center', padding: 30 }}>Select a map to view and edit details.</div>
                 )}

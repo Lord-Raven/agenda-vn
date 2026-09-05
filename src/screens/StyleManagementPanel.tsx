@@ -102,7 +102,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
         }
 
         const saveTimer = window.setTimeout(() => {
-            stageInstance.updateUiSettings(uiSettings);
+            stageInstance.updateConfiguration({ uiSettings });
             applyUiSettingsToRoot(uiSettings);
         }, 200);
 
@@ -119,9 +119,9 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
         try {
             const configuration = stageInstance.getConfiguration();
             const save = stageInstance.getSave();
-            const activeActors = Object.values(save.actors || {}).filter(actor => actor.active !== false && actor.id !== save.playerId);
-            const activeLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
-            const contextText = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats })) || 'None provided.';
+            const activeActors = (configuration.actors || []).filter(actor => actor.active !== false);
+            const activeLocations = (configuration.locations || []).filter(location => location.active !== false);
+            const contextText = formatLoreEntriesAsContext(selectConstantLoreEntries(configuration.lorebook || [], { ...save, actors: Object.fromEntries(activeActors.map(actor => [actor.id, actor])), globalStats: configuration.globalStats, actorStats: configuration.actorStats })) || 'None provided.';
 
             const selectedSettingContext = (configuration.globalStats || []).map((stat) => {
                 const statName = (stat.name || '').trim();
@@ -129,7 +129,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     return '';
                 }
 
-                const selectedValue = save.globalStatValues?.[stat.id] ?? stat.default;
+                const selectedValue = configuration.globalStatValues?.[stat.id] ?? stat.default;
                 const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, selectedValue) : undefined;
                 const valueText = selectedOption?.option.name || (typeof selectedValue === 'number' ? String(selectedValue) : String(selectedValue || ''));
                 if (!valueText) {
@@ -177,7 +177,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             const nextSettings = mergeGeneratedUiSettings(uiSettings, parsed);
 
             setUiSettings(nextSettings);
-            stageInstance.updateUiSettings(nextSettings);
+            stageInstance.updateConfiguration({ uiSettings: nextSettings });
             applyUiSettingsToRoot(nextSettings);
             stageInstance.showPriorityMessage('Generated style palette and font settings from game context.');
         } catch (error) {

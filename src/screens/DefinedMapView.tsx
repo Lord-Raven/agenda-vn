@@ -1,4 +1,4 @@
-import { CSSProperties, FC, Fragment, ReactNode, useEffect, useMemo, useState } from 'react';
+import { CSSProperties, FC, Fragment, ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -29,7 +29,8 @@ interface MapMarkerButtonProps {
     isHovered: boolean;
     isInteractive: boolean;
     markerSize: number;
-    expandedMarkerWidth: number;
+    label: string;
+    secondaryLabel?: string;
     disabled: boolean;
     onClick: () => void;
     onMouseEnter: () => void;
@@ -39,16 +40,32 @@ interface MapMarkerButtonProps {
     children: ReactNode;
 }
 
-const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, markerSize, expandedMarkerWidth, style, children, ...buttonProps }) => {
+const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, markerSize, label, secondaryLabel, style, children, ...buttonProps }) => {
     // Stay elevated through its own collapse animation so a newly hovered neighbor doesn't
     // cut off the shrink transition mid-flight, which otherwise reads as an instant snap.
     const [isElevated, setIsElevated] = useState(isHovered);
+    const [expandedMarkerWidth, setExpandedMarkerWidth] = useState(markerSize);
+    const measureRef = useRef<HTMLSpanElement>(null);
 
     useEffect(() => {
         if (isHovered) {
             setIsElevated(true);
         }
     }, [isHovered]);
+
+    useLayoutEffect(() => {
+        const measure = measureRef.current;
+        if (!measure) {
+            return;
+        }
+
+        const updateWidth = () => setExpandedMarkerWidth(markerSize + measure.getBoundingClientRect().width);
+        const observer = new ResizeObserver(updateWidth);
+        observer.observe(measure);
+        updateWidth();
+
+        return () => observer.disconnect();
+    }, [label, markerSize, secondaryLabel]);
 
     // A marker still collapsing (elevated but no longer hovered) must render above a freshly
     // hovered neighbor that's growing, otherwise the growing marker covers its shrink animation.
@@ -69,6 +86,10 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
             style={{ ...style, zIndex }}
         >
             {children}
+            <span ref={measureRef} aria-hidden="true" style={{ position: 'absolute', width: 'max-content', visibility: 'hidden', pointerEvents: 'none', whiteSpace: 'nowrap', padding: '0 12px 0 6px', fontSize: '0.82rem', fontWeight: 700 }}>
+                {label}
+                {secondaryLabel && <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 400 }}>{secondaryLabel}</span>}
+            </span>
         </motion.button>
     );
 };
@@ -77,6 +98,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
     const [hoveredLink, setHoveredLink] = useState<string | null>(null);
+    const mapViewportRef = useRef<HTMLDivElement>(null);
+    const [mapViewportSize, setMapViewportSize] = useState({ width: 0, height: 0 });
+    const [mapImageSize, setMapImageSize] = useState({ width: 0, height: 0 });
     const save = stage().getSave();
     const sortedMaps = useMemo(() => [...maps].sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name)), [maps]);
 
@@ -113,9 +137,64 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
     const cachedBackgroundImageUrl = useCachedImageUrl(configuredBackgroundImageUrl);
     const displayedMapImageUrl = useCachedImageUrl(displayedMap ? getMapImageUrl(displayedMap, stage()) : undefined);
 
+    useEffect(() => {
+        const viewport = mapViewportRef.current;
+        if (!viewport) {
+            return;
+        }
+
+        const updateViewportSize = () => {
+            const bounds = viewport.getBoundingClientRect();
+            setMapViewportSize({ width: bounds.width, height: bounds.height });
+        };
+        const observer = new ResizeObserver(updateViewportSize);
+        observer.observe(viewport);
+        updateViewportSize();
+
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        setMapImageSize({ width: 0, height: 0 });
+        if (!displayedMapImageUrl) {
+            return;
+        }
+
+        const image = new Image();
+        image.onload = () => setMapImageSize({ width: image.naturalWidth, height: image.naturalHeight });
+        image.src = displayedMapImageUrl;
+    }, [displayedMapImageUrl]);
+
     if (!displayedMap) {
         return null;
     }
+
+    const getMarkerPosition = (x: number, y: number) => {
+        const { width: viewportWidth, height: viewportHeight } = mapViewportSize;
+        const { width: imageWidth, height: imageHeight } = mapImageSize;
+        if (!viewportWidth || !viewportHeight || !imageWidth || !imageHeight) {
+            return { left: `${x * 100}%`, top: `${y * 100}%` };
+        }
+
+        // The editor stores coordinates in its fixed 16:9 preview space. Map that
+        // point through the source image and then through the runtime cover crop.
+        const previewWidth = 16;
+        const previewHeight = 9;
+        const previewScale = Math.max(previewWidth / imageWidth, previewHeight / imageHeight);
+        const previewRenderedWidth = imageWidth * previewScale;
+        const previewRenderedHeight = imageHeight * previewScale;
+        const sourceX = (x * previewWidth - (previewWidth - previewRenderedWidth) / 2) / previewRenderedWidth;
+        const sourceY = (y * previewHeight - (previewHeight - previewRenderedHeight) / 2) / previewRenderedHeight;
+        const runtimeScale = Math.max(viewportWidth / imageWidth, viewportHeight / imageHeight);
+        const renderedWidth = imageWidth * runtimeScale;
+        const renderedHeight = imageHeight * runtimeScale;
+        const offsetX = (viewportWidth - renderedWidth) / 2;
+        const offsetY = (viewportHeight - renderedHeight) / 2;
+        return {
+            left: `${((offsetX + sourceX * renderedWidth) / viewportWidth) * 100}%`,
+            top: `${((offsetY + sourceY * renderedHeight) / viewportHeight) * 100}%`,
+        };
+    };
 
     return (
         <>
@@ -141,7 +220,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                     />
                 </Box>
 
-                <Box sx={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid var(--agenda-line-strong)', borderRadius: '8px', background: 'color-mix(in srgb, var(--agenda-surface-base) 90%, black 10%)' }}>
+                <Box ref={mapViewportRef} sx={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid var(--agenda-line-strong)', borderRadius: '8px', background: 'color-mix(in srgb, var(--agenda-surface-base) 90%, black 10%)' }}>
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={`${displayedMap.id}-label`}
@@ -202,9 +281,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const configuration = stage().getConfiguration();
                                     const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats });
                                     const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
-                                    // Text space needed on top of the padding/icon that always occupies the button.
-                                    const longestLabelLength = Math.max(markerName.length, currentEvent && linkedLocation?.name ? linkedLocation.name.length : 0);
-                                    const expandedMarkerWidth = Math.max(markerSize, Math.min(220, markerSize + longestLabelLength * 8 + 18));
+                                    const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y);
                                     const handleMarkerClick = () => {
                                         if (linkedMap) {
                                             setDisplayedMapId(linkedMap.id);
@@ -233,8 +310,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                         onMouseLeave={() => setHoveredLink(null)}
                                                         isInteractive={isInteractive}
                                                         markerSize={markerSize}
-                                                        expandedMarkerWidth={expandedMarkerWidth}
-                                                        style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed' }}
+                                                        label={markerName}
+                                                        secondaryLabel={currentEvent ? linkedLocation?.name : undefined}
+                                                        style={{ position: 'absolute', ...markerPosition, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed' }}
                                                     >
                                                         <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
                                                         <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: markerImageUrl ? `url(${markerImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
@@ -255,7 +333,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             }}
                                         </CachedBackgroundUrl>
                                         {linkedLocation && (
-                                            <div style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `calc(${link.coordinates.y * 100}% + ${markerSize / 2 - actorPortraitSize * 0.35}px)`, transform: 'translateX(-50%)', zIndex: isHovered ? 5 : 3 }}>
+                                            <div style={{ position: 'absolute', ...markerPosition, transform: `translate(-50%, calc(-50% + ${markerSize / 2 - actorPortraitSize * 0.35}px))`, zIndex: isHovered ? 5 : 3 }}>
                                                 <LocationActorPortraits
                                                     locationId={linkedLocation.id}
                                                     stage={stage()}

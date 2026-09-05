@@ -1,4 +1,4 @@
-import React, { FC, useState } from 'react';
+import React, { FC, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
 import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart } from '@mui/icons-material';
@@ -20,7 +20,15 @@ interface ContentManagementScreenProps {
 type TabType = 'game' | 'style' | 'stats' | 'lorebook' | 'actors' | 'locations' | 'maps' | 'calendarEvents';
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
+    const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
+    const isCreatorMode = stage().isOwner && isCreateMode;
     const [activeTab, setActiveTab] = useState<TabType>('actors');
+
+    useEffect(() => {
+        if (!isCreatorMode && (activeTab === 'game' || activeTab === 'style' || activeTab === 'stats')) {
+            setActiveTab('actors');
+        }
+    }, [activeTab, isCreatorMode]);
 
     const sortByName = <T extends { name?: string }>(a: T, b: T) =>
         (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), undefined, { sensitivity: 'base' });
@@ -92,24 +100,35 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                                     Content Management
                                 </Title>
-                                <motion.button
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={onClose}
-                                    style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: 'var(--agenda-highlight)',
-                                        cursor: 'pointer',
-                                        fontSize: '24px',
-                                        padding: '5px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                    }}
-                                >
-                                    <Close />
-                                </motion.button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    {stage().isOwner && (
+                                        <Button
+                                            onClick={() => setIsCreateMode((current) => !current)}
+                                            variant={isCreatorMode ? 'primary' : 'secondary'}
+                                            style={{ minWidth: '100px' }}
+                                        >
+                                            {isCreatorMode ? 'Create' : 'Manage'}
+                                        </Button>
+                                    )}
+                                    <motion.button
+                                        whileHover={{ scale: 1.1 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        onClick={onClose}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--agenda-highlight)',
+                                            cursor: 'pointer',
+                                            fontSize: '24px',
+                                            padding: '5px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}
+                                    >
+                                        <Close />
+                                    </motion.button>
+                                </div>
                             </div>
 
                             {/* Tab Navigation */}
@@ -120,45 +139,51 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 borderBottom: '2px solid var(--agenda-line-strong)',
                                 paddingBottom: '10px',
                             }}>
-                                <Button
-                                    onClick={() => setActiveTab('game')}
-                                    variant={activeTab === 'game' ? 'primary' : 'secondary'}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        opacity: activeTab === 'game' ? 1 : 0.6,
-                                    }}
-                                >
-                                    <Tune />
-                                    Game
-                                </Button>
-                                <Button
-                                    onClick={() => setActiveTab('style')}
-                                    variant={activeTab === 'style' ? 'primary' : 'secondary'}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        opacity: activeTab === 'style' ? 1 : 0.6,
-                                    }}
-                                >
-                                    <Palette />
-                                    Style
-                                </Button>
-                                <Button
-                                    onClick={() => setActiveTab('stats')}
-                                    variant={activeTab === 'stats' ? 'primary' : 'secondary'}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        opacity: activeTab === 'stats' ? 1 : 0.6,
-                                    }}
-                                >
-                                    <BarChart />
-                                    Stats
-                                </Button>
+                                {isCreatorMode && (
+                                    <Button
+                                        onClick={() => setActiveTab('game')}
+                                        variant={activeTab === 'game' ? 'primary' : 'secondary'}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            opacity: activeTab === 'game' ? 1 : 0.6,
+                                        }}
+                                    >
+                                        <Tune />
+                                        Game
+                                    </Button>
+                                )}
+                                {isCreatorMode && (
+                                    <Button
+                                        onClick={() => setActiveTab('style')}
+                                        variant={activeTab === 'style' ? 'primary' : 'secondary'}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            opacity: activeTab === 'style' ? 1 : 0.6,
+                                        }}
+                                    >
+                                        <Palette />
+                                        Style
+                                    </Button>
+                                )}
+                                {isCreatorMode && (
+                                    <Button
+                                        onClick={() => setActiveTab('stats')}
+                                        variant={activeTab === 'stats' ? 'primary' : 'secondary'}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            opacity: activeTab === 'stats' ? 1 : 0.6,
+                                        }}
+                                    >
+                                        <BarChart />
+                                        Stats
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={() => setActiveTab('lorebook')}
                                     variant={activeTab === 'lorebook' ? 'primary' : 'secondary'}
@@ -170,7 +195,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     }}
                                 >
                                     <Book />
-                                    Lorebook ({stage().getSave().lorebook?.length || 0})
+                                    Lorebook ({(isCreatorMode ? stage().getConfiguration().lorebook : stage().getSave().lorebook)?.length || 0})
                                 </Button>
                                 <Button
                                     onClick={() => setActiveTab('actors')}
@@ -183,7 +208,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     }}
                                 >
                                     <Person />
-                                    Actors ({actors.length})
+                                    Actors ({(isCreatorMode ? stage().getConfiguration().actors : actors).filter(actor => actor.active !== false).length})
                                 </Button>
                                 <Button
                                     onClick={() => setActiveTab('locations')}
@@ -196,7 +221,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     }}
                                 >
                                     <Place />
-                                    Locations ({locations.length})
+                                    Locations ({(isCreatorMode ? stage().getConfiguration().locations : locations).filter(location => location.active !== false).length})
                                 </Button>
                                 <Button
                                     onClick={() => setActiveTab('maps')}
@@ -204,7 +229,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: activeTab === 'maps' ? 1 : 0.6 }}
                                 >
                                     <MapIcon />
-                                    Maps ({stage().getSave().maps?.filter(map => map.active !== false).length || 0})
+                                    Maps ({(isCreatorMode ? stage().getConfiguration().maps : stage().getSave().maps)?.filter(map => map.active !== false).length || 0})
                                 </Button>
                                 <Button
                                     onClick={() => setActiveTab('calendarEvents')}
@@ -217,7 +242,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     }}
                                 >
                                     <CalendarMonth />
-                                    Events ({stage().getManagedCalendarEvents().length})
+                                    Events ({stage().getManagedCalendarEvents(isCreatorMode).length})
                                 </Button>
                             </div>
 
@@ -242,27 +267,27 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
 
                                 {/* Lorebook Tab */}
                                 {activeTab === 'lorebook' && (
-                                    <LorebookManagementPanel stage={stage} />
+                                    <LorebookManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 
                                 {/* Calendar Events Tab */}
                                 {activeTab === 'calendarEvents' && (
-                                    <CalendarEventManagementPanel stage={stage} />
+                                    <CalendarEventManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 
                                 {/* Actors Tab */}
                                 {activeTab === 'actors' && (
-                                    <ActorManagementPanel stage={stage} />
+                                    <ActorManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 
                                 {/* Locations Tab */}
                                 {activeTab === 'locations' && (
-                                    <LocationManagementPanel stage={stage} />
+                                    <LocationManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 
                                 {/* Maps Tab */}
                                 {activeTab === 'maps' && (
-                                    <MapManagementPanel stage={stage} />
+                                    <MapManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 
                                 {/* Stats Tab */}
