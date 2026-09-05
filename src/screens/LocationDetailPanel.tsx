@@ -291,6 +291,14 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             }
         });
 
+        // Persist changes back to configuration or save
+        if (isCreatorMode) {
+            stage().updateConfiguration({ locations: stage().getConfiguration().locations || [] });
+        } else {
+            stage().getSave().atlas = stage().getSave().atlas || {};
+            stage().getSave().atlas[location.id] = location;
+        }
+
         onUpdate?.();
     };
 

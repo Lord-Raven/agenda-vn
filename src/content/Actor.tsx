@@ -609,6 +609,14 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
     loreEntry.title = actor.name;
     loreEntry.content = actor.profile;
     loreEntry.triggers = [...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)), ...actor.name.split(' ').filter(word => word.length > 2 && word.charAt(word.length - 1) !== '.')];
+    
+    // Persist the lorebook changes back to configuration or save
+    if (isCreatorMode) {
+        stage.updateConfiguration({ lorebook: stage.getConfiguration().lorebook || [] });
+    } else {
+        stage.getSave().lorebook = stage.getSave().lorebook || [];
+        stage.saveGame();
+    }
 }
 
 function getActiveOutfit(actor: Actor): Outfit {
@@ -895,6 +903,13 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage, isC
     const linkedLore = getLinkedActorLore(actor, stage, isCreatorMode);
 	if (linkedLore) {
 		linkedLore.content = lore;
+		// Persist the lorebook changes back to configuration or save
+		if (isCreatorMode) {
+			stage.updateConfiguration({ lorebook: stage.getConfiguration().lorebook || [] });
+		} else {
+			stage.getSave().lorebook = stage.getSave().lorebook || [];
+			stage.saveGame();
+		}
 		return;
 	}
 }

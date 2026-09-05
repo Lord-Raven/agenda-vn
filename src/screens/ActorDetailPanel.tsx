@@ -604,6 +604,13 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }
         });
 
+        // Persist changes back to configuration or save
+        if (isCreatorMode) {
+            stage().updateConfiguration({ actors: stage().getConfiguration().actors || [] });
+        } else {
+            stage().getSave().actors[actor.id] = actor;
+        }
+
         onUpdate?.();
     };
 

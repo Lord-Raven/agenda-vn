@@ -240,7 +240,6 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                 stage().updateConfiguration({ lorebook: nextEntries });
             } else {
                 stage().getSave().lorebook = nextEntries;
-                stage().saveGame();
             }
             return nextEntries;
         });
@@ -352,6 +351,12 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             if (linkedActor) {
                 console.log('Found linked actor:', linkedActor.id, linkedActor.name);
                 linkedActor.name = title;
+                // Persist actor changes back to configuration or save
+                if (isCreatorMode) {
+                    stage().updateConfiguration({ actors: stage().getConfiguration().actors || [] });
+                } else {
+                    stage().getSave().actors[linkedActor.id] = linkedActor;
+                }
             }
         }
 
@@ -359,6 +364,13 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             const linkedLocation = getLinkedLocationByLoreId(selectedLore.id);
             if (linkedLocation) {
                 linkedLocation.name = title;
+                // Persist location changes back to configuration or save
+                if (isCreatorMode) {
+                    stage().updateConfiguration({ locations: stage().getConfiguration().locations || [] });
+                } else {
+                    stage().getSave().atlas = stage().getSave().atlas || {};
+                    stage().getSave().atlas[linkedLocation.id] = linkedLocation;
+                }
             }
         }
 

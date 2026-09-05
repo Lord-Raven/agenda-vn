@@ -115,9 +115,24 @@ export function updateLocationDescription(locationId: string, description: strin
 	const lore = getLinkedLocationLore(location, stage, isCreatorMode);
 	if (lore) {
 		lore.content = description;
+		// Persist the lorebook changes back to configuration or save
+		if (isCreatorMode) {
+			stage.updateConfiguration({ lorebook: stage.getConfiguration().lorebook || [] });
+		} else {
+			stage.getSave().lorebook = stage.getSave().lorebook || [];
+			stage.saveGame();
+		}
 	}
 
 	location.description = description;
+	// Persist location changes back to configuration or save
+	if (isCreatorMode) {
+		stage.updateConfiguration({ locations: stage.getConfiguration().locations || [] });
+	} else {
+		stage.getSave().atlas = stage.getSave().atlas || {};
+		stage.getSave().atlas[location.id] = location;
+		stage.saveGame();
+	}
 }
 
 export function upsertLocationLoreEntry(location: Location, oldName: string, stage: Stage, isCreatorMode: boolean = stage.isOwner): void {
@@ -147,6 +162,14 @@ export function upsertLocationLoreEntry(location: Location, oldName: string, sta
 		...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)),
 		...location.name.split(' '),
 	];
+	
+	// Persist the lorebook changes back to configuration or save
+	if (isCreatorMode) {
+		stage.updateConfiguration({ lorebook: stage.getConfiguration().lorebook || [] });
+	} else {
+		stage.getSave().lorebook = stage.getSave().lorebook || [];
+		stage.saveGame();
+	}
 }
 
 export const LOCATION_TIME_OF_DAY_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
