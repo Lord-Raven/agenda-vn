@@ -906,6 +906,7 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage, isC
 	if (linkedLore) {
 		linkedLore.content = lore;
         console.log(`Updating lore to: ${lore}`);
+        console.log(stage.getConfiguration().lorebook);
 		return;
 	}
 }
