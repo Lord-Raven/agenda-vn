@@ -61,7 +61,10 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
         setScreenType(stage().getCurrentSkit() ? ScreenType.SKIT : ScreenType.MAP);
     };
 
-    const handleNewGame = () => {
+    const handleNewGame = async () => {
+        // Refresh configuration before showing new game settings to ensure
+        // the user's selections match the current published configuration
+        await stage().readStageConfiguration();
         setIsNewGameSettings(true);
         setShowSettings(true);
     };

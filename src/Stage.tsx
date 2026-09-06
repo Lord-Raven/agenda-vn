@@ -100,11 +100,16 @@ const LORE_UPDATE_CANDIDATE_FIELDS: StructuredFieldDefinition[] = [
         description: 'Brief explanation of which characters, if any, have profile details that should be revised to reflect the player\'s identity, role, or choices.',
     },
     {
-        key: 'characters',
+        key: 'characterGuidance',
         label: 'CHARACTERS',
-        description: 'Comma-separated names of characters, selected from Available Characters, whose profile should be updated. Leave empty if none apply.',
+        description: 'One brief line for each character whose profile should be updated, formatted as Character Name: specific guidance for the profile revision. Leave empty if none apply.',
     },
 ];
+
+type LoreUpdateCandidate = {
+    actor: Actor;
+    guidance: string;
+};
 
 const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
 
@@ -575,8 +580,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         // Insert a dummy promise into generationPromises to ensure the loading screen shows until we manually clear it after the initial actors are loaded.
         this.generationPromises['newGame'] = new Promise(() => {});
 
-        // Refresh the configuration from storage first, so a new game uses the most current owner-published content.
-        await this.readStageConfiguration();
+        // Note: readStageConfiguration() is now called from MenuScreen.handleNewGame() when the user
+        // clicks "New Game", ensuring the SettingsScreen shows the current published configuration.
+        // This prevents stat option values selected by the user from becoming invalid if the
+        // configuration changes between MenuScreen opening and startNewGame being called.
 
         // Get empty save slot or replace the oldest save if all slots are full
         const emptySlotIndex = this.saveData.saves.findIndex(save => save === undefined);
@@ -633,7 +640,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         // Ask the LLM to indicate whether any existing character profile (internally, lore) needs to be updated based upon user's identity/role/choices.
         const actorsNeedingLoreUpdate = await this.identifyActorsNeedingLoreUpdate(newSave).catch(error => {
             console.error('Failed to identify actors needing lore updates for new game', error);
-            return [] as Actor[];
+            return [] as LoreUpdateCandidate[];
         });
 
         // Once the number is known, we can adjust the anticipated loading promise count accordingly.
@@ -1758,7 +1765,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     public async generateText(
         prompt: string,
         minTokens: number = 50,
-        maxTokens: number = 200,
+        maxTokens: number = 500,
         expectedFields?: StructuredFieldDefinition[]
     ): Promise<string> {
 
@@ -2028,8 +2035,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return buildPrompt()
             .addBlock('Instructions',
                 `This is a preparatory request to review existing character profiles for a narrative game. ` +
-                `Determine which characters, if any, have background details that should be revised to account for the player's identity, role, or choices established below. ` +
-                `Most characters should require no change; only select ones whose profile plausibly conflicts with or ignores this context.`)
+                `Determine which characters, if any, have background details that should be revised to account for the player's identity, role, stats, or choices established below. ` +
+                `Many—probably most—characters will require no change; only select those whose profiles plausibly conflict with or ignore this context.`)
             .addBlock('Player Identity', playerIdentity)
             .addBlock('Active Configuration Context', this.buildActiveSettingContextSummary(save))
             .addBlock('Available Characters', candidateActors.map(actor =>
@@ -2041,7 +2048,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     LORE_UPDATE_CANDIDATE_FIELDS,
                     {
                         reasoning: 'Mirel\'s profile treats the player as a stranger, but the player is established as her employer, so her profile should be updated to reflect that relationship.',
-                        characters: 'Mirel',
+                        characterGuidance: 'Mirel: Update her profile to reflect that the player is now her employer and that she has begun relying on them for access to old transit hubs.',
                     },
                     { includeEndTag: true },
                 ))
@@ -2049,7 +2056,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // Identifies which existing characters' lore/profile should be revised to reflect the player's established identity, role, or choices.
-    private async identifyActorsNeedingLoreUpdate(save: SaveType): Promise<Actor[]> {
+    private async identifyActorsNeedingLoreUpdate(save: SaveType): Promise<LoreUpdateCandidate[]> {
+        
         const candidateActors = Object.values(save.actors || {})
             .filter(actor => actor.id !== save.playerId)
             .filter(actor => getLinkedActorLore(actor, this)?.updatable);
@@ -2057,6 +2065,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (candidateActors.length === 0) {
             return [];
         }
+
+        // Add promise to the stage's generationPromises to track this operation.
+        this.generationPromises[`identifyActorsNeedingLoreUpdate-${save.playerId}`] = new Promise(() => {});
 
         const response = await this.generateText(
             this.buildLoreUpdateCandidatePrompt(save, candidateActors),
@@ -2066,31 +2077,46 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         );
 
         const parsed = parseStructuredResponse(response, LORE_UPDATE_CANDIDATE_FIELDS);
-        const names = (parsed['characters'] || '').split(',').map(name => name.trim()).filter(Boolean);
+        const candidateGuidance = (parsed['characterGuidance'] || '')
+            .split('\n')
+            .map(line => line.trim())
+            .filter(Boolean);
 
-        const matchedActors: Actor[] = [];
-        for (const name of names) {
+        const matchedActors: LoreUpdateCandidate[] = [];
+        for (const line of candidateGuidance) {
+            const separatorIndex = line.indexOf(':');
+            if (separatorIndex <= 0) {
+                continue;
+            }
+
+            const name = line.slice(0, separatorIndex).trim();
+            const guidance = line.slice(separatorIndex + 1).trim();
+            if (!name || !guidance) {
+                continue;
+            }
+
             const matchedActor = findBestNameMatch(name, candidateActors, ['name']);
-            if (matchedActor && !matchedActors.includes(matchedActor)) {
-                matchedActors.push(matchedActor);
+            if (matchedActor && !matchedActors.some(candidate => candidate.actor === matchedActor)) {
+                matchedActors.push({ actor: matchedActor, guidance });
             }
         }
 
+        delete this.generationPromises[`identifyActorsNeedingLoreUpdate-${save.playerId}`];
         return matchedActors;
     }
 
     // Runs updateLoreEntry() for the given actors' linked lore, limiting how many run concurrently.
-    private async runLoreUpdatesWithConcurrency(actors: Actor[], concurrency: number = 3): Promise<void> {
-        const queue = [...actors];
+    private async runLoreUpdatesWithConcurrency(candidates: LoreUpdateCandidate[], concurrency: number = 3): Promise<void> {
+        const queue = [...candidates];
         const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
-            let actor: Actor | undefined;
-            while ((actor = queue.shift())) {
-                const loreEntry = getLinkedActorLore(actor, this);
+            let candidate: LoreUpdateCandidate | undefined;
+            while ((candidate = queue.shift())) {
+                const loreEntry = getLinkedActorLore(candidate.actor, this);
                 if (!loreEntry) {
                     continue;
                 }
-                await updateLoreEntry(loreEntry, this).catch(error => {
-                    console.error(`Error updating lore entry for actor ${actor?.name}`, error);
+                await updateLoreEntry(loreEntry, this, candidate.guidance).catch(error => {
+                    console.error(`Error updating lore entry for actor ${candidate?.actor.name}`, error);
                 });
             }
         });

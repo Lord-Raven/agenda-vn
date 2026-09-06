@@ -154,7 +154,7 @@ export async function fetchLorebook() {
 
 }
 
-export async function updateLoreEntry(loreEntry: Lore, stage: Stage): Promise<Lore> {
+export async function updateLoreEntry(loreEntry: Lore, stage: Stage, additionalGuidance?: string): Promise<Lore> {
 // Make a call with context and the current lore entry, asking for revisions based on context.
     const loreUpdatePromise = stage.generateText(buildPrompt()
         .addBlock('Instructions', `Based on the current context and recent events, output an updated or revised version of the content below, taking care to maintain all information from the original that remains true. If there are no significant changes, simply return the original content verbatim.`)
@@ -167,9 +167,10 @@ export async function updateLoreEntry(loreEntry: Lore, stage: Stage): Promise<Lo
                 content: '<revised content, including relevant updates and persisting other accurate details from the original.>',
             }))
         .addBlock('Additional Context', generateContext(undefined, stage, 3))
+        .addBlock('Additional Guidance', additionalGuidance || '')
         .format(),
         10,
-        1000,
+        2000,
         LORE_UPDATE_RESPONSE_FIELDS,
     ).then(response => {
         if (response) {

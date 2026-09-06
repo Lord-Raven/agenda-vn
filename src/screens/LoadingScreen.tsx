@@ -271,24 +271,33 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
 
                                     <AnimatePresence>
                                         {isMarked && (
-                                            <motion.div
+                                            <Box
                                                 key={`strike-${i}`}
-                                                initial={{ scaleX: 0, opacity: 0 }}
-                                                animate={{ scaleX: 1, opacity: 1 }}
-                                                exit={{ scaleX: 0, opacity: 0 }}
-                                                transition={{ duration: 0.2, ease: 'easeOut' }}
                                                 style={{
                                                     position: 'absolute',
                                                     width: '141.42%',
                                                     height: '1.6px',
-                                                    background: 'rgba(185, 143, 110, 0.76)',
                                                     top: '100%',
                                                     left: 0,
                                                     borderRadius: '1px',
                                                     transform: 'translateY(-50%) rotate(-45deg)',
                                                     transformOrigin: 'left center',
                                                 }}
-                                            />
+                                            >
+                                                <motion.div
+                                                    initial={{ scaleX: 0, opacity: 0 }}
+                                                    animate={{ scaleX: 1, opacity: 1 }}
+                                                    exit={{ scaleX: 0, opacity: 0 }}
+                                                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        background: 'rgba(185, 143, 110, 0.76)',
+                                                        borderRadius: '1px',
+                                                        transformOrigin: 'left center',
+                                                    }}
+                                                />
+                                            </Box>
                                         )}
                                     </AnimatePresence>
                                 </Box>
