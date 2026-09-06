@@ -83,7 +83,7 @@ export const createDefaultAtlas = () => {
 	return atlas;
 };
 
-export function getLinkedLocationLore(location: Location, stage: Stage, isCreatorMode: boolean = stage.isOwner) {
+export function getLinkedLocationLore(location: Location, stage: Stage, isCreatorMode: boolean = false) {
 	const save = stage.getSave();
 	const lorebook = isCreatorMode ? stage.getConfiguration().lorebook : save.lorebook;
 	const locations = isCreatorMode ? stage.getConfiguration().locations : Object.values(save.atlas);
@@ -105,7 +105,7 @@ export function getLinkedLocationLore(location: Location, stage: Stage, isCreato
 }
 
 
-export function updateLocationDescription(locationId: string, description: string, stage: Stage, isCreatorMode: boolean = stage.isOwner) {
+export function updateLocationDescription(locationId: string, description: string, stage: Stage, isCreatorMode: boolean = false) {
 	const locations = isCreatorMode ? stage.getConfiguration().locations : Object.values(stage.getSave().atlas);
 	const location = locations.find(candidate => candidate.id === locationId);
 	if (!location) {
@@ -135,7 +135,7 @@ export function updateLocationDescription(locationId: string, description: strin
 	}
 }
 
-export function upsertLocationLoreEntry(location: Location, oldName: string, stage: Stage, isCreatorMode: boolean = stage.isOwner): void {
+export function upsertLocationLoreEntry(location: Location, oldName: string, stage: Stage, isCreatorMode: boolean = false): void {
 	let loreEntry = getLinkedLocationLore(location, stage, isCreatorMode);
 	if (!loreEntry) {
 		loreEntry = createLoreEntry({
@@ -415,7 +415,7 @@ const LOCATION_DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
 	{ key: 'light_color', label: 'LIGHT COLOR', description: 'A hex lighting tint for the location, like #ffffff.' },
 ];
 
-export async function distillLocation(location: Location, definition: any, stage: Stage, isCreatorMode: boolean = stage.isOwner): Promise<Location | null> {
+export async function distillLocation(location: Location, definition: any, stage: Stage, isCreatorMode: boolean = false): Promise<Location | null> {
 	console.log('Distilling location:', definition?.name || location.name);
 	console.log(definition);
 

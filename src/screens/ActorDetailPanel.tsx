@@ -604,6 +604,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         });
 
         if (isProfileBackedByLore) {
+            console.log(`Updating lore for actor ${persistedActor.id}`);
             updateActorLore(persistedActor.id, nextEditedActor.lore, stage(), isCreatorMode);
         }
 

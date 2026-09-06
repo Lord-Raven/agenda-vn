@@ -418,7 +418,7 @@ export const VOICE_MAP: {[key: string]: string} = {
     'animated_male_20s': 'masculine - hip and lively',
 };
 
-export async function distillActor(actor: Actor, definition: any, stage: Stage, isCreatorMode: boolean = stage.isOwner): Promise<Actor|null> {
+export async function distillActor(actor: Actor, definition: any, stage: Stage, isCreatorMode: boolean = false): Promise<Actor|null> {
     console.log('Loading reserve actor:', definition.name);
     console.log(definition);
 
@@ -584,7 +584,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
     }
 }
 
-export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage, isCreatorMode: boolean = stage.isOwner): void {
+export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage, isCreatorMode: boolean = false): void {
     console.log(`Upserting lore entry for actor ${actor.name} (ID: ${actor.id})`);
     let loreEntry = getLinkedActorLore(actor, stage, isCreatorMode);
     // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
@@ -840,11 +840,13 @@ export async function generateEmotionImage(actor: Actor, emotion: Emotion, stage
     return '';
 }
 
-export function getLinkedActorLore(actor: Actor, stage: Stage, isCreatorMode: boolean = stage.isOwner) {
+export function getLinkedActorLore(actor: Actor, stage: Stage, isCreatorMode: boolean = false) {
     const save = stage.getSave();
     const lorebook = isCreatorMode ? stage.getConfiguration().lorebook : save.lorebook;
     const actors = isCreatorMode ? stage.getConfiguration().actors : Object.values(save.actors);
+    console.log(`Fetching linked actor lore for actor ${actor.name}`);
     if (actor && actor.loreId) {
+        console.log(`Looking for linked lore for actor ${actor.name} with loreId ${actor.loreId}`);
         const loreEntry = lorebook?.find(lore => lore.id === actor.loreId);
         if (loreEntry) {
             return loreEntry;
@@ -893,7 +895,7 @@ export function updateActorProfile(actorId: string, profile: string, stage: Stag
     actor.profile = profile;
 }
 
-export function updateActorLore(actorId: string, lore: string, stage: Stage, isCreatorMode: boolean = stage.isOwner) {
+export function updateActorLore(actorId: string, lore: string, stage: Stage, isCreatorMode: boolean = false) {
     const actors = isCreatorMode ? stage.getConfiguration().actors : Object.values(stage.getSave().actors);
     const actor = actors.find(candidate => candidate.id === actorId);
 	if (!actor) {
