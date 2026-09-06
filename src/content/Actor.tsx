@@ -905,13 +905,7 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage, isC
     const linkedLore = getLinkedActorLore(actor, stage, isCreatorMode);
 	if (linkedLore) {
 		linkedLore.content = lore;
-		// Persist the lorebook changes back to configuration or save
-		if (isCreatorMode) {
-            console.log(`updateActorLore() for actor ${actor.name} in creator mode`);
-			stage.updateConfiguration({ lorebook: stage.getConfiguration().lorebook || [] });
-		} else {
-			stage.getSave().lorebook = stage.getSave().lorebook || [];
-		}
+        console.log(`Updating lore to: ${lore}`);
 		return;
 	}
 }
