@@ -613,6 +613,7 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
     
     // Persist the lorebook changes back to configuration or save
     if (isCreatorMode) {
+        console.log(`Persisting lore changes for actor ${actor.name} in creator mode`);
         stage.updateConfiguration({ lorebook });
     } else {
         stage.getSave().lorebook = stage.getSave().lorebook || [];
@@ -906,7 +907,7 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage, isC
 		linkedLore.content = lore;
 		// Persist the lorebook changes back to configuration or save
 		if (isCreatorMode) {
-            console.log(`Persisting lore changes for actor ${actorId} in creator mode`);
+            console.log(`updateActorLore() for actor ${actor.name} in creator mode`);
 			stage.updateConfiguration({ lorebook: stage.getConfiguration().lorebook || [] });
 		} else {
 			stage.getSave().lorebook = stage.getSave().lorebook || [];
