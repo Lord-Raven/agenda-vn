@@ -587,6 +587,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
 export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage, isCreatorMode: boolean = false): void {
     console.log(`Upserting lore entry for actor ${actor.name} (ID: ${actor.id})`);
     let loreEntry = getLinkedActorLore(actor, stage, isCreatorMode);
+    let lorebook = stage.getConfiguration().lorebook || [];
     // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
     if (!loreEntry) {
         loreEntry = createLoreEntry({
@@ -601,7 +602,7 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
             probability: 100
         });
         if (isCreatorMode) {
-            stage.updateConfiguration({ lorebook: [...(stage.getConfiguration().lorebook || []), loreEntry] });
+            lorebook = [...lorebook, loreEntry];
         } else {
             stage.getSave().lorebook?.push(loreEntry);
         }
@@ -612,7 +613,7 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
     
     // Persist the lorebook changes back to configuration or save
     if (isCreatorMode) {
-        stage.updateConfiguration({ lorebook: stage.getConfiguration().lorebook || [] });
+        stage.updateConfiguration({ lorebook });
     } else {
         stage.getSave().lorebook = stage.getSave().lorebook || [];
         stage.saveGame();
@@ -844,12 +845,9 @@ export function getLinkedActorLore(actor: Actor, stage: Stage, isCreatorMode: bo
     const save = stage.getSave();
     const lorebook = isCreatorMode ? stage.getConfiguration().lorebook : save.lorebook;
     const actors = isCreatorMode ? stage.getConfiguration().actors : Object.values(save.actors);
-    console.log(`Fetching linked actor lore for actor ${actor.name}`);
     if (actor && actor.loreId) {
-        console.log(`Looking for linked lore for actor ${actor.name} with loreId ${actor.loreId}`);
         const loreEntry = lorebook?.find(lore => lore.id === actor.loreId);
         if (loreEntry) {
-            console.log(`Found linked lore for actor ${actor.name}: ${loreEntry.title}`);
             return loreEntry;
         }
         actor.loreId = ''; // Clear the loreId if it no longer exists
@@ -908,10 +906,10 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage, isC
 		linkedLore.content = lore;
 		// Persist the lorebook changes back to configuration or save
 		if (isCreatorMode) {
+            console.log(`Persisting lore changes for actor ${actorId} in creator mode`);
 			stage.updateConfiguration({ lorebook: stage.getConfiguration().lorebook || [] });
 		} else {
 			stage.getSave().lorebook = stage.getSave().lorebook || [];
-			stage.saveGame();
 		}
 		return;
 	}

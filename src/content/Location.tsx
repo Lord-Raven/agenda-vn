@@ -137,6 +137,7 @@ export function updateLocationDescription(locationId: string, description: strin
 
 export function upsertLocationLoreEntry(location: Location, oldName: string, stage: Stage, isCreatorMode: boolean = false): void {
 	let loreEntry = getLinkedLocationLore(location, stage, isCreatorMode);
+	let lorebook = stage.getConfiguration().lorebook || [];
 	if (!loreEntry) {
 		loreEntry = createLoreEntry({
 			type: 'location',
@@ -150,7 +151,7 @@ export function upsertLocationLoreEntry(location: Location, oldName: string, sta
 			probability: 100,
 		});
 		if (isCreatorMode) {
-			stage.updateConfiguration({ lorebook: [...(stage.getConfiguration().lorebook || []), loreEntry] });
+			lorebook = [...lorebook, loreEntry];
 		} else {
 			stage.getSave().lorebook?.push(loreEntry);
 		}
@@ -165,7 +166,7 @@ export function upsertLocationLoreEntry(location: Location, oldName: string, sta
 	
 	// Persist the lorebook changes back to configuration or save
 	if (isCreatorMode) {
-		stage.updateConfiguration({ lorebook: stage.getConfiguration().lorebook || [] });
+		stage.updateConfiguration({ lorebook });
 	} else {
 		stage.getSave().lorebook = stage.getSave().lorebook || [];
 		stage.saveGame();
