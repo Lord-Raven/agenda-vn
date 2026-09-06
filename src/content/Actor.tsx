@@ -849,6 +849,7 @@ export function getLinkedActorLore(actor: Actor, stage: Stage, isCreatorMode: bo
         console.log(`Looking for linked lore for actor ${actor.name} with loreId ${actor.loreId}`);
         const loreEntry = lorebook?.find(lore => lore.id === actor.loreId);
         if (loreEntry) {
+            console.log(`Found linked lore for actor ${actor.name}: ${loreEntry.title}`);
             return loreEntry;
         }
         actor.loreId = ''; // Clear the loreId if it no longer exists
