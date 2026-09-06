@@ -250,53 +250,59 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             autoSaveTimeoutRef.current = null;
         }
 
-        const oldName = location.name;
-        location.name = nextLocation.name;
-        location.category = nextLocation.category.trim();
-        if (location.name !== oldName) {
-            console.log(`Location name changed from "${oldName}" to "${location.name}". Updating linked lore entry.`);
-            upsertLocationLoreEntry(location, oldName, stage(), isCreatorMode);
+        const persistedLocation = new Location(location);
+        const oldName = persistedLocation.name;
+        persistedLocation.name = nextLocation.name;
+        persistedLocation.category = nextLocation.category.trim();
+        if (persistedLocation.name !== oldName) {
+            console.log(`Location name changed from "${oldName}" to "${persistedLocation.name}". Updating linked lore entry.`);
+            upsertLocationLoreEntry(persistedLocation, oldName, stage(), isCreatorMode);
         }
-        updateLocationDescription(location.id, nextLocation.description, stage(), isCreatorMode);
-        location.themeColor = nextLocation.themeColor;
-        location.imagePrompt = nextLocation.imagePrompt;
-        location.imageUrl = nextLocation.imageUrl;
-        location.alternativeImages = nextLocation.alternativeImages.map(createAlternativeImage);
-        location.availabilityConditions = splitAvailabilityCollections(nextLocation.availabilityCollections, nextLocation.availabilityStates);
-        location.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
-        location.statMap = location.statMap && typeof location.statMap === 'object' ? { ...location.statMap } : {};
+        updateLocationDescription(persistedLocation.id, nextLocation.description, stage(), isCreatorMode);
+        persistedLocation.description = nextLocation.description;
+        persistedLocation.themeColor = nextLocation.themeColor;
+        persistedLocation.imagePrompt = nextLocation.imagePrompt;
+        persistedLocation.imageUrl = nextLocation.imageUrl;
+        persistedLocation.alternativeImages = nextLocation.alternativeImages.map(createAlternativeImage);
+        persistedLocation.availabilityConditions = splitAvailabilityCollections(nextLocation.availabilityCollections, nextLocation.availabilityStates);
+        persistedLocation.focalPoint = { x: nextLocation.focalX, y: nextLocation.focalY };
+        persistedLocation.statMap = persistedLocation.statMap && typeof persistedLocation.statMap === 'object' ? { ...persistedLocation.statMap } : {};
 
         const activeStatIds = new Set<string>();
         locationStats.forEach((stat) => {
             activeStatIds.add(stat.id);
             if (stat.type === 'location') {
                 const candidateValue = nextStatMap[stat.id];
-                location.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
+                persistedLocation.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
                 return;
             }
             if (stat.type === 'checkbox') {
                 const candidateValue = nextStatMap[stat.id];
-                location.statMap[stat.id] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
+                persistedLocation.statMap[stat.id] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
                 return;
             }
             const candidateValue = Number(nextStatMap[stat.id]);
             const fallbackValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
             const resolvedValue = Number.isFinite(candidateValue) ? candidateValue : fallbackValue;
-            location.statMap[stat.id] = clampLocationStatValue(resolvedValue, stat);
+            persistedLocation.statMap[stat.id] = clampLocationStatValue(resolvedValue, stat);
         });
 
-        Object.keys(location.statMap).forEach((statId) => {
+        Object.keys(persistedLocation.statMap).forEach((statId) => {
             if (!activeStatIds.has(statId)) {
-                delete location.statMap[statId];
+            delete persistedLocation.statMap[statId];
             }
         });
 
         // Persist changes back to configuration or save
         if (isCreatorMode) {
-            stage().updateConfiguration({ locations: stage().getConfiguration().locations || [] });
+            stage().updateConfiguration({
+                locations: (stage().getConfiguration().locations || []).map((candidate) =>
+                    candidate.id === persistedLocation.id ? persistedLocation : candidate,
+                ),
+            });
         } else {
             stage().getSave().atlas = stage().getSave().atlas || {};
-            stage().getSave().atlas[location.id] = location;
+            stage().getSave().atlas[persistedLocation.id] = persistedLocation;
         }
 
         onUpdate?.();

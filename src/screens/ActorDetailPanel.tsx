@@ -531,28 +531,27 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
                 emotionPack: { ...(outfit.emotionPack || {}) },
             }));
 
-        const oldName = actor.name;
-        actor.name = nextEditedActor.name;
-        actor.displayName = nextEditedActor.displayName.trim() || nextEditedActor.name;
-        actor.role = nextEditedActor.role.trim();
-        actor.birthDate = nextEditedActor.birthDate.trim();
-        actor.category = nextEditedActor.category.trim();
-        actor.description = nextEditedActor.description;
-        actor.background = nextEditedActor.background;
-        if (isProfileBackedByLore) {
-            updateActorLore(actor.id, nextEditedActor.lore, stage(), isCreatorMode);
-        } else {
-            actor.profile = nextEditedActor.profile;
+        const persistedActor = new Actor(actor);
+        const oldName = persistedActor.name;
+        persistedActor.name = nextEditedActor.name;
+        persistedActor.displayName = nextEditedActor.displayName.trim() || nextEditedActor.name;
+        persistedActor.role = nextEditedActor.role.trim();
+        persistedActor.birthDate = nextEditedActor.birthDate.trim();
+        persistedActor.category = nextEditedActor.category.trim();
+        persistedActor.description = nextEditedActor.description;
+        persistedActor.background = nextEditedActor.background;
+        if (!isProfileBackedByLore) {
+            persistedActor.profile = nextEditedActor.profile;
         }
-        actor.voiceId = nextEditedActor.voiceId;
-        actor.themeColor = nextEditedActor.themeColor;
-        actor.themeFontFamily = nextEditedActor.themeFontFamily;
-        actor.schedule = Object.fromEntries(Object.entries(nextEditedActor.schedule).map(([destination, collections]) => [destination, collections.map(collection => [...collection])]));
-        actor.outfits = persistedOutfits;
-        actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
+        persistedActor.voiceId = nextEditedActor.voiceId;
+        persistedActor.themeColor = nextEditedActor.themeColor;
+        persistedActor.themeFontFamily = nextEditedActor.themeFontFamily;
+        persistedActor.schedule = Object.fromEntries(Object.entries(nextEditedActor.schedule).map(([destination, collections]) => [destination, collections.map(collection => [...collection])]));
+        persistedActor.outfits = persistedOutfits;
+        persistedActor.statMap = persistedActor.statMap && typeof persistedActor.statMap === 'object' ? { ...persistedActor.statMap } : {};
 
-        if (actor.name !== oldName) {
-            upsertActorLoreEntry(actor, oldName, stage(), isCreatorMode);
+        if (persistedActor.name !== oldName) {
+            upsertActorLoreEntry(persistedActor, oldName, stage(), isCreatorMode);
         }
 
         const activeStatIds = new Set<string>();
@@ -560,55 +559,63 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             activeStatIds.add(stat.id);
             if (stat.type === 'location') {
                 const candidateValue = nextEditedStatMap[stat.id];
-                actor.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
+                persistedActor.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
                 return;
             }
             if (stat.type === 'locationList') {
                 const candidateValue = nextEditedStatMap[stat.id];
-                actor.statMap[stat.id] = Array.isArray(candidateValue) ? normalizeLocationListValue(candidateValue) : normalizeLocationListValue(stat.default);
+                persistedActor.statMap[stat.id] = Array.isArray(candidateValue) ? normalizeLocationListValue(candidateValue) : normalizeLocationListValue(stat.default);
                 return;
             }
             if (stat.type === 'checkbox') {
                 const candidateValue = nextEditedStatMap[stat.id];
-                actor.statMap[stat.id] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
+                persistedActor.statMap[stat.id] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
                 return;
             }
             const candidateValue = Number(nextEditedStatMap[stat.id]);
             const fallbackValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
             const resolvedValue = Number.isFinite(candidateValue) ? candidateValue : fallbackValue;
-            actor.statMap[stat.id] = clampActorStatValue(resolvedValue, stat);
+            persistedActor.statMap[stat.id] = clampActorStatValue(resolvedValue, stat);
         });
 
-        Object.keys(actor.statMap).forEach((statId) => {
+        Object.keys(persistedActor.statMap).forEach((statId) => {
             if (!activeStatIds.has(statId)) {
-                delete actor.statMap[statId];
+                delete persistedActor.statMap[statId];
             }
         });
 
-        actor.statInitialMap = {};
+        persistedActor.statInitialMap = {};
         actorStats.forEach((stat) => {
-            actor.statInitialMap[stat.id] = cloneActorStatInitial(nextEditedStatInitialMap[stat.id], stat);
+            persistedActor.statInitialMap[stat.id] = cloneActorStatInitial(nextEditedStatInitialMap[stat.id], stat);
         });
 
         const activePerActorStatNames = new Set(perActorStats.map((stat) => stat.id));
-        actor.perActorStatMap = clonePerActorStatValueMap(nextEditedPerActorStatMap);
-        actor.perActorValueRules = clonePerActorValueRuleMap(nextEditedPerActorValueRules);
-        Object.keys(actor.perActorStatMap).forEach((statName) => {
+        persistedActor.perActorStatMap = clonePerActorStatValueMap(nextEditedPerActorStatMap);
+        persistedActor.perActorValueRules = clonePerActorValueRuleMap(nextEditedPerActorValueRules);
+        Object.keys(persistedActor.perActorStatMap).forEach((statName) => {
             if (!activePerActorStatNames.has(statName)) {
-                delete actor.perActorStatMap[statName];
+                delete persistedActor.perActorStatMap[statName];
             }
         });
-        Object.keys(actor.perActorValueRules).forEach((statName) => {
+        Object.keys(persistedActor.perActorValueRules).forEach((statName) => {
             if (!activePerActorStatNames.has(statName)) {
-                delete actor.perActorValueRules[statName];
+                delete persistedActor.perActorValueRules[statName];
             }
         });
 
+        if (isProfileBackedByLore) {
+            updateActorLore(persistedActor.id, nextEditedActor.lore, stage(), isCreatorMode);
+        }
+
         // Persist changes back to configuration or save
         if (isCreatorMode) {
-            stage().updateConfiguration({ actors: stage().getConfiguration().actors || [] });
+            stage().updateConfiguration({
+                actors: (stage().getConfiguration().actors || []).map((candidate) =>
+                    candidate.id === persistedActor.id ? persistedActor : candidate,
+                ),
+            });
         } else {
-            stage().getSave().actors[actor.id] = actor;
+            stage().getSave().actors[persistedActor.id] = persistedActor;
         }
 
         onUpdate?.();

@@ -5,8 +5,8 @@ import { Chip } from '@mui/material';
 import { Stage } from '../Stage';
 import { createLoreEntry, Lore } from '../content/Lore';
 import { Button, ConfirmDialog, TextArea, TextInput } from '../components/UiComponents';
-import { findBestNameMatch, getLinkedActorLore, updateActorLore } from '../content/Actor';
-import { getLinkedLocationLore, updateLocationDescription } from '../content/Location';
+import { findBestNameMatch, getLinkedActorLore } from '../content/Actor';
+import { getLinkedLocationLore } from '../content/Location';
 import {
     CategorizedEntrySection,
     CategorizedEntrySidebar,
@@ -378,30 +378,9 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
     };
 
     const updateSelectedLoreContent = (content: string) => {
-        if (!selectedLore) {
+        if (!selectedLoreId || !selectedLore) {
             return;
         }
-
-        if (selectedLore.type === 'character') {
-            const linkedActor = getLinkedActorByLoreId(selectedLore.id);
-
-            if (linkedActor) {
-                updateActorLore(linkedActor.id, content, stage(), isCreatorMode);
-                setLoreEntries(sortLoreEntries([...(isCreatorMode ? stage().getConfiguration().lorebook || [] : stage().getSave().lorebook || [])]));
-                return;
-            }
-        }
-
-        if (selectedLore.type === 'location') {
-            const linkedLocation = getLinkedLocationByLoreId(selectedLore.id);
-
-            if (linkedLocation) {
-                updateLocationDescription(linkedLocation.id, content, stage(), isCreatorMode);
-                setLoreEntries(sortLoreEntries([...(isCreatorMode ? stage().getConfiguration().lorebook || [] : stage().getSave().lorebook || [])]));
-                return;
-            }
-        }
-
         updateSelectedLore({ content });
     };
 

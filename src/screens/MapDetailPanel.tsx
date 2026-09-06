@@ -103,20 +103,27 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
     };
 
     const persistDraft = (nextDraft: MapDraft) => {
-        map.name = nextDraft.name;
-        map.description = nextDraft.description;
-        map.category = nextDraft.category.trim();
-        map.imagePrompt = nextDraft.imagePrompt;
-        map.imageUrl = nextDraft.imageUrl;
-        map.alternativeImages = nextDraft.alternativeImages.map(createAlternativeImage);
+        const persistedMap = new GameMap(map);
+        persistedMap.name = nextDraft.name;
+        persistedMap.description = nextDraft.description;
+        persistedMap.category = nextDraft.category.trim();
+        persistedMap.imagePrompt = nextDraft.imagePrompt;
+        persistedMap.imageUrl = nextDraft.imageUrl;
+        persistedMap.alternativeImages = nextDraft.alternativeImages.map(createAlternativeImage);
 
         const nextPriority = Number.isFinite(nextDraft.priority) ? nextDraft.priority : 0;
-        const conflict = sourceMaps.find(candidate => candidate.id !== map.id && candidate.active !== false && candidate.priority === nextPriority);
+        const conflict = sourceMaps.find(candidate => candidate.id !== persistedMap.id && candidate.active !== false && candidate.priority === nextPriority);
         if (conflict) {
-            conflict.priority = map.priority;
+            conflict.priority = persistedMap.priority;
         }
-        map.priority = nextPriority;
-        syncConfiguration();
+        persistedMap.priority = nextPriority;
+        if (isCreatorMode) {
+            stageInstance.updateConfiguration({
+                maps: sourceMaps.map((candidate) => candidate.id === persistedMap.id ? persistedMap : candidate),
+            });
+        } else {
+            stageInstance.saveGame();
+        }
         onChange();
     };
 
