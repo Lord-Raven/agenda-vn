@@ -279,11 +279,11 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
                                                 transition={{ duration: 0.2, ease: 'easeOut' }}
                                                 style={{
                                                     position: 'absolute',
-                                                    width: '150%',
+                                                    width: '141.42%',
                                                     height: '1.6px',
                                                     background: 'rgba(185, 143, 110, 0.76)',
-                                                    top: '50%',
-                                                    left: '-25%',
+                                                    top: '100%',
+                                                    left: 0,
                                                     borderRadius: '1px',
                                                     transform: 'translateY(-50%) rotate(-45deg)',
                                                     transformOrigin: 'left center',

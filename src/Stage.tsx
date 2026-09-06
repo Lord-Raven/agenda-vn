@@ -464,7 +464,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         });
     }
 
-    generateFreshSave(playerData: {name: string, personality: string, themeColor?: string}): SaveType {
+    generateFreshSave(
+        playerData: {name: string, personality: string, themeColor?: string},
+        selectedGlobalStatValues: {[key: string]: StatValue} = {},
+    ): SaveType {
         const configuration = this.getConfiguration();
         const startingDate = configuration.startingDate || new Date().toISOString().slice(0, 10);
 
@@ -538,7 +541,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
         configuredGlobalStats.forEach((stat) => {
             const ruleValue = resolveStatValueRule(stat.defaultValueRules, stat, globalStatContext);
-            globalStatValues[stat.id] = ruleValue !== undefined
+            const selectedValue = selectedGlobalStatValues[stat.id];
+            globalStatValues[stat.id] = selectedValue !== undefined
+                ? normalizeStatValue(selectedValue, stat)
+                : ruleValue !== undefined
                 ? ruleValue
                 : normalizeStatValue(configuration.globalStatValues?.[stat.id], stat);
         });
@@ -572,7 +578,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const saveSlotIndex = emptySlotIndex !== -1 ? emptySlotIndex : (this.saveData.lastSaveSlot + 1) % this.SAVE_SLOT_COUNT;
 
         // Create new save data structure
-        const newSave: SaveType = this.generateFreshSave(playerData);
+        const newSave: SaveType = this.generateFreshSave(playerData, playerData.data.globalStatValues);
         Object.assign(newSave, playerData.data);
 
         const persistedConfiguration = this.getConfiguration();

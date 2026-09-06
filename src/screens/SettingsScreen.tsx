@@ -153,6 +153,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         console.log('Saving settings:', settings);
         const playerThemeColor = resolvePlayerThemeColor(settings.playerColor);
         const resolvedGlobalStatValues = buildGlobalStatValues(globalStats, globalStatValues);
+        console.log("Resolved Global Stat Values:");
+        console.log(resolvedGlobalStatValues);
         
         if (isNewGame) {
             console.log('Starting new game with settings');
@@ -167,12 +169,10 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                     enableTextToSpeech: settings.enableTextToSpeech,
                     betaMode: settings.betaMode,
                     language: settings.language,
+                    globalStatValues: resolvedGlobalStatValues,
                 },
                 personality: settings.playerDescription,
             });
-
-            const newSave = stageInstance.getSave();
-            newSave.globalStatValues = resolvedGlobalStatValues;
         } else {
             console.log('Updating settings');
             const saveData = stageInstance.getSave();
