@@ -585,7 +585,6 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
 }
 
 export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage, isCreatorMode: boolean = false): void {
-    console.log(`Upserting lore entry for actor ${actor.name} (ID: ${actor.id})`);
     let loreEntry = getLinkedActorLore(actor, stage, isCreatorMode);
     // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
     if (!loreEntry) {

@@ -83,10 +83,10 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
                     setIsElevated(false);
                 }
             }}
-            style={{ ...style, zIndex }}
+            style={{ ...style, boxSizing: 'border-box', zIndex }}
         >
             {children}
-            <span ref={measureRef} aria-hidden="true" style={{ position: 'absolute', width: 'max-content', visibility: 'hidden', pointerEvents: 'none', whiteSpace: 'nowrap', padding: '0 12px 0 6px', fontSize: '0.82rem', fontWeight: 700 }}>
+            <span ref={measureRef} aria-hidden="true" style={{ position: 'absolute', display: 'block', boxSizing: 'border-box', width: 'max-content', visibility: 'hidden', pointerEvents: 'none', whiteSpace: 'nowrap', padding: '0 12px 0 6px', fontSize: '0.82rem', fontWeight: 700 }}>
                 {label}
                 {secondaryLabel && <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 400 }}>{secondaryLabel}</span>}
             </span>
