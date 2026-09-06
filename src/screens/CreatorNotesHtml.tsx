@@ -156,6 +156,7 @@ export const buildCreatorNotesHtml = ({
             bottom: calc(100% + 8px);
             transform: translateX(-50%);
             width: min(900px, var(--cast-tooltip-width, 80vw));
+            box-sizing: border-box;
             padding: 10px 12px;
             line-height: 1.4;
             background: ${uiSettings.surfaceBaseColor};
@@ -274,11 +275,15 @@ export const CreatorNotesHtml: FC<CreatorNotesHtmlProps> = (props) => {
                 const itemRect = item.getBoundingClientRect();
                 const tooltipWidth = Math.min(900, Math.max(0, castGridRect.width - 24));
                 const itemCenter = itemRect.left + itemRect.width / 2;
-                const minShift = castGridRect.left + 12 + tooltipWidth / 2 - itemCenter;
-                const maxShift = castGridRect.right - 12 - tooltipWidth / 2 - itemCenter;
-                const clampShift = Math.max(minShift, Math.min(maxShift, 0));
 
                 tooltip.style.setProperty('--cast-tooltip-width', `${tooltipWidth}px`);
+
+                const viewportWidth = window.visualViewport?.width || window.innerWidth;
+                const tooltipRect = tooltip.getBoundingClientRect();
+                const viewportPadding = 12;
+                const minShift = viewportPadding - tooltipRect.left;
+                const maxShift = viewportWidth - viewportPadding - tooltipRect.right;
+                const clampShift = Math.max(minShift, Math.min(maxShift, 0));
                 tooltip.style.setProperty('--cast-tooltip-shift', `${clampShift}px`);
             });
         };
