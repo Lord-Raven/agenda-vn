@@ -264,6 +264,7 @@ export const CreatorNotesHtml: FC<CreatorNotesHtmlProps> = (props) => {
             }
 
             const castGridRect = castGrid.getBoundingClientRect();
+            const viewportWidth = window.visualViewport?.width || window.innerWidth;
             const items = notesContainer.querySelectorAll('[data-cast-item]');
 
             items.forEach((item) => {
@@ -273,12 +274,12 @@ export const CreatorNotesHtml: FC<CreatorNotesHtmlProps> = (props) => {
                 }
 
                 const itemRect = item.getBoundingClientRect();
-                const tooltipWidth = Math.min(900, Math.max(0, castGridRect.width - 24));
+                const tooltipWidth = Math.min(900, Math.max(0, castGridRect.width - 24), Math.max(0, viewportWidth - 24));
                 const itemCenter = itemRect.left + itemRect.width / 2;
 
                 tooltip.style.setProperty('--cast-tooltip-width', `${tooltipWidth}px`);
+                tooltip.style.setProperty('--cast-tooltip-shift', '0px');
 
-                const viewportWidth = window.visualViewport?.width || window.innerWidth;
                 const tooltipRect = tooltip.getBoundingClientRect();
                 const viewportPadding = 12;
                 const minShift = viewportPadding - tooltipRect.left;
