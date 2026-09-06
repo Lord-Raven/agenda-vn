@@ -62,9 +62,10 @@ interface NumberStepperInputProps {
     value: number;
     onChange: (value: number) => void;
     ariaLabel: string;
+    disabled?: boolean;
 }
 
-const NumberStepperInput: FC<NumberStepperInputProps> = ({ value, onChange, ariaLabel }) => {
+const NumberStepperInput: FC<NumberStepperInputProps> = ({ value, onChange, ariaLabel, disabled }) => {
     return (
         <div className="number-stepper-shell">
             <TextInput
@@ -72,6 +73,7 @@ const NumberStepperInput: FC<NumberStepperInputProps> = ({ value, onChange, aria
                 step="any"
                 value={String(value)}
                 onChange={(event) => onChange(asNumber(event.target.value, value))}
+                disabled={disabled}
                 className="number-stepper-input"
                 fullWidth
                 aria-label={ariaLabel}
@@ -81,6 +83,7 @@ const NumberStepperInput: FC<NumberStepperInputProps> = ({ value, onChange, aria
                     type="button"
                     className="number-stepper-button"
                     onClick={() => onChange(value + 1)}
+                    disabled={disabled}
                     tabIndex={-1}
                 >
                     <KeyboardArrowUpRounded fontSize="small" />
@@ -89,6 +92,7 @@ const NumberStepperInput: FC<NumberStepperInputProps> = ({ value, onChange, aria
                     type="button"
                     className="number-stepper-button"
                     onClick={() => onChange(value - 1)}
+                    disabled={disabled}
                     tabIndex={-1}
                 >
                     <KeyboardArrowDownRounded fontSize="small" />
@@ -654,6 +658,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                 <NumberStepperInput
                                                     value={selectedLore.scanDepth}
                                                     onChange={(value) => updateSelectedLore({ scanDepth: value })}
+                                                    disabled={selectedLore.constant}
                                                     ariaLabel="Lore scan depth"
                                                 />
                                             </div>

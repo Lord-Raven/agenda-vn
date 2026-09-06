@@ -286,6 +286,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                                     transform: 'translateX(-50%)',
                                     zIndex: 5
                                 }}
+                                includeRole={true}
                             />;
                         }}
                         typingSpeed={10}

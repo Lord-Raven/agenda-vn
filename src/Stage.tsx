@@ -141,18 +141,23 @@ export type GameConfiguration = {
 
 }
 
-const cloneActor = (actor: Actor): Actor => new Actor({
+const cloneActor = (actor: Actor, stripImagePrompts: boolean = false): Actor => new Actor({
     ...actor,
     outfits: (actor.outfits || []).map(outfit => ({
         ...outfit,
-        prompts: { ...(outfit.prompts || {}) },
+        prompts: stripImagePrompts ? {} : { ...(outfit.prompts || {}) },
         emotionPack: { ...(outfit.emotionPack || {}) },
     })),
     statMap: actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {},
 });
 
-const cloneLocation = (location: Location): Location => new Location({
+const cloneLocation = (location: Location, stripImagePrompts: boolean = false): Location => new Location({
     ...location,
+    alternativeImages: (location.alternativeImages || []).map(alternative => ({
+        ...alternative,
+        imagePrompt: stripImagePrompts ? '' : alternative.imagePrompt,
+        conditionCollections: (alternative.conditionCollections || []).map(collection => [...collection]),
+    })),
     focalPoint: location.focalPoint ? { ...location.focalPoint } : undefined,
     statMap: location.statMap && typeof location.statMap === 'object' ? { ...location.statMap } : {},
 });
@@ -231,8 +236,8 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     locationStats: (input.locationStats || []).map(cloneStat),
     globalStats: (input.globalStats || []).map(cloneStat),
     globalStatValues: { ...(input.globalStatValues || {}) },
-    actors: (input.actors || []).map(cloneActor),
-    locations: (input.locations || []).map(cloneLocation),
+    actors: (input.actors || []).map(actor => cloneActor(actor)),
+    locations: (input.locations || []).map(location => cloneLocation(location)),
     maps: (input.maps || []).map(cloneMap),
     lorebook: (input.lorebook || []).map(cloneLore),
     calendarEvents: (input.calendarEvents || []).map(cloneCalendarEvent),
@@ -500,7 +505,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         (configuration.actors || [])
             .filter(actor => actor?.active !== false)
             .forEach((configuredActor) => {
-                const seededActor = cloneActor(configuredActor);
+                const seededActor = cloneActor(configuredActor, true);
                 if (seededActor.id !== this.primaryUser.anonymizedId) {
                     actors[seededActor.id] = seededActor;
                 }
@@ -510,7 +515,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         (configuration.locations || [])
             .filter(location => location?.active !== false)
             .forEach((configuredLocation) => {
-                const seededLocation = cloneLocation(configuredLocation);
+                const seededLocation = cloneLocation(configuredLocation, true);
                 atlas[seededLocation.id] = seededLocation;
             });
 

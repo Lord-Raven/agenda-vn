@@ -175,12 +175,14 @@ export const Title: FC<TitleProps> = ({
 
 interface NamePlateProps {
 	actor?: Actor;
+	includeRole?: boolean;
 	style?: React.CSSProperties;
 	className?: string;
 }
 
 export const NamePlate: FC<NamePlateProps> = ({
 	actor,
+	includeRole,
 	style,
 	className = ''
 }) => {
@@ -189,6 +191,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 	}
 
 	const themeColor = actor.themeColor || '#8ab0cc';
+	const nameColor = lighten(themeColor, 0.5)
 	const { clearTooltip } = useTooltip();
 
 	return (
@@ -251,19 +254,19 @@ export const NamePlate: FC<NamePlateProps> = ({
 						fontFamily: actor.themeFontFamily || 'inherit',
 						fontSize: 'inherit',
 						lineHeight: 1.2,
+						color: nameColor,
 					}}
 				>
 					{actor.displayName || actor.name}
 				</span>
-				{actor.role && (
+				{includeRole && actor.role && (
 					<span
 						style={{
 							fontSize: '0.72em',
 							fontWeight: 700,
 							opacity: 0.88,
-							lineHeight: 1.2,
+							lineHeight: 0.8,
 							letterSpacing: '0.04em',
-							textTransform: 'uppercase',
 						}}
 					>
 						{actor.role}
