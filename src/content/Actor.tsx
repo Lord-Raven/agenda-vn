@@ -587,7 +587,6 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
 export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage, isCreatorMode: boolean = false): void {
     console.log(`Upserting lore entry for actor ${actor.name} (ID: ${actor.id})`);
     let loreEntry = getLinkedActorLore(actor, stage, isCreatorMode);
-    let lorebook = stage.getConfiguration().lorebook || [];
     // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
     if (!loreEntry) {
         loreEntry = createLoreEntry({
@@ -602,7 +601,7 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
             probability: 100
         });
         if (isCreatorMode) {
-            lorebook = [...lorebook, loreEntry];
+            stage.getConfiguration().lorebook.push(loreEntry);
         } else {
             stage.getSave().lorebook?.push(loreEntry);
         }
@@ -610,12 +609,8 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
     loreEntry.title = actor.name;
     loreEntry.content = actor.profile;
     loreEntry.triggers = [...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)), ...actor.name.split(' ').filter(word => word.length > 2 && word.charAt(word.length - 1) !== '.')];
-    
-    // Persist the lorebook changes back to configuration or save
-    if (isCreatorMode) {
-        console.log(`Persisting lore changes for actor ${actor.name} in creator mode`);
-        stage.updateConfiguration({ lorebook });
-    } else {
+
+    if (!isCreatorMode) {
         stage.getSave().lorebook = stage.getSave().lorebook || [];
         stage.saveGame();
     }
@@ -905,9 +900,6 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage, isC
     const linkedLore = getLinkedActorLore(actor, stage, isCreatorMode);
 	if (linkedLore) {
 		linkedLore.content = lore;
-        console.log(`Updating lore to: ${lore}`);
-        console.log(stage.getConfiguration().lorebook);
-		return;
 	}
 }
 

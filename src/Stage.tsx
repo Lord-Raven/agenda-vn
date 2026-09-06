@@ -353,31 +353,33 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return;
         }
 
-        this.saveData.configuration = {
-            actors: (this.saveData.configuration.actors || defaultConfiguration.actors).map(cloneActor),
-            locations: (this.saveData.configuration.locations || defaultConfiguration.locations).map(cloneLocation),
-            maps: (this.saveData.configuration.maps || defaultConfiguration.maps).map(cloneMap),
-            universalSchedule: cloneActorSchedule(this.saveData.configuration.universalSchedule),
-            lorebook: (this.saveData.configuration.lorebook || defaultConfiguration.lorebook).map(cloneLore),
-            calendarEvents: (this.saveData.configuration.calendarEvents || defaultConfiguration.calendarEvents).map(cloneCalendarEvent),
-            actorStats: (this.saveData.configuration.actorStats || defaultConfiguration.actorStats).map(cloneStat),
-            locationStats: (this.saveData.configuration.locationStats || defaultConfiguration.locationStats).map(cloneStat),
-            globalStats: (this.saveData.configuration.globalStats || defaultConfiguration.globalStats).map(cloneStat),
-            globalStatValues: { ...(this.saveData.configuration.globalStatValues || defaultConfiguration.globalStatValues) },
-            statUpdateRules: cloneStatUpdateRules(this.saveData.configuration.statUpdateRules),
-            uiSettings: cloneUiSettings(this.saveData.configuration.uiSettings || defaultConfiguration.uiSettings),
-            startingDate: this.saveData.configuration.startingDate || defaultConfiguration.startingDate,
-            title: this.saveData.configuration.title || defaultConfiguration.title,
-            titleImageUrl: this.saveData.configuration.titleImageUrl || defaultConfiguration.titleImageUrl,
-            titleImagePrompt: this.saveData.configuration.titleImagePrompt || defaultConfiguration.titleImagePrompt,
-            backgroundImageUrl: this.saveData.configuration.backgroundImageUrl || defaultConfiguration.backgroundImageUrl,
-            backgroundImagePrompt: this.saveData.configuration.backgroundImagePrompt || defaultConfiguration.backgroundImagePrompt,
-            artStyle: this.saveData.configuration.artStyle || defaultConfiguration.artStyle,
-            creatorNotes: this.saveData.configuration.creatorNotes || defaultConfiguration.creatorNotes,
-            versionNotes: this.saveData.configuration.versionNotes || defaultConfiguration.versionNotes,
-            castActorIds: [...(this.saveData.configuration.castActorIds || defaultConfiguration.castActorIds)],
-            slideshowLocationIds: [...(this.saveData.configuration.slideshowLocationIds || defaultConfiguration.slideshowLocationIds)],
-        };
+        // Backfill any missing fields and coerce array items into proper class instances in place, rather than
+        // replacing the whole configuration (and its arrays) with new clones on every call. getConfiguration()
+        // callers rely on the returned references being stable so in-place edits actually stick.
+        const configuration = this.saveData.configuration;
+        configuration.actors = (configuration.actors || defaultConfiguration.actors).map(actor => actor instanceof Actor ? actor : cloneActor(actor));
+        configuration.locations = (configuration.locations || defaultConfiguration.locations).map(location => location instanceof Location ? location : cloneLocation(location));
+        configuration.maps = (configuration.maps || defaultConfiguration.maps).map(map => map instanceof GameMap ? map : cloneMap(map));
+        configuration.universalSchedule = configuration.universalSchedule || defaultConfiguration.universalSchedule;
+        configuration.lorebook = configuration.lorebook || defaultConfiguration.lorebook;
+        configuration.calendarEvents = configuration.calendarEvents || defaultConfiguration.calendarEvents;
+        configuration.actorStats = configuration.actorStats || defaultConfiguration.actorStats;
+        configuration.locationStats = configuration.locationStats || defaultConfiguration.locationStats;
+        configuration.globalStats = configuration.globalStats || defaultConfiguration.globalStats;
+        configuration.globalStatValues = configuration.globalStatValues || defaultConfiguration.globalStatValues;
+        configuration.statUpdateRules = configuration.statUpdateRules || defaultConfiguration.statUpdateRules;
+        configuration.uiSettings = configuration.uiSettings || defaultConfiguration.uiSettings;
+        configuration.startingDate = configuration.startingDate || defaultConfiguration.startingDate;
+        configuration.title = configuration.title || defaultConfiguration.title;
+        configuration.titleImageUrl = configuration.titleImageUrl || defaultConfiguration.titleImageUrl;
+        configuration.titleImagePrompt = configuration.titleImagePrompt || defaultConfiguration.titleImagePrompt;
+        configuration.backgroundImageUrl = configuration.backgroundImageUrl || defaultConfiguration.backgroundImageUrl;
+        configuration.backgroundImagePrompt = configuration.backgroundImagePrompt || defaultConfiguration.backgroundImagePrompt;
+        configuration.artStyle = configuration.artStyle || defaultConfiguration.artStyle;
+        configuration.creatorNotes = configuration.creatorNotes || defaultConfiguration.creatorNotes;
+        configuration.versionNotes = configuration.versionNotes || defaultConfiguration.versionNotes;
+        configuration.castActorIds = configuration.castActorIds || defaultConfiguration.castActorIds;
+        configuration.slideshowLocationIds = configuration.slideshowLocationIds || defaultConfiguration.slideshowLocationIds;
 
         this.syncUniversalSchedule();
     }
@@ -409,24 +411,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.saveData.configuration = {
             ...current,
             ...updates,
-            title: updates.title ?? current.title ?? 'Agenda VN',
-            titleImageUrl: updates.titleImageUrl ?? current.titleImageUrl ?? '',
-            titleImagePrompt: updates.titleImagePrompt ?? current.titleImagePrompt ?? '',
-            backgroundImageUrl: updates.backgroundImageUrl ?? current.backgroundImageUrl ?? '',
-            backgroundImagePrompt: updates.backgroundImagePrompt ?? current.backgroundImagePrompt ?? '',
-            actors: (updates.actors ?? current.actors ?? []).map(cloneActor),
-            locations: (updates.locations ?? current.locations ?? []).map(cloneLocation),
-            maps: (updates.maps ?? current.maps ?? []).map(cloneMap),
-            universalSchedule: cloneActorSchedule(updates.universalSchedule ?? current.universalSchedule),
-            lorebook: (updates.lorebook ?? current.lorebook ?? []).map(cloneLore),
-            calendarEvents: (updates.calendarEvents ?? current.calendarEvents ?? []).map(cloneCalendarEvent),
-            actorStats: (updates.actorStats ?? current.actorStats ?? []).map(cloneStat),
-            locationStats: (updates.locationStats ?? current.locationStats ?? []).map(cloneStat),
-            globalStats: (updates.globalStats ?? current.globalStats ?? []).map(cloneStat),
-            globalStatValues: { ...(updates.globalStatValues ?? current.globalStatValues ?? {}) },
-            statUpdateRules: cloneStatUpdateRules(updates.statUpdateRules ?? current.statUpdateRules),
-            uiSettings: cloneUiSettings(updates.uiSettings ?? current.uiSettings ?? DEFAULT_UI_SETTINGS),
-            startingDate: updates.startingDate ?? current.startingDate,
+            actors: (updates.actors ?? current.actors).map(actor => actor instanceof Actor ? actor : cloneActor(actor)),
+            locations: (updates.locations ?? current.locations).map(location => location instanceof Location ? location : cloneLocation(location)),
+            maps: (updates.maps ?? current.maps).map(map => map instanceof GameMap ? map : cloneMap(map)),
         };
 
         const currentSave = this.saveData.saves[this.saveData.lastSaveSlot];
