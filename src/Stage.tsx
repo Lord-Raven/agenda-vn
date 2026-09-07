@@ -2043,16 +2043,22 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .addBlock('Available Characters', candidateActors.map(actor =>
                 `${actor.name}: ${actor.profile || actor.description || 'No profile available.'}`,
             ))
-            .addBlock('Response Format', buildStructuredResponseFormat(LORE_UPDATE_CANDIDATE_FIELDS, { includeEndTag: true }))
+            .addBlock('Response Format',
+                `<REASONING>Brief explanation of which characters, if any, have profile details that should be revised to reflect the player's identity, role, or choices.</REASONING>\n` +
+                `<Characters>\n` +
+                `<Character>Character Name: specific guidance for the profile revision.</Character>\n` +
+                `<!-- Repeat the Character element once for each character whose profile should be updated. Leave Characters empty if none apply. -->\n` +
+                `</Characters>\n` +
+                `#END#`,
+            )
             .addBlock('Example Response',
-                buildStructuredExampleResponse(
-                    LORE_UPDATE_CANDIDATE_FIELDS,
-                    {
-                        reasoning: 'Mirel\'s profile treats the player as a stranger, but the player is established as her employer, so her profile should be updated to reflect that relationship.',
-                        characterGuidance: 'Mirel: Update her profile to reflect that the player is now her employer and that she has begun relying on them for access to old transit hubs.',
-                    },
-                    { includeEndTag: true },
-                ))
+                `System:\n` +
+                `<REASONING>Mirel's profile treats the player as a stranger, but the player is established as her employer, so her profile should be updated to reflect that relationship.</REASONING>\n` +
+                `<Characters>\n` +
+                `<Character>Mirel: Update her profile to reflect that the player is now her employer and that she has begun relying on them for access to old transit hubs.</Character>\n` +
+                `</Characters>\n` +
+                `#END#`,
+            )
             .format();
     }
 
@@ -2078,8 +2084,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         );
 
         const parsed = parseStructuredResponse(response, LORE_UPDATE_CANDIDATE_FIELDS);
-        const candidateGuidance = (parsed['characterGuidance'] || '')
-            .split('\n')
+        const characterGuidanceText = parsed['characterGuidance'] || '';
+        const taggedCharacterGuidance = Array.from(characterGuidanceText.matchAll(
+            /<\s*Character\s*>([\s\S]*?)<\s*\/\s*Character\s*>/gi,
+        )).map(match => match[1].trim());
+        const candidateGuidance = (taggedCharacterGuidance.length > 0 ? taggedCharacterGuidance : characterGuidanceText.split('\n'))
             .map(line => line.trim())
             .filter(Boolean);
 
