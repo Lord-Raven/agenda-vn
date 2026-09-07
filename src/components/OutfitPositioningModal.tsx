@@ -64,6 +64,7 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
     }, [open, outfit]);
 
     const containerRef = useRef<HTMLDivElement>(null);
+    const adjustedImageRef = useRef<HTMLImageElement>(null);
 
     const getReferenceActor = useCallback(() => {
         return otherActors.find(a => a.id === referenceActorId);
@@ -73,10 +74,12 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
         const outfits = targetActor.outfits || [];
         if (outfits.length > 0) {
             const outfit = outfits.find(o => o.id === targetActor.outfitId) || outfits[0];
-            return outfit.emotionPack?.['base'] || '';
+            return outfit.emotionPack?.['neutral'] || outfit.emotionPack?.['base'] || '';
         }
         return '';
     }, []);
+
+    const outfitImageUrl = outfit.emotionPack?.['neutral'] || outfit.emotionPack?.['base'] || '';
 
     const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!containerRef.current) return;
@@ -98,8 +101,8 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
         const deltaY = e.clientY - imageState.dragStartY;
 
         // Convert pixel movement to percentage of scaled image
-        const scaledWidth = DEFAULT_IMAGE_WIDTH * imageState.scaleX;
-        const scaledHeight = DEFAULT_IMAGE_HEIGHT * imageState.scaleY;
+        const scaledWidth = (adjustedImageRef.current?.offsetWidth || DEFAULT_IMAGE_WIDTH) * imageState.scaleX;
+        const scaledHeight = (adjustedImageRef.current?.offsetHeight || DEFAULT_IMAGE_HEIGHT) * imageState.scaleY;
 
         const percentDeltaX = (deltaX / scaledWidth) * 100;
         const percentDeltaY = (deltaY / scaledHeight) * 100;
@@ -223,14 +226,18 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
                                 overflow: 'hidden',
                                 position: 'relative',
                             }}>
-                                {outfit.emotionPack?.['base'] ? (
+                                {outfitImageUrl ? (
                                     <img
-                                        src={outfit.emotionPack['base']}
+                                        src={outfitImageUrl}
                                         alt="Original"
                                         style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '100%',
-                                            objectFit: 'contain',
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
+                                            height: '100%',
+                                            width: 'auto',
+                                            maxWidth: 'none',
                                         }}
                                     />
                                 ) : (
@@ -272,26 +279,29 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
                                     transition: imageState.isDragging ? 'none' : 'border-color 0.2s',
                                 }}
                             >
-                                {outfit.emotionPack?.['base'] ? (
+                                {outfitImageUrl ? (
                                     <div
                                         style={{
                                             position: 'absolute',
-                                            width: `${DEFAULT_IMAGE_WIDTH * imageState.scaleX}px`,
-                                            height: `${DEFAULT_IMAGE_HEIGHT * imageState.scaleY}px`,
-                                            left: `${(DEFAULT_IMAGE_WIDTH * imageState.scaleX * imageState.offsetX) / 100}px`,
-                                            top: `${(DEFAULT_IMAGE_HEIGHT * imageState.scaleY * imageState.offsetY) / 100}px`,
-                                            transform: 'translate(-50%, -50%)',
-                                            transformOrigin: 'center',
+                                            bottom: 0,
+                                            left: '50%',
+                                            height: '100%',
+                                            transform: 'translateX(-50%)',
                                         }}
                                     >
                                         <img
-                                            src={outfit.emotionPack['base']}
+                                            ref={adjustedImageRef}
+                                            src={outfitImageUrl}
                                             alt="Adjusted"
                                             style={{
-                                                width: '100%',
+                                                display: 'block',
                                                 height: '100%',
-                                                objectFit: 'contain',
+                                                width: 'auto',
+                                                maxWidth: 'none',
                                                 pointerEvents: 'none',
+                                                // Scale first, then offset, so offsets read as a percentage of the scaled image.
+                                                transform: `scale(${imageState.scaleX}, ${imageState.scaleY}) translate(${imageState.offsetX}%, ${imageState.offsetY}%)`,
+                                                transformOrigin: 'bottom center',
                                             }}
                                         />
                                     </div>
@@ -313,7 +323,39 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
                             <h3 style={{ color: 'var(--agenda-highlight)', margin: '0 0 10px 0' }}>
                                 Reference
                             </h3>
-                            <div style={{ width: '100%', marginBottom: '10px' }}>
+                            <div style={{
+                                width: `${DEFAULT_IMAGE_WIDTH}px`,
+                                height: `${DEFAULT_IMAGE_HEIGHT}px`,
+                                backgroundColor: 'var(--agenda-surface-base)',
+                                border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                                position: 'relative',
+                            }}>
+                                {referenceImageUrl ? (
+                                    <img
+                                        src={referenceImageUrl}
+                                        alt="Reference"
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
+                                            height: '100%',
+                                            width: 'auto',
+                                            maxWidth: 'none',
+                                        }}
+                                    />
+                                ) : (
+                                    <span style={{ color: 'var(--agenda-text-secondary)' }}>
+                                        No image
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ width: '100%' }}>
                                 <select
                                     value={referenceActorId}
                                     onChange={(e) => setReferenceActorId(e.target.value)}
@@ -335,34 +377,6 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
                                         </option>
                                     ))}
                                 </select>
-                            </div>
-                            <div style={{
-                                width: `${DEFAULT_IMAGE_WIDTH}px`,
-                                height: `${DEFAULT_IMAGE_HEIGHT}px`,
-                                backgroundColor: 'var(--agenda-surface-base)',
-                                border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                                borderRadius: '8px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                overflow: 'hidden',
-                                position: 'relative',
-                            }}>
-                                {referenceImageUrl ? (
-                                    <img
-                                        src={referenceImageUrl}
-                                        alt="Reference"
-                                        style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '100%',
-                                            objectFit: 'contain',
-                                        }}
-                                    />
-                                ) : (
-                                    <span style={{ color: 'var(--agenda-text-secondary)' }}>
-                                        No image
-                                    </span>
-                                )}
                             </div>
                         </div>
                     </div>
