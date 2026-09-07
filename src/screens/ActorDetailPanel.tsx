@@ -13,6 +13,7 @@ import { StatRating } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { CachedImage } from '../components/CachedImage';
+import { OutfitPositioningModal } from '../components/OutfitPositioningModal';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -357,6 +358,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         open: boolean;
         target: ImageTarget | null;
     }>({ open: false, target: null });
+    const [positioningModalOpen, setPositioningModalOpen] = useState(false);
     const [baseRegenSource, setBaseRegenSource] = useState<BaseRegenSource>('description');
     const [emotionPromptDraft, setEmotionPromptDraft] = useState('');
     const [isImageDropActive, setIsImageDropActive] = useState(false);
@@ -1696,6 +1698,15 @@ ${indent}}`;
         });
     };
 
+    const handleUpdateOutfitPositioning = (updates: Partial<Outfit>) => {
+        const updatedOutfits = editedOutfits.map((o) => 
+            o.id === selectedOutfitId 
+                ? { ...o, ...updates }
+                : o
+        );
+        setEditedOutfits(updatedOutfits);
+    };
+
     const currentImageUrl = imageDialog.target ? getSelectedOutfitImageUrl(imageDialog.target as Emotion | 'base') : '';
     const isCurrentImageRegenerating = imageDialog.target ? regeneratingImages.has(imageDialog.target) : false;
     const imageTargetLabel = imageDialog.target || '';
@@ -2726,6 +2737,12 @@ ${indent}}`;
                                             ? 'Filling Missing Emotions...'
                                             : `Fill Missing Emotions (${missingEmotionCount})`}
                                     </Button>
+                                    <Button
+                                        onClick={() => setPositioningModalOpen(true)}
+                                        disabled={!selectedOutfit}
+                                    >
+                                        Configure Positioning
+                                    </Button>
                                 </div>
                                 
                                 <div style={{ 
@@ -3304,6 +3321,15 @@ ${indent}}`;
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <OutfitPositioningModal
+                open={positioningModalOpen}
+                actor={actor}
+                outfit={selectedOutfit || { id: '', name: '', description: '', prompts: {}, emotionPack: {} }}
+                otherActors={otherActiveActors}
+                onClose={() => setPositioningModalOpen(false)}
+                onUpdate={handleUpdateOutfitPositioning}
+            />
 
             <ConfirmDialog
                 isOpen={confirmDialog.open}
