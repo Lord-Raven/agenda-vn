@@ -1219,7 +1219,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 inlineFieldStyle={inlineFieldStyle}
                                             />
 
-                                            {stat.llmSees.value !== false && (
+                                            {(stat.llmSees.value === true || stat.llmSees.conditions?.length > 0) && (
                                                 <ConditionalFlagEditor
                                                     label="Generatively Maintained"
                                                     enabledLabel="LLM may update this stat via outcomes"
@@ -1249,7 +1249,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 </div>
                                             )}
 
-                                            <div style={inlineFieldTopStyle}>
+                                            {(stat.llmSees.value === true || stat.llmSees.conditions?.length > 0) && (
+                                                <div style={inlineFieldTopStyle}>
                                                 <label style={fieldLabelStyle}>Guidance</label>
                                                 <TextArea
                                                     value={stat.guidance}
@@ -1259,6 +1260,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     style={{ width: '100%', resize: 'vertical' }}
                                                 />
                                             </div>
+                                            )}
 
                                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                                 <label style={fieldLabelStyle}>Type</label>

@@ -118,7 +118,7 @@ const buildLetterGradeOptions = (stat: Stat): Array<{ label: string; value: numb
 const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: string]: StatValue } => {
     const nextMap: { [key: string]: StatValue } = {};
     actorStats.forEach((stat) => {
-        if (stat.type === 'location') {
+        if (stat.type === 'text' || stat.type === 'location') {
             const currentValue = actor.statMap?.[stat.id];
             nextMap[stat.id] = typeof currentValue === 'string' ? currentValue : (typeof stat.default === 'string' ? stat.default : '');
             return;
@@ -147,10 +147,22 @@ const cloneActorStatModifier = (modifier: ActorStatModifier): ActorStatModifier 
     conditions: (modifier.conditions || []).map((collection) => [...collection]),
 });
 
-const cloneActorStatInitial = (initial: ActorStatInitial | undefined, stat: Stat): ActorStatInitial => ({
-    value: Number.isFinite(initial?.value) ? Number(initial!.value) : (Number.isFinite(stat.default) ? Number(stat.default) : 0),
-    modifiers: (initial?.modifiers || []).map(cloneActorStatModifier),
-});
+const cloneActorStatInitial = (initial: ActorStatInitial | undefined, stat: Stat): ActorStatInitial => {
+    let value: StatValue;
+    if (stat.type === 'checkbox') {
+        value = typeof initial?.value === 'boolean' ? initial.value : (typeof stat.default === 'boolean' ? stat.default : false);
+    } else if (stat.type === 'text' || stat.type === 'location') {
+        value = typeof initial?.value === 'string' ? initial.value : (typeof stat.default === 'string' ? stat.default : '');
+    } else if (stat.type === 'locationList') {
+        value = Array.isArray(initial?.value) ? normalizeLocationListValue(initial!.value) : normalizeLocationListValue(stat.default);
+    } else {
+        value = Number.isFinite(initial?.value) ? Number(initial!.value) : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
+    }
+    return {
+        value,
+        modifiers: (initial?.modifiers || []).map(cloneActorStatModifier),
+    };
+};
 
 const createInitialActorStatInitialMap = (actor: Actor, actorStats: Stat[]): { [key: string]: ActorStatInitial } => {
     const nextMap: { [key: string]: ActorStatInitial } = {};
@@ -559,7 +571,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         const activeStatIds = new Set<string>();
         actorStats.forEach((stat) => {
             activeStatIds.add(stat.id);
-            if (stat.type === 'location') {
+            if (stat.type === 'text' || stat.type === 'location') {
                 const candidateValue = nextEditedStatMap[stat.id];
                 persistedActor.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
                 return;
@@ -814,7 +826,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         )));
     };
 
-    const handleActorStatValueChange = (stat: Stat, value: number) => {
+    const handleActorStatValueChange = (stat: Stat, value: number | string) => {
         if (stat.type === 'checkbox') {
             setEditedStatMap((prev) => ({
                 ...prev,
@@ -822,7 +834,14 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }));
             return;
         }
-        const normalized = clampActorStatValue(value, stat);
+        if (stat.type === 'text') {
+            setEditedStatMap((prev) => ({
+                ...prev,
+                [stat.id]: typeof value === 'string' ? value : String(value),
+            }));
+            return;
+        }
+        const normalized = clampActorStatValue(Number(value), stat);
         setEditedStatMap((prev) => ({
             ...prev,
             [stat.id]: normalized,
@@ -836,11 +855,18 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         }));
     };
 
-    const handleActorStatInitialValueChange = (stat: Stat, value: number | boolean) => {
+    const handleActorStatInitialValueChange = (stat: Stat, value: number | boolean | string) => {
         if (stat.type === 'checkbox') {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
                 [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: Boolean(value) },
+            }));
+            return;
+        }
+        if (stat.type === 'text') {
+            setEditedStatInitialMap((prev) => ({
+                ...prev,
+                [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: typeof value === 'string' ? value : String(value) },
             }));
             return;
         }
@@ -2083,6 +2109,14 @@ ${indent}}`;
                                                                 </label>
                                                             )}
 
+                                                            {stat.type === 'text' && (
+                                                                <TextInput
+                                                                    value={typeof editedStatMap[stat.id] === 'string' ? editedStatMap[stat.id] as string : ''}
+                                                                    onChange={(e) => handleActorStatValueChange(stat, e.target.value)}
+                                                                    style={{ maxWidth: '220px' }}
+                                                                />
+                                                            )}
+
                                                             {stat.type === 'location' && (
                                                                 <LocationSelect
                                                                     value={typeof editedStatMap[stat.id] === 'string' ? String(editedStatMap[stat.id]) : ''}
@@ -2182,6 +2216,12 @@ ${indent}}`;
                                                                             />
                                                                             {Boolean(statInitial.value === true) ? 'True' : 'False'}
                                                                         </label>
+                                                                    ) : stat.type === 'text' ? (
+                                                                        <TextInput
+                                                                            value={typeof statInitial.value === 'string' ? statInitial.value : ''}
+                                                                            onChange={(e) => handleActorStatInitialValueChange(stat, e.target.value)}
+                                                                            style={{ maxWidth: '220px' }}
+                                                                        />
                                                                     ) : (
                                                                         <TextInput
                                                                             type="number"
@@ -2192,6 +2232,7 @@ ${indent}}`;
                                                                     )}
                                                                 </div>
 
+                                                                {stat.type !== 'text' && (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                                     <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
                                                                         Initial Modifiers
@@ -2252,6 +2293,7 @@ ${indent}}`;
                                                                         <Add fontSize="small" /> Add modifier
                                                                     </Button>
                                                                 </div>
+                                                                )}
                                                                 </>
                                                                 )}
                                                             </>
