@@ -209,8 +209,7 @@ export type Outfit = {
     description: string;
     prompts: EmotionPack; // This emotionPack actually contains a map of prompts rather than image URLs. The keys are the same emotion keys, but the values are prompts describing how to alter the character's expression, pose, and overall demeanor to convey that emotion while wearing this outfit. These prompts are used to guide the image generation for each emotion when a character is wearing this outfit.
     emotionPack: EmotionPack;
-    scaleX?: number; // Horizontal scale factor for the outfit, affecting the width of the character when rendered
-    scaleY?: number; // Vertical scale factor for the outfit, affecting the height of the character when rendered
+    scale?: number; // Scale factor for the outfit, affecting the width of the character when rendered
     offsetX?: number; // Horizontal offset for the outfit, affecting the position of the character when rendered, as a percentage of the image's scaled width.
     offsetY?: number; // Vertical offset for the outfit, affecting the position of the character when rendered, as a percentage of the image's scaled height.
 }

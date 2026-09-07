@@ -16,8 +16,7 @@ interface OutfitPositioningModalProps {
 interface InteractiveImageState {
     offsetX: number;
     offsetY: number;
-    scaleX: number;
-    scaleY: number;
+    scale: number;
     isDragging: boolean;
     dragStartX: number;
     dragStartY: number;
@@ -51,8 +50,7 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
     const [imageState, setImageState] = useState<InteractiveImageState>({
         offsetX: outfit.offsetX ?? 0,
         offsetY: outfit.offsetY ?? 0,
-        scaleX: outfit.scaleX ?? 1,
-        scaleY: outfit.scaleY ?? 1,
+        scale: outfit.scale ?? 1,
         isDragging: false,
         dragStartX: 0,
         dragStartY: 0,
@@ -68,8 +66,7 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
                 ...prev,
                 offsetX: outfit.offsetX ?? 0,
                 offsetY: outfit.offsetY ?? 0,
-                scaleX: outfit.scaleX ?? 1,
-                scaleY: outfit.scaleY ?? 1,
+                scale: outfit.scale ?? 1,
             }));
         }
     }, [open, outfit]);
@@ -113,8 +110,8 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
         const deltaY = e.clientY - imageState.dragStartY;
 
         // Convert pixel movement to percentage of scaled image
-        const scaledWidth = (adjustedImageRef.current?.offsetWidth || DEFAULT_IMAGE_WIDTH) * imageState.scaleX;
-        const scaledHeight = (adjustedImageRef.current?.offsetHeight || DEFAULT_IMAGE_HEIGHT) * imageState.scaleY;
+        const scaledWidth = (adjustedImageRef.current?.offsetWidth || DEFAULT_IMAGE_WIDTH) * imageState.scale
+        const scaledHeight = (adjustedImageRef.current?.offsetHeight || DEFAULT_IMAGE_HEIGHT) * imageState.scale;
 
         const percentDeltaX = (deltaX / scaledWidth) * 100;
         const percentDeltaY = (deltaY / scaledHeight) * 100;
@@ -124,7 +121,7 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
             offsetX: Math.max(-50, Math.min(50, prev.dragStartOffsetX + percentDeltaX)),
             offsetY: Math.max(-50, Math.min(50, prev.dragStartOffsetY + percentDeltaY)),
         }));
-    }, [imageState.isDragging, imageState.dragStartX, imageState.dragStartY, imageState.scaleX, imageState.scaleY]);
+    }, [imageState.isDragging, imageState.dragStartX, imageState.dragStartY, imageState.scale]);
 
     const handleMouseUp = useCallback(() => {
         setImageState(prev => ({ ...prev, isDragging: false }));
@@ -141,11 +138,11 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
         }
     }, [imageState.isDragging, handleMouseMove, handleMouseUp]);
 
-    const handleScaleChange = (axis: 'X' | 'Y', value: number) => {
+    const handleScaleChange = (value: number) => {
         const clampedValue = Math.max(0.5, Math.min(2, value));
         setImageState(prev => ({
             ...prev,
-            [`scale${axis}`]: clampedValue,
+            scale: clampedValue,
         }));
     };
 
@@ -159,8 +156,7 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
 
     const handleSave = () => {
         onUpdate({
-            scaleX: imageState.scaleX,
-            scaleY: imageState.scaleY,
+            scale: imageState.scale,
             offsetX: imageState.offsetX,
             offsetY: imageState.offsetY,
         });
@@ -172,15 +168,14 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
             ...prev,
             offsetX: 0,
             offsetY: 0,
-            scaleX: 1,
-            scaleY: 1,
+            scale: 1,
         }));
     };
 
     const referenceActor = getReferenceActor();
     const referenceImageUrl = referenceActor ? getNeutralImage(referenceActor) : '';
     const referenceOutfit = referenceActor ? getCurrentOutfit(referenceActor) : undefined;
-    const referenceTransform = `scale(${referenceOutfit?.scaleX ?? 1}, ${referenceOutfit?.scaleY ?? 1}) translate(${referenceOutfit?.offsetX ?? 0}%, ${referenceOutfit?.offsetY ?? 0}%)`;
+    const referenceTransform = `scale(${referenceOutfit?.scale ?? 1}) translate(${referenceOutfit?.offsetX ?? 0}%, ${referenceOutfit?.offsetY ?? 0}%)`;
 
     return (
         <Dialog
@@ -314,7 +309,7 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
                                                 maxWidth: 'none',
                                                 pointerEvents: 'none',
                                                 // Scale first, then offset, so offsets read as a percentage of the scaled image.
-                                                transform: `scale(${imageState.scaleX}, ${imageState.scaleY}) translate(${imageState.offsetX}%, ${imageState.offsetY}%)`,
+                                                transform: `scale(${imageState.scale}) translate(${imageState.offsetX}%, ${imageState.offsetY}%)`,
                                                 transformOrigin: 'bottom center',
                                             }}
                                         />
@@ -412,29 +407,15 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--agenda-text-secondary)' }}>
-                                        Scale X: {imageState.scaleX.toFixed(2)}
+                                        Scale: {imageState.scale.toFixed(2)}
                                     </label>
                                     <input
                                         type="range"
                                         min="0.5"
                                         max="2"
                                         step="0.05"
-                                        value={imageState.scaleX}
-                                        onChange={(e) => handleScaleChange('X', parseFloat(e.target.value))}
-                                        style={{ width: '100%' }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--agenda-text-secondary)' }}>
-                                        Scale Y: {imageState.scaleY.toFixed(2)}
-                                    </label>
-                                    <input
-                                        type="range"
-                                        min="0.5"
-                                        max="2"
-                                        step="0.05"
-                                        value={imageState.scaleY}
-                                        onChange={(e) => handleScaleChange('Y', parseFloat(e.target.value))}
+                                        value={imageState.scale}
+                                        onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
                                         style={{ width: '100%' }}
                                     />
                                 </div>
