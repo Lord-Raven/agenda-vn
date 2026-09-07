@@ -393,6 +393,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         availableActors.map(actor => buildActorContext(actor, '', stage, [], ['profile']).format()))
                     .addBlock('Response Format',
                         buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
+                    .addBlock('Additional Context',
+                        generateContext(skit, stage, 5))
                     .addBlock('Example Response',
                         buildStructuredExampleResponse(
                             SKIT_GUIDANCE_FIELDS,
@@ -402,8 +404,6 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             },
                             { includeEndTag: true }
                         ))
-                    .addBlock('Additional Context',
-                        generateContext(skit, stage, 5))
                     .format(),
                 10,
                 500,
@@ -471,7 +471,11 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `When this tag is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
                             `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "HERE" to move to the scene's location, or "AWAY" to leave this area. ` +
                             `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when Present Characters leave or the scene itself relocates.`)
-                ).addBlock('Example Script',
+                ).addBlock('Scene Prompt',
+                    `Scene Prompt: ${skit.guidance}`)
+                .addBlock('Context',
+                    generateContext(skit, stage, 7 - retry * 2))
+                .addBlock('Example Script',
                     `<Entry><Speaker>NARRATOR</Speaker><Message>The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.</Message></Entry>\n` +
                     `<Entry><Speaker>CYANEA</Speaker><Message>"I can't believe we're finally here. It's been a long journey."</Message></Entry>\n` +
                     `<Entry><Speaker>PERSEPHONE</Speaker><Message>"Yes, but the real challenge is just beginning. We must stay vigilant." Persephone gently chides Cyanea.</Message></Entry>\n` +
@@ -479,15 +483,17 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     (save.enableImpersonation ? `<Entry><Speaker>${playerName.toUpperCase()}</Speaker><Message>I smile warmly at the two women, "I agree. We need to be careful and work together."</Message></Entry>\n` : '') +
                     `<Entry><Speaker>RED HOOD</Speaker><Movement><Actor>Red Hood</Actor><Location>Here</Location></Movement><Message>A crimson-clad figure approaches with supplies."</Message></Entry>\n`
                 )
-                .addBlock('Scene Prompt',
-                    `Scene Prompt: ${skit.guidance}`)
-                .addBlock('Context',
-                    generateContext(skit, stage, 7 - retry * 2))
                 .format();
         console.log(prompt);
         const response = await stage.generateText(prompt, 10, 2000)
 
         if (response && response.trim().length > 0) {
+            if (!/<Entry\b[^>]*>/i.test(response)) {
+                console.warn('Generated skit response did not contain an Entry tag; retrying.');
+                retry++;
+                continue;
+            }
+
             // Strip all double asterisks; this is a temporary measure due to current model behavior.
             let text = response.replace(/\*\*/g, '').trim();
             let endScene = false;

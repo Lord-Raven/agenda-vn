@@ -1783,6 +1783,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     stop: ['#END']
                 });
                 const result = response?.result || '';
+                
                 if (!result || !this.hasExpectedResponseTags(result, expectedFields)) {
                     const expectedTags = expectedFields ? getStructuredFieldTags(expectedFields) : [];
                     const errorText = expectedTags.length > 0
