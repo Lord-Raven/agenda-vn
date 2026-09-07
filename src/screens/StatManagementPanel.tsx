@@ -749,6 +749,16 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                 />
                                             </div>
 
+                                            {stat.exposed.value === true && (<div style={inlineFieldStyle}>
+                                                <label style={fieldLabelStyle}>Display Name</label>
+                                                <TextInput
+                                                    fullWidth
+                                                    value={stat.displayName === undefined ? stat.name : stat.displayName}
+                                                    onChange={(e) => updateGlobalStat(statIndex, { displayName: e.target.value })}
+                                                    placeholder="Name shown in UI (blank to hide)"
+                                                />
+                                            </div>)}
+
                                             <ConditionalFlagEditor
                                                 label="Visible In UI"
                                                 enabledLabel="Exposed"
@@ -1156,6 +1166,16 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     placeholder="Stat name"
                                                 />
                                             </div>
+
+                                            {stat.exposed.value === true && (<div style={inlineFieldStyle}>
+                                                <label style={fieldLabelStyle}>Display Name</label>
+                                                <TextInput
+                                                    fullWidth
+                                                    value={stat.displayName === undefined ? stat.name : stat.displayName}
+                                                    onChange={(e) => updateActorStat(statIndex, { displayName: e.target.value })}
+                                                    placeholder="Name shown in UI (blank to hide)"
+                                                />
+                                            </div>)}
 
                                             <ConditionalFlagEditor
                                                 label="Visible In UI"
@@ -1631,6 +1651,16 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                                     placeholder="Stat name"
                                                 />
                                             </div>
+
+                                            {stat.exposed.value === true && (<div style={inlineFieldStyle}>
+                                                <label style={fieldLabelStyle}>Display Name</label>
+                                                <TextInput
+                                                    fullWidth
+                                                    value={stat.displayName === undefined ? stat.name : stat.displayName}
+                                                    onChange={(e) => updateLocationStat(statIndex, { displayName: e.target.value })}
+                                                    placeholder="Name shown in UI (blank to hide)"
+                                                />
+                                            </div>)}
 
                                             <ConditionalFlagEditor
                                                 label="Visible In UI"

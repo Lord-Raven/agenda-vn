@@ -28,6 +28,9 @@ interface InteractiveImageState {
 const DEFAULT_IMAGE_WIDTH = 400;
 const DEFAULT_IMAGE_HEIGHT = 600;
 
+// Persists the reference actor selection across openings of the modal.
+let lastReferenceActorId = '';
+
 export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
     open,
     actor,
@@ -36,7 +39,14 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
     onClose,
     onUpdate,
 }) => {
-    const [referenceActorId, setReferenceActorId] = useState<string>(otherActors[0]?.id || '');
+    const [referenceActorId, setReferenceActorId] = useState<string>(
+        otherActors.some(a => a.id === lastReferenceActorId) ? lastReferenceActorId : (otherActors[0]?.id || '')
+    );
+
+    const selectReferenceActor = (id: string) => {
+        lastReferenceActorId = id;
+        setReferenceActorId(id);
+    };
     
     const [imageState, setImageState] = useState<InteractiveImageState>({
         offsetX: outfit.offsetX ?? 0,
@@ -53,6 +63,7 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
     // Sync state when outfit changes
     useEffect(() => {
         if (open) {
+            setReferenceActorId(otherActors.some(a => a.id === lastReferenceActorId) ? lastReferenceActorId : (otherActors[0]?.id || ''));
             setImageState(prev => ({
                 ...prev,
                 offsetX: outfit.offsetX ?? 0,
@@ -70,14 +81,15 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
         return otherActors.find(a => a.id === referenceActorId);
     }, [referenceActorId, otherActors]);
 
-    const getNeutralImage = useCallback((targetActor: Actor) => {
+    const getCurrentOutfit = useCallback((targetActor: Actor) => {
         const outfits = targetActor.outfits || [];
-        if (outfits.length > 0) {
-            const outfit = outfits.find(o => o.id === targetActor.outfitId) || outfits[0];
-            return outfit.emotionPack?.['neutral'] || outfit.emotionPack?.['base'] || '';
-        }
-        return '';
+        return outfits.find(o => o.id === targetActor.outfitId) || outfits[0];
     }, []);
+
+    const getNeutralImage = useCallback((targetActor: Actor) => {
+        const targetOutfit = getCurrentOutfit(targetActor);
+        return targetOutfit?.emotionPack?.['neutral'] || targetOutfit?.emotionPack?.['base'] || '';
+    }, [getCurrentOutfit]);
 
     const outfitImageUrl = outfit.emotionPack?.['neutral'] || outfit.emotionPack?.['base'] || '';
 
@@ -167,6 +179,8 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
 
     const referenceActor = getReferenceActor();
     const referenceImageUrl = referenceActor ? getNeutralImage(referenceActor) : '';
+    const referenceOutfit = referenceActor ? getCurrentOutfit(referenceActor) : undefined;
+    const referenceTransform = `scale(${referenceOutfit?.scaleX ?? 1}, ${referenceOutfit?.scaleY ?? 1}) translate(${referenceOutfit?.offsetX ?? 0}%, ${referenceOutfit?.offsetY ?? 0}%)`;
 
     return (
         <Dialog
@@ -343,10 +357,11 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
                                             position: 'absolute',
                                             bottom: 0,
                                             left: '50%',
-                                            transform: 'translateX(-50%)',
                                             height: '100%',
                                             width: 'auto',
                                             maxWidth: 'none',
+                                            transform: `translateX(-50%) ${referenceTransform}`,
+                                            transformOrigin: 'bottom center',
                                         }}
                                     />
                                 ) : (
@@ -358,7 +373,7 @@ export const OutfitPositioningModal: FC<OutfitPositioningModalProps> = ({
                             <div style={{ width: '100%' }}>
                                 <select
                                     value={referenceActorId}
-                                    onChange={(e) => setReferenceActorId(e.target.value)}
+                                    onChange={(e) => selectReferenceActor(e.target.value)}
                                     style={{
                                         width: '100%',
                                         padding: '8px',

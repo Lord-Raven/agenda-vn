@@ -3,7 +3,7 @@ import { Box, Typography } from "@mui/material";
 import { Bed, Bedtime, EventAvailable, WbSunny, WbTwilight } from "@mui/icons-material";
 import { Stage } from "../Stage";
 import { formatCurrentDate, formatDateLabel } from "../content/Skit";
-import { findStatOptionByValue, getStatOptionValue, isStatExposed, Stat, resolveStatText } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, isStatExposed, resolveStatDisplayName, Stat, resolveStatText } from '../content/Stat';
 import { resolveIcon } from "./StatRating";
 import { StatValueDisplay } from "./StatDisplay";
 
@@ -165,6 +165,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
                     ?? stat.default;
                 const normalizedValue = normalizeStatValue(rawValue, stat);
                 const isNumericStat = stat.type === "number";
+                const displayName = resolveStatDisplayName(stat);
                 const StatIcon = stat.labelIconName ? resolveIcon(stat.labelIconName) : null;
                 const selectedOptionDescription = stat.type === "option"
                     ? resolveStatText(findStatOptionByValue(stat, normalizedValue)?.option.description, stageInstance).trim()
@@ -175,7 +176,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
 
                 return (
                     <Box
-                        key={`player-stat-bar-${statName}`}
+                        key={`player-stat-bar-${stat.id}`}
                         title={tooltipText || undefined}
                         sx={{
                             flex: "1 1 150px",
@@ -200,17 +201,19 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
                             }}
                         >
                             {StatIcon && <StatIcon sx={{ fontSize: "0.8rem", color: "var(--agenda-highlight)" }} />}
-                            <Typography
-                                sx={{
-                                    color: "var(--agenda-text-muted)",
-                                    fontSize: "0.66rem",
-                                    letterSpacing: "0.1em",
-                                    textTransform: "uppercase",
-                                    lineHeight: 1.2,
-                                }}
-                            >
-                                {statName}
-                            </Typography>
+                            {displayName && (
+                                <Typography
+                                    sx={{
+                                        color: "var(--agenda-text-muted)",
+                                        fontSize: "0.66rem",
+                                        letterSpacing: "0.1em",
+                                        textTransform: "uppercase",
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    {displayName}
+                                </Typography>
+                            )}
                         </Box>
 
                         {isNumericStat ? (
