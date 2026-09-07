@@ -580,14 +580,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         // Insert a dummy promise into generationPromises to ensure the loading screen shows until we manually clear it after the initial actors are loaded.
         this.generationPromises['newGame'] = new Promise(() => {});
 
-        // Note: readStageConfiguration() is now called from MenuScreen.handleNewGame() when the user
-        // clicks "New Game", ensuring the SettingsScreen shows the current published configuration.
-        // This prevents stat option values selected by the user from becoming invalid if the
-        // configuration changes between MenuScreen opening and startNewGame being called.
-
         // Get empty save slot or replace the oldest save if all slots are full
-        const emptySlotIndex = this.saveData.saves.findIndex(save => save === undefined);
+        const emptySlotIndex = this.saveData.saves.findIndex(save => !save);
         const saveSlotIndex = emptySlotIndex !== -1 ? emptySlotIndex : (this.saveData.lastSaveSlot + 1) % this.SAVE_SLOT_COUNT;
+        console.log(`Using slot ${saveSlotIndex}`);
 
         // Create new save data structure
         const newSave: SaveType = this.generateFreshSave(playerData, playerData.data.globalStatValues);
@@ -600,7 +596,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         if (!newSave.lorebook || newSave.lorebook.length === 0) {
+            console.log('Initializing lorebook for new save');
             newSave.lorebook = persistedConfiguration.lorebook.map(cloneLore);
+            console.log(newSave.lorebook);
         }
 
         if (!newSave.maps || newSave.maps.length === 0) {
@@ -1525,7 +1523,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 : undefined,
         }));
 
-        save.globalStatValues = { ...(this.getConfiguration().globalStatValues || {}) };
+        save.globalStatValues = {
+            ...(this.getConfiguration().globalStatValues || {}),
+            ...(save.globalStatValues || {}),
+        };
 
         this.syncActorStats(save);
         this.syncLocationStats(save);
@@ -2114,6 +2115,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 const loreEntry = getLinkedActorLore(candidate.actor, this);
                 if (!loreEntry) {
                     continue;
+                } else {
+                    console.log(`Updating lore entry for actor ${candidate.actor.name}`);
+                    if (this.getSave()?.lorebook?.includes(loreEntry)) {
+                        console.log(`Lore entry for actor ${candidate.actor.name} is present in the lorebook.`);
+                    }
+                    if (this.getConfiguration()?.lorebook?.includes(loreEntry)) {
+                        console.log(`Lore entry for actor ${candidate.actor.name} is present in the configured lorebook.`);
+                    }  
                 }
                 await updateLoreEntry(loreEntry, this, candidate.guidance).catch(error => {
                     console.error(`Error updating lore entry for actor ${candidate?.actor.name}`, error);
