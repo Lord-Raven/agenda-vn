@@ -2,7 +2,7 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, StatValueRule, normalizeLocationListValue, resolveStatDefault } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, StatValueRule, normalizeLocationListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ConditionContext } from '../content/Condition';
@@ -118,25 +118,7 @@ const buildLetterGradeOptions = (stat: Stat): Array<{ label: string; value: numb
 const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: string]: StatValue } => {
     const nextMap: { [key: string]: StatValue } = {};
     actorStats.forEach((stat) => {
-        if (stat.type === 'text' || stat.type === 'location') {
-            const currentValue = actor.statMap?.[stat.id];
-            nextMap[stat.id] = typeof currentValue === 'string' ? currentValue : (typeof stat.default === 'string' ? stat.default : '');
-            return;
-        }
-        if (stat.type === 'locationList') {
-            const currentValue = actor.statMap?.[stat.id];
-            nextMap[stat.id] = Array.isArray(currentValue) ? normalizeLocationListValue(currentValue) : normalizeLocationListValue(stat.default);
-            return;
-        }
-        if (stat.type === 'checkbox') {
-            const currentValue = actor.statMap?.[stat.id];
-            nextMap[stat.id] = typeof currentValue === 'boolean' ? currentValue : (typeof stat.default === 'boolean' ? stat.default : false);
-            return;
-        }
-        const currentValue = Number(actor.statMap?.[stat.id]);
-        const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
-        const resolved = Number.isFinite(currentValue) ? currentValue : fallback;
-        nextMap[stat.id] = clampActorStatValue(resolved, stat);
+        nextMap[stat.id] = normalizeStatValue(actor.statMap?.[stat.id], stat);
     });
     return nextMap;
 };
@@ -148,18 +130,8 @@ const cloneActorStatModifier = (modifier: ActorStatModifier): ActorStatModifier 
 });
 
 const cloneActorStatInitial = (initial: ActorStatInitial | undefined, stat: Stat): ActorStatInitial => {
-    let value: StatValue;
-    if (stat.type === 'checkbox') {
-        value = typeof initial?.value === 'boolean' ? initial.value : (typeof stat.default === 'boolean' ? stat.default : false);
-    } else if (stat.type === 'text' || stat.type === 'location') {
-        value = typeof initial?.value === 'string' ? initial.value : (typeof stat.default === 'string' ? stat.default : '');
-    } else if (stat.type === 'locationList') {
-        value = Array.isArray(initial?.value) ? normalizeLocationListValue(initial!.value) : normalizeLocationListValue(stat.default);
-    } else {
-        value = Number.isFinite(initial?.value) ? Number(initial!.value) : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
-    }
     return {
-        value,
+        value: normalizeStatValue(initial?.value, stat),
         modifiers: (initial?.modifiers || []).map(cloneActorStatModifier),
     };
 };
@@ -185,14 +157,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             if (!name || uniqueStatMap[name]) {
                 return;
             }
+            const normalizedStat = { ...stat, name };
             uniqueStatMap[name] = {
-                ...stat,
-                name,
-                default: stat.type === 'location'
-                    ? (typeof stat.default === 'string' ? stat.default : '')
-                    : stat.type === 'locationList'
-                        ? normalizeLocationListValue(stat.default)
-                        : (Number.isFinite(stat.default) ? Number(stat.default) : 0),
+                ...normalizedStat,
+                default: resolveStatDefault(normalizedStat),
             };
         });
         return Object.values(uniqueStatMap);
@@ -571,25 +539,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         const activeStatIds = new Set<string>();
         actorStats.forEach((stat) => {
             activeStatIds.add(stat.id);
-            if (stat.type === 'text' || stat.type === 'location') {
-                const candidateValue = nextEditedStatMap[stat.id];
-                persistedActor.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
-                return;
-            }
-            if (stat.type === 'locationList') {
-                const candidateValue = nextEditedStatMap[stat.id];
-                persistedActor.statMap[stat.id] = Array.isArray(candidateValue) ? normalizeLocationListValue(candidateValue) : normalizeLocationListValue(stat.default);
-                return;
-            }
-            if (stat.type === 'checkbox') {
-                const candidateValue = nextEditedStatMap[stat.id];
-                persistedActor.statMap[stat.id] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
-                return;
-            }
-            const candidateValue = Number(nextEditedStatMap[stat.id]);
-            const fallbackValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
-            const resolvedValue = Number.isFinite(candidateValue) ? candidateValue : fallbackValue;
-            persistedActor.statMap[stat.id] = clampActorStatValue(resolvedValue, stat);
+            const statMapValue = isCreatorMode
+                ? cloneActorStatInitial(nextEditedStatInitialMap[stat.id], stat).value
+                : nextEditedStatMap[stat.id];
+            persistedActor.statMap[stat.id] = normalizeStatValue(statMapValue, stat);
         });
 
         Object.keys(persistedActor.statMap).forEach((statId) => {
@@ -826,7 +779,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         )));
     };
 
-    const handleActorStatValueChange = (stat: Stat, value: number | string) => {
+    const handleActorStatValueChange = (stat: Stat, value: StatValue) => {
         if (stat.type === 'checkbox') {
             setEditedStatMap((prev) => ({
                 ...prev,
@@ -834,10 +787,17 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }));
             return;
         }
-        if (stat.type === 'text') {
+        if (stat.type === 'text' || stat.type === 'location' || stat.type === 'option') {
             setEditedStatMap((prev) => ({
                 ...prev,
                 [stat.id]: typeof value === 'string' ? value : String(value),
+            }));
+            return;
+        }
+        if (stat.type === 'locationList') {
+            setEditedStatMap((prev) => ({
+                ...prev,
+                [stat.id]: Array.isArray(value) ? normalizeLocationListValue(value) : [],
             }));
             return;
         }
@@ -848,14 +808,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         }));
     };
 
-    const handleActorStatLocationChange = (stat: Stat, locationIds: string | string[]) => {
-        setEditedStatMap((prev) => ({
-            ...prev,
-            [stat.id]: locationIds,
-        }));
-    };
-
-    const handleActorStatInitialValueChange = (stat: Stat, value: number | boolean | string) => {
+    const handleActorStatInitialValueChange = (stat: Stat, value: StatValue) => {
         if (stat.type === 'checkbox') {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
@@ -863,10 +816,17 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }));
             return;
         }
-        if (stat.type === 'text') {
+        if (stat.type === 'text' || stat.type === 'location' || stat.type === 'option') {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
                 [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: typeof value === 'string' ? value : String(value) },
+            }));
+            return;
+        }
+        if (stat.type === 'locationList') {
+            setEditedStatInitialMap((prev) => ({
+                ...prev,
+                [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: Array.isArray(value) ? normalizeLocationListValue(value) : [] },
             }));
             return;
         }
@@ -875,6 +835,14 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             ...prev,
             [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: normalized },
         }));
+    };
+
+    const handleActorStatEditorValueChange = (stat: Stat, value: StatValue) => {
+        if (isCreatorMode) {
+            handleActorStatInitialValueChange(stat, value);
+        } else {
+            handleActorStatValueChange(stat, value);
+        }
     };
 
     const toggleStatExpanded = (statName: string) => {
@@ -2052,7 +2020,9 @@ ${indent}}`;
                                             </label>
 
                                             {actorStats.map((stat) => {
-                                                const value = Number(editedStatMap[stat.id]);
+                                                const statInitial = cloneActorStatInitial(editedStatInitialMap[stat.id], stat);
+                                                const editorValue = isCreatorMode ? statInitial.value : editedStatMap[stat.id];
+                                                const value = Number(editorValue);
                                                 const displayValue = Number.isFinite(value)
                                                     ? value
                                                     : clampActorStatValue(Number(stat.default) || 0, stat);
@@ -2063,7 +2033,6 @@ ${indent}}`;
                                                     const closestDelta = Math.abs(closest.value - displayValue);
                                                     return optionDelta < closestDelta ? option : closest;
                                                 }, letterGradeOptions[0]);
-                                                const statInitial = cloneActorStatInitial(editedStatInitialMap[stat.id], stat);
                                                 const isExpanded = expandedStatNames.has(stat.id);
 
                                                 return (
@@ -2109,25 +2078,25 @@ ${indent}}`;
                                                                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
                                                                     <input
                                                                         type="checkbox"
-                                                                        checked={Boolean(editedStatMap[stat.id] === true)}
-                                                                        onChange={(e) => handleActorStatValueChange(stat, e.target.checked ? 1 : 0)}
+                                                                        checked={Boolean(editorValue === true)}
+                                                                        onChange={(e) => handleActorStatEditorValueChange(stat, e.target.checked)}
                                                                     />
-                                                                    {Boolean(editedStatMap[stat.id] === true) ? 'True' : 'False'}
+                                                                    {Boolean(editorValue === true) ? 'True' : 'False'}
                                                                 </label>
                                                             )}
 
                                                             {stat.type === 'text' && (
                                                                 <TextInput
-                                                                    value={typeof editedStatMap[stat.id] === 'string' ? editedStatMap[stat.id] as string : ''}
-                                                                    onChange={(e) => handleActorStatValueChange(stat, e.target.value)}
+                                                                    value={typeof editorValue === 'string' ? editorValue : ''}
+                                                                    onChange={(e) => handleActorStatEditorValueChange(stat, e.target.value)}
                                                                     style={{ maxWidth: '220px' }}
                                                                 />
                                                             )}
 
                                                             {stat.type === 'location' && (
                                                                 <LocationSelect
-                                                                    value={typeof editedStatMap[stat.id] === 'string' ? String(editedStatMap[stat.id]) : ''}
-                                                                    onChange={(locationId) => handleActorStatLocationChange(stat, locationId)}
+                                                                    value={typeof editorValue === 'string' ? String(editorValue) : ''}
+                                                                    onChange={(locationId) => handleActorStatEditorValueChange(stat, locationId)}
                                                                     locations={locationOptions}
                                                                     stage={stage}
                                                                     style={{ maxWidth: '220px' }}
@@ -2136,8 +2105,8 @@ ${indent}}`;
 
                                                             {stat.type === 'locationList' && (
                                                                 <LocationMultiSelect
-                                                                    values={Array.isArray(editedStatMap[stat.id]) ? editedStatMap[stat.id] as string[] : []}
-                                                                    onChange={(locationIds) => handleActorStatLocationChange(stat, locationIds)}
+                                                                    values={Array.isArray(editorValue) ? editorValue : []}
+                                                                    onChange={(locationIds) => handleActorStatEditorValueChange(stat, locationIds)}
                                                                     locations={locationOptions}
                                                                     stage={stage}
                                                                     style={{ maxWidth: '220px' }}
@@ -2148,7 +2117,7 @@ ${indent}}`;
                                                                 <StatRating
                                                                     stat={stat}
                                                                     value={displayValue}
-                                                                    updateScore={(nextValue) => handleActorStatValueChange(stat, nextValue)}
+                                                                    updateScore={(nextValue) => handleActorStatEditorValueChange(stat, nextValue)}
                                                                 />
                                                             )}
 
@@ -2161,7 +2130,7 @@ ${indent}}`;
                                                                             if (!selectedOption) {
                                                                                 return;
                                                                             }
-                                                                            handleActorStatValueChange(stat, selectedOption.value);
+                                                                            handleActorStatEditorValueChange(stat, selectedOption.value);
                                                                         }}
                                                                         style={{
                                                                             width: '100%',
@@ -2191,9 +2160,33 @@ ${indent}}`;
                                                                     max={statRange.max}
                                                                     step={statRange.step}
                                                                     value={Math.min(statRange.max, Math.max(statRange.min, displayValue))}
-                                                                    onChange={(e) => handleActorStatValueChange(stat, Number(e.target.value))}
+                                                                    onChange={(e) => handleActorStatEditorValueChange(stat, Number(e.target.value))}
                                                                     style={{ width: '100%' }}
                                                                 />
+                                                            )}
+
+                                                            {stat.type === 'option' && (
+                                                                <select
+                                                                    value={typeof editorValue === 'string' ? String(editorValue) : ''}
+                                                                    onChange={(e) => handleActorStatEditorValueChange(stat, e.target.value)}
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        padding: '10px',
+                                                                        fontSize: '14px',
+                                                                        backgroundColor: 'var(--agenda-surface-raised)',
+                                                                        border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
+                                                                        borderRadius: '5px',
+                                                                        color: 'var(--agenda-text-primary)',
+                                                                        fontFamily: 'inherit',
+                                                                        cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    {(stat.options || []).map((option, optionIndex) => (
+                                                                        <option key={getStatOptionValue(option, optionIndex)} value={getStatOptionValue(option, optionIndex)}>
+                                                                            {option.name}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
                                                             )}
                                                         </div>
 
@@ -2205,48 +2198,14 @@ ${indent}}`;
                                                                     </div>
                                                                 )}
 
-                                                                {stat.type !== 'location' && stat.type !== 'locationList' && (
-                                                                <>
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
-                                                                    <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
-                                                                        Initial Value
-                                                                    </label>
-                                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                                        Used to seed this actor's stat when a new game starts, before modifiers below are applied.
-                                                                    </span>
-                                                                    {stat.type === 'checkbox' ? (
-                                                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={Boolean(statInitial.value === true)}
-                                                                                onChange={(e) => handleActorStatInitialValueChange(stat, e.target.checked)}
-                                                                            />
-                                                                            {Boolean(statInitial.value === true) ? 'True' : 'False'}
-                                                                        </label>
-                                                                    ) : stat.type === 'text' ? (
-                                                                        <TextInput
-                                                                            value={typeof statInitial.value === 'string' ? statInitial.value : ''}
-                                                                            onChange={(e) => handleActorStatInitialValueChange(stat, e.target.value)}
-                                                                            style={{ maxWidth: '220px' }}
-                                                                        />
-                                                                    ) : (
-                                                                        <TextInput
-                                                                            type="number"
-                                                                            value={typeof statInitial.value === 'number' ? statInitial.value : 0}
-                                                                            onChange={(e) => handleActorStatInitialValueChange(stat, Number(e.target.value))}
-                                                                            style={{ maxWidth: '160px' }}
-                                                                        />
-                                                                    )}
-                                                                </div>
-
-                                                                {stat.type !== 'text' && (
+                                                                {isCreatorMode && stat.type !== 'text' && stat.type !== 'location' && stat.type !== 'locationList' && (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                                     <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
-                                                                        Initial Modifiers
+                                                                        Default Modifiers
                                                                     </label>
                                                                     {statInitial.modifiers.length === 0 && (
                                                                         <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                                            No modifiers. The initial value above is used as-is.
+                                                                            No modifiers. The default value above is used as-is.
                                                                         </span>
                                                                     )}
                                                                     {statInitial.modifiers.map((modifier) => (
@@ -2300,8 +2259,6 @@ ${indent}}`;
                                                                         <Add fontSize="small" /> Add modifier
                                                                     </Button>
                                                                 </div>
-                                                                )}
-                                                                </>
                                                                 )}
                                                             </>
                                                         )}

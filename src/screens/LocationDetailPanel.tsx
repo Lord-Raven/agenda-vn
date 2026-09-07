@@ -18,7 +18,7 @@ import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, LocationSe
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from '../components/ConditionEditor';
-import { getStatOptionValue } from '../content/Stat';
+import { getStatOptionValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 
 type LocationAvailabilityState = 'unavailable' | 'disabled';
 
@@ -102,20 +102,7 @@ const buildLocationStatLetterGradeOptions = (stat: Stat): Array<{ label: string;
 const createInitialLocationStatMap = (location: Location, locationStats: Stat[]): { [key: string]: StatValue } => {
     const nextMap: { [key: string]: StatValue } = {};
     locationStats.forEach((stat) => {
-        if (stat.type === 'location') {
-            const currentValue = location.statMap?.[stat.id];
-            nextMap[stat.id] = typeof currentValue === 'string' ? currentValue : (typeof stat.default === 'string' ? stat.default : '');
-            return;
-        }
-        if (stat.type === 'checkbox') {
-            const currentValue = location.statMap?.[stat.id];
-            nextMap[stat.id] = typeof currentValue === 'boolean' ? currentValue : (typeof stat.default === 'boolean' ? stat.default : false);
-            return;
-        }
-        const currentValue = Number(location.statMap?.[stat.id]);
-        const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
-        const resolved = Number.isFinite(currentValue) ? currentValue : fallback;
-        nextMap[stat.id] = clampLocationStatValue(resolved, stat);
+        nextMap[stat.id] = normalizeStatValue(location.statMap?.[stat.id], stat);
     });
     return nextMap;
 };
@@ -140,12 +127,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
             if (!name || uniqueStatMap[name]) {
                 return;
             }
+            const normalizedStat = { ...stat, name };
             uniqueStatMap[name] = {
-                ...stat,
-                name,
-                default: stat.type === 'location'
-                    ? (typeof stat.default === 'string' ? stat.default : '')
-                    : (Number.isFinite(stat.default) ? Number(stat.default) : 0),
+                ...normalizedStat,
+                default: resolveStatDefault(normalizedStat),
             };
         });
         return Object.values(uniqueStatMap);
@@ -271,20 +256,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         const activeStatIds = new Set<string>();
         locationStats.forEach((stat) => {
             activeStatIds.add(stat.id);
-            if (stat.type === 'location') {
-                const candidateValue = nextStatMap[stat.id];
-                persistedLocation.statMap[stat.id] = typeof candidateValue === 'string' ? candidateValue : (typeof stat.default === 'string' ? stat.default : '');
-                return;
-            }
-            if (stat.type === 'checkbox') {
-                const candidateValue = nextStatMap[stat.id];
-                persistedLocation.statMap[stat.id] = typeof candidateValue === 'boolean' ? candidateValue : (typeof stat.default === 'boolean' ? stat.default : false);
-                return;
-            }
-            const candidateValue = Number(nextStatMap[stat.id]);
-            const fallbackValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
-            const resolvedValue = Number.isFinite(candidateValue) ? candidateValue : fallbackValue;
-            persistedLocation.statMap[stat.id] = clampLocationStatValue(resolvedValue, stat);
+            persistedLocation.statMap[stat.id] = normalizeStatValue(nextStatMap[stat.id], stat);
         });
 
         Object.keys(persistedLocation.statMap).forEach((statId) => {
@@ -821,7 +793,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                 />
                             </section>
 
-                            {isCreatorMode && locationStats.length > 0 && (
+                            {locationStats.length > 0 && (
                                 <section>
                                     <h2 style={sectionHeadingStyle}>Location Stats</h2>
                                     <div style={{

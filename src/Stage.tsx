@@ -1593,8 +1593,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private syncActorStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().actorStats || [])
-            .filter(stat => stat?.name?.trim())
-            .filter(stat => stat.type === 'number' || stat.type === 'checkbox' || stat.type === 'location' || stat.type === 'locationList');
+            .filter(stat => stat?.name?.trim());
         const scalarStats = configuredStats.filter(stat => !stat.perActor);
         const perActorStats = configuredStats.filter(stat => stat.perActor);
         const statIds = new Set(scalarStats.map(stat => stat.id));
@@ -1613,20 +1612,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             scalarStats.forEach(stat => {
                 const existingValue = actor.statMap[stat.id];
-                if (stat.type === 'locationList') {
-                    actor.statMap[stat.id] = normalizeLocationListValue(existingValue);
-                    return;
-                }
-                const normalized = normalizeStatValue(existingValue, stat);
-                if (stat.type === 'location') {
-                    actor.statMap[stat.id] = typeof normalized === 'string' ? normalized : '';
-                    return;
-                }
-                actor.statMap[stat.id] = typeof normalized === 'boolean'
-                    ? normalized
-                    : Number.isFinite(normalized)
-                        ? Number(normalized)
-                        : 0;
+                actor.statMap[stat.id] = normalizeStatValue(existingValue, stat);
             });
 
             Object.keys(actor.statMap).forEach(statId => {
@@ -1661,8 +1647,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private syncLocationStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().locationStats || [])
-            .filter(stat => stat?.name?.trim())
-            .filter(stat => stat.type === 'number' || stat.type === 'checkbox' || stat.type === 'location' || stat.type === 'locationList');
+            .filter(stat => stat?.name?.trim());
         const statIds = new Set(configuredStats.map(stat => stat.id));
 
         Object.values(save.atlas || {}).forEach(location => {
@@ -1672,20 +1657,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             configuredStats.forEach(stat => {
                 const existingValue = location.statMap[stat.id];
-                if (stat.type === 'locationList') {
-                    location.statMap[stat.id] = normalizeLocationListValue(existingValue);
-                    return;
-                }
-                const normalized = normalizeStatValue(existingValue, stat);
-                if (stat.type === 'location') {
-                    location.statMap[stat.id] = typeof normalized === 'string' ? normalized : '';
-                    return;
-                }
-                location.statMap[stat.id] = typeof normalized === 'boolean'
-                    ? normalized
-                    : Number.isFinite(normalized)
-                        ? Number(normalized)
-                        : 0;
+                location.statMap[stat.id] = normalizeStatValue(existingValue, stat);
             });
 
             Object.keys(location.statMap).forEach(statId => {

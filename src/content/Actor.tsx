@@ -365,11 +365,9 @@ function clampActorStatValue(value: number, stat: Stat): number {
 }
 
 // Computes an actor's initial stat value from its configured initial value plus any modifiers whose conditions currently evaluate true.
-export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatInitial | undefined, context: ConditionContext): number | boolean | string {
-    if (stat.type === 'text' || stat.type === 'location') {
-        return typeof initial?.value === 'string' && initial.value
-            ? initial.value
-            : (typeof stat.default === 'string' ? stat.default : '');
+export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatInitial | undefined, context: ConditionContext): StatValue {
+    if (stat.type === 'text' || stat.type === 'location' || stat.type === 'option' || stat.type === 'locationList') {
+        return normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
     }
 
     if (stat.type === 'checkbox') {
@@ -395,9 +393,9 @@ export function applyActorInitialStats(actor: Actor, actorStats: Stat[], context
         actor.statMap = {};
     }
     actorStats
-        .filter(stat => stat?.name?.trim() && !stat.perActor && (isNumericDisplayType(stat.type) || stat.type === 'checkbox' || stat.type === 'location' || stat.type === 'text'))
+        .filter(stat => stat?.name?.trim() && !stat.perActor)
         .forEach(stat => {
-            actor.statMap[stat.id] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.name], context) as number | string | boolean;
+            actor.statMap[stat.id] = resolveInitialActorStatValue(stat, actor.statInitialMap?.[stat.id] || actor.statInitialMap?.[stat.name], context);
         });
 }
 
