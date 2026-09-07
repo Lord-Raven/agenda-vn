@@ -5,7 +5,7 @@ import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer
 import { NamePlate } from "../components/UiComponents";
 import { ActorCard } from "../components/ActorCard";
 import { useTooltip } from "../components/TooltipContext";
-import { Actor, getEmotionImage } from "../content/Actor";
+import { Actor, getEmotionImage, getOutfitById } from "../content/Actor";
 import { accumulateOutcomes, generateSkitScript, getCurrentActors, Skit } from "../content/Skit";
 import { getLocationImageUrl } from "../content/Location";
 import { ContentManagementScreen } from "./ContentManagementScreen";
@@ -320,6 +320,16 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                             return {
                                 filter: undefined,
                                 filterColor: undefined,
+                            };
+                        }}
+                        getActorScaleOffset={(actor, _script, index) => {
+                            const outfitId = getActorOutfitsAtIndex(_script, index, stage().getSave().actors)[actor.id] || actor.outfitId;
+                            const outfit = getOutfitById(actor, outfitId);
+                            return {
+                                scaleX: outfit?.scaleX ?? 1,
+                                scaleY: outfit?.scaleY ?? 1,
+                                offsetX: outfit?.offsetX ?? 0,
+                                offsetY: outfit?.offsetY ?? 0,
                             };
                         }}
                         onSubmitInput={handleSkitSubmit}

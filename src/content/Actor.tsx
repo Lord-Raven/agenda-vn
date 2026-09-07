@@ -237,10 +237,6 @@ export class Actor {
     perActorStatMap: PerActorStatValueMap = {}; // For perActor stats: map of stat name to a map of target actorId to explicit value override
     perActorValueRules: PerActorValueRuleMap = {}; // For perActor stats: map of stat name to this actor's own default-value rules, which take precedence over the stat's perActorDefaultRules
     schedule: ActorSchedule = {}; // Destinations are evaluated in insertion order; the first matching collection wins.
-    scaleX?: () => number = () => {return getActiveOutfit(this)?.scaleX ?? 1}; // Horizontal scale factor for the outfit, affecting the width of the character when rendered
-    scaleY?: () => number = () => {return getActiveOutfit(this)?.scaleY ?? 1}; // Vertical scale factor for the outfit, affecting the height of the character when rendered
-    offsetX?: () => number = () => {return getActiveOutfit(this)?.offsetX ?? 0}; // Horizontal offset for the outfit, affecting the position of the character when rendered, as a percentage of the image's scaled width.
-    offsetY?: () => number = () => {return getActiveOutfit(this)?.offsetY ?? 0}; // Vertical offset for the outfit, affecting the position of the character when rendered, as a percentage of the image's scaled height.
 
     /**
      * Rehydrate an Actor from saved data
@@ -642,7 +638,7 @@ function getActiveOutfit(actor: Actor): Outfit {
     }
 }
 
-function getOutfitById(actor: Actor, outfitId: string = ''): Outfit {
+export function getOutfitById(actor: Actor, outfitId: string = ''): Outfit {
     const resolvedOutfitId = outfitId || actor.outfitId;
     return actor.outfits.find((outfit) => outfit.id === resolvedOutfitId) || getActiveOutfit(actor);
 }
