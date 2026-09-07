@@ -1,13 +1,12 @@
-import { FC, useCallback, useEffect, useRef, useState } from "react";
-import { SaveType, Stage } from "../Stage";
+import { FC, useCallback, useEffect } from "react";
+import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer";
-import { Box, Typography } from "@mui/material";
-import { Button, NamePlate } from "../components/UiComponents";
+import { NamePlate } from "../components/UiComponents";
 import { ActorCard } from "../components/ActorCard";
 import { useTooltip } from "../components/TooltipContext";
-import { Actor, getActorLore, getEmotionImage } from "../content/Actor";
-import { accumulateOutcomes, determineEmotion, generateSkitScript, getCurrentActors, getCurrentLocation, Skit } from "../content/Skit";
+import { Actor, getEmotionImage } from "../content/Actor";
+import { accumulateOutcomes, generateSkitScript, getCurrentActors, Skit } from "../content/Skit";
 import { getLocationImageUrl } from "../content/Location";
 import { ContentManagementScreen } from "./ContentManagementScreen";
 import { Outcome } from "../content/Outcome";
@@ -17,7 +16,6 @@ import { GlobalStatBar } from "../components/GlobalStatBar";
 
 import {
     Send,
-    LastPage,
     PlayArrow,
     Menu as MenuIcon,
     EditNote,
@@ -136,11 +134,16 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
 	const handleSkitSubmit = useCallback(async (input: string, skitArg: Skit, index: number) => {
 		index = Math.max(0, index);
         setIsLoading(true);
-        const nextEntries = await generateSkitScript(skitArg, stage());
-        setIsLoading(false);
-        skitArg.script.push(...nextEntries);
-        console.log('handleSkitSubmit: Updated skitArg.script length:', skitArg.script.length);
-        stage().saveGame();
+        try {
+            const nextEntries = await generateSkitScript(skitArg, stage());
+            setIsLoading(false);
+            skitArg.script.push(...nextEntries);
+            console.log('handleSkitSubmit: Updated skitArg.script length:', skitArg.script.length);
+            stage().saveGame();
+        } catch (error) {
+            console.error('Error generating skit script:', error);
+            setIsLoading(false);
+        }
 
         return skitArg;
 	}, [stage]);
