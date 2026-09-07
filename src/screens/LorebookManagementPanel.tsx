@@ -823,6 +823,19 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                         </div>
 
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                                            {isCreatorMode && (
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={() => {
+                                                        const applied = stage().applyConfigurationLoreToSave(selectedLore.id);
+                                                        stage().showPriorityMessage(applied
+                                                            ? `${selectedLore.title || 'Lore entry'} applied to the active save.`
+                                                            : `${selectedLore.title || 'Lore entry'} does not exist in the active save yet.`);
+                                                    }}
+                                                >
+                                                    Apply
+                                                </Button>
+                                            )}
                                             <Button variant="secondary" onClick={cloneSelectedLore}>Clone</Button>
                                             <Button variant="danger" onClick={deleteSelectedLore}>Delete</Button>
                                         </div>

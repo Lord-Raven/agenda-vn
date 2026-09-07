@@ -627,6 +627,13 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         onDeactivate?.(location.id);
     };
 
+    const handleApplyToSave = () => {
+        const applied = stage().applyConfigurationLocationToSave(location.id);
+        stage().showPriorityMessage(applied
+            ? `${location.name || 'Location'} applied to the active save.`
+            : `${location.name || 'Location'} does not exist in the active save yet.`);
+    };
+
     const updateFocalFromPointer = (event: PointerEvent<HTMLElement>) => {
         const previewBounds = focalPreviewRef.current?.getBoundingClientRect();
         if (!previewBounds) {
@@ -1281,6 +1288,11 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                     zIndex: 1,
                                 }}
                             >
+                                {isCreatorMode && (
+                                    <Button onClick={handleApplyToSave} variant="secondary">
+                                        Apply
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={() => {
                                         setConfirmDialog({

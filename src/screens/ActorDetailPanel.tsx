@@ -1395,6 +1395,13 @@ ${indent}}`;
         onDeactivate?.(actor.id);
     };
 
+    const handleApplyToSave = () => {
+        const applied = stage().applyConfigurationActorToSave(actor.id);
+        stage().showPriorityMessage(applied
+            ? `${actor.name || 'Actor'} applied to the active save.`
+            : `${actor.name || 'Actor'} does not exist in the active save yet.`);
+    };
+
     const handleRegenerateEmotion = async (emotion: Emotion, promptDraft: string) => {
         if (regeneratingImages.has(emotion)) return;
         
@@ -2958,6 +2965,11 @@ ${indent}}`;
                             </section>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                                {isCreatorMode && (
+                                    <Button onClick={handleApplyToSave} variant="secondary">
+                                        Apply
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={() => {
                                         setConfirmDialog({

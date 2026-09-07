@@ -325,7 +325,6 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         getActorScaleOffset={(actor, _script, index) => {
                             const outfitId = getActorOutfitsAtIndex(_script, index, stage().getSave().actors)[actor.id] || actor.outfitId;
                             const outfit = getOutfitById(actor, outfitId);
-                            console.log(outfit);
                             return {
                                 scaleX: outfit?.scaleX ?? 1,
                                 scaleY: outfit?.scaleY ?? 1,

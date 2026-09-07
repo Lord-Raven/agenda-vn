@@ -585,6 +585,20 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                 </div>
             </div>
 
+            {isCreatorMode && (
+                <Button
+                    variant="secondary"
+                    onClick={() => {
+                        const applied = stageInstance.applyConfigurationMapToSave(map.id);
+                        stageInstance.showPriorityMessage(applied
+                            ? `${map.name || 'Map'} applied to the active save.`
+                            : `${map.name || 'Map'} does not exist in the active save yet.`);
+                    }}
+                    style={{ justifySelf: 'end' }}
+                >
+                    Apply
+                </Button>
+            )}
             <Button variant="danger" onClick={() => persist(() => { map.active = false; onDeactivate(); })} style={{ justifySelf: 'end' }}>Deactivate Map</Button>
         </div>
     );

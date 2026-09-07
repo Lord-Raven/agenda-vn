@@ -437,6 +437,57 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.syncUniversalSchedule();
     }
 
+    // Overwrites the save-game copy of an actor/location/map/lore entry with its canon configuration
+    // counterpart (matched by id), used by the "Apply" buttons in creator mode detail panels.
+    // Returns false if there is no configured entry or no matching save entry to apply it to.
+    applyConfigurationActorToSave(actorId: string): boolean {
+        const configuredActor = (this.getConfiguration().actors || []).find(actor => actor.id === actorId);
+        const save = this.getSave();
+        if (!configuredActor || !save.actors[actorId]) {
+            return false;
+        }
+        save.actors[actorId] = cloneActor(configuredActor, true);
+        this.syncActorStats(save);
+        this.saveGame();
+        return true;
+    }
+
+    applyConfigurationLocationToSave(locationId: string): boolean {
+        const configuredLocation = (this.getConfiguration().locations || []).find(location => location.id === locationId);
+        const save = this.getSave();
+        if (!configuredLocation || !save.atlas[locationId]) {
+            return false;
+        }
+        save.atlas[locationId] = cloneLocation(configuredLocation, true);
+        this.syncLocationStats(save);
+        this.saveGame();
+        return true;
+    }
+
+    applyConfigurationMapToSave(mapId: string): boolean {
+        const configuredMap = (this.getConfiguration().maps || []).find(map => map.id === mapId);
+        const save = this.getSave();
+        const index = (save.maps || []).findIndex(map => map.id === mapId);
+        if (!configuredMap || index === -1) {
+            return false;
+        }
+        save.maps[index] = cloneMap(configuredMap);
+        this.saveGame();
+        return true;
+    }
+
+    applyConfigurationLoreToSave(loreId: string): boolean {
+        const configuredLore = (this.getConfiguration().lorebook || []).find(entry => entry.id === loreId);
+        const save = this.getSave();
+        const index = (save.lorebook || []).findIndex(entry => entry.id === loreId);
+        if (!configuredLore || index === -1 || !save.lorebook) {
+            return false;
+        }
+        save.lorebook[index] = cloneLore(configuredLore);
+        this.saveGame();
+        return true;
+    }
+
     async load(): Promise<Partial<LoadResponse<InitStateType, ChatStateType, MessageStateType>>> {
 
         // Test whether userId has storage access to update this bot.
