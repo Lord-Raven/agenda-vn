@@ -213,3 +213,15 @@ export function parseStructuredResponse(
 
     return parsedValues;
 }
+
+export function parseStructuredListValue(value: string, itemTag: string): string[] {
+    const normalizedItemTag = normalizeTag(itemTag);
+    const itemRegex = new RegExp(`<\\s*${normalizedItemTag}\\s*>([\\s\\S]*?)<\\s*\\/\\s*${normalizedItemTag}\\s*>`, 'gi');
+    const items = Array.from(value.matchAll(itemRegex))
+        .map(match => match[1]?.trim() || '')
+        .filter(Boolean);
+
+    return items.length > 0
+        ? items
+        : value.split(',').map(item => item.trim()).filter(Boolean);
+}

@@ -19,6 +19,7 @@ import {
     buildStructuredResponseFormat,
     getStructuredFieldTags,
     parseStructuredResponse,
+    parseStructuredListValue,
     StructuredFieldDefinition,
 } from "./utils/StructuredResponse.js";
 
@@ -89,7 +90,7 @@ const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'participants',
         label: 'PARTICIPANTS',
-        description: 'Comma-separated character names selected from Available Characters who should be present in the intro.',
+        description: '<participant>Character Name</participant> for each character selected from Available Characters who should be present in the intro.',
     },
 ];
 
@@ -2036,8 +2037,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return buildPrompt()
             .addBlock('Instructions',
                 `This is a preparatory request to review existing character profiles for a narrative game. ` +
-                `Determine which characters, if any, have background details that should be revised to account for the player's identity, role, stats, or choices established below. ` +
-                `Many—probably most—characters will require no change; only select those whose profiles plausibly conflict with or ignore this context.`)
+                `Identify the top twenty characters, if any, that require profile revision to account for the player's identity, role, stats, or choices established below. ` +
+                `Many—probably most—characters will require no substantial change; focus on selecting only those whose profiles clearly conflict with or would greatly benefit from this context.`)
             .addBlock('Player Identity', playerIdentity)
             .addBlock('Active Configuration Context', this.buildActiveSettingContextSummary(save))
             .addBlock('Available Characters', candidateActors.map(actor =>
@@ -2193,7 +2194,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private async generateIntroSkitSeed(save: SaveType): Promise<{ guidance: string; locationId: string; initialActorIds: string[] } | null> {
         const locations = Object.values(save.atlas || {});
         const availableActors = Object.values(save.actors || {}).filter(actor => actor.id !== save.playerId);
-        const preferredActor = availableActors[0];
 
         if (!locations.length) {
             return null;
@@ -2207,13 +2207,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             response = await this.generateText(
                 buildPrompt()
                     .addBlock('Instructions',
-                        `This is a preparatory request for the opening scene of a visual novel. ` +
-                        `Generate concise but evocative guidance for the intro skit, plus the best location and 1-3 participants. ` +
-                        `The guidance should introduce the core concept of the world and a strong first-scene hook. ` +
-                        `Prefer including the preferred character if it fits naturally.`)
-                    .addBlock('Preferred Character', preferredActor
-                        ? `${preferredActor.name}: ${preferredActor.profile || preferredActor.description || 'No profile available.'}`
-                        : 'None available.')
+                        `This is a preparatory request for the opening scene of a visual novel centering on {{user}}. ` +
+                        `Generate concise but evocative guidance for the intro skit, plus a suitable location and 1-3 participants. ` +
+                        `The guidance should introduce the core concept of the world and a strong first-scene hook. `)
                     .addBlock('Available Locations', locations.map(location =>
                         `${location.name}: ${location.description || 'No description available.'}`,
                     ))
@@ -2227,14 +2223,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                             {
                                 guidance: `${this.getPlayerActor()?.name || 'The player'} arrives expecting a normal beginning, but the first conversation immediately reveals this world is stranger, more intimate, and more precarious than it first appears.`,
                                 location: locations[0]?.name || 'Unknown Location',
-                                participants: preferredActor ? preferredActor.name : '',
+                                participants: '<participant>John Doe</participant><participant>Jane Smith</participant>',
                             },
                             { includeEndTag: true },
                         ))
                     .addBlock('Additional Context', generateContext(undefined, this, 3))
                     .format(),
                 20,
-                360,
+                1000,
                 INTRO_SKIT_FIELDS,
             ).catch(error => {
                 console.error('Error generating intro skit seed', error);
@@ -2256,8 +2252,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             const matchedLocation = findBestNameMatch(locationText, locations, ['name']);
             const locationId = matchedLocation?.id || locations[0].id;
-            const initialActorIds = participantsText
-                .split(',')
+            const initialActorIds = parseStructuredListValue(participantsText, 'participant')
                 .map(name => findBestNameMatch(name.trim(), availableActors, ['name'])?.id)
                 .filter((id): id is string => Boolean(id))
                 .slice(0, 3);

@@ -10,6 +10,7 @@ import {
     buildStructuredExampleResponse,
     buildStructuredResponseFormat,
     parseStructuredResponse,
+    parseStructuredListValue,
     parseXmlTagsToObjects,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
@@ -115,7 +116,7 @@ const SKIT_GUIDANCE_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'participants',
         label: 'PARTICIPANTS',
-        description: 'Comma-separated character names selected from Available Characters who will participate in the scene.',
+        description: '<participant>Character Name</participant> for each character from Available Characters who will participate in the scene.',
     },
 ];
 
@@ -397,7 +398,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             SKIT_GUIDANCE_FIELDS,
                             {
                                 guidance: `${playerName} is relaxing at the Amber Drop when Cyanea walks in. Persephone hovers nearby, pretending not to listen to their exchange, but inevitably cutting in when things take an unexpected turn.`,
-                                participants: 'Cyanea, Persephone',
+                                participants: '<participant>Cyanea</participant><participant>Persephone</participant>',
                             },
                             { includeEndTag: true }
                         ))
@@ -421,7 +422,9 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     console.log('Guidance Text:', guidanceText);
                     console.log('Participants Text:', participantsText);
                     skit.guidance = guidanceText;
-                    const selectedActorIds = participantsText.split(',').map(name => findBestNameMatch(name.trim(), availableActors, ['name'])?.id).filter(id => id !== undefined) as string[];
+                    const selectedActorIds = parseStructuredListValue(participantsText, 'participant')
+                        .map(name => findBestNameMatch(name, availableActors, ['name'])?.id)
+                        .filter(id => id !== undefined) as string[];
                     console.log('Selected Actor IDs:', selectedActorIds);
                     skit.initialActors = Array.from(new Set([...actorsAtLocation.map(actor => actor.id), ...selectedActorIds]));
                     break;
