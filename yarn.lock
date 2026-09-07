@@ -666,9 +666,9 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@lord-raven/novel-visualizer@lord-raven/novel-visualizer#v0.2.75":
-  version "0.2.74"
-  resolved "https://codeload.github.com/lord-raven/novel-visualizer/tar.gz/e3bbac4f0fbb8ac750a24b45c1d3c686231a9f8f"
+"@lord-raven/novel-visualizer@lord-raven/novel-visualizer#v0.2.76":
+  version "0.2.75"
+  resolved "https://codeload.github.com/lord-raven/novel-visualizer/tar.gz/9d49ba4c145b5df936dc379232b9373199eb3495"
 
 "@microsoft/api-extractor-model@7.28.13":
   version "7.28.13"
