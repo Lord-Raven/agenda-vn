@@ -48,9 +48,9 @@ export const buildCreatorNotesHtml = ({
         .slice(0, 100)
         .map((actor) => {
             const actorName = escapeHtml(actor.displayName || actor.name || 'Unnamed Character');
-            const actorBackground = escapeHtml((actor.background || actor.description || 'No background provided.').replace(/\s+/g, ' ').trim());
+            const actorSummary = escapeHtml((actor.summary || 'No summary provided.').replace(/\s+/g, ' ').trim());
             const portraitUrl = getEmotionImage(actor, 'neutral', stage, actor.outfitId) || getEmotionImage(actor, 'base', stage, actor.outfitId) || ' ';
-            return `<div class="cast-item" tabindex="0" data-cast-item><img src="${escapeHtml(portraitUrl)}" alt="${actorName}" class="cast-portrait" /><span class="cast-name">${actorName}</span><div class="cast-tooltip">${actorBackground}</div></div>`;
+            return `<div class="cast-item" tabindex="0" data-cast-item><img src="${escapeHtml(portraitUrl)}" alt="${actorName}" class="cast-portrait" /><span class="cast-name">${actorName}</span><div class="cast-tooltip">${actorSummary}</div></div>`;
         })
         .join('');
 

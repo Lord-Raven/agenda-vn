@@ -30,6 +30,7 @@ const ACTOR_DETAIL_GENERATION_FIELDS = [
     { key: 'name', label: 'Name', description: 'Replaces both the canonical name and the display name.' },
     { key: 'role', label: 'Role', description: `Updates the actor's social or narrative role.` },
     { key: 'birthDate', label: 'Birth Date', description: `Updates the actor's birth date for age calculations.` },
+    { key: 'summary', label: 'Summary', description: 'Updates the one- to two-sentence character and role summary.' },
     { key: 'description', label: 'Description', description: 'Updates the physical description.' },
     { key: 'background', label: 'Background', description: 'Updates the backstory and fixed foundation.' },
     { key: 'profile', label: 'Profile', description: 'Updates the ongoing personality and motives.' },
@@ -47,6 +48,7 @@ const DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION: ActorDetailGenerationSelection 
     name: true,
     role: true,
     birthDate: true,
+    summary: true,
     description: true,
     background: true,
     profile: true,
@@ -227,6 +229,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         displayName: string;
         role: string;
         birthDate: string;
+        summary: string;
         category: string;
         description: string;
         background: string;
@@ -241,6 +244,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         displayName: actor.displayName || '',
         role: actor.role || '',
         birthDate: actor.birthDate || '',
+        summary: actor.summary || '',
         category: actor.category ?? '',
         description: actor.description || '',
         background: actor.background || '',
@@ -533,6 +537,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         persistedActor.displayName = nextEditedActor.displayName.trim() || nextEditedActor.name;
         persistedActor.role = nextEditedActor.role.trim();
         persistedActor.birthDate = nextEditedActor.birthDate.trim();
+        persistedActor.summary = nextEditedActor.summary.trim();
         persistedActor.category = nextEditedActor.category.trim();
         persistedActor.description = nextEditedActor.description;
         persistedActor.background = nextEditedActor.background;
@@ -727,6 +732,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             displayName: actor.displayName || '',
             role: actor.role || '',
             birthDate: actor.birthDate || '',
+            summary: actor.summary || '',
             category: actor.category ?? '',
             description: actor.description || '',
             background: actor.background || '',
@@ -1230,7 +1236,9 @@ ${indent}}`;
             name: nextEditedActor.name.trim() || actor.name,
             role: nextEditedActor.role,
             birthDate: nextEditedActor.birthDate,
+            summary: nextEditedActor.summary,
             personality: [
+                nextEditedActor.summary,
                 nextEditedActor.description,
                 nextEditedActor.background,
                 isProfileBackedByLore ? nextEditedActor.lore : nextEditedActor.profile,
@@ -1248,6 +1256,7 @@ ${indent}}`;
             displayName: actor.displayName,
             role: actor.role,
             birthDate: actor.birthDate,
+            summary: actor.summary,
             description: actor.description,
             background: actor.background,
             profile: actor.profile,
@@ -1267,6 +1276,7 @@ ${indent}}`;
                 displayName: actor.displayName,
                 role: actor.role,
                 birthDate: actor.birthDate,
+                summary: actor.summary,
                 description: actor.description,
                 background: actor.background,
                 profile: actor.profile,
@@ -1295,6 +1305,9 @@ ${indent}}`;
             }
             if (selectedFields.birthDate) {
                 actor.birthDate = distilledActor.birthDate || actor.birthDate;
+            }
+            if (selectedFields.summary) {
+                actor.summary = distilledActor.summary || actor.summary;
             }
             if (selectedFields.description) {
                 actor.description = distilledActor.description || actor.description;
@@ -1339,6 +1352,7 @@ ${indent}}`;
             actor.displayName = previousGeneratedState.displayName;
             actor.role = previousGeneratedState.role;
             actor.birthDate = previousGeneratedState.birthDate;
+            actor.summary = previousGeneratedState.summary;
             actor.description = previousGeneratedState.description;
             actor.background = previousGeneratedState.background;
             actor.profile = previousGeneratedState.profile;
@@ -1939,6 +1953,32 @@ ${indent}}`;
                                             style={{
                                                 width: '100%',
                                                 minHeight: '100px',
+                                                borderRadius: '5px',
+                                                resize: 'vertical',
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Summary
+                                        </label>
+                                        <TextArea
+                                            value={editedActor.summary}
+                                            onChange={(e) => handleInputChange('summary', e.target.value)}
+                                            placeholder="One or two sentences summarizing this character and their role"
+                                            maxLength={500}
+                                            style={{
+                                                width: '100%',
+                                                minHeight: '72px',
                                                 borderRadius: '5px',
                                                 resize: 'vertical',
                                             }}

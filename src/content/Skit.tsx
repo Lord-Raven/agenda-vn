@@ -390,7 +390,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         `  ${skit.initialLocationId ? getLocationName(skit.initialLocationId, stage) : 'Unknown Location'}\n` +
                         `    ${getLocationDescription(skit.initialLocationId, stage) || 'No description available.'}`)
                     .addBlock('Known Characters',
-                        availableActors.map(actor => buildActorContext(actor, '', stage, [], ['profile']).format()))
+                        availableActors.map(actor => buildActorContext(actor, '', stage, [], ['summary', 'profile']).format()))
                     .addBlock('Response Format',
                         buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
                     .addBlock('Additional Context',
@@ -440,7 +440,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             buildPrompt()
                 .addBlock(`Instructions`,
                     `${skit.script.length == 0 ? 'Produce the initial moments of a scene (perhaps joined in medias res)' : 'Extend or conclude the current scene script'} with three to five entries, ` +
-                    `based upon the Premise and the specified Scene Prompt. Involve only the Present Characters; do not introduce Absent Characters. ` +
+                    `based upon the Premise and the specified Scene Prompt. ` +
                     `The script should tacitly consider characters motives, relationships, and past events. ` +
                     `\n\nFollow the structure of the strict Example Script formatting; ` +
                     `actions are depicted in prose and character dialogue in quotation marks. ` +

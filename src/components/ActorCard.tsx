@@ -1,7 +1,7 @@
 import { FC, useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Stage } from '../Stage';
-import { isStatExposed, resolveStatDisplayName, Stat, StatValue } from '../content/Stat';
+import { isStatExposed, Stat, StatValue } from '../content/Stat';
 import { Actor } from '../content/Actor';
 import { NamePlate } from './UiComponents';
 import { resolveIcon } from './StatRating';
@@ -124,6 +124,12 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                 </Box>
             )}
 
+            {actor.summary && (
+                <Box sx={{ fontSize: '0.85rem', lineHeight: 1.45, color: 'var(--agenda-text-primary)', textAlign: 'center' }}>
+                    {actor.summary}
+                </Box>
+            )}
+
             {exposedStats.length > 0 && (
                 <Box
                     sx={{
@@ -136,7 +142,6 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                 >
                     {exposedStats.map(stat => {
                         const LabelIcon = stat.labelIconName ? resolveIcon(stat.labelIconName) : null;
-                        const displayName = resolveStatDisplayName(stat);
 
                         return (
                             <Box
@@ -152,7 +157,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                             >
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', minWidth: 0 }}>
                                     {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
-                                    <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</Box>
+                                    <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.name || ''}</Box>
                                 </Box>
                                 <StatValueContainer stat={stat} value={resolveStatValue(actor, stat)} atlas={stage().getSave()?.atlas} />
                             </Box>

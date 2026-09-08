@@ -230,9 +230,10 @@ export class Actor {
     displayName: string = ''; // Name as it appears in NamePlate and chats, used everywhere beyond content management. Fall back to name.
     role: string = ''; // Optional role for this actor. This displays beneath the name in the NamePlate and under name in the ActorCard.
     birthDate: string = ''; // Optional birth date for this actor, in YYYY-MM-DD format. Used for age calculations and display.
+    summary: string = ''; // A one-to-two sentence summary of this character. Used on ActorCard and in Creator Notes generation.
     description: string = ''; // Core physical description—not outfit-oriented
     background: string = ''; // Backstory and integral traits of this character (as opposed to "profile"/lore entry, which contains evolving details).
-    profile: string = ''; // Evolving personality profile that will eventually portray their character arc
+    profile: string = ''; // Evolving personality profile backed by a lore entry; this reflects the character's development and motives over time.
     category: string = ''; // A category for filtering or organization in the UI. Could be a role ("good guys", "baddies") or could be a type of character ("human", "elf"); it is for organizational and not gameplay purposes.
     outfitId: string = ''; // The ID of the current outfit for this actor; if empty, use the first outfit index
     outfits: Outfit[] = []; // Sets of outfits representing transformations for this actor; each outfit has a full set of emotions
@@ -297,6 +298,11 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
         key: 'birthDate',
         label: 'BIRTH DATE',
         description: 'A birth date for the character in YYYY-MM-DD format, based on age and the current date.',
+    },
+    {
+        key: 'summary',
+        label: 'SUMMARY',
+        description: 'A very brief summary of the character and their role in the world or story. Use no more than two sentences; one sentence preferred.',
     },
     {
         key: 'description',
@@ -480,6 +486,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
             return `${otherActor.name}\n` +
                 (otherActor.role ? `  Role: ${otherActor.role}\n` : '') +
                 (otherActor.birthDate ? `  Birth Date: ${otherActor.birthDate}\n` : '') +
+                `  Summary: ${otherActor.summary || 'No summary available.'}\n` +
                 `  Background: ${otherActor.background || 'No background available.'}\n` +
                 `  Profile: ${getActorLore(otherActor.id, stage) || 'No profile available.'}`
         })
@@ -510,6 +517,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
                         name: 'Jane Doe',
                         role: 'Frontier Mercenary',
                         birthDate: '1992-08-14',
+                        summary: 'Jane is a frontier mercenary driven by loyalty to the people she cannot leave behind.',
                         description: 'A tall, athletic woman with short, dark hair and piercing blue eyes. She rarely smiles, but when she does, it lights up her face.',
                         outfit_description: 'She wears a simple, utilitarian outfit made from durable materials in dark colors. Lots of pockets and zippers.',
                         outfit_name: 'Adventurer\'s Gear',
@@ -552,6 +560,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
         actor.displayName = actor.name;
         actor.role = parsedData['role'] || actor.role || '';
         actor.birthDate = parsedData['birthDate'] || actor.birthDate || '';
+        actor.summary = parsedData['summary'] || actor.summary || '';
         actor.description = parsedData['description'] || actor.description || '';
         actor.background = parsedData['background'] || actor.background || '';
         actor.profile = parsedData['profile'] || actor.profile || '';
@@ -936,11 +945,15 @@ const formatActorStatValue = (value: StatValue, stat: Stat, atlas?: { [key: stri
 };
 
 // Used to build actor context for LLM requests. The `options` parameter allows specifying which elements of the actor's information should be included, such as outfit details, description, profile, stats, and lore.
-export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, otherActors: Actor[] = [], options: string[] = ['outfit', 'wardrobe', 'description', 'profile', 'stats', 'lore']): PromptBuilder {
+export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, otherActors: Actor[] = [], options: string[] = ['outfit', 'wardrobe', 'summary', 'description', 'profile', 'stats', 'lore']): PromptBuilder {
     const builder = buildPrompt(actor.displayName || actor.name);
     const currentOutfit = actor.outfits.find(a => a.id === outfitId) ?? actor.outfits[0];
     const wardrobe = actor.outfits.filter(o => o.id !== currentOutfit?.id && o.emotionPack['neutral']);
     const save = stage.getSave();
+
+    if (options.includes('summary') && actor.summary) {
+        builder.addBlock('Summary', actor.summary);
+    }
 
     if (options.includes('description') && actor.description) {
         builder.addBlock('Description', actor.description);
