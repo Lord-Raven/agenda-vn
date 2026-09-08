@@ -195,9 +195,6 @@ export const NamePlate: FC<NamePlateProps> = ({
 	const nameColor = lighten(themeColor, 0.5)
 	const { clearTooltip } = useTooltip();
 
-	const fontSizeMultiplier = getFontSizeMultiplier(actor.themeFontFamily || 'inherit');
-	console.log(`Current font size multiplier for ${actor.themeFontFamily}: ${fontSizeMultiplier}`);
-
 	return (
 		<Box
 			component={'div'}
