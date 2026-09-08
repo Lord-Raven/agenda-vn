@@ -1,7 +1,7 @@
 import { FC } from 'react';
 import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, isNumericDisplayType } from '../content/Stat';
 import { Stage } from '../Stage';
-import { LocationMultiSelect, LocationSelect, TextInput } from './UiComponents';
+import { LocationMultiSelect, LocationSelect, TextArea, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
 
 interface StatValueInputProps {
@@ -16,7 +16,7 @@ interface StatValueInputProps {
 
 export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, locations = [], stage, allowExpression = false }) => {
     if (!stat) {
-        return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
+        return <TextArea fullWidth rows={3} value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
     }
 
     if (stat.type === 'checkbox') {
@@ -41,7 +41,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     }
 
     if (stat.type === 'text') {
-        return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
+        return <TextArea fullWidth rows={3} value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
     }
 
     if (stat.type === 'location') {

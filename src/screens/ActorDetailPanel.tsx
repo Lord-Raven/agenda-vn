@@ -2,7 +2,7 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, StatValueRule, normalizeLocationListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, isNumericDisplayType, Stat, StatValue, StatValueRule, normalizeLocationListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ConditionContext } from '../content/Condition';
@@ -14,6 +14,7 @@ import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { CachedImage } from '../components/CachedImage';
 import { OutfitPositioningModal } from '../components/OutfitPositioningModal';
+import { StatValueInput } from '../components/StatValueInput';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -123,16 +124,29 @@ const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: st
     return nextMap;
 };
 
-const cloneActorStatModifier = (modifier: ActorStatModifier): ActorStatModifier => ({
+const normalizeActorStatModifierAmount = (stat: Stat, amount: unknown): StatValue => {
+    if (stat.type === 'text' || stat.type === 'location' || stat.type === 'option') {
+        return typeof amount === 'string' ? amount : String(resolveStatDefault(stat));
+    }
+    if (stat.type === 'locationList') {
+        return Array.isArray(amount) ? normalizeLocationListValue(amount) : normalizeLocationListValue(resolveStatDefault(stat));
+    }
+    if (stat.type === 'checkbox') {
+        return typeof amount === 'boolean' ? amount : Boolean(resolveStatDefault(stat));
+    }
+    return Number.isFinite(amount) ? Number(amount) : 0;
+};
+
+const cloneActorStatModifier = (modifier: ActorStatModifier, stat: Stat): ActorStatModifier => ({
     id: modifier.id,
-    amount: Number.isFinite(modifier.amount) ? Number(modifier.amount) : 0,
+    amount: normalizeActorStatModifierAmount(stat, modifier.amount),
     conditions: (modifier.conditions || []).map((collection) => [...collection]),
 });
 
 const cloneActorStatInitial = (initial: ActorStatInitial | undefined, stat: Stat): ActorStatInitial => {
     return {
         value: normalizeStatValue(initial?.value, stat),
-        modifiers: (initial?.modifiers || []).map(cloneActorStatModifier),
+        modifiers: (initial?.modifiers || []).map((modifier) => cloneActorStatModifier(modifier, stat)),
     };
 };
 
@@ -873,10 +887,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         });
     };
 
-    const updateActorStatModifierAmount = (stat: Stat, modifierId: string, amount: number) => {
+    const updateActorStatModifierAmount = (stat: Stat, modifierId: string, amount: StatValue) => {
         setEditedStatInitialMap((prev) => {
             const current = cloneActorStatInitial(prev[stat.id], stat);
-            current.modifiers = current.modifiers.map((modifier) => modifier.id === modifierId ? { ...modifier, amount: Number.isFinite(amount) ? amount : 0 } : modifier);
+            current.modifiers = current.modifiers.map((modifier) => modifier.id === modifierId ? { ...modifier, amount: normalizeActorStatModifierAmount(stat, amount) } : modifier);
             return { ...prev, [stat.id]: current };
         });
     };
@@ -2086,9 +2100,10 @@ ${indent}}`;
                                                             )}
 
                                                             {stat.type === 'text' && (
-                                                                <TextInput
+                                                                <TextArea
                                                                     value={typeof editorValue === 'string' ? editorValue : ''}
                                                                     onChange={(e) => handleActorStatEditorValueChange(stat, e.target.value)}
+                                                                    rows={3}
                                                                     style={{ maxWidth: '220px' }}
                                                                 />
                                                             )}
@@ -2198,7 +2213,7 @@ ${indent}}`;
                                                                     </div>
                                                                 )}
 
-                                                                {isCreatorMode && stat.type !== 'text' && stat.type !== 'location' && stat.type !== 'locationList' && (
+                                                                {isCreatorMode && (isNumericDisplayType(stat.type) || stat.type === 'text' || stat.type === 'location' || stat.type === 'locationList') && (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                                     <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
                                                                         Default Modifiers
@@ -2221,13 +2236,16 @@ ${indent}}`;
                                                                             }}
                                                                         >
                                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Amount</span>
-                                                                                <TextInput
-                                                                                    type="number"
-                                                                                    value={modifier.amount}
-                                                                                    onChange={(e) => updateActorStatModifierAmount(stat, modifier.id, Number(e.target.value))}
-                                                                                    style={{ maxWidth: '120px' }}
-                                                                                />
+                                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>{isNumericDisplayType(stat.type) ? 'Amount' : 'Replacement'}</span>
+                                                                                <div style={{ flex: 1 }}>
+                                                                                    <StatValueInput
+                                                                                        stat={stat}
+                                                                                        value={modifier.amount}
+                                                                                        onChange={(nextValue) => updateActorStatModifierAmount(stat, modifier.id, nextValue)}
+                                                                                        locations={locationOptions}
+                                                                                        stage={stage}
+                                                                                    />
+                                                                                </div>
                                                                                 <Button
                                                                                     variant="danger"
                                                                                     onClick={() => removeActorStatModifier(stat, modifier.id)}

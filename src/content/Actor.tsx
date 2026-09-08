@@ -13,10 +13,10 @@ import {
 } from "../utils/StructuredResponse.js";
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableActorTarget, pickSeededItem } from './Condition';
 import { formatCurrentDate } from './Skit';
-// A single conditional adjustment to an actor's initial stat value; applied when its conditions evaluate true at game start.
+// A single conditional modifier to an actor's initial stat value; numeric stats are adjusted, while text/location stats are replaced.
 export type ActorStatModifier = {
     id: string;
-    amount: number;
+    amount: StatValue;
     conditions: ConditionCollection[];
 };
 
@@ -28,7 +28,13 @@ export type ActorStatInitial = {
 
 const cloneStatModifier = (modifier: any): ActorStatModifier => ({
     id: modifier?.id || generateUuid(),
-    amount: Number.isFinite(modifier?.amount) ? Number(modifier.amount) : 0,
+    amount: Array.isArray(modifier?.amount)
+        ? normalizeLocationListValue(modifier.amount)
+        : typeof modifier?.amount === 'boolean' || typeof modifier?.amount === 'string'
+            ? modifier.amount
+            : Number.isFinite(modifier?.amount)
+                ? Number(modifier.amount)
+                : 0,
     conditions: Array.isArray(modifier?.conditions)
         ? modifier.conditions.map((collection: unknown) => Array.isArray(collection) ? [...collection] : [])
         : [],
@@ -95,7 +101,9 @@ const cloneStatInitialMap = (statInitialMap: unknown): { [key: string]: ActorSta
     return Object.fromEntries(Object.entries(statInitialMap as Record<string, any>).map(([statName, initial]) => [
         statName,
         {
-            value: typeof initial?.value === 'boolean'
+            value: Array.isArray(initial?.value)
+                ? normalizeLocationListValue(initial.value)
+                : typeof initial?.value === 'boolean'
                 ? initial.value
                 : typeof initial?.value === 'string'
                     ? initial.value
@@ -364,9 +372,17 @@ function clampActorStatValue(value: number, stat: Stat): number {
     return normalized;
 }
 
-// Computes an actor's initial stat value from its configured initial value plus any modifiers whose conditions currently evaluate true.
+// Computes an actor's initial stat value from its configured initial value and any modifiers whose conditions currently evaluate true.
 export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatInitial | undefined, context: ConditionContext): StatValue {
-    if (stat.type === 'text' || stat.type === 'location' || stat.type === 'option' || stat.type === 'locationList') {
+    if (stat.type === 'text' || stat.type === 'location' || stat.type === 'locationList') {
+        return (initial?.modifiers || []).reduce((currentValue, modifier) => {
+            return evaluateConditionCollections(modifier.conditions, context)
+                ? normalizeStatValue(modifier.amount, stat, { evaluateDiceNotation: true })
+                : currentValue;
+        }, normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true }));
+    }
+
+    if (stat.type === 'option') {
         return normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
     }
 
@@ -387,7 +403,7 @@ export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatIniti
     return clampActorStatValue(baseValue + modifierTotal, stat);
 }
 
-// Seeds an actor's statMap from its statInitialMap (initial value +/- applicable modifiers); used when initializing actors for a new game.
+// Seeds an actor's statMap from its statInitialMap; used when initializing actors for a new game.
 export function applyActorInitialStats(actor: Actor, actorStats: Stat[], context: ConditionContext): void {
     if (!actor.statMap || typeof actor.statMap !== 'object') {
         actor.statMap = {};
