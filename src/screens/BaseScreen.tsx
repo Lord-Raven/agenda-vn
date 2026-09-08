@@ -11,7 +11,7 @@ import { MapScreen } from './MapScreen';
 import { SkitScreen } from './SkitScreen';
 import { LoadingScreen } from './LoadingScreen';
 import { applyUiSettingsToRoot } from '../content/Style';
-import { FontHandler } from '../components/FontHandler';
+import { collectFontFamilies, FontHandler } from "@lord-raven/novel-visualizer";
 
 /*
  * Base screen management; the Stage class will display this, and this will track the current screen being displayed.
@@ -58,9 +58,23 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
         applyUiSettingsToRoot(stage().getUiSettings());
     }, [stage, screenType]);
 
+    const collectStageFontFamilies = (stageInstance: Stage): string[] => {
+        const uiSettings = stageInstance.getUiSettings();
+        const save = stageInstance.getSave();
+        const configuration = stageInstance.getConfiguration();
+        const fontStacks = [
+            uiSettings.primaryFontFamily,
+            uiSettings.secondaryFontFamily,
+            uiSettings.flavorFontFamily,
+            ...Object.values(save.actors || {}).map(actor => actor.themeFontFamily),
+            ...(configuration.actors || []).map(actor => actor.themeFontFamily),
+        ];
+        return collectFontFamilies(fontStacks);
+    };
+
     return (
         <div className="agenda-screen-root">
-            <FontHandler stage={stage} />
+            <FontHandler fontFamilies={collectStageFontFamilies(stage())} />
             <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                     key={screenType}

@@ -2,7 +2,7 @@ import React, { FC, useEffect, useMemo } from 'react';
 import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Location, getLocationImageUrl } from '../content/Location';
-import { buildGoogleFontImportRules } from '../components/FontHandler';
+import { buildGoogleFontImportRules } from '@lord-raven/novel-visualizer';
 
 export interface CreatorNotesHtmlProps {
     stage: Stage;
