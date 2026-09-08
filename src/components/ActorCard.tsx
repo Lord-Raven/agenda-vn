@@ -125,7 +125,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
             )}
 
             {actor.summary && (
-                <Box sx={{ fontSize: '0.85rem', lineHeight: 1.45, color: 'var(--agenda-text-primary)', textAlign: 'center' }}>
+                <Box sx={{ fontSize: '0.85rem', lineHeight: 1.45, color: 'var(--agenda-text-primary)', textAlign: 'left' }}>
                     {actor.summary}
                 </Box>
             )}

@@ -16,7 +16,7 @@ interface StatValueInputProps {
 
 export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, locations = [], stage, allowExpression = false }) => {
     if (!stat) {
-        return <TextArea fullWidth rows={3} value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
+        return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
     }
 
     if (stat.type === 'checkbox') {
