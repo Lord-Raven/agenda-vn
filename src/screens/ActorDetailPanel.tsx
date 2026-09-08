@@ -1935,31 +1935,6 @@ ${indent}}`;
                                     </div>
 
                                     <div>
-                                        <label 
-                                            style={{
-                                                display: 'block',
-                                                color: 'var(--agenda-highlight)',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold',
-                                                marginBottom: '8px',
-                                            }}
-                                        >
-                                            Physical Description
-                                        </label>
-                                        <TextArea
-                                            value={editedActor.description}
-                                            onChange={(e) => handleInputChange('description', e.target.value)}
-                                            placeholder="Core physical appearance, separate from clothing or outfit details"
-                                            style={{
-                                                width: '100%',
-                                                minHeight: '100px',
-                                                borderRadius: '5px',
-                                                resize: 'vertical',
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div>
                                         <label
                                             style={{
                                                 display: 'block',
@@ -1979,6 +1954,31 @@ ${indent}}`;
                                             style={{
                                                 width: '100%',
                                                 minHeight: '72px',
+                                                borderRadius: '5px',
+                                                resize: 'vertical',
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label 
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Physical Description
+                                        </label>
+                                        <TextArea
+                                            value={editedActor.description}
+                                            onChange={(e) => handleInputChange('description', e.target.value)}
+                                            placeholder="Core physical appearance, separate from clothing or outfit details"
+                                            style={{
+                                                width: '100%',
+                                                minHeight: '100px',
                                                 borderRadius: '5px',
                                                 resize: 'vertical',
                                             }}
