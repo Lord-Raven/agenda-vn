@@ -14,6 +14,7 @@ import { useTooltip } from './TooltipContext';
 import { LocationPortrait, LocationLike } from './LocationPortrait';
 import { PickerOption, SearchableOptionPicker } from './SearchableOptionPicker';
 import { Stage } from '../Stage';
+import { getFontSizeMultiplier } from '@lord-raven/novel-visualizer';
 
 /* ===============================================
    PANEL COMPONENTS (Using MUI Paper with custom styling)
@@ -194,6 +195,9 @@ export const NamePlate: FC<NamePlateProps> = ({
 	const nameColor = lighten(themeColor, 0.5)
 	const { clearTooltip } = useTooltip();
 
+	const fontSizeMultiplier = getFontSizeMultiplier(actor.themeFontFamily || 'inherit');
+	console.log(`Current font size multiplier for ${actor.themeFontFamily}: ${fontSizeMultiplier}`);
+
 	return (
 		<Box
 			component={'div'}
@@ -252,7 +256,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 				<span
 					style={{
 						fontFamily: actor.themeFontFamily || 'inherit',
-						fontSize: 'inherit',
+						fontSize: `${getFontSizeMultiplier(actor.themeFontFamily || 'inherit') * 1.2}em`,
 						lineHeight: 1.2,
 						color: nameColor,
 					}}
