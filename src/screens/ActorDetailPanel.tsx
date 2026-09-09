@@ -543,9 +543,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         persistedActor.category = nextEditedActor.category.trim();
         persistedActor.description = nextEditedActor.description;
         persistedActor.background = nextEditedActor.background;
-        if (!isProfileBackedByLore) {
-            persistedActor.profile = nextEditedActor.profile;
-        }
+        // Keep the actor's own profile field in sync even when it's backed by lore, since other consumers read actor.profile directly.
+        persistedActor.profile = isProfileBackedByLore ? nextEditedActor.lore : nextEditedActor.profile;
         persistedActor.voiceId = nextEditedActor.voiceId;
         persistedActor.voiceModulation = nextEditedActor.voiceModulation;
         persistedActor.themeColor = nextEditedActor.themeColor;

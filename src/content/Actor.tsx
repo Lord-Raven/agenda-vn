@@ -962,6 +962,8 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage, isC
 	if (linkedLore) {
 		linkedLore.content = lore;
 	}
+    // Keep actor.profile in sync so consumers that read it directly (e.g. exports) don't see stale data.
+    actor.profile = lore;
 }
 
 const formatActorStatValue = (value: StatValue, stat: Stat, atlas?: { [key: string]: { name: string } }): string => {
