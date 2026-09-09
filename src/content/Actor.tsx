@@ -423,23 +423,45 @@ export function applyActorInitialStats(actor: Actor, actorStats: Stat[], context
 
 // Mapping of voice IDs to a description of the voice, so the AI can choose an ID based on the character profile.
 export const VOICE_MAP: {[key: string]: string} = {
-    '751212e5-a871-45c7-b10b-6f42a5785954': 'feminine - posh and catty',
-    '03a438b7-ebfa-4f72-9061-f086d8f1fca6': 'feminine - calm and soothing', // HQ Female Lowrange
-    'a2533977-83cb-4c10-9955-0277e047538f': 'feminine - energetic and lively', // LQ Female Midrange
-    '057d53b3-bb28-47f1-9c19-a85a79851863': 'feminine - low and warm', // HQ Female Midrange
-    '6e6619ba-4880-4cf3-a5df-d0697ba46656': 'feminine - high and soft', // LQ Female Highrange
-    'd6e05564-eea9-4181-aee9-fa0d7315f67d': 'masculine - cool and confident', // HQ Male Lowrange
-    'e6b74abb-f4b2-4a84-b9ef-c390512f2f47': 'masculine - posh and articulate', // HQ Male Midrange
-    'bright_female_20s': 'feminine - bright and cheerful',
-    'resonant_male_40s': 'masculine - resonant and mature',
-    'gentle_female_30s': 'feminine - gentle and caring',
-    'whispery_female_40s': 'feminine - whispery and mysterious',
-    'formal_female_30s': 'feminine - formal and refined',
-    'professional_female_30s': 'feminine - professional and direct',
-    'calm_female_20s': 'feminine - calm and soothing',
-    'light_male_20s': 'masculine - light and thoughtful',
-    'animated_male_20s': 'masculine - hip and lively',
+    '751212e5-a871-45c7-b10b-6f42a5785954': 'Feminine - British Accent - Posh and catty', // Deletion candidate
+    '03a438b7-ebfa-4f72-9061-f086d8f1fca6': 'Feminine - British Accent - Calm and soothing',
+    'a2533977-83cb-4c10-9955-0277e047538f': 'Feminine - British Accent - Energetic and lively',
+    '057d53b3-bb28-47f1-9c19-a85a79851863': 'Feminine - American Accent - Low and warm',
+    '6e6619ba-4880-4cf3-a5df-d0697ba46656': 'Feminine - American Accent - High and soft',
+    'd6e05564-eea9-4181-aee9-fa0d7315f67d': 'Masculine - American Accent - Cool and confident',
+    'e6b74abb-f4b2-4a84-b9ef-c390512f2f47': 'Masculine - American Accent - Posh and articulate',
+    'bright_female_20s': 'Feminine - American Accent - Bright and cheerful',
+    'resonant_male_40s': 'Masculine - American Accent - Resonant and mature',
+    'gentle_female_30s': 'Feminine - American Accent - Gentle and caring',
+    'whispery_female_40s': 'Feminine - American Accent - Whispery and mysterious',
+    'formal_female_30s': 'Feminine - American Accent - Formal and refined',
+    'professional_female_30s': 'Feminine - American Accent - Professional and direct',
+    'calm_female_20s': 'Feminine - American Accent - Calm and soothing',
+    'light_male_20s': 'Masculine - American Accent - Light and thoughtful',
+    'animated_male_20s': 'Masculine - American Accent - Hip and lively',
+    'bfb9b9b1-e25e-4c06-859a-1271e29cc9d4': 'Masculine - British Accent - Bold and whimsical', // Matt Berry
+    '8c9b8c56-20e6-490e-b787-8efcff4e89f7': 'Feminine - British Accent - Haughty and catty', // Ilithya
+    '1e0aa062-c5ee-4731-9fa1-c34c11097b03': 'Feminine - French Accent - Mature and warm', // Madame LaMarquise
+    '5004afbd-9f53-48af-8947-e8c31db03bd5': 'Masculine - French Accent - Resonant and low', // candeur
+    'bb3e5ef7-2eda-470c-b93b-32c39d285b0e': 'Feminine - French Accent - Soft and insecure', // ohPaytriarchy
+    '3383a73e-5a5b-4155-a741-5f0fe21b5b11': 'Feminine - French Accent - High and light', // chocolatine_va
+    'ae245bb9-83a9-4b34-9aa8-f670431b9c82': 'Feminine - French Accent - Low and breathy', // VenusDeVelours
+    'e735ff09-8ab1-4a74-bff6-7b17f0207e9b': 'Masculine - French Accent - Deep and resonant', // audioByDominic
+    '77a6e53d-16c7-47d7-84cc-5ea307e3a11d': 'Feminine - British Accent - Saucy and bright', // BretonBrat
+    '6d147025-53bf-479b-a159-8a1510c6bb92': 'Masculine - French Accent - Androgynous and softspoken', // Pikatchoum
+    '23626ae8-691f-45d4-9870-7fddea8a0184': 'Feminine - French Accent - Nasal and playful', // Solene-Cherie
+    '9f882b0a-d0da-4d7d-ad0d-e868b851b6f1': 'Feminine - French Accent - Bright and warm', // RosalinaKinks
+    '74bedcda-2fcf-43ab-9aee-66b2bad14f69': 'Masculine - French Accent - Light and relaxed', // Elias23h47
+    '35b7e629-4df8-4c0e-a107-d037c594838a': 'Feminine - French Accent - Bright and warm', // EllyHart456
+    '3b46afa4-62a6-4ba7-9652-e5065d75db6e': 'Feminine - Multilingual Accent - Calm and low', // youronlynora
+    '7fef668b-5cc4-47b1-b9ca-7dcadac15bf3': 'Masculine - French Accent - Deep and warm', // daddydeep
+    '825b8263-63ca-4729-82a6-78855b637214': 'Masculine - French Accent - Friendly and approachable', // mercadien
+    'f6e0ffd3-b512-4261-b4e4-e161391046fc': 'Feminine - American Accent - Fried and youthful', // Daisy4Dayz
+    '48d3008b-b1fd-4c36-81ea-d2f36413da9a': 'Feminine - French Accent - High and airy', // hummingael
+    'a3a9a163-a283-4ba7-8535-d3f583ed342d': 'Feminine - Slavic Accent - Keen and direct', // audio_allure
+    
 };
+
 
 export async function distillActor(actor: Actor, definition: any, stage: Stage, isCreatorMode: boolean = false): Promise<Actor|null> {
     console.log('Loading reserve actor:', definition.name);
