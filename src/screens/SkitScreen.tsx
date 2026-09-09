@@ -331,6 +331,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                                 offsetY: outfit?.offsetY ?? 0,
                             };
                         }}
+                        getActorVoiceModulation={(actor) => actor.voiceModulation ?? 1}
                         onSubmitInput={handleSkitSubmit}
                         onSkitChange={onSkitChange}
                         getSubmitButtonConfig={(_script, index, inputText) => {

@@ -34,7 +34,7 @@ const ACTOR_DETAIL_GENERATION_FIELDS = [
     { key: 'description', label: 'Description', description: 'Updates the physical description.' },
     { key: 'background', label: 'Background', description: 'Updates the backstory and fixed foundation.' },
     { key: 'profile', label: 'Profile', description: 'Updates the ongoing personality and motives.' },
-    { key: 'voiceId', label: 'Voice', description: 'Updates the assigned voice ID.' },
+    { key: 'voiceId', label: 'Voice', description: 'Updates the assigned voice ID and its modulation.' },
     { key: 'themeColor', label: 'Color', description: 'Updates the theme color.' },
     { key: 'themeFontFamily', label: 'Font', description: 'Updates the theme font family.' },
     { key: 'outfit', label: 'Outfit', description: 'Updates regenerated outfit details and active outfit assignment.' },
@@ -236,6 +236,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         profile: string;
         lore: string;
         voiceId: string;
+        voiceModulation: number;
         themeColor: string;
         themeFontFamily: string;
         schedule: ActorSchedule;
@@ -251,6 +252,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         profile: actor.profile || '',
         lore: linkedLoreEntry?.content || '',
         voiceId: actor.voiceId,
+        voiceModulation: actor.voiceModulation ?? 1,
         themeColor: actor.themeColor,
         themeFontFamily: actor.themeFontFamily,
         schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
@@ -545,6 +547,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             persistedActor.profile = nextEditedActor.profile;
         }
         persistedActor.voiceId = nextEditedActor.voiceId;
+        persistedActor.voiceModulation = nextEditedActor.voiceModulation;
         persistedActor.themeColor = nextEditedActor.themeColor;
         persistedActor.themeFontFamily = nextEditedActor.themeFontFamily;
         persistedActor.schedule = Object.fromEntries(Object.entries(nextEditedActor.schedule).map(([destination, collections]) => [destination, collections.map(collection => [...collection])]));
@@ -739,6 +742,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             profile: actor.profile || '',
             lore: latestLinkedLoreEntry?.content || '',
             voiceId: actor.voiceId,
+            voiceModulation: actor.voiceModulation ?? 1,
             themeColor: actor.themeColor,
             themeFontFamily: actor.themeFontFamily,
             schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
@@ -1247,6 +1251,7 @@ ${indent}}`;
                     .join('\n'),
             ].filter((value) => value?.trim()).join('\n\n'),
             voice_id: nextEditedActor.voiceId,
+            voice_modulation: nextEditedActor.voiceModulation,
         };
 
         setIsGeneratingActorDetails(true);
@@ -1261,6 +1266,7 @@ ${indent}}`;
             background: actor.background,
             profile: actor.profile,
             voiceId: actor.voiceId,
+            voiceModulation: actor.voiceModulation,
             themeColor: actor.themeColor,
             themeFontFamily: actor.themeFontFamily,
             outfitId: actor.outfitId,
@@ -1281,6 +1287,7 @@ ${indent}}`;
                 background: actor.background,
                 profile: actor.profile,
                 voiceId: actor.voiceId,
+                voiceModulation: actor.voiceModulation,
                 themeColor: actor.themeColor,
                 themeFontFamily: actor.themeFontFamily,
                 outfitId: actor.outfitId,
@@ -1320,6 +1327,7 @@ ${indent}}`;
             }
             if (selectedFields.voiceId) {
                 actor.voiceId = distilledActor.voiceId || actor.voiceId;
+                actor.voiceModulation = distilledActor.voiceModulation;
             }
             if (selectedFields.themeColor) {
                 actor.themeColor = distilledActor.themeColor || actor.themeColor;
@@ -1357,6 +1365,7 @@ ${indent}}`;
             actor.background = previousGeneratedState.background;
             actor.profile = previousGeneratedState.profile;
             actor.voiceId = previousGeneratedState.voiceId;
+            actor.voiceModulation = previousGeneratedState.voiceModulation;
             actor.themeColor = previousGeneratedState.themeColor;
             actor.themeFontFamily = previousGeneratedState.themeFontFamily;
             actor.outfitId = previousGeneratedState.outfitId;
@@ -2571,6 +2580,35 @@ ${indent}}`;
                                                         <PlayArrow style={{ fontSize: '18px' }} />
                                                     )}
                                             </Button>
+                                        </div>
+                                        <div style={{ marginTop: '12px' }}>
+                                            <label
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    color: 'var(--agenda-text-primary)',
+                                                    fontSize: '13px',
+                                                    marginBottom: '6px',
+                                                }}
+                                            >
+                                                <span>Voice Modulation</span>
+                                                <span>{editedActor.voiceModulation.toFixed(2)}x</span>
+                                            </label>
+                                            <input
+                                                type="range"
+                                                min="0.75"
+                                                max="1.25"
+                                                step="0.01"
+                                                value={editedActor.voiceModulation}
+                                                onChange={(event) => handleInputChange('voiceModulation', Number(event.target.value))}
+                                                title="Mildly tune the voice down or up to suit the character; 1.00x is neutral."
+                                                style={{ width: '100%', accentColor: 'var(--agenda-highlight)' }}
+                                            />
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
+                                                <span>Lower</span>
+                                                <span>Neutral</span>
+                                                <span>Higher</span>
+                                            </div>
                                         </div>
                                     </div>
 

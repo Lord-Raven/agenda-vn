@@ -240,6 +240,7 @@ export class Actor {
     themeColor: string = ''; // Theme color (hex code)
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
+    voiceModulation: number = 1; // Modulation factor for the actor's voice in TTS (0.75 to 1.25)
     statMap: { [key: string]: StatValue } = {}; // Map of custom stat name to value for this actor
     statInitialMap: { [key: string]: ActorStatInitial } = {}; // Map of custom stat name to its initial value and conditional modifiers, used to seed statMap when a new game starts
     perActorStatMap: PerActorStatValueMap = {}; // For perActor stats: map of stat name to a map of target actorId to explicit value override
@@ -253,6 +254,7 @@ export class Actor {
         const actor = Object.create(Actor.prototype);
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
+        actor.voiceModulation = Math.min(1.25, Math.max(0.75, Number(savedActor?.voiceModulation) || 1));
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
         actor.statInitialMap = cloneStatInitialMap(savedActor?.statInitialMap);
         actor.perActorStatMap = clonePerActorStatValueMap(savedActor?.perActorStatMap);
@@ -273,6 +275,7 @@ export class Actor {
             this.id = generateUuid();
         }
         this.active = this.active !== false;
+        this.voiceModulation = Math.min(1.25, Math.max(0.75, Number(this.voiceModulation) || 1));
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
         this.statInitialMap = cloneStatInitialMap(this.statInitialMap);
         this.perActorStatMap = clonePerActorStatValueMap(this.perActorStatMap);
@@ -334,6 +337,11 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
         key: 'voice',
         label: 'VOICE',
         description: 'Output the specific voice ID from the Available Voices section that best matches the character\'s apparent gender (foremost) and personality.',
+    },
+    {
+        key: 'voice_modulation',
+        label: 'VOICE MODULATION',
+        description: 'A number from 0.75 to 1.25 that can mildly tune the selected voice down or up to suit the character. Use 1 for no modulation.',
     },
     {
         key: 'color',
@@ -424,41 +432,42 @@ export function applyActorInitialStats(actor: Actor, actorStats: Stat[], context
 // Mapping of voice IDs to a description of the voice, so the AI can choose an ID based on the character profile.
 export const VOICE_MAP: {[key: string]: string} = {
     //'751212e5-a871-45c7-b10b-6f42a5785954': 'Feminine - British Accent - Posh and catty', // Obsolete version of Ilithya
-    '03a438b7-ebfa-4f72-9061-f086d8f1fca6': 'Feminine - British Accent - Calm and soothing',
-    'a2533977-83cb-4c10-9955-0277e047538f': 'Feminine - British Accent - Energetic and lively',
-    '057d53b3-bb28-47f1-9c19-a85a79851863': 'Feminine - American Accent - Low and warm',
-    '6e6619ba-4880-4cf3-a5df-d0697ba46656': 'Feminine - American Accent - High and soft',
-    'd6e05564-eea9-4181-aee9-fa0d7315f67d': 'Masculine - American Accent - Cool and confident',
-    'e6b74abb-f4b2-4a84-b9ef-c390512f2f47': 'Masculine - American Accent - Posh and articulate',
-    'bright_female_20s': 'Feminine - American Accent - Bright and cheerful',
-    'resonant_male_40s': 'Masculine - American Accent - Resonant and mature',
-    'gentle_female_30s': 'Feminine - American Accent - Gentle and caring',
-    'whispery_female_40s': 'Feminine - American Accent - Whispery and mysterious',
-    'formal_female_30s': 'Feminine - American Accent - Formal and refined',
-    'professional_female_30s': 'Feminine - American Accent - Professional and direct',
-    'calm_female_20s': 'Feminine - American Accent - Calm and soothing',
-    'light_male_20s': 'Masculine - American Accent - Light and thoughtful',
-    'animated_male_20s': 'Masculine - American Accent - Hip and lively',
-    'bfb9b9b1-e25e-4c06-859a-1271e29cc9d4': 'Masculine - British Accent - Bold and whimsical', // Matt Berry
-    '8c9b8c56-20e6-490e-b787-8efcff4e89f7': 'Feminine - British Accent - Haughty and catty', // Ilithya
-    '1e0aa062-c5ee-4731-9fa1-c34c11097b03': 'Feminine - French Accent - Mature and warm', // Madame LaMarquise
-    '5004afbd-9f53-48af-8947-e8c31db03bd5': 'Masculine - French Accent - Resonant and low', // candeur
-    'bb3e5ef7-2eda-470c-b93b-32c39d285b0e': 'Feminine - French Accent - Soft and insecure', // ohPaytriarchy
-    '3383a73e-5a5b-4155-a741-5f0fe21b5b11': 'Feminine - French Accent - High and light', // chocolatine_va
-    'ae245bb9-83a9-4b34-9aa8-f670431b9c82': 'Feminine - French Accent - Low and breathy', // VenusDeVelours
-    'e735ff09-8ab1-4a74-bff6-7b17f0207e9b': 'Masculine - French Accent - Deep and resonant', // audioByDominic
-    '77a6e53d-16c7-47d7-84cc-5ea307e3a11d': 'Feminine - British Accent - Saucy and bright', // BretonBrat
-    '6d147025-53bf-479b-a159-8a1510c6bb92': 'Masculine - French Accent - Androgynous and softspoken', // Pikatchoum
-    '23626ae8-691f-45d4-9870-7fddea8a0184': 'Feminine - French Accent - Nasal and playful', // Solene-Cherie
-    '9f882b0a-d0da-4d7d-ad0d-e868b851b6f1': 'Feminine - French Accent - Bright and warm', // RosalinaKinks
-    '74bedcda-2fcf-43ab-9aee-66b2bad14f69': 'Masculine - French Accent - Light and relaxed', // Elias23h47
-    '35b7e629-4df8-4c0e-a107-d037c594838a': 'Feminine - French Accent - Bright and warm', // EllyHart456
-    '3b46afa4-62a6-4ba7-9652-e5065d75db6e': 'Feminine - Multilingual Accent - Calm and low', // youronlynora
-    '7fef668b-5cc4-47b1-b9ca-7dcadac15bf3': 'Masculine - French Accent - Deep and warm', // daddydeep
-    '825b8263-63ca-4729-82a6-78855b637214': 'Masculine - French Accent - Friendly and approachable', // mercadien
-    'f6e0ffd3-b512-4261-b4e4-e161391046fc': 'Feminine - American Accent - Fried and youthful', // Daisy4Dayz
-    '48d3008b-b1fd-4c36-81ea-d2f36413da9a': 'Feminine - French Accent - High and airy', // hummingael
-    'a3a9a163-a283-4ba7-8535-d3f583ed342d': 'Feminine - Slavic Accent - Keen and direct', // audio_allure
+    '03a438b7-ebfa-4f72-9061-f086d8f1fca6': 'Feminine - American - Warm and soothing',
+    'a2533977-83cb-4c10-9955-0277e047538f': 'Feminine - American - Energetic and youthful',
+    '057d53b3-bb28-47f1-9c19-a85a79851863': 'Feminine - American - Low and warm',
+    '6e6619ba-4880-4cf3-a5df-d0697ba46656': 'Feminine - American - High and soft',
+    'd6e05564-eea9-4181-aee9-fa0d7315f67d': 'Masculine - American - Cool and confident',
+    'e6b74abb-f4b2-4a84-b9ef-c390512f2f47': 'Masculine - American - Posh and articulate',
+    'bright_female_20s': 'Feminine - American - Bright and cheerful',
+    'resonant_male_40s': 'Masculine - American - Resonant and mature',
+    'gentle_female_30s': 'Feminine - American - Gentle and caring',
+    'whispery_female_40s': 'Feminine - American - Whispery and mysterious',
+    'formal_female_30s': 'Feminine - American - Formal and reedy',
+    'professional_female_30s': 'Feminine - American - Professional and direct',
+    'calm_female_20s': 'Feminine - American - Calm and soothing',
+    'light_male_20s': 'Masculine - American - Light and thoughtful',
+    'animated_male_20s': 'Masculine - American - Hip and lively',
+
+    '6d147025-53bf-479b-a159-8a1510c6bb92': 'Androgynous - French - Youthful and softspoken', // Pikatchoum
+    'f6e0ffd3-b512-4261-b4e4-e161391046fc': 'Feminine - American - Fried and youthful', // Daisy4Dayz
+    '77a6e53d-16c7-47d7-84cc-5ea307e3a11d': 'Feminine - British - Saucy and bright', // BretonBrat
+    '8c9b8c56-20e6-490e-b787-8efcff4e89f7': 'Feminine - British - Haughty and catty', // Ilithya
+    '1e0aa062-c5ee-4731-9fa1-c34c11097b03': 'Feminine - French - Mature and warm', // Madame LaMarquise
+    'bb3e5ef7-2eda-470c-b93b-32c39d285b0e': 'Feminine - French - Soft and insecure', // ohPaytriarchy
+    '3383a73e-5a5b-4155-a741-5f0fe21b5b11': 'Feminine - French - High and light', // chocolatine_va ****
+    'ae245bb9-83a9-4b34-9aa8-f670431b9c82': 'Feminine - French - Low and breathy', // VenusDeVelours ****
+    '23626ae8-691f-45d4-9870-7fddea8a0184': 'Feminine - French - Nasal and youthful', // Solene-Cherie
+    '9f882b0a-d0da-4d7d-ad0d-e868b851b6f1': 'Feminine - French - Bright and confident', // RosalinaKinks
+    '35b7e629-4df8-4c0e-a107-d037c594838a': 'Feminine - French - Bright and warm', // EllyHart456
+    '48d3008b-b1fd-4c36-81ea-d2f36413da9a': 'Feminine - French - Light and airy', // hummingael *****
+    '3b46afa4-62a6-4ba7-9652-e5065d75db6e': 'Feminine - Multilingual - Calm and low', // youronlynora
+    'a3a9a163-a283-4ba7-8535-d3f583ed342d': 'Feminine - Slavic - Keen and direct', // audio_allure
+    'bfb9b9b1-e25e-4c06-859a-1271e29cc9d4': 'Masculine - British - Bold and whimsical', // Matt Berry
+    '5004afbd-9f53-48af-8947-e8c31db03bd5': 'Masculine - French - Low and commanding', // candeur
+    'e735ff09-8ab1-4a74-bff6-7b17f0207e9b': 'Masculine - French - Deep and resonant', // audioByDominic
+    '74bedcda-2fcf-43ab-9aee-66b2bad14f69': 'Masculine - French - Light and relaxed', // Elias23h47
+    '7fef668b-5cc4-47b1-b9ca-7dcadac15bf3': 'Masculine - French - Deep and warm', // daddydeep
+    '825b8263-63ca-4729-82a6-78855b637214': 'Masculine - French - Friendly and approachable', // mercadien
     
 };
 
@@ -546,6 +555,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
                         background: 'Raised in a border settlement that was burned out when she was twelve, Jane came up through mercenary companies and learned early that promises are collateral. Her older brother, still missing after the raid, is the reason she keeps taking contracts along the frontier. She is unflinchingly loyal to the handful of people who have earned it, and constitutionally incapable of walking away from someone who cannot defend themselves.',
                         profile: 'Jane is confident and determined, quick-witted, and fiercely independent. Known for her sharp wit and strong presence, she has a commanding aura that draws attention. Deep down, Jane is driven by a need to prove she\'s worthy of love despite her past betrayals. She\'s here looking for someone who will challenge her and see beyond her tough exterior.',
                         voice: '03a438b7-ebfa-4f72-9061-f086d8f1fca6',
+                        voice_modulation: '1.00',
                         color: '#666666',
                         font: 'Calibri, sans-serif',
                         ...exampleStatValues,
@@ -587,6 +597,10 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
         actor.background = parsedData['background'] || actor.background || '';
         actor.profile = parsedData['profile'] || actor.profile || '';
         actor.voiceId = parsedData['voice'] || actor.voiceId || '';
+        const parsedVoiceModulation = Number(parsedData['voice_modulation']);
+        actor.voiceModulation = Number.isFinite(parsedVoiceModulation)
+            ? Math.min(1.25, Math.max(0.75, parsedVoiceModulation))
+            : actor.voiceModulation;
         actor.themeColor = themeColor || actor.themeColor;
         actor.themeFontFamily = parsedData['font'] || actor.themeFontFamily || 'Arial, sans-serif';
         actor.outfits = actor.outfits.length > 0 ? actor.outfits : [];
