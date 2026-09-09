@@ -2598,8 +2598,8 @@ ${indent}}`;
                                             </label>
                                             <input
                                                 type="range"
-                                                min="0.75"
-                                                max="1.25"
+                                                min="0.8"
+                                                max="1.2"
                                                 step="0.01"
                                                 value={editedActor.voiceModulation}
                                                 onChange={(event) => handleInputChange('voiceModulation', Number(event.target.value))}

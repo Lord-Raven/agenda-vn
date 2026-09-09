@@ -240,7 +240,7 @@ export class Actor {
     themeColor: string = ''; // Theme color (hex code)
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
-    voiceModulation: number = 1; // Modulation factor for the actor's voice in TTS (0.75 to 1.25)
+    voiceModulation: number = 1; // Modulation factor for the actor's voice in TTS (0.8 to 1.2)
     statMap: { [key: string]: StatValue } = {}; // Map of custom stat name to value for this actor
     statInitialMap: { [key: string]: ActorStatInitial } = {}; // Map of custom stat name to its initial value and conditional modifiers, used to seed statMap when a new game starts
     perActorStatMap: PerActorStatValueMap = {}; // For perActor stats: map of stat name to a map of target actorId to explicit value override
@@ -254,7 +254,7 @@ export class Actor {
         const actor = Object.create(Actor.prototype);
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
-        actor.voiceModulation = Math.min(1.25, Math.max(0.75, Number(savedActor?.voiceModulation) || 1));
+        actor.voiceModulation = Math.min(1.2, Math.max(0.8, Number(savedActor?.voiceModulation) || 1));
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
         actor.statInitialMap = cloneStatInitialMap(savedActor?.statInitialMap);
         actor.perActorStatMap = clonePerActorStatValueMap(savedActor?.perActorStatMap);
@@ -275,7 +275,7 @@ export class Actor {
             this.id = generateUuid();
         }
         this.active = this.active !== false;
-        this.voiceModulation = Math.min(1.25, Math.max(0.75, Number(this.voiceModulation) || 1));
+        this.voiceModulation = Math.min(1.2, Math.max(0.8, Number(this.voiceModulation) || 1));
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
         this.statInitialMap = cloneStatInitialMap(this.statInitialMap);
         this.perActorStatMap = clonePerActorStatValueMap(this.perActorStatMap);
@@ -341,7 +341,7 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'voice_modulation',
         label: 'VOICE MODULATION',
-        description: 'A number from 0.75 to 1.25 that can mildly tune the selected voice down or up to suit the character. Use 1 for no modulation.',
+        description: 'A number from 0.8 to 1.2 that can mildly tune the selected voice down or up to suit the character. Use 1 for no modulation.',
     },
     {
         key: 'color',
@@ -599,7 +599,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
         actor.voiceId = parsedData['voice'] || actor.voiceId || '';
         const parsedVoiceModulation = Number(parsedData['voice_modulation']);
         actor.voiceModulation = Number.isFinite(parsedVoiceModulation)
-            ? Math.min(1.25, Math.max(0.75, parsedVoiceModulation))
+            ? Math.min(1.2, Math.max(0.8, parsedVoiceModulation))
             : actor.voiceModulation;
         actor.themeColor = themeColor || actor.themeColor;
         actor.themeFontFamily = parsedData['font'] || actor.themeFontFamily || 'Arial, sans-serif';

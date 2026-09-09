@@ -485,7 +485,15 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 )
                 .format();
         console.log(prompt);
-        const response = await stage.generateText(prompt, 10, 2000)
+        let response;
+        
+        try {
+            response = await stage.generateText(prompt, 10, 2000);
+        } catch (error) {
+            console.error('Error generating skit response:', error);
+            retry++;
+            continue;
+        }
 
         if (response && response.trim().length > 0) {
             if (!/<Entry\b[^>]*>/i.test(response)) {
