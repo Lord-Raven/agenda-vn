@@ -556,7 +556,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     schedule: {},
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
                     themeFontFamily: '',
-                    voiceId: ''
+                    voiceId: '',
+                    voiceModulation: 1,
                 },
             };
 
