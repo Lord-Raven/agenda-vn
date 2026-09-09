@@ -1121,7 +1121,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
     const getVoiceSampleCacheKey = (actorId: string, voiceId: string): string => `${actorId}:${voiceId}`;
 
-    const playSampleUrl = async (sampleUrl: string) => {
+    const playSampleUrl = async (sampleUrl: string, voiceModulation: number) => {
         if (!sampleUrl) {
             return;
         }
@@ -1133,6 +1133,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }
 
             const audio = new Audio(sampleUrl);
+            audio.preservesPitch = false;
+            audio.playbackRate = Math.min(1.25, Math.max(0.75, voiceModulation));
             audioRef.current = audio;
             await audio.play();
         } catch (error) {
@@ -1155,7 +1157,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         const cacheKey = getVoiceSampleCacheKey(actor.id, selectedVoiceId);
         const cachedSampleUrl = voiceSampleCache.get(cacheKey);
         if (cachedSampleUrl) {
-            await playSampleUrl(cachedSampleUrl);
+            await playSampleUrl(cachedSampleUrl, editedActor.voiceModulation);
             return;
         }
 
@@ -1168,7 +1170,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }
 
             voiceSampleCache.set(cacheKey, sampleUrl);
-            await playSampleUrl(sampleUrl);
+            await playSampleUrl(sampleUrl, editedActor.voiceModulation);
         } catch (error) {
             console.error('Failed to generate demo speech sample:', error);
             stage().showPriorityMessage('Failed to generate voice sample. Please try again.');
