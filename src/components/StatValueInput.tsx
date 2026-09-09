@@ -1,7 +1,7 @@
 import { FC } from 'react';
 import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, isNumericDisplayType } from '../content/Stat';
 import { Stage } from '../Stage';
-import { LocationMultiSelect, LocationSelect, TextArea, TextInput } from './UiComponents';
+import { LocationMultiSelect, LocationSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
 
 interface StatValueInputProps {

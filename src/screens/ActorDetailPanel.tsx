@@ -2151,10 +2151,9 @@ ${indent}}`;
                                                             )}
 
                                                             {stat.type === 'text' && (
-                                                                <TextArea
+                                                                <TextInput
                                                                     value={typeof editorValue === 'string' ? editorValue : ''}
                                                                     onChange={(e) => handleActorStatEditorValueChange(stat, e.target.value)}
-                                                                    rows={3}
                                                                     style={{ maxWidth: '220px' }}
                                                                 />
                                                             )}
