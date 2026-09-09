@@ -423,7 +423,7 @@ export function applyActorInitialStats(actor: Actor, actorStats: Stat[], context
 
 // Mapping of voice IDs to a description of the voice, so the AI can choose an ID based on the character profile.
 export const VOICE_MAP: {[key: string]: string} = {
-    '751212e5-a871-45c7-b10b-6f42a5785954': 'Feminine - British Accent - Posh and catty', // Deletion candidate
+    //'751212e5-a871-45c7-b10b-6f42a5785954': 'Feminine - British Accent - Posh and catty', // Obsolete version of Ilithya
     '03a438b7-ebfa-4f72-9061-f086d8f1fca6': 'Feminine - British Accent - Calm and soothing',
     'a2533977-83cb-4c10-9955-0277e047538f': 'Feminine - British Accent - Energetic and lively',
     '057d53b3-bb28-47f1-9c19-a85a79851863': 'Feminine - American Accent - Low and warm',

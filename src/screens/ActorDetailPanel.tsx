@@ -1157,7 +1157,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
         setIsGeneratingDemoSpeech(true);
         try {
-            const sampleUrl = await generateDemoSpeech(selectedVoiceId, editedActor.profile || actor.profile || actor.name);
+            const sampleUrl = await generateDemoSpeech(selectedVoiceId, editedActor.summary || actor.summary || actor.name);
             if (!sampleUrl) {
                 stage().showPriorityMessage('Voice sample generation returned no audio URL.');
                 return;
