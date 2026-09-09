@@ -1,6 +1,6 @@
 import { FC, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
-import { Add, ArrowDownward, ArrowUpward, AutoAwesome, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place } from '@mui/icons-material';
+import { Add, ArrowDownward, ArrowUpward, AutoAwesome, CenterFocusStrong, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place } from '@mui/icons-material';
 import { generateMapAlternativeImage, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
 import { Button, TextArea, TextInput, TextInputWithOptions } from '../components/UiComponents';
@@ -20,7 +20,7 @@ interface MapDetailPanelProps {
 
 const clampCoordinate = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 
-type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages'>;
+type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages'> & { focalX: number; focalY: number };
 
 const createMapDraft = (map: GameMap): MapDraft => ({
     name: map.name,
@@ -30,6 +30,8 @@ const createMapDraft = (map: GameMap): MapDraft => ({
     imagePrompt: map.imagePrompt,
     imageUrl: map.imageUrl,
     alternativeImages: map.alternativeImages?.map(createAlternativeImage) || [],
+    focalX: map.focalPoint?.x ?? 0.5,
+    focalY: map.focalPoint?.y ?? 0.5,
 });
 
 export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorMode, onChange, onDeactivate }) => {
@@ -110,6 +112,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         persistedMap.imagePrompt = nextDraft.imagePrompt;
         persistedMap.imageUrl = nextDraft.imageUrl;
         persistedMap.alternativeImages = nextDraft.alternativeImages.map(createAlternativeImage);
+        persistedMap.focalPoint = { x: clampCoordinate(nextDraft.focalX), y: clampCoordinate(nextDraft.focalY) };
 
         const nextPriority = Number.isFinite(nextDraft.priority) ? nextDraft.priority : 0;
         const conflict = sourceMaps.find(candidate => candidate.id !== persistedMap.id && candidate.active !== false && candidate.priority === nextPriority);
@@ -334,6 +337,17 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         });
     };
 
+    const updateFocalFromPointer = (event: PointerEvent<HTMLElement>) => {
+        const previewBounds = previewRef.current?.getBoundingClientRect();
+        if (!previewBounds) {
+            return;
+        }
+
+        const focalX = clampCoordinate((event.clientX - previewBounds.left) / previewBounds.width);
+        const focalY = clampCoordinate((event.clientY - previewBounds.top) / previewBounds.height);
+        setDraft(current => ({ ...current, focalX, focalY }));
+    };
+
     const previewTabStyle = (isActive: boolean): React.CSSProperties => ({
         padding: '6px 12px',
         fontSize: '13px',
@@ -424,7 +438,26 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
 
             <div>
                 <strong style={{ display: 'block', color: 'var(--agenda-text-primary)', marginBottom: 8 }}>Preview</strong>
+                <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 8px' }}>Drag link markers to position them. Drag the crosshair to set the focal point kept in view when the map image is cropped.</p>
                 <div ref={previewRef} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: previewImageUrl ? `url(${previewImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden', touchAction: 'none', marginBottom: 10 }}>
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Drag to set focal point"
+                        title="Drag to set focal point"
+                        onPointerDown={event => {
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            updateFocalFromPointer(event);
+                        }}
+                        onPointerMove={event => {
+                            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                                updateFocalFromPointer(event);
+                            }
+                        }}
+                        style={{ position: 'absolute', left: `${draft.focalX * 100}%`, top: `${draft.focalY * 100}%`, transform: 'translate(-50%, -50%)', zIndex: 4, display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '50%', color: 'var(--agenda-text-primary)', backgroundColor: 'color-mix(in srgb, var(--agenda-highlight) 55%, transparent)', border: '2px dashed var(--agenda-text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,.65)', cursor: 'grab', userSelect: 'none' }}
+                    >
+                        <CenterFocusStrong style={{ fontSize: 18 }} />
+                    </div>
                     {map.links.map((link, index) => {
                         const locationImageUrl = activeLocations.find(location => location.id === link.childId)?.imageUrl;
                         return (

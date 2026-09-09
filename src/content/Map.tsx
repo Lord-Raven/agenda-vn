@@ -140,11 +140,13 @@ export class Map {
     imagePrompt: string = ''; // A prompt for generating a map image 
     imageUrl: string = ''; // URL for the map image
     alternativeImages: AlternativeImage[] = [];
+    focalPoint: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Focus within the editor's 16:9 preview space, used when the runtime viewport crops the image
     links: MapLink[] = []; // Links to other maps or locations
 
     constructor(data?: Partial<Map>) {
         Object.assign(this, data || {});
         this.alternativeImages = (data?.alternativeImages || []).map(createAlternativeImage);
+        this.focalPoint = { x: data?.focalPoint?.x ?? 0.5, y: data?.focalPoint?.y ?? 0.5 };
         this.links = (data?.links || []).map((link) => ({
             ...link,
             parentId: data?.id || this.id,

@@ -59,7 +59,7 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
             return;
         }
 
-        const updateWidth = () => setExpandedMarkerWidth(markerSize + measure.getBoundingClientRect().width);
+        const updateWidth = () => setExpandedMarkerWidth(markerSize + measure.getBoundingClientRect().width + 8);
         const observer = new ResizeObserver(updateWidth);
         observer.observe(measure);
         updateWidth();
@@ -169,31 +169,55 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
         return null;
     }
 
-    const getMarkerPosition = (x: number, y: number) => {
-        const { width: viewportWidth, height: viewportHeight } = mapViewportSize;
-        const { width: imageWidth, height: imageHeight } = mapImageSize;
-        if (!viewportWidth || !viewportHeight || !imageWidth || !imageHeight) {
-            return { left: `${x * 100}%`, top: `${y * 100}%` };
-        }
+    const { width: viewportWidth, height: viewportHeight } = mapViewportSize;
+    const { width: imageWidth, height: imageHeight } = mapImageSize;
+    const hasMeasuredMap = Boolean(viewportWidth && viewportHeight && imageWidth && imageHeight);
 
-        // The editor stores coordinates in its fixed 16:9 preview space. Map that
-        // point through the source image and then through the runtime cover crop.
+    // The editor stores coordinates in its fixed 16:9 preview space. Map a point from that
+    // space onto the source image so it can be projected through the runtime cover crop.
+    const toSourceCoordinates = (x: number, y: number) => {
         const previewWidth = 16;
         const previewHeight = 9;
         const previewScale = Math.max(previewWidth / imageWidth, previewHeight / imageHeight);
         const previewRenderedWidth = imageWidth * previewScale;
         const previewRenderedHeight = imageHeight * previewScale;
-        const sourceX = (x * previewWidth - (previewWidth - previewRenderedWidth) / 2) / previewRenderedWidth;
-        const sourceY = (y * previewHeight - (previewHeight - previewRenderedHeight) / 2) / previewRenderedHeight;
-        const runtimeScale = Math.max(viewportWidth / imageWidth, viewportHeight / imageHeight);
-        const renderedWidth = imageWidth * runtimeScale;
-        const renderedHeight = imageHeight * runtimeScale;
-        const offsetX = (viewportWidth - renderedWidth) / 2;
-        const offsetY = (viewportHeight - renderedHeight) / 2;
         return {
-            left: `${((offsetX + sourceX * renderedWidth) / viewportWidth) * 100}%`,
-            top: `${((offsetY + sourceY * renderedHeight) / viewportHeight) * 100}%`,
+            x: (x * previewWidth - (previewWidth - previewRenderedWidth) / 2) / previewRenderedWidth,
+            y: (y * previewHeight - (previewHeight - previewRenderedHeight) / 2) / previewRenderedHeight,
         };
+    };
+
+    const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
+    const rawFocalPoint = hasMeasuredMap
+        ? toSourceCoordinates(displayedMap.focalPoint?.x ?? 0.5, displayedMap.focalPoint?.y ?? 0.5)
+        : { x: 0.5, y: 0.5 };
+    const focalPoint = { x: clampUnit(rawFocalPoint.x), y: clampUnit(rawFocalPoint.y) };
+
+    const getMarkerPosition = (x: number, y: number, markerSize: number) => {
+        let left = x;
+        let top = y;
+
+        if (hasMeasuredMap) {
+            const source = toSourceCoordinates(x, y);
+            const runtimeScale = Math.max(viewportWidth / imageWidth, viewportHeight / imageHeight);
+            const renderedWidth = imageWidth * runtimeScale;
+            const renderedHeight = imageHeight * runtimeScale;
+            // Matches the background-position percentage formula so markers track the focal crop.
+            const offsetX = (viewportWidth - renderedWidth) * focalPoint.x;
+            const offsetY = (viewportHeight - renderedHeight) * focalPoint.y;
+            left = (offsetX + source.x * renderedWidth) / viewportWidth;
+            top = (offsetY + source.y * renderedHeight) / viewportHeight;
+        }
+
+        // Keep markers clear of the viewport edges so nothing is clipped by the focal shift.
+        if (viewportWidth && viewportHeight) {
+            const marginX = (markerSize / 2 + 10) / viewportWidth;
+            const marginY = (markerSize / 2 + 10) / viewportHeight;
+            left = marginX * 2 >= 1 ? 0.5 : Math.min(1 - marginX, Math.max(marginX, left));
+            top = marginY * 2 >= 1 ? 0.5 : Math.min(1 - marginY, Math.max(marginY, top));
+        }
+
+        return { left: `${left * 100}%`, top: `${top * 100}%` };
     };
 
     return (
@@ -228,7 +252,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.28, ease: 'easeInOut' }}
-                                style={{ position: 'absolute', top: 0, left: 0, zIndex: 3, maxWidth: 'min(72%, 460px)', pointerEvents: 'none' }}
+                                style={{ position: 'absolute', top: 0, left: 0, zIndex: 3, maxWidth: 'min(72%, 800px)', pointerEvents: 'none' }}
                             >
                                 <Box
                                     sx={{
@@ -258,7 +282,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.45, ease: 'easeInOut' }}
-                                style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
+                                style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`, backgroundRepeat: 'no-repeat' }}
                             >
                                 {displayedMap.links.map((link, index) => {
                                     const linkedLocation = save.atlas?.[link.childId];
@@ -281,7 +305,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const configuration = stage().getConfiguration();
                                     const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats });
                                     const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
-                                    const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y);
+                                    const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize);
                                     const handleMarkerClick = () => {
                                         if (linkedMap) {
                                             setDisplayedMapId(linkedMap.id);
@@ -333,7 +357,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             }}
                                         </CachedBackgroundUrl>
                                         {linkedLocation && (
-                                            <div style={{ position: 'absolute', ...markerPosition, transform: `translate(-50%, calc(-50% + ${markerSize / 2 - actorPortraitSize * 0.35}px))`, zIndex: isHovered ? 5 : 3 }}>
+                                            <div style={{ position: 'absolute', ...markerPosition, transform: `translate(-50%, calc(-50% + ${markerSize / 2 - actorPortraitSize * 0.15}px))`, zIndex: isHovered ? 5 : 3 }}>
                                                 <LocationActorPortraits
                                                     locationId={linkedLocation.id}
                                                     stage={stage()}
