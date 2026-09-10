@@ -487,20 +487,20 @@ export const VOICE_MAP: {[key: string]: string} = {
     '8c9b8c56-20e6-490e-b787-8efcff4e89f7': 'Feminine - British - Haughty and catty', // Ilithya
     '1e0aa062-c5ee-4731-9fa1-c34c11097b03': 'Feminine - French - Mature and warm', // Madame LaMarquise
     'bb3e5ef7-2eda-470c-b93b-32c39d285b0e': 'Feminine - French - Soft and insecure', // ohPaytriarchy
-    '3383a73e-5a5b-4155-a741-5f0fe21b5b11': 'Feminine - French - High and light', // chocolatine_va ****
+    '3383a73e-5a5b-4155-a741-5f0fe21b5b11': 'Feminine - French - High and light', // chocolatine_va - maybe a bit tinny ****
     'ae245bb9-83a9-4b34-9aa8-f670431b9c82': 'Feminine - French - Low and breathy', // VenusDeVelours ****
     '23626ae8-691f-45d4-9870-7fddea8a0184': 'Feminine - French - Nasal and youthful', // Solene-Cherie
     '9f882b0a-d0da-4d7d-ad0d-e868b851b6f1': 'Feminine - French - Bright and confident', // RosalinaKinks
     '35b7e629-4df8-4c0e-a107-d037c594838a': 'Feminine - French - Bright and warm', // EllyHart456
     '48d3008b-b1fd-4c36-81ea-d2f36413da9a': 'Feminine - French - Light and airy', // hummingael *****
     '3b46afa4-62a6-4ba7-9652-e5065d75db6e': 'Feminine - Multilingual - Calm and low', // youronlynora
-    'a3a9a163-a283-4ba7-8535-d3f583ed342d': 'Feminine - Slavic - Keen and direct', // audio_allure
-    'bfb9b9b1-e25e-4c06-859a-1271e29cc9d4': 'Masculine - British - Bold and whimsical', // Matt Berry
+    'a3a9a163-a283-4ba7-8535-d3f583ed342d': 'Feminine - Slavic - Keen and direct', // audio_allure ****
+    'bfb9b9b1-e25e-4c06-859a-1271e29cc9d4': 'Masculine - British - Bold and whimsical', // Matt Berry *****
     '5004afbd-9f53-48af-8947-e8c31db03bd5': 'Masculine - French - Low and commanding', // candeur
     'e735ff09-8ab1-4a74-bff6-7b17f0207e9b': 'Masculine - French - Deep and resonant', // audioByDominic
     '74bedcda-2fcf-43ab-9aee-66b2bad14f69': 'Masculine - French - Light and relaxed', // Elias23h47
     '7fef668b-5cc4-47b1-b9ca-7dcadac15bf3': 'Masculine - French - Deep and warm', // daddydeep
-    '825b8263-63ca-4729-82a6-78855b637214': 'Masculine - French - Friendly and approachable', // mercadien
+    '825b8263-63ca-4729-82a6-78855b637214': 'Masculine - French - Friendly and approachable', // mercadien - a bit too quiet ***
     
 };
 

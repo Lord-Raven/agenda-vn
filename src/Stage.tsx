@@ -438,13 +438,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.syncUniversalSchedule();
     }
 
-    // Overwrites the save-game copy of an actor/location/map/lore entry with its canon configuration
-    // counterpart (matched by id), used by the "Apply" buttons in creator mode detail panels.
-    // Returns false if there is no configured entry or no matching save entry to apply it to.
+    // Copies an actor/location/map/lore entry from the canon configuration into the current save,
+    // replacing an existing entry or adding it when the current save does not contain it yet.
     applyConfigurationActorToSave(actorId: string): boolean {
         const configuredActor = (this.getConfiguration().actors || []).find(actor => actor.id === actorId);
         const save = this.getSave();
-        if (!configuredActor || !save.actors[actorId]) {
+        if (!configuredActor) {
             return false;
         }
         save.actors[actorId] = cloneActor(configuredActor, true);
@@ -456,7 +455,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     applyConfigurationLocationToSave(locationId: string): boolean {
         const configuredLocation = (this.getConfiguration().locations || []).find(location => location.id === locationId);
         const save = this.getSave();
-        if (!configuredLocation || !save.atlas[locationId]) {
+        if (!configuredLocation) {
             return false;
         }
         save.atlas[locationId] = cloneLocation(configuredLocation, true);
@@ -469,10 +468,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const configuredMap = (this.getConfiguration().maps || []).find(map => map.id === mapId);
         const save = this.getSave();
         const index = (save.maps || []).findIndex(map => map.id === mapId);
-        if (!configuredMap || index === -1) {
+        if (!configuredMap) {
             return false;
         }
-        save.maps[index] = cloneMap(configuredMap);
+        if (index === -1) {
+            save.maps = [...(save.maps || []), cloneMap(configuredMap)];
+        } else {
+            save.maps[index] = cloneMap(configuredMap);
+        }
         this.saveGame();
         return true;
     }
@@ -481,10 +484,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const configuredLore = (this.getConfiguration().lorebook || []).find(entry => entry.id === loreId);
         const save = this.getSave();
         const index = (save.lorebook || []).findIndex(entry => entry.id === loreId);
-        if (!configuredLore || index === -1 || !save.lorebook) {
+        if (!configuredLore) {
             return false;
         }
-        save.lorebook[index] = cloneLore(configuredLore);
+        if (index === -1) {
+            save.lorebook = [...(save.lorebook || []), cloneLore(configuredLore)];
+        } else {
+            const lorebook = save.lorebook || [];
+            lorebook[index] = cloneLore(configuredLore);
+            save.lorebook = lorebook;
+        }
         this.saveGame();
         return true;
     }
