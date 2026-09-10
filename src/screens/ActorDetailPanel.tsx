@@ -1346,6 +1346,7 @@ ${indent}}`;
                 actor.background = distilledActor.background || actor.background;
             }
             if (selectedFields.profile) {
+                console.log('Updated profile!');
                 actor.profile = distilledActor.profile || actor.profile;
             }
             if (selectedFields.voiceId) {
@@ -1371,6 +1372,7 @@ ${indent}}`;
                     lore.triggers = [...lore.triggers.filter((trigger) => !previousGeneratedState.name.includes(trigger)), ...actor.name.split(' ')];
                 }
                 if (selectedFields.profile) {
+                    console.log('Updated lore content with profile!');
                     lore.content = actor.profile;
                 }
             }

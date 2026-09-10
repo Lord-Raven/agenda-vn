@@ -470,7 +470,7 @@ export const VOICE_MAP: {[key: string]: string} = {
     '057d53b3-bb28-47f1-9c19-a85a79851863': 'Feminine - American - Low and warm',
     '6e6619ba-4880-4cf3-a5df-d0697ba46656': 'Feminine - American - High and soft',
     'd6e05564-eea9-4181-aee9-fa0d7315f67d': 'Masculine - American - Cool and confident',
-    'e6b74abb-f4b2-4a84-b9ef-c390512f2f47': 'Masculine - American - Posh and articulate',
+    'e6b74abb-f4b2-4a84-b9ef-c390512f2f47': 'Masculine - British - Posh and articulate', // stock ****
     'bright_female_20s': 'Feminine - American - Bright and cheerful',
     'resonant_male_40s': 'Masculine - American - Resonant and mature',
     'gentle_female_30s': 'Feminine - American - Gentle and caring',
