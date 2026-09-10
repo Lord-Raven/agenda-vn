@@ -1407,15 +1407,22 @@ ${indent}}`;
 
         // Want to be certain we aren't deleting a lore entry that has erroneously become shared across actors.
         const actorsWithLoreId = (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {})).filter((a) => a !== actor && a.loreId === linkedLore?.id);
+        const shouldRemoveLinkedLore = linkedLore && actorsWithLoreId.length === 0;
 
-        if (linkedLore && actorsWithLoreId.length === 0) {
-            if (isCreatorMode) {
-                stage().updateConfiguration({ lorebook: (stage().getConfiguration().lorebook || []).filter((entry) => entry.id !== linkedLore.id) });
-            } else {
-                const save = stage().getSave();
+        if (isCreatorMode) {
+            const configuration = stage().getConfiguration();
+            stage().updateConfiguration({
+                actors: configuration.actors || [],
+                ...(shouldRemoveLinkedLore
+                    ? { lorebook: (configuration.lorebook || []).filter((entry) => entry.id !== linkedLore.id) }
+                    : {}),
+            });
+        } else {
+            const save = stage().getSave();
+            if (shouldRemoveLinkedLore) {
                 save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
-                stage().saveGame();
             }
+            stage().saveGame();
         }
 
         stage().showPriorityMessage(`${actor.name || 'Actor'} is now inactive and hidden from management.`);
