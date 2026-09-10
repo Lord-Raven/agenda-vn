@@ -4,7 +4,8 @@ import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/mater
 import { Stage } from '../Stage';
 import { findStatOptionByValue, getStatOptionValue, isNumericDisplayType, Stat, StatValue, StatValueRule, normalizeLocationListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
+import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry, normalizeVoiceModulation } from '../content/Actor';
+import type { NovelVoiceModulation } from '@lord-raven/novel-visualizer';
 import { ConditionContext } from '../content/Condition';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
@@ -59,6 +60,22 @@ const DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION: ActorDetailGenerationSelection 
 };
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
+
+const VOICE_MODULATION_CONTROLS: Array<{
+    key: keyof NovelVoiceModulation;
+    label: string;
+    min: number;
+    max: number;
+    step: number;
+    unit: string;
+}> = [
+    { key: 'pitch', label: 'Pitch', min: -12, max: 12, step: 1, unit: ' st' },
+    { key: 'rate', label: 'Rate', min: 0.8, max: 1.2, step: 0.01, unit: 'x' },
+    { key: 'volume', label: 'Volume', min: 0, max: 2, step: 0.05, unit: 'x' },
+    { key: 'warmth', label: 'Warmth', min: -12, max: 12, step: 1, unit: ' dB' },
+    { key: 'brightness', label: 'Brightness', min: -12, max: 12, step: 1, unit: ' dB' },
+    { key: 'nasality', label: 'Nasality', min: -12, max: 12, step: 1, unit: ' dB' },
+];
 
 const clampActorStatValue = (value: number, stat: Stat): number => {
     let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
@@ -236,7 +253,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         profile: string;
         lore: string;
         voiceId: string;
-        voiceModulation: number;
+        voiceModulation: Required<NovelVoiceModulation>;
         themeColor: string;
         themeFontFamily: string;
         schedule: ActorSchedule;
@@ -252,7 +269,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         profile: actor.profile || '',
         lore: linkedLoreEntry?.content || '',
         voiceId: actor.voiceId,
-        voiceModulation: actor.voiceModulation ?? 1,
+        voiceModulation: normalizeVoiceModulation(actor.voiceModulation),
         themeColor: actor.themeColor,
         themeFontFamily: actor.themeFontFamily,
         schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
@@ -546,7 +563,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         // Keep the actor's own profile field in sync even when it's backed by lore, since other consumers read actor.profile directly.
         persistedActor.profile = isProfileBackedByLore ? nextEditedActor.lore : nextEditedActor.profile;
         persistedActor.voiceId = nextEditedActor.voiceId;
-        persistedActor.voiceModulation = nextEditedActor.voiceModulation;
+        persistedActor.voiceModulation = { ...nextEditedActor.voiceModulation };
         persistedActor.themeColor = nextEditedActor.themeColor;
         persistedActor.themeFontFamily = nextEditedActor.themeFontFamily;
         persistedActor.schedule = Object.fromEntries(Object.entries(nextEditedActor.schedule).map(([destination, collections]) => [destination, collections.map(collection => [...collection])]));
@@ -741,7 +758,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             profile: actor.profile || '',
             lore: latestLinkedLoreEntry?.content || '',
             voiceId: actor.voiceId,
-            voiceModulation: actor.voiceModulation ?? 1,
+            voiceModulation: normalizeVoiceModulation(actor.voiceModulation),
             themeColor: actor.themeColor,
             themeFontFamily: actor.themeFontFamily,
             schedule: Object.fromEntries(Object.entries(actor.schedule || {}).map(([destination, collections]) => [destination, collections.map(collection => [...collection])])),
@@ -790,6 +807,16 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         setEditedActor(prev => ({
             ...prev,
             [field]: value
+        }));
+    };
+
+    const handleVoiceModulationChange = (field: keyof NovelVoiceModulation, value: number) => {
+        setEditedActor((previous) => ({
+            ...previous,
+            voiceModulation: normalizeVoiceModulation({
+                ...previous.voiceModulation,
+                [field]: value,
+            }),
         }));
     };
 
@@ -1120,7 +1147,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
     const getVoiceSampleCacheKey = (actorId: string, voiceId: string): string => `${actorId}:${voiceId}`;
 
-    const playSampleUrl = async (sampleUrl: string, voiceModulation: number) => {
+    const playSampleUrl = async (sampleUrl: string, voiceModulation: NovelVoiceModulation) => {
         if (!sampleUrl) {
             return;
         }
@@ -1133,7 +1160,8 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
             const audio = new Audio(sampleUrl);
             audio.preservesPitch = false;
-            audio.playbackRate = Math.min(1.25, Math.max(0.75, voiceModulation));
+            audio.playbackRate = voiceModulation.rate ?? 1;
+            audio.volume = Math.min(1, Math.max(0, voiceModulation.volume ?? 1));
             audioRef.current = audio;
             await audio.play();
         } catch (error) {
@@ -2581,34 +2609,35 @@ ${indent}}`;
                                                     )}
                                             </Button>
                                         </div>
-                                        <div style={{ marginTop: '12px' }}>
-                                            <label
-                                                style={{
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    color: 'var(--agenda-text-primary)',
-                                                    fontSize: '13px',
-                                                    marginBottom: '6px',
-                                                }}
-                                            >
-                                                <span>Voice Modulation</span>
-                                                <span>{editedActor.voiceModulation.toFixed(2)}x</span>
-                                            </label>
-                                            <input
-                                                type="range"
-                                                min="0.8"
-                                                max="1.2"
-                                                step="0.01"
-                                                value={editedActor.voiceModulation}
-                                                onChange={(event) => handleInputChange('voiceModulation', Number(event.target.value))}
-                                                title="Mildly tune the voice down or up to suit the character; 1.00x is neutral."
-                                                style={{ width: '100%', accentColor: 'var(--agenda-highlight)' }}
-                                            />
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                <span>Lower</span>
-                                                <span>Neutral</span>
-                                                <span>Higher</span>
-                                            </div>
+                                        <div style={{ marginTop: '12px', display: 'grid', gap: '10px' }}>
+                                            {VOICE_MODULATION_CONTROLS.map((control) => {
+                                                const value = editedActor.voiceModulation[control.key];
+                                                return (
+                                                    <div key={control.key}>
+                                                        <label
+                                                            style={{
+                                                                display: 'flex',
+                                                                justifyContent: 'space-between',
+                                                                color: 'var(--agenda-text-primary)',
+                                                                fontSize: '13px',
+                                                                marginBottom: '4px',
+                                                            }}
+                                                        >
+                                                            <span>{control.label}</span>
+                                                            <span>{value.toFixed(control.step < 1 ? 2 : 0)}{control.unit}</span>
+                                                        </label>
+                                                        <input
+                                                            type="range"
+                                                            min={control.min}
+                                                            max={control.max}
+                                                            step={control.step}
+                                                            value={value}
+                                                            onChange={(event) => handleVoiceModulationChange(control.key, Number(event.target.value))}
+                                                            style={{ width: '100%', accentColor: 'var(--agenda-highlight)' }}
+                                                        />
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 

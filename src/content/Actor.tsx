@@ -13,6 +13,38 @@ import {
 } from "../utils/StructuredResponse.js";
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableActorTarget, pickSeededItem } from './Condition';
 import { formatCurrentDate } from './Skit';
+import { NovelVoiceModulation } from '@lord-raven/novel-visualizer';
+
+export const DEFAULT_VOICE_MODULATION: Required<NovelVoiceModulation> = {
+    pitch: 0,
+    rate: 1,
+    volume: 1,
+    warmth: 0,
+    brightness: 0,
+    nasality: 0,
+};
+
+export const normalizeVoiceModulation = (value: unknown): Required<NovelVoiceModulation> => {
+    const source = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : { rate: value };
+    const finiteOrDefault = (key: keyof NovelVoiceModulation): number => {
+        const rawValue = source[key];
+        const parsed = typeof rawValue === 'number' || (typeof rawValue === 'string' && rawValue.trim())
+            ? Number(rawValue)
+            : Number.NaN;
+        return Number.isFinite(parsed) ? parsed : DEFAULT_VOICE_MODULATION[key];
+    };
+
+    return {
+        pitch: Math.min(12, Math.max(-12, finiteOrDefault('pitch'))),
+        rate: Math.min(1.2, Math.max(0.8, finiteOrDefault('rate'))),
+        volume: Math.min(2, Math.max(0, finiteOrDefault('volume'))),
+        warmth: Math.min(12, Math.max(-12, finiteOrDefault('warmth'))),
+        brightness: Math.min(12, Math.max(-12, finiteOrDefault('brightness'))),
+        nasality: Math.min(12, Math.max(-12, finiteOrDefault('nasality'))),
+    };
+};
 // A single conditional modifier to an actor's initial stat value; numeric stats are adjusted, while text/location stats are replaced.
 export type ActorStatModifier = {
     id: string;
@@ -240,7 +272,13 @@ export class Actor {
     themeColor: string = ''; // Theme color (hex code)
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
-    voiceModulation: number = 1; // Modulation factor for the actor's voice in TTS (0.8 to 1.2)
+    /*pitch?: number; // +/- semitones (0 is normal)
+    rate?: number; // multiplier (1 is normal)
+    volume?: number; // multiplier (1 is normal)
+    warmth?: number; // +/- dB (0 is normal)
+    brightness?: number; // +/- dB (0 is normal)
+    nasality?: number; // +/- dB (0 is normal)*/
+    voiceModulation: NovelVoiceModulation = { ...DEFAULT_VOICE_MODULATION };
     statMap: { [key: string]: StatValue } = {}; // Map of custom stat name to value for this actor
     statInitialMap: { [key: string]: ActorStatInitial } = {}; // Map of custom stat name to its initial value and conditional modifiers, used to seed statMap when a new game starts
     perActorStatMap: PerActorStatValueMap = {}; // For perActor stats: map of stat name to a map of target actorId to explicit value override
@@ -254,7 +292,7 @@ export class Actor {
         const actor = Object.create(Actor.prototype);
         Object.assign(actor, savedActor);
         actor.active = savedActor?.active !== false;
-        actor.voiceModulation = Math.min(1.2, Math.max(0.8, Number(savedActor?.voiceModulation) || 1));
+        actor.voiceModulation = normalizeVoiceModulation(savedActor?.voiceModulation);
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};
         actor.statInitialMap = cloneStatInitialMap(savedActor?.statInitialMap);
         actor.perActorStatMap = clonePerActorStatValueMap(savedActor?.perActorStatMap);
@@ -275,7 +313,7 @@ export class Actor {
             this.id = generateUuid();
         }
         this.active = this.active !== false;
-        this.voiceModulation = Math.min(1.2, Math.max(0.8, Number(this.voiceModulation) || 1));
+        this.voiceModulation = normalizeVoiceModulation(this.voiceModulation);
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
         this.statInitialMap = cloneStatInitialMap(this.statInitialMap);
         this.perActorStatMap = clonePerActorStatValueMap(this.perActorStatMap);
@@ -338,11 +376,12 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
         label: 'VOICE',
         description: 'Output the specific voice ID from the Available Voices section that best matches the character\'s apparent gender (foremost) and personality.',
     },
-    {
-        key: 'voice_modulation',
-        label: 'VOICE MODULATION',
-        description: 'A number from 0.8 to 1.2 that can mildly tune the selected voice down or up to suit the character. Use 1 for no modulation.',
-    },
+    { key: 'voice_pitch', label: 'VOICE PITCH', description: 'Pitch adjustment in semitones from -12 to 12. Use 0 for no adjustment.' },
+    { key: 'voice_rate', label: 'VOICE RATE', description: 'Speaking-rate multiplier from 0.8 to 1.2. Use 1 for normal speed.' },
+    { key: 'voice_volume', label: 'VOICE VOLUME', description: 'Volume multiplier from 0 to 2. Use 1 for normal volume.' },
+    { key: 'voice_warmth', label: 'VOICE WARMTH', description: 'Low-mid warmth adjustment in dB from -12 to 12. Use 0 for no adjustment.' },
+    { key: 'voice_brightness', label: 'VOICE BRIGHTNESS', description: 'Presence/brightness adjustment in dB from -12 to 12. Use 0 for no adjustment.' },
+    { key: 'voice_nasality', label: 'VOICE NASALITY', description: 'Nasal-formant adjustment in dB from -12 to 12. Use 0 for no adjustment.' },
     {
         key: 'color',
         label: 'COLOR',
@@ -555,7 +594,12 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
                         background: 'Raised in a border settlement that was burned out when she was twelve, Jane came up through mercenary companies and learned early that promises are collateral. Her older brother, still missing after the raid, is the reason she keeps taking contracts along the frontier. She is unflinchingly loyal to the handful of people who have earned it, and constitutionally incapable of walking away from someone who cannot defend themselves.',
                         profile: 'Jane is confident and determined, quick-witted, and fiercely independent. Known for her sharp wit and strong presence, she has a commanding aura that draws attention. Deep down, Jane is driven by a need to prove she\'s worthy of love despite her past betrayals. She\'s here looking for someone who will challenge her and see beyond her tough exterior.',
                         voice: '03a438b7-ebfa-4f72-9061-f086d8f1fca6',
-                        voice_modulation: '1.00',
+                        voice_pitch: '0',
+                        voice_rate: '1.00',
+                        voice_volume: '1.00',
+                        voice_warmth: '0',
+                        voice_brightness: '0',
+                        voice_nasality: '0',
                         color: '#666666',
                         font: 'Calibri, sans-serif',
                         ...exampleStatValues,
@@ -597,10 +641,15 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
         actor.background = parsedData['background'] || actor.background || '';
         actor.profile = parsedData['profile'] || actor.profile || '';
         actor.voiceId = parsedData['voice'] || actor.voiceId || '';
-        const parsedVoiceModulation = Number(parsedData['voice_modulation']);
-        actor.voiceModulation = Number.isFinite(parsedVoiceModulation)
-            ? Math.min(1.2, Math.max(0.8, parsedVoiceModulation))
-            : actor.voiceModulation;
+        actor.voiceModulation = normalizeVoiceModulation({
+            ...actor.voiceModulation,
+            pitch: parsedData['voice_pitch'] || actor.voiceModulation?.pitch,
+            rate: parsedData['voice_rate'] || actor.voiceModulation?.rate,
+            volume: parsedData['voice_volume'] || actor.voiceModulation?.volume,
+            warmth: parsedData['voice_warmth'] || actor.voiceModulation?.warmth,
+            brightness: parsedData['voice_brightness'] || actor.voiceModulation?.brightness,
+            nasality: parsedData['voice_nasality'] || actor.voiceModulation?.nasality,
+        });
         actor.themeColor = themeColor || actor.themeColor;
         actor.themeFontFamily = parsedData['font'] || actor.themeFontFamily || 'Arial, sans-serif';
         actor.outfits = actor.outfits.length > 0 ? actor.outfits : [];
