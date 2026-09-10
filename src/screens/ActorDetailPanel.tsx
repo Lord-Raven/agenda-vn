@@ -6,6 +6,7 @@ import { findStatOptionByValue, getStatOptionValue, isNumericDisplayType, Stat, 
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry, normalizeVoiceModulation } from '../content/Actor';
 import type { NovelVoiceModulation } from '@lord-raven/novel-visualizer';
+import { playVoiceAudio, VoiceAudioPlayback } from '@lord-raven/novel-visualizer';
 import { ConditionContext } from '../content/Condition';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
@@ -365,7 +366,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         actorDetailGenerationSelectionRef.current = actorDetailGenerationSelection;
     }, [actorDetailGenerationSelection]);
     const [isGeneratingDemoSpeech, setIsGeneratingDemoSpeech] = useState(false);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const audioRef = useRef<VoiceAudioPlayback | null>(null);
     const [regeneratingImages, setRegeneratingImages] = useState<Set<string>>(new Set());
     const [isFillingMissingEmotions, setIsFillingMissingEmotions] = useState(false);
     const [isGeneratingActorDetails, setIsGeneratingActorDetails] = useState(false);
@@ -1154,16 +1155,12 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
         try {
             if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current.src = '';
+                audioRef.current.stop();
             }
 
-            const audio = new Audio(sampleUrl);
-            audio.preservesPitch = false;
-            audio.playbackRate = voiceModulation.rate ?? 1;
-            audio.volume = Math.min(1, Math.max(0, voiceModulation.volume ?? 1));
-            audioRef.current = audio;
-            await audio.play();
+            playVoiceAudio(sampleUrl, voiceModulation);
+
+            audioRef.current = await playVoiceAudio(sampleUrl, voiceModulation);
         } catch (error) {
             console.error('Failed to play demo speech sample:', error);
             stage().showPriorityMessage('Unable to play voice sample. Please try again.');
@@ -2554,8 +2551,52 @@ ${indent}}`;
                                 </h2>
                                 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                                    {/* Voice ID */}
+                                    {/* Theme Color */}
                                     <div>
+                                        <label 
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Theme Color
+                                        </label>
+                                        <ColorPickerInput
+                                            value={editedActor.themeColor}
+                                            onChange={(value) => handleInputChange('themeColor', value)}
+                                            placeholder="#RRGGBB"
+                                            popoverTitle="Choose theme color"
+                                            swatches={actorThemeColorSwatches}
+                                            inputStyle={{ flex: 1 }}
+                                        />
+                                    </div>
+
+                                    {/* Font Family */}
+                                    <div>
+                                        <label 
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Font Family
+                                        </label>
+                                        <TextInput
+                                            fullWidth
+                                            value={editedActor.themeFontFamily}
+                                            onChange={(e) => handleInputChange('themeFontFamily', e.target.value)}
+                                            placeholder="Font stack (e.g., Arial, sans-serif)"
+                                        />
+                                    </div>
+
+                                    {/* Voice ID */}
+                                    <div style={{ gridColumn: '1 / -1' }}>
                                         <label 
                                             style={{
                                                 display: 'block',
@@ -2609,7 +2650,7 @@ ${indent}}`;
                                                     )}
                                             </Button>
                                         </div>
-                                        <div style={{ marginTop: '12px', display: 'grid', gap: '10px' }}>
+                                        <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px 18px' }}>
                                             {VOICE_MODULATION_CONTROLS.map((control) => {
                                                 const value = editedActor.voiceModulation[control.key];
                                                 return (
@@ -2639,50 +2680,6 @@ ${indent}}`;
                                                 );
                                             })}
                                         </div>
-                                    </div>
-
-                                    {/* Theme Color */}
-                                    <div>
-                                        <label 
-                                            style={{
-                                                display: 'block',
-                                                color: 'var(--agenda-highlight)',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold',
-                                                marginBottom: '8px',
-                                            }}
-                                        >
-                                            Theme Color
-                                        </label>
-                                        <ColorPickerInput
-                                            value={editedActor.themeColor}
-                                            onChange={(value) => handleInputChange('themeColor', value)}
-                                            placeholder="#RRGGBB"
-                                            popoverTitle="Choose theme color"
-                                            swatches={actorThemeColorSwatches}
-                                            inputStyle={{ flex: 1 }}
-                                        />
-                                    </div>
-
-                                    {/* Font Family */}
-                                    <div style={{ gridColumn: '1 / -1' }}>
-                                        <label 
-                                            style={{
-                                                display: 'block',
-                                                color: 'var(--agenda-highlight)',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold',
-                                                marginBottom: '8px',
-                                            }}
-                                        >
-                                            Font Family
-                                        </label>
-                                        <TextInput
-                                            fullWidth
-                                            value={editedActor.themeFontFamily}
-                                            onChange={(e) => handleInputChange('themeFontFamily', e.target.value)}
-                                            placeholder="Font stack (e.g., Arial, sans-serif)"
-                                        />
                                     </div>
                                 </div>
                             </section>
