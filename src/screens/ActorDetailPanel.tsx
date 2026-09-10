@@ -394,6 +394,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const editedPerActorStatMapRef = useRef(editedPerActorStatMap);
     const editedPerActorValueRulesRef = useRef(editedPerActorValueRules);
     const autoSaveTimeoutRef = useRef<number | null>(null);
+    const isDeactivatingRef = useRef(false);
     const didMountRef = useRef(false);
 
     const cloneOutfits = (outfits: Outfit[]) => outfits.map((outfit) => ({
@@ -730,7 +731,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
     useEffect(() => {
         return () => {
-            if (autoSaveTimeoutRef.current) {
+            if (autoSaveTimeoutRef.current && !isDeactivatingRef.current) {
                 persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current, editedPerActorStatMapRef.current, editedPerActorValueRulesRef.current);
             }
         };
@@ -1402,23 +1403,28 @@ ${indent}}`;
     };
 
     const handleDeactivateActor = () => {
+        isDeactivatingRef.current = true;
+        persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current, editedPerActorStatMapRef.current, editedPerActorValueRulesRef.current);
+
         const linkedLore = getLinkedActorLore(actor, stage(), isCreatorMode);
-        actor.active = false;
 
         // Want to be certain we aren't deleting a lore entry that has erroneously become shared across actors.
-        const actorsWithLoreId = (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {})).filter((a) => a !== actor && a.loreId === linkedLore?.id);
+        const actorsWithLoreId = (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {})).filter((candidate) => candidate.id !== actor.id && candidate.loreId === linkedLore?.id);
         const shouldRemoveLinkedLore = linkedLore && actorsWithLoreId.length === 0;
 
         if (isCreatorMode) {
             const configuration = stage().getConfiguration();
             stage().updateConfiguration({
-                actors: configuration.actors || [],
+                actors: (configuration.actors || []).map((candidate) =>
+                    candidate.id === actor.id ? new Actor({ ...candidate, active: false }) : candidate,
+                ),
                 ...(shouldRemoveLinkedLore
                     ? { lorebook: (configuration.lorebook || []).filter((entry) => entry.id !== linkedLore.id) }
                     : {}),
             });
         } else {
             const save = stage().getSave();
+            save.actors[actor.id].active = false;
             if (shouldRemoveLinkedLore) {
                 save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
             }

@@ -29,8 +29,7 @@ interface MapMarkerButtonProps {
     isHovered: boolean;
     isInteractive: boolean;
     markerSize: number;
-    spaceToLeft: number;
-    spaceToRight: number;
+    expansionDirection: 'left' | 'right' | 'center';
     label: string;
     secondaryLabel?: string;
     disabled: boolean;
@@ -42,7 +41,7 @@ interface MapMarkerButtonProps {
     children: ReactNode;
 }
 
-const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, markerSize, spaceToLeft, spaceToRight, label, secondaryLabel, style, children, ...buttonProps }) => {
+const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, markerSize, expansionDirection, label, secondaryLabel, style, children, ...buttonProps }) => {
     // Stay elevated through its own collapse animation so a newly hovered neighbor doesn't
     // cut off the shrink transition mid-flight, which otherwise reads as an instant snap.
     const [isElevated, setIsElevated] = useState(isHovered);
@@ -72,19 +71,18 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
     // A marker still collapsing (elevated but no longer hovered) must render above a freshly
     // hovered neighbor that's growing, otherwise the growing marker covers its shrink animation.
     const zIndex = isElevated && !isHovered ? 3 : isHovered ? 2 : 1;
-    const mapMargin = 10;
-    const minHorizontalOffset = expandedMarkerWidth / 2 + mapMargin - spaceToLeft;
-    const maxHorizontalOffset = spaceToRight - expandedMarkerWidth / 2 - mapMargin;
-    const horizontalOffset = minHorizontalOffset <= maxHorizontalOffset
-        ? Math.min(maxHorizontalOffset, Math.max(minHorizontalOffset, 0))
-        : (minHorizontalOffset + maxHorizontalOffset) / 2;
+    const expandedHorizontalPosition = expansionDirection === 'right'
+        ? `${-markerSize / 2}px`
+        : expansionDirection === 'left'
+            ? `calc(-100% + ${markerSize / 2}px)`
+            : '-50%';
 
     return (
         <motion.button
             type="button"
             {...buttonProps}
             initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
-            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: isHovered ? `calc(-50% + ${horizontalOffset}px)` : '-50%', y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
+            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: isHovered ? expandedHorizontalPosition : '-50%', y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             onAnimationComplete={() => {
                 if (!isHovered) {
@@ -228,8 +226,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
         return {
             left: `${left * 100}%`,
             top: `${top * 100}%`,
-            spaceToLeft: left * viewportWidth,
-            spaceToRight: (1 - left) * viewportWidth,
+            expansionDirection: left <= 0.25 ? 'right' : left >= 0.75 ? 'left' : 'center' as 'left'|'right'|'center',
         };
     };
 
@@ -318,7 +315,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const configuration = stage().getConfiguration();
                                     const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats });
                                     const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
-                                    const { spaceToLeft, spaceToRight, ...markerPosition } = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize);
+                                    const { expansionDirection, ...markerPosition } = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize);
                                     const handleMarkerClick = () => {
                                         if (linkedMap) {
                                             setDisplayedMapId(linkedMap.id);
@@ -347,8 +344,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                         onMouseLeave={() => setHoveredLink(null)}
                                                         isInteractive={isInteractive}
                                                         markerSize={markerSize}
-                                                        spaceToLeft={spaceToLeft}
-                                                        spaceToRight={spaceToRight}
+                                                        expansionDirection={expansionDirection}
                                                         label={markerName}
                                                         secondaryLabel={currentEvent ? linkedLocation?.name : undefined}
                                                         style={{ position: 'absolute', ...markerPosition, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed' }}
