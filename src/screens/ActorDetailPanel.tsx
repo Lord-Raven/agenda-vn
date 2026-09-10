@@ -1158,8 +1158,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
                 audioRef.current.stop();
             }
 
-            playVoiceAudio(sampleUrl, voiceModulation);
-
             audioRef.current = await playVoiceAudio(sampleUrl, voiceModulation);
         } catch (error) {
             console.error('Failed to play demo speech sample:', error);
