@@ -240,7 +240,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         persistedLocation.name = nextLocation.name;
         persistedLocation.category = nextLocation.category.trim();
         if (persistedLocation.name !== oldName) {
-            console.log(`Location name changed from "${oldName}" to "${persistedLocation.name}". Updating linked lore entry.`);
             upsertLocationLoreEntry(persistedLocation, oldName, stage(), isCreatorMode);
         }
         updateLocationDescription(persistedLocation.id, nextLocation.description, stage(), isCreatorMode);

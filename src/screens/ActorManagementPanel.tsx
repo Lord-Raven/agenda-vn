@@ -169,7 +169,7 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage, isC
                         style={{
                             color: actor.themeColor || 'var(--agenda-highlight)',
                             fontFamily: actor.themeFontFamily || 'inherit',
-                            fontSize: `${getFontSizeMultiplier(actor.themeFontFamily || 'inherit') * 15}px`,
+                            fontSize: `${getFontSizeMultiplier(actor.themeFontFamily || 'inherit')}em`,
                             fontWeight: 700,
                         }}
                     >
