@@ -29,7 +29,7 @@ interface MapMarkerButtonProps {
     isHovered: boolean;
     isInteractive: boolean;
     markerSize: number;
-    expansionDirection: 'left' | 'right' | 'center';
+    expansionDirection: 'center' | 'left' | 'right';
     label: string;
     secondaryLabel?: string;
     disabled: boolean;
@@ -71,25 +71,21 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
     // A marker still collapsing (elevated but no longer hovered) must render above a freshly
     // hovered neighbor that's growing, otherwise the growing marker covers its shrink animation.
     const zIndex = isElevated && !isHovered ? 3 : isHovered ? 2 : 1;
-    const expandedHorizontalPosition = expansionDirection === 'right'
-        ? `${-markerSize / 2}px`
-        : expansionDirection === 'left'
-            ? `calc(-100% + ${markerSize / 2}px)`
-            : '-50%';
+    const translateX = expansionDirection === 'right' ? `-${markerSize / 2}px` : expansionDirection === 'left' ? `calc(-100% + ${markerSize / 2}px)` : '-50%';
 
     return (
         <motion.button
             type="button"
             {...buttonProps}
             initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
-            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: isHovered ? expandedHorizontalPosition : '-50%', y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
+            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: isHovered ? translateX : '-50%', y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             onAnimationComplete={() => {
                 if (!isHovered) {
                     setIsElevated(false);
                 }
             }}
-            style={{ ...style, zIndex }}
+            style={{ ...style, transformOrigin: expansionDirection === 'left' ? 'right center' : expansionDirection === 'right' ? 'left center' : 'center', zIndex }}
         >
             {children}
             <span ref={measureRef} aria-hidden="true" style={{ position: 'absolute', width: 'max-content', visibility: 'hidden', pointerEvents: 'none', whiteSpace: 'nowrap', padding: '0 12px 0 6px', fontSize: '0.82rem', fontWeight: 700 }}>
@@ -199,7 +195,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
         : { x: 0.5, y: 0.5 };
     const focalPoint = { x: clampUnit(rawFocalPoint.x), y: clampUnit(rawFocalPoint.y) };
 
-    const getMarkerPosition = (x: number, y: number, markerSize: number) => {
+    const getMarkerPosition = (x: number, y: number, markerSize: number): { style: { left: string; top: string }; expansionDirection: MapMarkerButtonProps['expansionDirection'] } => {
         let left = x;
         let top = y;
 
@@ -223,11 +219,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
             top = marginY * 2 >= 1 ? 0.5 : Math.min(1 - marginY, Math.max(marginY, top));
         }
 
-        return {
-            left: `${left * 100}%`,
-            top: `${top * 100}%`,
-            expansionDirection: left <= 0.25 ? 'right' : left >= 0.75 ? 'left' : 'center' as 'left'|'right'|'center',
-        };
+        const expansionDirection: MapMarkerButtonProps['expansionDirection'] = left < 0.25 ? 'right' : left > 0.75 ? 'left' : 'center';
+
+        return { style: { left: `${left * 100}%`, top: `${top * 100}%` }, expansionDirection };
     };
 
     return (
@@ -315,7 +309,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const configuration = stage().getConfiguration();
                                     const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats });
                                     const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
-                                    const { expansionDirection, ...markerPosition } = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize);
+                                    const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize);
                                     const handleMarkerClick = () => {
                                         if (linkedMap) {
                                             setDisplayedMapId(linkedMap.id);
@@ -344,22 +338,22 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                         onMouseLeave={() => setHoveredLink(null)}
                                                         isInteractive={isInteractive}
                                                         markerSize={markerSize}
-                                                        expansionDirection={expansionDirection}
+                                                        expansionDirection={markerPosition.expansionDirection}
                                                         label={markerName}
                                                         secondaryLabel={currentEvent ? linkedLocation?.name : undefined}
-                                                        style={{ position: 'absolute', ...markerPosition, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed' }}
+                                                        style={{ position: 'absolute', ...markerPosition.style, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed' }}
                                                     >
-                                                        <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
+                                                        <span style={{ display: 'flex', flexDirection: markerPosition.expansionDirection === 'left' ? 'row-reverse' : 'row', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
                                                         <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: markerImageUrl ? `url(${markerImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                                                             {!markerImageUrl && <MapRounded fontSize="small" />}
                                                         </span>
-                                                            <span style={{ padding: '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700, flex: '1 1 auto', minWidth: 0, overflow: 'hidden' }}>
+                                                            <span style={{ padding: markerPosition.expansionDirection === 'left' ? '0 6px 0 12px' : '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700, flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textAlign: markerPosition.expansionDirection === 'left' ? 'right' : 'left' }}>
                                                                 {markerName}
                                                                 {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 400 }}>{linkedLocation?.name}</span>}
                                                             </span>
                                                         </span>
                                                         {isInteractive && (
-                                                            <span style={{ position: 'absolute', top: -2, left: -2, display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
+                                                            <span style={{ position: 'absolute', top: -2, left: markerPosition.expansionDirection === 'left' ? 'auto' : -2, right: markerPosition.expansionDirection === 'left' ? -2 : 'auto', display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
                                                                 {linkedMap ? <ArrowOutward sx={{ fontSize: 11 }} /> : <PlayArrow sx={{ fontSize: 11 }} />}
                                                             </span>
                                                         )}
@@ -368,7 +362,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             }}
                                         </CachedBackgroundUrl>
                                         {linkedLocation && (
-                                            <div style={{ position: 'absolute', ...markerPosition, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, zIndex: isHovered ? 5 : 3 }}>
+                                            <div style={{ position: 'absolute', ...markerPosition.style, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, zIndex: isHovered ? 5 : 3 }}>
                                                 <LocationActorPortraits
                                                     locationId={linkedLocation.id}
                                                     stage={stage()}
