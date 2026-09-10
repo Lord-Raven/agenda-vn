@@ -215,7 +215,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
         // Keep markers clear of the viewport edges so nothing is clipped by the focal shift.
         if (viewportWidth && viewportHeight) {
             const marginX = (markerSize / 2 + 10) / viewportWidth;
-            const marginY = (markerSize / 2 + 10) / viewportHeight;
+            const marginY = (markerSize) / viewportHeight;
             left = marginX * 2 >= 1 ? 0.5 : Math.min(1 - marginX, Math.max(marginX, left));
             top = marginY * 2 >= 1 ? 0.5 : Math.min(1 - marginY, Math.max(marginY, top));
         }

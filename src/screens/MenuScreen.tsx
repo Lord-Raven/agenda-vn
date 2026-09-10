@@ -464,20 +464,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                                 boxSizing: 'border-box',
                                             }}
                                         >
-                                            {stage().getConfiguration().versionNotes || 'v2026.08.20 - Initial release of Agenda VN.'}
-                                        </div>
-                                        <div
-                                            style={{
-                                                textAlign: 'center',
-                                                marginTop: 'clamp(8px, 1.5vh, 12px)',
-                                                color: 'rgba(185, 210, 227, 0.72)',
-                                                fontSize: 'clamp(10px, 1.5vw, 12px)',
-                                                letterSpacing: '0.04em',
-                                                width: '100%',
-                                                boxSizing: 'border-box',
-                                            }}
-                                        >
-                                            {'v2026.04.22 - Initial Release.'}
+                                            {stage().getConfiguration().versionNotes || '2026.09.10 - Initial release of Agenda VN.'}
                                         </div>
                                     </motion.div>
                                 )}
