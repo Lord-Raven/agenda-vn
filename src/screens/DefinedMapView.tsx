@@ -71,14 +71,15 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
     // A marker still collapsing (elevated but no longer hovered) must render above a freshly
     // hovered neighbor that's growing, otherwise the growing marker covers its shrink animation.
     const zIndex = isElevated && !isHovered ? 3 : isHovered ? 2 : 1;
-    const translateX = expansionDirection === 'right' ? `-${markerSize / 2}px` : expansionDirection === 'left' ? `calc(-100% + ${markerSize / 2}px)` : '-50%';
+    const collapsedTranslateX = expansionDirection === 'center' ? '-50%' : -markerSize / 2;
+    const expandedTranslateX = expansionDirection === 'left' ? -(expandedMarkerWidth - markerSize / 2) : collapsedTranslateX;
 
     return (
         <motion.button
             type="button"
             {...buttonProps}
-            initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
-            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: isHovered ? translateX : '-50%', y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
+            initial={{ opacity: 0, scale: 0.86, x: collapsedTranslateX, y: '-50%', width: markerSize }}
+            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: isHovered ? expandedTranslateX : collapsedTranslateX, y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             onAnimationComplete={() => {
                 if (!isHovered) {
