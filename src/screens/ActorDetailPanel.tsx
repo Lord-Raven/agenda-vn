@@ -1326,7 +1326,6 @@ ${indent}}`;
 
             console.log(selectedFields);
             if (selectedFields.name) {
-                console.log(`Updating actor name from "${actor.name}" to "${distilledActor.name || actor.name}".`);
                 actor.name = distilledActor.name || actor.name;
                 actor.displayName = distilledActor.displayName || distilledActor.name || actor.name;
             }
@@ -1346,7 +1345,6 @@ ${indent}}`;
                 actor.background = distilledActor.background || actor.background;
             }
             if (selectedFields.profile) {
-                console.log('Updated profile!');
                 actor.profile = distilledActor.profile || actor.profile;
             }
             if (selectedFields.voiceId) {
@@ -1366,16 +1364,7 @@ ${indent}}`;
                 }
             }
 
-            if (lore) {
-                if (selectedFields.name) {
-                    lore.title = actor.name;
-                    lore.triggers = [...lore.triggers.filter((trigger) => !previousGeneratedState.name.includes(trigger)), ...actor.name.split(' ')];
-                }
-                if (selectedFields.profile) {
-                    console.log('Updated lore content with profile!');
-                    lore.content = actor.profile;
-                }
-            }
+            upsertActorLoreEntry(actor, previousGeneratedState.name, stage(), isCreatorMode);
 
             syncEditedFieldsFromActor();
             forceUpdate({});

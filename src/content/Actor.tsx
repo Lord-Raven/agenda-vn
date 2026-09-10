@@ -653,8 +653,6 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
             actor.statMap[stat.id] = clampActorStatValue(resolvedValue, stat);
         });
 
-        upsertActorLoreEntry(actor, oldName, stage, isCreatorMode);
-
         if (parsedData['outfit_description'] && parsedData['outfit_name']) {
             const outfit: Outfit = {
                 id: generateUuid(),
