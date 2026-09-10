@@ -5,7 +5,7 @@ import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer
 import { NamePlate } from "../components/UiComponents";
 import { ActorCard } from "../components/ActorCard";
 import { useTooltip } from "../components/TooltipContext";
-import { Actor, getEmotionImage, getOutfitById } from "../content/Actor";
+import { Actor, DEFAULT_VOICE_MODULATION, getEmotionImage, getOutfitById } from "../content/Actor";
 import { accumulateOutcomes, generateSkitScript, getCurrentActors, Skit } from "../content/Skit";
 import { getLocationImageUrl } from "../content/Location";
 import { ContentManagementScreen } from "./ContentManagementScreen";
@@ -331,7 +331,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                                 offsetY: outfit?.offsetY ?? 0,
                             };
                         }}
-                        getActorVoiceModulation={(actor) => actor.voiceModulation}
+                        getActorVoiceModulation={(actor) => ({...actor.voiceModulation, volume: 1})}
                         getActorTheme={(actor) => ({ color: actor.themeColor ?? 'default', fontFamily: actor.themeFontFamily ?? 'default' })}
                         onSubmitInput={handleSkitSubmit}
                         onSkitChange={onSkitChange}

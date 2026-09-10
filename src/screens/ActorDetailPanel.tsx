@@ -4,7 +4,7 @@ import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/mater
 import { Stage } from '../Stage';
 import { findStatOptionByValue, getStatOptionValue, isNumericDisplayType, Stat, StatValue, StatValueRule, normalizeLocationListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry, normalizeVoiceModulation } from '../content/Actor';
+import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry, normalizeVoiceModulation, VoiceModulation } from '../content/Actor';
 import type { NovelVoiceModulation } from '@lord-raven/novel-visualizer';
 import { playVoiceAudio, VoiceAudioPlayback } from '@lord-raven/novel-visualizer';
 import { ConditionContext } from '../content/Condition';
@@ -63,16 +63,14 @@ const DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION: ActorDetailGenerationSelection 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 
 const VOICE_MODULATION_CONTROLS: Array<{
-    key: keyof NovelVoiceModulation;
+    key: keyof VoiceModulation;
     label: string;
     min: number;
     max: number;
     step: number;
     unit: string;
 }> = [
-    { key: 'pitch', label: 'Pitch', min: -12, max: 12, step: 1, unit: ' st' },
     { key: 'rate', label: 'Rate', min: 0.8, max: 1.2, step: 0.01, unit: 'x' },
-    { key: 'volume', label: 'Volume', min: 0, max: 2, step: 0.05, unit: 'x' },
     { key: 'warmth', label: 'Warmth', min: -12, max: 12, step: 1, unit: ' dB' },
     { key: 'brightness', label: 'Brightness', min: -12, max: 12, step: 1, unit: ' dB' },
     { key: 'nasality', label: 'Nasality', min: -12, max: 12, step: 1, unit: ' dB' },
@@ -254,7 +252,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         profile: string;
         lore: string;
         voiceId: string;
-        voiceModulation: Required<NovelVoiceModulation>;
+        voiceModulation: VoiceModulation;
         themeColor: string;
         themeFontFamily: string;
         schedule: ActorSchedule;

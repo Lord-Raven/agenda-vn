@@ -13,22 +13,19 @@ import {
 } from "../utils/StructuredResponse.js";
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableActorTarget, pickSeededItem } from './Condition';
 import { formatCurrentDate } from './Skit';
-import { NovelVoiceModulation } from '@lord-raven/novel-visualizer';
 
-export const DEFAULT_VOICE_MODULATION: Required<NovelVoiceModulation> = {
-    pitch: 0,
+export const DEFAULT_VOICE_MODULATION: VoiceModulation = {
     rate: 1,
-    volume: 1,
     warmth: 0,
     brightness: 0,
     nasality: 0,
 };
 
-export const normalizeVoiceModulation = (value: unknown): Required<NovelVoiceModulation> => {
+export const normalizeVoiceModulation = (value: unknown): VoiceModulation => {
     const source = value && typeof value === 'object' && !Array.isArray(value)
         ? value as Record<string, unknown>
         : { rate: value };
-    const finiteOrDefault = (key: keyof NovelVoiceModulation): number => {
+    const finiteOrDefault = (key: keyof VoiceModulation): number => {
         const rawValue = source[key];
         const parsed = typeof rawValue === 'number' || (typeof rawValue === 'string' && rawValue.trim())
             ? Number(rawValue)
@@ -37,9 +34,7 @@ export const normalizeVoiceModulation = (value: unknown): Required<NovelVoiceMod
     };
 
     return {
-        pitch: Math.min(12, Math.max(-12, finiteOrDefault('pitch'))),
         rate: Math.min(1.2, Math.max(0.8, finiteOrDefault('rate'))),
-        volume: Math.min(2, Math.max(0, finiteOrDefault('volume'))),
         warmth: Math.min(12, Math.max(-12, finiteOrDefault('warmth'))),
         brightness: Math.min(12, Math.max(-12, finiteOrDefault('brightness'))),
         nasality: Math.min(12, Math.max(-12, finiteOrDefault('nasality'))),
@@ -254,6 +249,13 @@ export type Outfit = {
     offsetY?: number; // Vertical offset for the outfit, affecting the position of the character when rendered, as a percentage of the image's scaled height.
 }
 
+export type VoiceModulation = {
+    rate: number;
+    warmth: number;
+    brightness: number;
+    nasality: number;
+}
+
 export class Actor {
     id: string = ''; // UUID
     loreId: string = ''; // The ID of the lore entry associated with this actor, if any. This is used to link the actor to their description in the lorebook.
@@ -272,13 +274,7 @@ export class Actor {
     themeColor: string = ''; // Theme color (hex code)
     themeFontFamily: string = ''; // Font family stack for CSS styling
     voiceId: string = ''; // Voice ID for TTS
-    /*pitch?: number; // +/- semitones (0 is normal)
-    rate?: number; // multiplier (1 is normal)
-    volume?: number; // multiplier (1 is normal)
-    warmth?: number; // +/- dB (0 is normal)
-    brightness?: number; // +/- dB (0 is normal)
-    nasality?: number; // +/- dB (0 is normal)*/
-    voiceModulation: NovelVoiceModulation = { ...DEFAULT_VOICE_MODULATION };
+    voiceModulation: VoiceModulation = { ...DEFAULT_VOICE_MODULATION};
     statMap: { [key: string]: StatValue } = {}; // Map of custom stat name to value for this actor
     statInitialMap: { [key: string]: ActorStatInitial } = {}; // Map of custom stat name to its initial value and conditional modifiers, used to seed statMap when a new game starts
     perActorStatMap: PerActorStatValueMap = {}; // For perActor stats: map of stat name to a map of target actorId to explicit value override
@@ -376,12 +372,10 @@ const DISTILLATION_FIELDS: StructuredFieldDefinition[] = [
         label: 'VOICE',
         description: 'Output the specific voice ID from the Available Voices section that best matches the character\'s apparent gender (foremost) and personality.',
     },
-    { key: 'voice_pitch', label: 'VOICE PITCH', description: 'Pitch adjustment in semitones from -12 to 12. Use 0 for no adjustment.' },
-    { key: 'voice_rate', label: 'VOICE RATE', description: 'Speaking-rate multiplier from 0.8 to 1.2. Use 1 for normal speed.' },
-    { key: 'voice_volume', label: 'VOICE VOLUME', description: 'Volume multiplier from 0 to 2. Use 1 for normal volume.' },
-    { key: 'voice_warmth', label: 'VOICE WARMTH', description: 'Low-mid warmth adjustment in dB from -12 to 12. Use 0 for no adjustment.' },
-    { key: 'voice_brightness', label: 'VOICE BRIGHTNESS', description: 'Presence/brightness adjustment in dB from -12 to 12. Use 0 for no adjustment.' },
-    { key: 'voice_nasality', label: 'VOICE NASALITY', description: 'Nasal-formant adjustment in dB from -12 to 12. Use 0 for no adjustment.' },
+    { key: 'voice_rate', label: 'VOICE RATE', description: 'Speaking-rate multiplier from 0.8 to 1.2. Use 1 for normal speed. Can be used to adjust tempo and pitch of the base voice.' },
+    { key: 'voice_warmth', label: 'VOICE WARMTH', description: 'Low-mid warmth adjustment in dB from -12 to 12. Use 0 for no adjustment. Used to adjust the tonal quality of the base voice.' },
+    { key: 'voice_brightness', label: 'VOICE BRIGHTNESS', description: 'Presence/brightness adjustment in dB from -12 to 12. Use 0 for no adjustment. Used to adjust the tonal quality of the base voice.' },
+    { key: 'voice_nasality', label: 'VOICE NASALITY', description: 'Nasal-formant adjustment in dB from -12 to 12. Use 0 for no adjustment. Used to adjust the tonal quality of the base voice.' },
     {
         key: 'color',
         label: 'COLOR',
@@ -594,11 +588,9 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
                         background: 'Raised in a border settlement that was burned out when she was twelve, Jane came up through mercenary companies and learned early that promises are collateral. Her older brother, still missing after the raid, is the reason she keeps taking contracts along the frontier. She is unflinchingly loyal to the handful of people who have earned it, and constitutionally incapable of walking away from someone who cannot defend themselves.',
                         profile: 'Jane is confident and determined, quick-witted, and fiercely independent. Known for her sharp wit and strong presence, she has a commanding aura that draws attention. Deep down, Jane is driven by a need to prove she\'s worthy of love despite her past betrayals. She\'s here looking for someone who will challenge her and see beyond her tough exterior.',
                         voice: '03a438b7-ebfa-4f72-9061-f086d8f1fca6',
-                        voice_pitch: '0',
                         voice_rate: '1.00',
-                        voice_volume: '1.00',
-                        voice_warmth: '0',
-                        voice_brightness: '0',
+                        voice_warmth: '0.1',
+                        voice_brightness: '-0.1',
                         voice_nasality: '0',
                         color: '#666666',
                         font: 'Calibri, sans-serif',
@@ -643,9 +635,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
         actor.voiceId = parsedData['voice'] || actor.voiceId || '';
         actor.voiceModulation = normalizeVoiceModulation({
             ...actor.voiceModulation,
-            pitch: parsedData['voice_pitch'] || actor.voiceModulation?.pitch,
             rate: parsedData['voice_rate'] || actor.voiceModulation?.rate,
-            volume: parsedData['voice_volume'] || actor.voiceModulation?.volume,
             warmth: parsedData['voice_warmth'] || actor.voiceModulation?.warmth,
             brightness: parsedData['voice_brightness'] || actor.voiceModulation?.brightness,
             nasality: parsedData['voice_nasality'] || actor.voiceModulation?.nasality,

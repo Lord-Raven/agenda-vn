@@ -357,7 +357,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                             }}
                                         </CachedBackgroundUrl>
                                         {linkedLocation && (
-                                            <div style={{ position: 'absolute', ...markerPosition, transform: `translate(-50%, calc(-50% + ${markerSize / 2 - actorPortraitSize * 0.15}px))`, zIndex: isHovered ? 5 : 3 }}>
+                                            <div style={{ position: 'absolute', ...markerPosition, transform: `translate(-50%, calc(-50% + ${markerSize / 2}px))`, zIndex: isHovered ? 5 : 3 }}>
                                                 <LocationActorPortraits
                                                     locationId={linkedLocation.id}
                                                     stage={stage()}
