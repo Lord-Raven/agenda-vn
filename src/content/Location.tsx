@@ -87,21 +87,24 @@ export function getLinkedLocationLore(location: Location, stage: Stage, isCreato
 	const save = stage.getSave();
 	const lorebook = isCreatorMode ? stage.getConfiguration().lorebook : save.lorebook;
 	const locations = isCreatorMode ? stage.getConfiguration().locations : Object.values(save.atlas);
-	if (location && location.loreId) {
-		const loreEntry = lorebook?.find(lore => lore.id === location.loreId);
-		if (loreEntry) {
-			return loreEntry;
+	if (location) {
+		if (location.loreId) {
+			const loreEntry = lorebook?.find(lore => lore.id === location.loreId);
+			if (loreEntry) {
+				return loreEntry;
+			}
+			location.loreId = ''; // Clear the loreId if it no longer exists
 		}
-		location.loreId = ''; // Clear the loreId if it no longer exists
-	}
 
-	const unassociatedLoreEntries = lorebook?.filter(lore => lore.type === 'location' && !locations.some(a => a.loreId === lore.id)) ?? [];
+		const unassociatedLoreEntries = lorebook?.filter(lore => lore.type === 'location' && !locations.some(a => a.loreId === lore.id)) ?? [];
 
-	const bestMatch = findBestNameMatch(location.name, unassociatedLoreEntries, ['title']);
-	if (bestMatch) {
-		location.loreId = bestMatch.id; // Link the location to the best matching lore entry
+		const bestMatch = findBestNameMatch(location.name, unassociatedLoreEntries, ['title']);
+		if (bestMatch) {
+			location.loreId = bestMatch.id; // Link the location to the best matching lore entry
+		}
+		return bestMatch;
 	}
-	return bestMatch;
+	return null;
 }
 
 
