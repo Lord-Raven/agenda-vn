@@ -154,7 +154,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     }>({
         name: location.name,
         category: location.category ?? '',
-        description: getLocationDescription(location.id, stage()),
+        description: getLocationDescription(location.id, stage(), isCreatorMode),
         themeColor: location.themeColor,
         imagePrompt: getLocationImagePrompt(location),
         imageUrl: location.imageUrl,
@@ -285,7 +285,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         setEditedLocation({
             name: location.name,
             category: location.category ?? '',
-            description: getLocationDescription(location.id, stage()),
+            description: getLocationDescription(location.id, stage(), isCreatorMode),
             themeColor: location.themeColor,
             imagePrompt: location.imagePrompt,
             imageUrl: location.imageUrl,

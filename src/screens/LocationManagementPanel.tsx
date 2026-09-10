@@ -2,7 +2,6 @@ import React, { FC, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Stage } from '../Stage';
 import { Location } from '../content/Location';
-import { Button } from '../components/UiComponents';
 import { LocationPortrait } from '../components/LocationPortrait';
 import { LocationDetailPanel } from './LocationDetailPanel';
 import { createLoreEntry } from '../content/Lore';

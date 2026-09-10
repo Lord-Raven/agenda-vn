@@ -1,5 +1,6 @@
 import React, { FC, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { getFontSizeMultiplier } from '@lord-raven/novel-visualizer';
 import { Stage } from '../Stage';
 import { Actor } from '../content/Actor';
 import { Button } from '../components/UiComponents';
@@ -164,7 +165,14 @@ export const ActorManagementPanel: FC<ActorManagementPanelProps> = ({ stage, isC
                     ariaLabel={actor.name}
                 />
                 <div>
-                    <div style={{ color: actor.themeColor || 'var(--agenda-highlight)', fontSize: '15px', fontWeight: 700 }}>
+                    <div
+                        style={{
+                            color: actor.themeColor || 'var(--agenda-highlight)',
+                            fontFamily: actor.themeFontFamily || 'inherit',
+                            fontSize: `${getFontSizeMultiplier(actor.themeFontFamily || 'inherit') * 15}px`,
+                            fontWeight: 700,
+                        }}
+                    >
                         {actor.name || '(Unnamed Actor)'}
                     </div>
                 </div>
