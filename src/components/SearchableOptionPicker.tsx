@@ -22,6 +22,7 @@ export interface SearchableOptionPickerProps {
     options: PickerOption[];
     allowClear?: boolean;
     placeholder?: string;
+    initialSearch?: string; // Seeds the search field each time the picker is opened.
     defaultOptionKeys?: string[];
     emptyLabel?: string;
     title?: string;
@@ -36,12 +37,13 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     options,
     allowClear = false,
     placeholder = 'Search',
+    initialSearch = '',
     defaultOptionKeys = [],
     emptyLabel = 'None',
     title = 'Choose option',
     renderButton,
 }) => {
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState(initialSearch);
     const [isOpen, setIsOpen] = useState(false);
     const optionGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: '8px' };
 
@@ -57,13 +59,13 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 return aIndex - bIndex;
             })
             : allOptions;
-        const query = search.trim().toLowerCase();
-        if (!query) {
+        const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        if (terms.length === 0) {
             return preferred;
         }
         return preferred.filter((option) => {
             const haystack = `${option.label} ${option.category || ''} ${option.description || ''} ${option.key}`.toLowerCase();
-            return haystack.includes(query);
+            return terms.every((term) => haystack.includes(term));
         });
     }, [defaultOptionKeys, options, search]);
 
@@ -85,7 +87,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
             }
             sectionByLabel.get(key)?.push(option);
         });
-        return sections;
+        return sections.sort((a, b) => a.label.localeCompare(b.label));
     }, [orderedOptions]);
 
     const selectedValues = multiple ? (values ?? []) : (value ? [value] : []);
@@ -269,7 +271,10 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         <>
             <button
                 type="button"
-                onClick={() => setIsOpen(true)}
+                onClick={() => {
+                    setSearch(initialSearch);
+                    setIsOpen(true);
+                }}
                 style={{
                     display: 'inline-flex',
                     alignItems: 'center',

@@ -80,6 +80,11 @@ const VOICE_PICKER_OPTIONS: PickerOption[] = [...ACTOR_VOICES]
         description: [ACTOR_VOICE_GENDER_LABELS[voice.gender], voice.gender, voice.accent, ...(voice.tags || [])].join(' '),
     }));
 
+const getVoiceSearchSeed = (voiceId: string | undefined): string => {
+    const voice = getActorVoice(voiceId);
+    return voice ? `${ACTOR_VOICE_GENDER_LABELS[voice.gender]} ${voice.accent}` : '';
+};
+
 const VOICE_MODULATION_CONTROLS: Array<{
     key: keyof VoiceModulation;
     label: string;
@@ -2637,6 +2642,7 @@ ${indent}}`;
                                                     emptyLabel="No voice"
                                                     title="Select voice"
                                                     placeholder="Search voices (e.g. female, british, deep)"
+                                                    initialSearch={getVoiceSearchSeed(editedActor.voiceId)}
                                                     renderButton={(value) => {
                                                         const voice = getActorVoice(typeof value === 'string' ? value : undefined);
                                                         const Icon = voice ? VOICE_GENDER_ICONS[voice.gender] : RecordVoiceOver;

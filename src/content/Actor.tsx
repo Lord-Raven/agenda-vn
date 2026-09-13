@@ -463,25 +463,25 @@ export function applyActorInitialStats(actor: Actor, actorStats: Stat[], context
 }
 
 export const ACTOR_VOICE_ACCENTS = [
+    'African',
     'American',
     'American (Southern)',
-    'British',
     'Australian',
+    'British',
+    'Caribbean',
+    'Chinese',
     'French',
+    'German',
+    'Indian',
     'Italian',
     'Japanese',
     'Korean',
-    'Chinese',
-    'Spanish',
-    'German',
+    'Latin American',
+    'Middle Eastern',
+    'Multilingual',
     'Scandinavian',
     'Slavic',
-    'Middle Eastern',
-    'African',
-    'Indian',
-    'Caribbean',
-    'Latin American',
-    'Multilingual',
+    'Spanish',
 ] as const;
 export type ActorVoiceAccent = typeof ACTOR_VOICE_ACCENTS[number];
 
