@@ -4,7 +4,8 @@ import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/mater
 import { Stage } from '../Stage';
 import { findStatOptionByValue, getStatOptionValue, isNumericDisplayType, Stat, StatValue, StatValueRule, normalizeLocationListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, ACTOR_VOICES, ACTOR_VOICE_GENDER_LABELS, ActorVoice, formatActorVoiceLabel, getActorVoice, getActorVoiceVolume, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry, normalizeVoiceModulation, VoiceModulation } from '../content/Actor';
+import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
+import { ACTOR_VOICES, ACTOR_VOICE_GENDER_LABELS, ActorVoice, formatActorVoiceLabel, getActorVoice, getActorVoiceVolume, normalizeVoiceModulation, VoiceModulation } from '../content/ActorVoice';
 import type { NovelVoiceModulation } from '@lord-raven/novel-visualizer';
 import { playVoiceAudio, VoiceAudioPlayback } from '@lord-raven/novel-visualizer';
 import { ConditionContext } from '../content/Condition';

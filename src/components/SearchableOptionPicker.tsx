@@ -59,13 +59,17 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 return aIndex - bIndex;
             })
             : allOptions;
-        const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const terms = search.trim().toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
         if (terms.length === 0) {
             return preferred;
         }
         return preferred.filter((option) => {
-            const haystack = `${option.label} ${option.category || ''} ${option.description || ''} ${option.key}`.toLowerCase();
-            return terms.every((term) => haystack.includes(term));
+            // Terms must match the start of a word, so "male" does not match "female".
+            const words = `${option.label} ${option.category || ''} ${option.description || ''} ${option.key}`
+                .toLowerCase()
+                .split(/[^a-z0-9]+/)
+                .filter(Boolean);
+            return terms.every((term) => words.some((word) => word.startsWith(term)));
         });
     }, [defaultOptionKeys, options, search]);
 

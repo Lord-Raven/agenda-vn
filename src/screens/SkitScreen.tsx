@@ -5,7 +5,8 @@ import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer
 import { NamePlate } from "../components/UiComponents";
 import { ActorCard } from "../components/ActorCard";
 import { useTooltip } from "../components/TooltipContext";
-import { Actor, getActorVoiceVolume, getEmotionImage, getOutfitById } from "../content/Actor";
+import { Actor, getEmotionImage, getOutfitById } from "../content/Actor";
+import { getActorVoiceVolume } from "../content/ActorVoice";
 import { accumulateOutcomes, generateSkitScript, getCurrentActors, Skit } from "../content/Skit";
 import { getLocationImageUrl } from "../content/Location";
 import { ContentManagementScreen } from "./ContentManagementScreen";
