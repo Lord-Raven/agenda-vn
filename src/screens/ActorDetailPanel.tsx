@@ -4,12 +4,13 @@ import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/mater
 import { Stage } from '../Stage';
 import { findStatOptionByValue, getStatOptionValue, isNumericDisplayType, Stat, StatValue, StatValueRule, normalizeLocationListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, VOICE_MAP, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry, normalizeVoiceModulation, VoiceModulation } from '../content/Actor';
+import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, ACTOR_VOICES, ACTOR_VOICE_GENDER_LABELS, ActorVoice, formatActorVoiceLabel, getActorVoice, getActorVoiceVolume, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry, normalizeVoiceModulation, VoiceModulation } from '../content/Actor';
 import type { NovelVoiceModulation } from '@lord-raven/novel-visualizer';
 import { playVoiceAudio, VoiceAudioPlayback } from '@lord-raven/novel-visualizer';
 import { ConditionContext } from '../content/Condition';
 import { Emotion } from '../content/Emotion';
-import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add } from '@mui/icons-material';
+import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add, Female, Male, Transgender, RecordVoiceOver } from '@mui/icons-material';
+import { PickerOption, SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { StatRating } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
@@ -61,6 +62,23 @@ const DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION: ActorDetailGenerationSelection 
 };
 
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
+
+const VOICE_GENDER_ICONS: Record<ActorVoice['gender'], any> = {
+    male: Male,
+    female: Female,
+    'non-binary': Transgender,
+};
+
+const VOICE_PICKER_OPTIONS: PickerOption[] = [...ACTOR_VOICES]
+    .sort((a, b) => formatActorVoiceLabel(a).localeCompare(formatActorVoiceLabel(b)))
+    .map((voice) => ({
+        key: voice.id,
+        label: voice.description,
+        category: voice.accent,
+        icon: VOICE_GENDER_ICONS[voice.gender],
+        // Not rendered; this feeds the picker's free-text search.
+        description: [ACTOR_VOICE_GENDER_LABELS[voice.gender], voice.gender, voice.accent, ...(voice.tags || [])].join(' '),
+    }));
 
 const VOICE_MODULATION_CONTROLS: Array<{
     key: keyof VoiceModulation;
@@ -1176,9 +1194,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         }
 
         const cacheKey = getVoiceSampleCacheKey(actor.id, selectedVoiceId);
+        const sampleModulation = { ...editedActor.voiceModulation, volume: getActorVoiceVolume(selectedVoiceId) };
         const cachedSampleUrl = voiceSampleCache.get(cacheKey);
         if (cachedSampleUrl) {
-            await playSampleUrl(cachedSampleUrl, editedActor.voiceModulation);
+            await playSampleUrl(cachedSampleUrl, sampleModulation);
             return;
         }
 
@@ -1191,7 +1210,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }
 
             voiceSampleCache.set(cacheKey, sampleUrl);
-            await playSampleUrl(sampleUrl, editedActor.voiceModulation);
+            await playSampleUrl(sampleUrl, sampleModulation);
         } catch (error) {
             console.error('Failed to generate demo speech sample:', error);
             stage().showPriorityMessage('Failed to generate voice sample. Please try again.');
@@ -2609,27 +2628,29 @@ ${indent}}`;
                                             Voice ID
                                         </label>
                                         <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
-                                            <select
-                                                value={editedActor.voiceId}
-                                                onChange={(e) => handleInputChange('voiceId', e.target.value)}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '12px',
-                                                    fontSize: '14px',
-                                                    backgroundColor: 'var(--agenda-surface-raised)',
-                                                    border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                                                    borderRadius: '5px',
-                                                    color: 'var(--agenda-text-primary)',
-                                                    fontFamily: 'inherit',
-                                                    cursor: 'pointer',
-                                                }}
-                                            >
-                                                {Object.entries(VOICE_MAP).sort(([idA, descriptionA], [idB, descriptionB]) => descriptionA.localeCompare(descriptionB)).map(([id, description]) => (
-                                                    <option key={id} value={id}>
-                                                        {description}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <SearchableOptionPicker
+                                                    value={editedActor.voiceId || undefined}
+                                                    onChange={(value) => handleInputChange('voiceId', typeof value === 'string' ? value : '')}
+                                                    options={VOICE_PICKER_OPTIONS}
+                                                    allowClear
+                                                    emptyLabel="No voice"
+                                                    title="Select voice"
+                                                    placeholder="Search voices (e.g. female, british, deep)"
+                                                    renderButton={(value) => {
+                                                        const voice = getActorVoice(typeof value === 'string' ? value : undefined);
+                                                        const Icon = voice ? VOICE_GENDER_ICONS[voice.gender] : RecordVoiceOver;
+                                                        return (
+                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%', fontSize: '13px' }}>
+                                                                <Icon style={{ fontSize: 20, color: voice ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)', flexShrink: 0 }} />
+                                                                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                    {voice ? formatActorVoiceLabel(voice) : 'No voice'}
+                                                                </span>
+                                                            </span>
+                                                        );
+                                                    }}
+                                                />
+                                            </div>
                                             <Button
                                                     onClick={handlePlayDemoSpeech}
                                                     disabled={isGeneratingDemoSpeech || !editedActor.voiceId}
