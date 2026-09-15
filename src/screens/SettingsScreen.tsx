@@ -1,7 +1,8 @@
-import { FC, useState } from 'react';
+import { FC, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SaveType, Stage } from '../Stage';
 import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, applyUserPlaceholder, isNumericDisplayType } from '../content/Stat';
+import { DEFAULT_UI_SETTINGS } from '../content/Style';
 import { GlassPanel, Title, Button, ColorPickerInput, LocationSelect, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
@@ -28,6 +29,8 @@ interface SettingsData {
     playerName: string;
     playerDescription: string;
     playerColor: string;
+    playerFontFamily: string;
+    birthDate: string;
     textToSpeech: boolean;
     enableImpersonation: boolean;
     enableFontEffects: boolean;
@@ -130,6 +133,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         playerName: stageInstance.getPlayerActor()?.name || stageInstance.primaryUser?.name || 'Player',
         playerDescription: stageInstance.getPlayerActor()?.profile || stageInstance.primaryUser?.chatProfile || 'An enigmatic individual.',
         playerColor: resolvePlayerThemeColor(stageInstance.getPlayerActor()?.themeColor || ''),
+        playerFontFamily: stageInstance.getPlayerActor()?.themeFontFamily || stageInstance.getConfiguration()?.uiSettings?.primaryFontFamily || DEFAULT_UI_SETTINGS.primaryFontFamily,
+        birthDate: stageInstance.getPlayerActor()?.birthDate || '',
         textToSpeech: (stageInstance.getSave()?.textToSpeech ?? true),
         enableImpersonation: (stageInstance.getSave()?.enableImpersonation ?? true),
         enableFontEffects: (stageInstance.getSave()?.enableFontEffects ?? true),
@@ -149,6 +154,31 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     const resolvedPlayerThemeColor = resolvePlayerThemeColor(settings.playerColor);
     const resolveText = (rawText?: string) => applyUserPlaceholder(rawText, settings.playerName.trim());
 
+    const birthDateLabel = useMemo(() => {
+        const birthDate = settings.birthDate.trim();
+        if (!birthDate) {
+            return 'Birth Date';
+        }
+
+        const birth = new Date(`${birthDate}T00:00:00Z`);
+        const currentDate = (stageInstance.getSave()?.currentDate || stageInstance.getConfiguration()?.startingDate || new Date().toISOString().slice(0, 10)).trim();
+        const current = new Date(`${currentDate}T00:00:00Z`);
+
+        if (Number.isNaN(birth.getTime()) || Number.isNaN(current.getTime())) {
+            return 'Birth Date';
+        }
+
+        let age = current.getUTCFullYear() - birth.getUTCFullYear();
+        const monthDelta = current.getUTCMonth() - birth.getUTCMonth();
+        const dayDelta = current.getUTCDate() - birth.getUTCDate();
+
+        if (monthDelta < 0 || (monthDelta === 0 && dayDelta < 0)) {
+            age -= 1;
+        }
+
+        return age >= 0 ? `Birth Date (${age} years old)` : 'Birth Date';
+    }, [settings.birthDate, stageInstance]);
+
     const handleSave = async () => {
         console.log('Saving settings:', settings);
         const playerThemeColor = resolvePlayerThemeColor(settings.playerColor);
@@ -162,6 +192,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             await stageInstance.startNewGame({
                 name: settings.playerName,
                 themeColor: playerThemeColor,
+                themeFontFamily: settings.playerFontFamily,
                 data: {
                     textToSpeech: settings.textToSpeech,
                     enableImpersonation: settings.enableImpersonation,
@@ -172,6 +203,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                     globalStatValues: resolvedGlobalStatValues,
                 },
                 personality: settings.playerDescription,
+                birthDate: settings.birthDate,
             });
         } else {
             console.log('Updating settings');
@@ -189,6 +221,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             player.name = settings.playerName;
             player.profile = settings.playerDescription;
             player.themeColor = playerThemeColor;
+            player.themeFontFamily = settings.playerFontFamily;
+            player.birthDate = settings.birthDate;
         }
 
         stageInstance.saveGame();
@@ -324,7 +358,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
                         {/* Settings Form */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            {/* Player Name + Color */}
+                            {/* Player Name + Birth Date */}
                             <div
                                 style={{
                                     display: 'flex',
@@ -358,6 +392,39 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
                                 <div style={{ flex: '0 1 220px', minWidth: '180px' }}>
                                     <label
+                                        htmlFor="player-birth-date"
+                                        style={{
+                                            display: 'block',
+                                            color: 'var(--agenda-text-muted)',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            marginBottom: '8px',
+                                        }}
+                                    >
+                                        {birthDateLabel}
+                                    </label>
+                                    <TextInput
+                                        id="player-birth-date"
+                                        fullWidth
+                                        value={settings.birthDate}
+                                        onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                                        placeholder="YYYY-MM-DD"
+                                        style={{ fontSize: '16px' }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Player Color + Font */}
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    gap: '12px',
+                                    alignItems: 'flex-end',
+                                    flexWrap: 'wrap',
+                                }}
+                            >
+                                <div style={{ flex: '0 1 220px', minWidth: '180px' }}>
+                                    <label
                                         style={{
                                             display: 'block',
                                             color: 'var(--agenda-text-muted)',
@@ -374,6 +441,29 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         placeholder="#RRGGBB"
                                         popoverTitle="Choose player color"
                                         inputStyle={{ fontSize: '13px' }}
+                                    />
+                                </div>
+
+                                <div style={{ flex: '1 1 280px', minWidth: '220px' }}>
+                                    <label
+                                        htmlFor="player-font"
+                                        style={{
+                                            display: 'block',
+                                            color: 'var(--agenda-text-muted)',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            marginBottom: '8px',
+                                        }}
+                                    >
+                                        Player Font
+                                    </label>
+                                    <TextInput
+                                        id="player-font"
+                                        fullWidth
+                                        value={settings.playerFontFamily}
+                                        onChange={(e) => handleInputChange('playerFontFamily', e.target.value)}
+                                        placeholder="Font stack (e.g., Arial, sans-serif)"
+                                        style={{ fontSize: '13px' }}
                                     />
                                 </div>
                             </div>

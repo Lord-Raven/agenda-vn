@@ -106,7 +106,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
         }
     };
     
-    const actors = {...stage().getSave().actors};
+    const actors = stage().getSave().actors;
 
     
     const onSkitChange = useCallback((newSkit: Skit) => {
@@ -297,7 +297,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         setTooltip={setTooltip}
                         isVerticalLayout={isVerticalLayout}
                         actors={actors}
-                        playerActorId={'player'}
+                        playerActorId={stage().getSave().playerId}
                         getPresentActors={(_script, _index) =>
                             getActorsAtIndex(_script, _index, stage()) || []
                         }

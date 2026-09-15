@@ -538,7 +538,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     generateFreshSave(
-        playerData: {name: string, personality: string, themeColor?: string},
+        playerData: {name: string, personality: string, themeColor?: string, themeFontFamily?: string, birthDate?: string},
         selectedGlobalStatValues: {[key: string]: StatValue} = {},
     ): SaveType {
         const configuration = this.getConfiguration();
@@ -551,8 +551,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     active: true,
                     name: playerData.name,
                     displayName: playerData.name,
-                    role: '',
-                    birthDate: '',
+                    role: 'You',
+                    birthDate: playerData.birthDate ?? '',
                     summary: '',
                     description: '',
                     background: '',
@@ -566,7 +566,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     perActorValueRules: {},
                     schedule: {},
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
-                    themeFontFamily: '',
+                    themeFontFamily: playerData.themeFontFamily || '',
                     voiceId: '',
                     voiceModulation: DEFAULT_VOICE_MODULATION,
                 },
@@ -641,7 +641,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
     }
 
-    async startNewGame(playerData: {name: string, data: Partial<SaveType>, personality: string, themeColor?: string}): Promise<void> {
+    async startNewGame(playerData: {name: string, data: Partial<SaveType>, personality: string, themeColor?: string, themeFontFamily?: string, birthDate?: string}): Promise<void> {
         // Insert a dummy promise into generationPromises to ensure the loading screen shows until we manually clear it after the initial actors are loaded.
         this.generationPromises['newGame'] = new Promise(() => {});
 
