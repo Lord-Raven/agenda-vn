@@ -145,6 +145,7 @@ import {
     RoomService,
     Router,
     Sailing,
+    Sanitizer,
     SatelliteAlt,
     Save,
     Savings,
