@@ -216,14 +216,32 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 
     const pickerContent = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input
-                type="text"
-                className="input-base"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={placeholder}
-                autoFocus
-            />
+            <div style={{ position: 'relative' }}>
+                <input
+                    type="text"
+                    className="input-base"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={placeholder}
+                    autoFocus
+                    style={{ width: '100%', paddingRight: '82px' }}
+                />
+                <span
+                    aria-live="polite"
+                    style={{
+                        position: 'absolute',
+                        top: '50%',
+                        right: '10px',
+                        transform: 'translateY(-50%)',
+                        color: 'var(--agenda-text-muted)',
+                        fontSize: '11px',
+                        pointerEvents: 'none',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    {orderedOptions.length} {orderedOptions.length === 1 ? 'result' : 'results'}
+                </span>
+            </div>
             <div style={{ maxHeight: '320px', overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {allowClear && (
                     <div style={optionGridStyle}>{renderClearOption()}</div>
