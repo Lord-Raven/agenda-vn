@@ -62,6 +62,10 @@ const DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION: ActorDetailGenerationSelection 
     outfit: true,
 };
 
+let actorDetailGenerationSelectionPreference: ActorDetailGenerationSelection = {
+    ...DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION,
+};
+
 const ORIGINAL_OUTFIT_NAME = 'Original Outfit';
 
 const VOICE_GENDER_ICONS: Record<ActorVoice['gender'], any> = {
@@ -380,9 +384,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         return outfits[0]?.id || '';
     });
 
-    const [actorDetailGenerationSelection, setActorDetailGenerationSelection] = useState<ActorDetailGenerationSelection>({
-        ...DEFAULT_ACTOR_DETAIL_GENERATION_SELECTION,
-    });
+    const [actorDetailGenerationSelection, setActorDetailGenerationSelection] = useState<ActorDetailGenerationSelection>(() => ({
+        ...actorDetailGenerationSelectionPreference,
+    }));
     const actorDetailGenerationSelectionRef = useRef(actorDetailGenerationSelection);
     useEffect(() => {
         actorDetailGenerationSelectionRef.current = actorDetailGenerationSelection;
@@ -487,6 +491,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
                 ...previous,
                 [field]: checked,
             };
+            actorDetailGenerationSelectionPreference = nextSelection;
             syncActorDetailGenerationDialog(nextSelection);
             return nextSelection;
         });
@@ -498,6 +503,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             (Object.keys(nextSelection) as ActorDetailGenerationField[]).forEach((field) => {
                 nextSelection[field] = checked;
             });
+            actorDetailGenerationSelectionPreference = nextSelection;
             syncActorDetailGenerationDialog(nextSelection);
             return nextSelection;
         });

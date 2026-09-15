@@ -46,6 +46,33 @@ button {
   font-family: var(--agenda-font-secondary);
 }
 
+input[type="checkbox"],
+input[type="range"] {
+  accent-color: var(--agenda-highlight);
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+}
+
+input[type="checkbox"]:focus-visible,
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--agenda-highlight);
+  outline-offset: 2px;
+}
+
 .agenda-screen-root {
   position: relative;
   width: 100vw;

@@ -96,7 +96,7 @@ export const ACTOR_VOICES: ActorVoice[] = [
     { id: '3b46afa4-62a6-4ba7-9652-e5065d75db6e', gender: 'female', accent: 'Multilingual', description: 'Calm and low', volumeModifier: 1.6, tags: ['quiet'] },
     { id: 'a3a9a163-a283-4ba7-8535-d3f583ed342d', gender: 'female', accent: 'Slavic', description: 'Keen and direct', volumeModifier: 1, tags: [] },
     { id: 'bfb9b9b1-e25e-4c06-859a-1271e29cc9d4', gender: 'male', accent: 'British', description: 'Bold and whimsical', volumeModifier: 1, tags: ['theatrical'] },
-    { id: '5004afbd-9f53-48af-8947-e8c31db03bd5', gender: 'male', accent: 'French', description: 'Low and commanding', volumeModifier: 1, tags: ['authoritative'] },
+    { id: '5004afbd-9f53-48af-8947-e8c31db03bd5', gender: 'male', accent: 'French', description: 'Low and murmuring', volumeModifier: 1, tags: ['authoritative'] },
     { id: 'e735ff09-8ab1-4a74-bff6-7b17f0207e9b', gender: 'male', accent: 'French', description: 'Deep and resonant', volumeModifier: 1, tags: ['low'] },
     { id: '74bedcda-2fcf-43ab-9aee-66b2bad14f69', gender: 'male', accent: 'French', description: 'Light and relaxed', volumeModifier: 1, tags: [] },
     { id: '7fef668b-5cc4-47b1-b9ca-7dcadac15bf3', gender: 'male', accent: 'French', description: 'Deep and warm', volumeModifier: 1, tags: [] },
@@ -140,28 +140,7 @@ export const ACTOR_VOICES: ActorVoice[] = [
     { id: '9cab115a-e345-4985-9d1d-462d6bc70b15', gender: 'male', accent: 'American', description: 'Commanding and twangy', volumeModifier: 1, tags: ['commanding', 'twangy'] },
     { id: '49f1fc7c-6718-4f0d-908d-2b0a4068f2ce', gender: 'male', accent: 'Australian', description: 'Confident and playful', volumeModifier: 1, tags: ['confident', 'playful'] },
 
-    /* Another batch to add:
-    -anniegulie - Female - German - 1a2511b4-4e46-48ed-b74d-02def9b196f2 - Light and confident
-    -critterjitterisback - Female - American - f184b6b1-6c9c-4fca-b25c-91899f59aa81 - Pouty and youthful
-    -IcyKaleidoscope85 - Female - German - c2ffaf44-10b4-411e-a1bb-e85e87058f40 - Professional and confident 
-    -ravenvo_ - Female - Australian - d94c3f6e-cda3-4750-b2a7-afdad61941b2 - Warm and loving
-    -arachnya - Female - American - 9e370917-9964-42b5-9d0b-5a8adfef1955 - Playful and ditzy
-    -miss_lizzie - Female - American - b52d6608-66eb-4daa-87cb-541b0a63d830 - Bratty and Nasal
-    -ReadByRanae - Female - American - 4d440d36-105a-4cb3-a836-a008c9fb5f0e - Rich and sassy
-    -lumitooni - Female - American - 171ecd2a-c4d4-4a4e-99bb-43eff6deeb9c - Sharp and twangy
-    -jesseTheVA - Female - Scottish - efd80f23-39dc-4d81-8030-66c72951dc54 - Warm and playful
-    -CraftJustin64 - Male - German - 6a6cb9c6-f41f-492b-a9f2-49f1188949a7 - Soft and kind
-    -JinxieRay - Female - Australian - fc734b40-bf22-4c0a-b926-a5fbd5b85aa0 - Bright and nerdy
-    -LucieCannons - Female - Australian - 81972ea2-42c5-40b4-826d-a29d338f430e - Bright and youthful
-    -erisserenity1 - Female - American - a97ec94e-84a6-4413-aee5-f5ce411089ae - Sarcastic and twangy
-    -erisserenity2 - Female - American - 7397e640-fbc7-4ecf-9508-cb11f3662d99 - Bubbly and nervous
-    -VauxiBox - Female - British - 37cafa09-cdaf-4d0a-8cee-d81dc580617d - Mature and predatory
-    -Astrojade - Female - American - ce6c77dc-10bb-4872-a209-905548885a2b - Soft and nervous - needs a boost
-    -NDW242 - Male - American - 8ddffc90-2eaf-4df9-a3e4-2a34301107b9 - Low and twangy
-    -VanitysLair - Female - French - dfceb7ed-1dce-450f-8512-963f369e37d4 - Confident and playful
-    -YourPersonalPrince-VA - Male - Australian - 61cb21e2-bb49-4a9b-a4c8-b2215c844a0f - Warm and welcoming
-    -AdamRileyVO - Male - American - 9cab115a-e345-4985-9d1d-462d6bc70b15 - Commanding and twangy
-    -Alot-of-axolotl - Male - Australian - 49f1fc7c-6718-4f0d-908d-2b0a4068f2ce - Confident and playful*/
+
 ];
 
 export const getActorVoice = (voiceId: string | undefined): ActorVoice | undefined =>
