@@ -120,6 +120,14 @@ const SKIT_GUIDANCE_FIELDS: StructuredFieldDefinition[] = [
     },
 ];
 
+const SKIT_SUMMARY_FIELDS: StructuredFieldDefinition[] = [
+    {
+        key: 'summary',
+        label: 'SUMMARY',
+        description: 'A concise summary of the scene\'s key events, revelations, decisions, and outcomes. Write in past tense and do not mention the analysis process.',
+    },
+];
+
     
 // Returns the last emotion for the given actor in the skit up to the current index, or neutral if none found.
 export const determineEmotion = (actorId: string, skit: Skit, index: number): Emotion => {
@@ -389,7 +397,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     .addBlock('Location',
                         `  ${skit.initialLocationId ? getLocationName(skit.initialLocationId, stage) : 'Unknown Location'}\n` +
                         `    ${getLocationDescription(skit.initialLocationId, stage) || 'No description available.'}`)
-                    .addBlock('Known Characters',
+                    .addBlock('Available Characters',
                         availableActors.map(actor => buildActorContext(actor, '', stage, [], ['summary', 'profile']).format()))
                     .addBlock('Response Format',
                         buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
@@ -1116,8 +1124,48 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
     }
 
     return [];
+}
 
+export async function generateSkitSummary(skit: Skit, stage: Stage): Promise<string> {
+    if (!skit.script?.length) {
+        return '';
+    }
 
+    try {
+        const response = await stage.generateText(
+            buildPrompt()
+                .addBlock('Instructions',
+                    `Analyze the completed scene script below and produce a concise summary of the scene's key events, ` +
+                    `revelations, decisions, and consequences. Write in past tense, name important characters, and omit ` +
+                    `minor conversational details. Return only the requested response structure.`)
+                .addBlock('Scene Script for Analysis', buildScriptLog(skit, [], stage))
+                .addBlock('Response Format', buildStructuredResponseFormat(SKIT_SUMMARY_FIELDS, { includeEndTag: true }))
+                .addBlock('Example Response',
+                    buildStructuredExampleResponse(
+                        SKIT_SUMMARY_FIELDS,
+                        {
+                            summary: 'A faction representative visited the station and offered a patient a place in the faction. The patient accepted and left the station permanently.',
+                        },
+                        { includeEndTag: true },
+                    ))
+                .format(),
+            20,
+            1000,
+            SKIT_SUMMARY_FIELDS,
+        );
+
+        const summary = parseStructuredResponse(response, SKIT_SUMMARY_FIELDS).summary?.trim() || '';
+        if (!summary) {
+            return '';
+        }
+
+        skit.summary = summary;
+        console.log('New summary for skit:', skit.summary);
+        return skit.summary;
+    } catch (error) {
+        console.error('Error generating skit summary:', error);
+        return '';
+    }
 }
 
 // This function goes through current outcomes on the provided scriptEntries and produces an accumulated Outcome array that combines like stat changes.

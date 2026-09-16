@@ -7,7 +7,7 @@ import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
 import { findStatOptionByValue, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeLocationListValue, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
-import { generateContext, generateSkitScript, Skit } from "./content/Skit";
+import { generateContext, generateSkitScript, generateSkitSummary, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
@@ -2000,6 +2000,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
         }
         
+        // Generate a summary. No need to wait.
+        this.summaryCheck();
+
         // Increment time or tick over the day: calendar-event skits jump to the slot after the
         // event's duration; other skits (e.g. plain location visits) just advance one slot.
         const timelineEntry = (save.timeline || []).find(entry => entry.skit === currentSkit);
@@ -2267,33 +2270,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .format();
     }
 
-    private async generateActorSeed(save: SaveType): Promise<Partial<Actor> | null> {
-        const existingActorNames = Object.values(save.actors || {})
-            .map(actor => actor.name?.trim())
-            .filter((name): name is string => Boolean(name));
-
-        const response = await this.generateText(
-            this.buildActorSeedPrompt(save, existingActorNames),
-            40,
-            220,
-            ACTOR_SEED_FIELDS,
-        );
-        const parsed = parseStructuredResponse(response, ACTOR_SEED_FIELDS);
-        const name = (parsed['name'] || '').trim();
-        if (!name) {
-            return null;
-        }
-
-        return {
-            name,
-            profile: (parsed['profile'] || '').trim(),
-            description: (parsed['description'] || '').trim(),
-            outfits: [],
-            outfitId: '',
-            statMap: {},
-        };
-    }
-
     private async generateIntroSkitSeed(save: SaveType): Promise<{ guidance: string; locationId: string; initialActorIds: string[] } | null> {
         const locations = Object.values(save.atlas || {});
         const availableActors = Object.values(save.actors || {}).filter(actor => actor.id !== save.playerId);
@@ -2368,6 +2344,20 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         return null;
+    }
+
+    async summaryCheck() {
+        const save = this.getSave();
+        // Look at past skits (starting from the beginning), and find one that doesn't have a summary, to generate:
+        const skitToSummarize = (save.timeline || []).find(entry => entry.skit && !entry.skit.summary)?.skit;
+        if (skitToSummarize) {
+            console.log(`Summarizing an old skit.`);
+            generateSkitSummary(skitToSummarize, this).then(summary => {
+                if (summary) {
+                    this.saveGame();
+                }
+            });
+        }
     }
 
     async generateTitleImage() {
