@@ -743,8 +743,6 @@ export function getEmotionImage(actor: Actor, emotion: Emotion | string, stage?:
     const neutralUrl = emotionPack['neutral'] || emotionPack['base'];
     const fallbackUrl = neutralUrl || '';
 
-    console.log(`Getting emotion image for actor ${actor.name} (ID: ${actor.id}), Emotion: ${emotionKey}, Outfit ID: ${targetOutfitId}`);
-
     // Return the emotion image or fallback
     return emotionUrl || fallbackUrl;
 }

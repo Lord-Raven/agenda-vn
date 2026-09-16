@@ -307,9 +307,8 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                             if (skit.script && skit.script.length > 0 && index < skit.script.length) {
                                 for (let j = index; j >= 0; j--) {
                                     const entry = skit.script[j];
-                                    if (entry.actorEmotions && entry.actorEmotions[actor.name]) {
-                                        emotion = entry.actorEmotions[actor.name];
-                                        console.log(`Actor: ${actor.name}, Emotion: ${emotion}`);
+                                    if (entry.actorEmotions && entry.actorEmotions[actor.id]) {
+                                        emotion = entry.actorEmotions[actor.id];
                                         break;
                                     }
                                 }
