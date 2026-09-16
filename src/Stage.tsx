@@ -202,6 +202,7 @@ const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({
 type TimelineEntry = {
     calendarEventId?: string;
     date?: string;
+    calendarEventEndTimeOfDay?: CalendarTimeOfDay;
     skit?: Skit;
 }
 
@@ -983,7 +984,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             summary: '',
         });
 
-        this.advanceCalendarAfterEvent(save, selectedEvent);
         if (!save.timeline) {
             save.timeline = [];
         }
@@ -991,6 +991,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         save.timeline.push({
             calendarEventId: selectedEvent.id,
             date: selectedEvent.date,
+            calendarEventEndTimeOfDay: this.getEventEndTimeOfDay(selectedEvent),
             skit,
         });
         save.upcomingEvents = (save.upcomingEvents || []).filter(event => event.id !== selectedEvent.id);
@@ -1260,16 +1261,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private advanceCalendarAfterEvent(save: SaveType, event: CalendarEvent) {
         const eventDate = `${event.date || ''}`.trim() || save.currentDate || this.getStartingDate(save);
-        const endingTimeOfDay = this.getEventEndTimeOfDay(event);
+        this.advanceTimeToNextSlot(save, eventDate, this.getEventEndTimeOfDay(event));
+    }
+
+    // Advances the save's calendar position to the slot following (date, timeOfDay), rolling to the next day
+    // after night, and replays any stat update rules for periods entered along the way.
+    private advanceTimeToNextSlot(save: SaveType, date: string, timeOfDay: CalendarTimeOfDay) {
         const previousDate = save.currentDate || this.getStartingDate(save);
         const previousTimeOfDay = save.currentTimeOfDay || 'morning';
 
-        if (endingTimeOfDay === 'night') {
-            save.currentDate = this.addDays(eventDate, 1);
+        if (timeOfDay === 'night') {
+            save.currentDate = this.addDays(date, 1);
             save.currentTimeOfDay = 'morning';
         } else {
-            save.currentDate = eventDate;
-            save.currentTimeOfDay = this.getNextTimeOfDay(endingTimeOfDay);
+            save.currentDate = date;
+            save.currentTimeOfDay = this.getNextTimeOfDay(timeOfDay);
         }
 
         this.applyStatUpdateRules(save, previousDate, previousTimeOfDay);
@@ -1948,6 +1954,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     }
                     break;
             }
+        }
+        
+        // Increment time or tick over the day: calendar-event skits jump to the slot after the
+        // event's duration; other skits (e.g. plain location visits) just advance one slot.
+        const timelineEntry = (save.timeline || []).find(entry => entry.skit === currentSkit);
+        const currentDate = save.currentDate || this.getStartingDate(save);
+        const currentTimeOfDay = save.currentTimeOfDay || 'morning';
+        if (timelineEntry?.calendarEventId) {
+            this.advanceTimeToNextSlot(save, timelineEntry.date || currentDate, timelineEntry.calendarEventEndTimeOfDay || currentTimeOfDay);
+        } else {
+            this.advanceTimeToNextSlot(save, currentDate, currentTimeOfDay);
         }
 
         this.rebuildUpcomingEvents(save)
