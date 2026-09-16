@@ -1825,7 +1825,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     const expectedTags = expectedFields ? getStructuredFieldTags(expectedFields) : [];
                     const errorText = expectedTags.length > 0
                         ? `missing expected tags: ${expectedTags.join(', ')}`
-                        : 'empty response';
+                        : (
+                            (result.replace(/[^\u4e00-\u9fff]/g, '').length / result.length) > 0.3
+                                ? 'response contains too many Chinese characters'
+                                : 'empty response'
+                        );
                     throw new Error(`Invalid response format: ${errorText}. Response: ${result}`);
                 }
                 console.log('Successful text generation:', result);
