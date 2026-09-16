@@ -867,7 +867,7 @@ const renderStatIcon = (
                     opacity: filled || highlight ? 1 : 0.35,
                     color: fillColor,
                     filter: shadow,
-                    transform: highlight === 'increase' ? 'scale(1.1)' : (filled ? 'none' : 'translateY(1px)'),
+                    transform: highlight === 'increase' ? 'scale(1.2)' : (filled ? 'none' : 'translateY(1px)'),
                 }}
             />
         </button>

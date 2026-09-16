@@ -49,6 +49,11 @@ const renderStatOutcomeValue = (stat: Stat | undefined, currentValue: StatValue 
         : `${fallbackCurrentValue ?? ''} → ${nextValue}`;
 };
 
+interface OutcomeGroup {
+    outcomes: Outcome[];
+    actor?: Actor;
+}
+
 export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => {
     if (!outcomes || outcomes.length === 0) {
         return null;
@@ -58,6 +63,23 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
         if (!actorId) return undefined;
         return stage().getSave().actors?.[actorId] || undefined;
     };
+
+    const outcomeGroups = outcomes.reduce<OutcomeGroup[]>((groups, outcome) => {
+        const actorId = typeof outcome.details?.actorId === 'string' ? outcome.details.actorId : '';
+        const actor = outcome.type === OutcomeType.ACTOR_STAT ? resolveActor(actorId) : undefined;
+        if (!actor) {
+            groups.push({ outcomes: [outcome] });
+            return groups;
+        }
+
+        const existingGroup = groups.find(group => group.actor?.id === actor.id);
+        if (existingGroup) {
+            existingGroup.outcomes.push(outcome);
+        } else {
+            groups.push({ outcomes: [outcome], actor });
+        }
+        return groups;
+    }, []);
 
     return (
         <Box
@@ -74,34 +96,44 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                 pointerEvents: 'none',
             }}
         >
-            {outcomes.map((outcome, index) => {
+            {outcomeGroups.map((group, index) => {
+                const outcome = group.outcomes[0];
                 const actorId = typeof outcome.details?.actorId === 'string' ? outcome.details.actorId : '';
-                const actor = resolveActor(actorId);
+                const actor = group.actor || resolveActor(actorId);
                 const isActorOutcome = !!actor && outcome.type !== OutcomeType.PLAYER_STAT && outcome.type !== OutcomeType.LORE_UPDATE && outcome.type !== OutcomeType.NEW_EVENT;
+                const isGroupedActorStats = !!group.actor && group.outcomes.every(groupedOutcome => groupedOutcome.type === OutcomeType.ACTOR_STAT);
 
                 let topLine = outcome.description || '';
                 let bottomLine: ReactNode = '';
 
-                if (outcome.type === OutcomeType.ACTOR_STAT) {
-                    const statName = `${outcome.details?.statName || ''}`.trim() || 'Stat';
+                const renderActorStat = (actorStatOutcome: Outcome): ReactNode => {
+                    const statName = `${actorStatOutcome.details?.statName || ''}`.trim() || 'Stat';
                     const stat = stage().getConfiguration().actorStats.find(candidate => candidate.name === statName);
                     const currentValue = actor?.statMap?.[stat?.id || ''];
-                    topLine = `${actor?.name || 'Actor'} · ${statName}`;
-                    if (outcome.details?.absoluteValue !== undefined) {
-                        const nextValue = outcome.details.absoluteValue;
-                        bottomLine = renderStatOutcomeValue(stat, currentValue, nextValue, currentValue);
-                    } else {
-                        const delta = Number(outcome.details?.changeValue ?? 0);
-                        const numericCurrentValue = Number(currentValue ?? 0);
-                        const previousValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
-                        const nextValue = previousValue + delta;
-                        const arrow = '→';
-                        bottomLine = stat?.type === 'number' && stat.displayType === 'rating'
-                            ? renderStatOutcomeValue(stat, previousValue, nextValue, previousValue)
-                            : (stat
-                                ? `${resolveStatValueText(stat, previousValue)} ${arrow} ${resolveStatValueText(stat, nextValue)}`
-                                : `${previousValue} ${arrow} ${nextValue}`);
+                    if (actorStatOutcome.details?.absoluteValue !== undefined) {
+                        const nextValue = actorStatOutcome.details.absoluteValue;
+                        return renderStatOutcomeValue(stat, currentValue, nextValue, currentValue);
                     }
+
+                    const delta = Number(actorStatOutcome.details?.changeValue ?? 0);
+                    const numericCurrentValue = Number(currentValue ?? 0);
+                    const previousValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
+                    const nextValue = previousValue + delta;
+                    const arrow = '→';
+                    return stat?.type === 'number' && stat.displayType === 'rating'
+                        ? renderStatOutcomeValue(stat, previousValue, nextValue, previousValue)
+                        : (stat
+                            ? `${resolveStatValueText(stat, previousValue)} ${arrow} ${resolveStatValueText(stat, nextValue)}`
+                            : `${previousValue} ${arrow} ${nextValue}`);
+                };
+
+                if (isGroupedActorStats) {
+                    topLine = actor?.displayName || actor?.name || 'Actor';
+                } else if (outcome.type === OutcomeType.ACTOR_STAT) {
+                    const statName = `${outcome.details?.statName || ''}`.trim() || 'Stat';
+                    const stat = stage().getConfiguration().actorStats.find(candidate => candidate.name === statName);
+                    topLine = `${actor?.displayName || actor?.name || 'Actor'} · ${statName}`;
+                    bottomLine = renderActorStat(outcome);
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Player Stat';
                     const stat = stage().getConfiguration().globalStats.find(candidate => candidate.name === statName);
@@ -164,7 +196,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                                         height: 64,
                                         borderRadius: 12,
                                     }}
-                                    ariaLabel={actor.name}
+                                    ariaLabel={actor.displayName || actor.name}
                                 />
                             </Box>
                         )}
@@ -172,9 +204,24 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                             <Typography variant="caption" sx={{ color: 'var(--agenda-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                                 {topLine}
                             </Typography>
-                            <Typography component="div" variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {bottomLine || topLine}
-                            </Typography>
+                            {isGroupedActorStats ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, marginTop: 0.35 }}>
+                                    {group.outcomes.map((actorStatOutcome, statIndex) => (
+                                        <Box key={`${actorStatOutcome.details?.statName || 'stat'}-${statIndex}`} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingLeft: 1.25, borderLeft: '2px solid color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)' }}>
+                                            <Typography variant="caption" sx={{ color: 'var(--agenda-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {`${actorStatOutcome.details?.statName || ''}`.trim() || 'Stat'}
+                                            </Typography>
+                                            <Typography component="div" variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {renderActorStat(actorStatOutcome)}
+                                            </Typography>
+                                        </Box>
+                                    ))}
+                                </Box>
+                            ) : (
+                                <Typography component="div" variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {bottomLine || topLine}
+                                </Typography>
+                            )}
                         </Box>
                     </Box>
                 );
