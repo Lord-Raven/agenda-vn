@@ -432,7 +432,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const currentSave = this.saveData.saves[this.saveData.lastSaveSlot];
         if (currentSave) {
-            currentSave.globalStatValues = { ...(this.saveData.configuration.globalStatValues || {}) };
+            // Preserve the save's own values (e.g. changed in-game via stat update rules); only fill gaps
+            // from configuration so this doesn't clobber player progress with the configured tester defaults.
+            currentSave.globalStatValues = {
+                ...(this.saveData.configuration.globalStatValues || {}),
+                ...(currentSave.globalStatValues || {}),
+            };
             this.syncActorStats(currentSave);
             this.syncLocationStats(currentSave);
             this.syncGlobalStats(currentSave);
