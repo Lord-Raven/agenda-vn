@@ -1820,7 +1820,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 });
                 const result = response?.result || '';
                 
-                if (!result || !this.hasExpectedResponseTags(result, expectedFields)) {
+                // If empty or missing expected tags or contains a large percentage (30%) of Chinese characters:
+                if (!result || !this.hasExpectedResponseTags(result, expectedFields) || (result.replace(/[^\u4e00-\u9fff]/g, '').length / result.length) > 0.3) {
                     const expectedTags = expectedFields ? getStructuredFieldTags(expectedFields) : [];
                     const errorText = expectedTags.length > 0
                         ? `missing expected tags: ${expectedTags.join(', ')}`
