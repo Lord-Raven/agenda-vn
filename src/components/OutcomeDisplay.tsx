@@ -46,20 +46,42 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
 
                 if (outcome.type === OutcomeType.ACTOR_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Stat';
-                    const delta = Number(outcome.details?.changeValue ?? 0);
                     const stat = stage().getConfiguration().actorStats.find(candidate => candidate.name === statName);
-                    const currentValue = Number(actor?.statMap?.[stat?.id || ''] ?? 0);
-                    const nextValue = Number.isFinite(currentValue) ? currentValue : 0;
-                    const arrow = '→';
+                    const currentValue = actor?.statMap?.[stat?.id || ''];
                     topLine = `${actor?.name || 'Actor'} · ${statName}`;
-                    bottomLine = stat
-                        ? `${resolveStatValueText(stat, currentValue)} ${arrow} ${resolveStatValueText(stat, nextValue + delta)}`
-                        : `${currentValue} ${arrow} ${nextValue + delta}`;
+                    if (outcome.details?.absoluteValue !== undefined) {
+                        const nextValue = outcome.details.absoluteValue;
+                        bottomLine = stat
+                            ? `${resolveStatValueText(stat, currentValue ?? stat.default)} → ${resolveStatValueText(stat, nextValue)}`
+                            : `${currentValue ?? ''} → ${nextValue}`;
+                    } else {
+                        const delta = Number(outcome.details?.changeValue ?? 0);
+                        const numericCurrentValue = Number(currentValue ?? 0);
+                        const nextValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
+                        const arrow = '→';
+                        bottomLine = stat
+                            ? `${resolveStatValueText(stat, nextValue)} ${arrow} ${resolveStatValueText(stat, nextValue + delta)}`
+                            : `${nextValue} ${arrow} ${nextValue + delta}`;
+                    }
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Player Stat';
-                    const changeValue = Number(outcome.details?.changeValue ?? 0);
-                    topLine = `Player · ${statName}`;
-                    bottomLine = `${changeValue > 0 ? '+' : ''}${changeValue} → ${Math.abs(changeValue)}`;
+                    const stat = stage().getConfiguration().globalStats.find(candidate => candidate.name === statName);
+                    const currentValue = stage().getSave().globalStatValues?.[stat?.id || ''];
+                    topLine = `World · ${statName}`;
+                    if (outcome.details?.absoluteValue !== undefined) {
+                        const nextValue = outcome.details.absoluteValue;
+                        bottomLine = stat
+                            ? `${resolveStatValueText(stat, currentValue ?? stat.default)} → ${resolveStatValueText(stat, nextValue)}`
+                            : `${currentValue ?? ''} → ${nextValue}`;
+                    } else {
+                        const delta = Number(outcome.details?.changeValue ?? 0);
+                        const numericCurrentValue = Number(currentValue ?? 0);
+                        const nextValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
+                        const arrow = '→';
+                        bottomLine = stat
+                            ? `${resolveStatValueText(stat, nextValue)} ${arrow} ${resolveStatValueText(stat, nextValue + delta)}`
+                            : `${nextValue} ${arrow} ${nextValue + delta}`;
+                    }
                 } else if (outcome.type === OutcomeType.LORE_UPDATE) {
                     topLine = 'Lore Update';
                     bottomLine = `${outcome.details?.loreTitle || 'Entry'}`;

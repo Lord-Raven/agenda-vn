@@ -15,7 +15,7 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
-import { findStatOptionByValue, isStatLlmMaintained, isStatLlmSeen } from './Stat';
+import { findStatOptionByValue, isStatLlmMaintained, isStatLlmSeen, normalizeStatValue } from './Stat';
 import { build } from "vite";
 
 const getDayDifference = (startDate: string, endDate: string): number => {
@@ -466,11 +466,20 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `When establishing a character at the beginning of a scene or when moving to this location with a movement tag, give special consideration to the inclusion of a 'wears' tag to explicitly call out an appropriate look. ` +
                             `OUTFIT NAME must be found under the specified character—either their current outfit or one of their listed alternatives.`)
                         .addBlock('Movement Tags',
-                            `A Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be included when a Present Character leaves the scene or moves to another location. ` +
-                            `\n\nA Scene movement tag ("<Movement><Scene/><Location>[HERE|location name|location ID]</Location></Movement>") may be used when the scene itself transitions to another location. ` +
-                            `When this tag is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
+                            `A Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be included when a character enters or leaves the scene or the scene itself moves to another location. ` +
+                            `\n\nA Scene movement tag ("<Movement><Scene/><Location>[HERE|location name|location ID]</Location></Movement>") may be used when the scene transitions to another location. ` +
+                            `When this <Scene/> element is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
                             `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "HERE" to move to the scene's location, or "AWAY" to leave this area. ` +
-                            `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when Present Characters leave or the scene itself relocates.`)
+                            `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when characters come or go or when the scene itself relocates.`)
+                        .addBlock('Stat Change Tags',
+                            `Stat change tags ("<StatChange><Actor>[Character Name]</Actor><Stat>[STAT NAME]</Stat><Amount>+/-x</Amount></StatChange>") should be used to indicate changes in a character's numeric stats as a result of events in the skit. ` +
+                            `For stats that hold text or a selectable option rather than a number, use <Value>[NEW VALUE]</Value> instead of <Amount> to set the stat directly (e.g. "<StatChange><Actor>[Character Name]</Actor><Stat>[STAT NAME]</Stat><Value>[NEW VALUE]</Value></StatChange>"); NEW VALUE must match one of that stat's known options when applicable. ` +
+                            `For global/world stats that aren't tied to any one character, omit the <Actor> element entirely (e.g. "<StatChange><Stat>[STAT NAME]</Stat><Amount>+/-x</Amount></StatChange>"). ` +
+                            `Attach these tags to the specific entry where the change occurs, so the change reflects the moment it happens rather than being held until the scene ends. ` +
+                            `See each character's stats for reference and use the known stat list for guidance on how to apply relevant changes based on skit activity or the implications thereof.`
+                        )
+
+
                 ).addBlock('Scene Prompt',
                     `Scene Prompt: ${skit.guidance}`)
                 .addBlock('Context',
@@ -480,6 +489,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     `<Entry><Speaker>CYANEA</Speaker><Message>"I can't believe we're finally here. It's been a long journey."</Message></Entry>\n` +
                     `<Entry><Speaker>PERSEPHONE</Speaker><Message>"Yes, but the real challenge is just beginning. We must stay vigilant." Persephone gently chides Cyanea.</Message></Entry>\n` +
                     `<Entry><Speaker>CYANEA</Speaker><Expression><Actor>Cyanea</Actor><Mood>Determination</Mood></Expression><Message>Cyanea frowns uncharacteristically with determination, "Of course." She nods with almost comical sobriety.</Message></Entry>\n` +
+                    `<Entry><Speaker>PERSEPHONE</Speaker><StatChange><Actor>Cyanea</Actor><Stat>Resolve</Stat><Amount>+1</Amount></StatChange><Message>"Good. That's the spirit we'll need." Persephone offers a rare, approving smile.</Message></Entry>\n` +
                     (save.enableImpersonation ? `<Entry><Speaker>${playerName.toUpperCase()}</Speaker><Message>I smile warmly at the two women, "I agree. We need to be careful and work together."</Message></Entry>\n` : '') +
                     `<Entry><Speaker>RED HOOD</Speaker><Movement><Actor>Red Hood</Actor><Location>Here</Location></Movement><Message>A crimson-clad figure approaches with supplies."</Message></Entry>\n`
                 )
@@ -565,10 +575,129 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 return actorEmotions;
             };
 
+            // Resolves a narrative stat-change tag/field into an outcome. Amount is a numeric delta (for
+            // 'number' stats); Value is an absolute assignment (needed for option/text/checkbox stats). If both
+            // are provided, Amount takes precedence. When actorName is blank, this targets a global/world stat
+            // (no associated actor) rather than a specific character's stat.
+            const resolveStatChangeOutcome = (actorName: string, statName: string, amountText?: string, valueText?: string, actorPool: Actor[] = allActors): Outcome | undefined => {
+                const normalizedStatName = `${statName || ''}`.trim();
+                const normalizedActorName = `${actorName || ''}`.trim();
+                if (!normalizedStatName) {
+                    return undefined;
+                }
+
+                if (!normalizedActorName) {
+                    const matchedGlobalStat = findBestNameMatch(normalizedStatName, stage.getConfiguration().globalStats || [], ['name']);
+                    if (!matchedGlobalStat) {
+                        return undefined;
+                    }
+
+                    const globalStatContext: ConditionContext = { ...save, globalStats: stage.getConfiguration().globalStats, actorStats: stage.getConfiguration().actorStats };
+                    if (!isStatLlmMaintained(matchedGlobalStat, globalStatContext)) {
+                        return undefined;
+                    }
+
+                    const globalChangeValue = amountText !== undefined ? parseInt(`${amountText}`.trim(), 10) : NaN;
+                    if (!isNaN(globalChangeValue) && globalChangeValue !== 0) {
+                        return new Outcome({
+                            type: OutcomeType.PLAYER_STAT,
+                            description: `${normalizedStatName} changes by ${globalChangeValue > 0 ? '+' : ''}${globalChangeValue}.`,
+                            details: {
+                                statName: normalizedStatName,
+                                changeValue: globalChangeValue,
+                                statMap: {
+                                    [normalizedStatName]: globalChangeValue,
+                                },
+                            },
+                        });
+                    }
+
+                    const rawGlobalValue = `${valueText ?? ''}`.trim();
+                    if (!rawGlobalValue) {
+                        return undefined;
+                    }
+
+                    const absoluteGlobalValue = normalizeStatValue(rawGlobalValue, matchedGlobalStat);
+                    return new Outcome({
+                        type: OutcomeType.PLAYER_STAT,
+                        description: `${normalizedStatName} changes to ${absoluteGlobalValue}.`,
+                        details: {
+                            statName: normalizedStatName,
+                            absoluteValue: absoluteGlobalValue,
+                        },
+                    });
+                }
+
+                const matchedActor = findBestNameMatch(normalizedActorName, actorPool, ['name']);
+                const matchedStat = findBestNameMatch(normalizedStatName, stage.getConfiguration().actorStats || [], ['name']);
+                if (!matchedActor || !matchedStat) {
+                    return undefined;
+                }
+
+                const matchedStatContext: ConditionContext = {
+                    ...stage.getScheduleContext(save),
+                    currentActor: { id: matchedActor.id, name: matchedActor.name, statMap: matchedActor.statMap },
+                };
+                if (!isStatLlmMaintained(matchedStat, matchedStatContext)) {
+                    return undefined;
+                }
+
+                const changeValue = amountText !== undefined ? parseInt(`${amountText}`.trim(), 10) : NaN;
+                if (!isNaN(changeValue) && changeValue !== 0) {
+                    return new Outcome({
+                        type: OutcomeType.ACTOR_STAT,
+                        description: `${matchedActor.name}'s ${normalizedStatName} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
+                        details: {
+                            actorId: matchedActor.id,
+                            actorName: matchedActor.name,
+                            statName: normalizedStatName,
+                            changeValue,
+                            statMap: {
+                                [normalizedStatName]: changeValue,
+                            },
+                        },
+                    });
+                }
+
+                const rawValue = `${valueText ?? ''}`.trim();
+                if (!rawValue) {
+                    return undefined;
+                }
+
+                const absoluteValue = normalizeStatValue(rawValue, matchedStat);
+                return new Outcome({
+                    type: OutcomeType.ACTOR_STAT,
+                    description: `${matchedActor.name}'s ${normalizedStatName} changes to ${absoluteValue}.`,
+                    details: {
+                        actorId: matchedActor.id,
+                        actorName: matchedActor.name,
+                        statName: normalizedStatName,
+                        absoluteValue,
+                    },
+                });
+            };
+
             const stripMechanicTags = (input: string): string => input
-                .replace(/<(Expression|OutfitChange|Movement)>[\s\S]*?<\/\1>/gi, '')
+                .replace(/<(Expression|OutfitChange|Movement|StatChange)>[\s\S]*?<\/\1>/gi, '')
                 .replace(/<[^>]+>/g, '')
                 .trim();
+
+            const parseStatChangeTags = (input: string): Outcome[] => {
+                const statOutcomes: Outcome[] = [];
+                for (const statChangeMatch of input.matchAll(/<StatChange>([\s\S]*?)<\/StatChange>/gi)) {
+                    const statChangeBody = statChangeMatch[1];
+                    const actorName = (/<Actor>([\s\S]*?)<\/Actor>/i.exec(statChangeBody)?.[1] || '').trim();
+                    const statName = (/<Stat>([\s\S]*?)<\/Stat>/i.exec(statChangeBody)?.[1] || '').trim();
+                    const amountText = /<Amount>([\s\S]*?)<\/Amount>/i.exec(statChangeBody)?.[1];
+                    const valueText = /<Value>([\s\S]*?)<\/Value>/i.exec(statChangeBody)?.[1];
+
+                    const outcome = resolveStatChangeOutcome(actorName, statName, amountText, valueText);
+                    if (outcome) {
+                        statOutcomes.push(outcome);
+                    }
+                }
+                return statOutcomes;
+            };
 
             const parseXmlScriptEntries = (input: string): ScriptEntry[] => {
                 const entries: ScriptEntry[] = [];
@@ -584,7 +713,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     const message = messageBlock
                         .replace(/[“”]/g, '"')
                         .replace(/[‘’]/g, '\'')
-                        .replace(/<(Expression|OutfitChange|Movement)>[\s\S]*?<\/\1>/gi, '')
+                        .replace(/<(Expression|OutfitChange|Movement|StatChange)>[\s\S]*?<\/\1>/gi, '')
                         .replace(/<[^>]+>/g, '')
                         .trim();
 
@@ -660,7 +789,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         actorOutfits,
                         updatedActors,
                         updatedLocationId,
-                        outcomes: [],
+                        outcomes: parseStatChangeTags(entryBody),
                     }));
                 }
 
@@ -759,7 +888,9 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         )
                         .addBlock('Stat Changes',
                             `Indicate stat changes for any characters affected by the scene.\n` +
-                            `<StatChange><Actor>[Character Name]</Actor><Stat>[Stat Name]</Stat><Amount>+/-x</Amount></StatChange>`
+                            `<StatChange><Actor>[Character Name]</Actor><Stat>[Stat Name]</Stat><Amount>+/-x</Amount></StatChange>\n` +
+                            `For text or option stats, use <Value>[New Value]</Value> instead of <Amount> to set the stat directly.\n` +
+                            `For global/world stats not tied to a character, omit <Actor> entirely.`
                         )
                         .addBlock('Lore Updates',
                             `Indicate lore entries that may need to be updated as a result of the skit. Actual updates happen elsewhere; this only flags entries for review.\n` +
@@ -819,28 +950,19 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                                 : typeof statChange?.stat === 'string'
                                     ? statChange.stat
                                     : '';
-                            const changeValue = parseInt(`${statChange?.Amount ?? statChange?.amount ?? ''}`, 10);
-                            const matchedActor = findBestNameMatch(actorName, Object.values(save.actors), ['name']);
-                            const normalizedStatName = `${statName || ''}`.trim();
-                            const matchedStat = findBestNameMatch(normalizedStatName, stage.getConfiguration().actorStats || [], ['name']);
-                            const matchedStatContext: ConditionContext = {
-                                ...stage.getScheduleContext(save),
-                                currentActor: matchedActor ? { id: matchedActor.id, name: matchedActor.name, statMap: matchedActor.statMap } : undefined,
-                            };
-                            if (matchedActor && normalizedStatName && matchedStat && isStatLlmMaintained(matchedStat, matchedStatContext) && !isNaN(changeValue) && changeValue !== 0) {
-                                outcomes.push(new Outcome({
-                                    type: OutcomeType.ACTOR_STAT,
-                                    description: `${matchedActor.name}'s ${normalizedStatName} changes by ${changeValue > 0 ? '+' : ''}${changeValue}.`,
-                                    details: {
-                                        actorId: matchedActor.id,
-                                        actorName: matchedActor.name,
-                                        statName: normalizedStatName,
-                                        changeValue,
-                                        statMap: {
-                                            [normalizedStatName]: changeValue,
-                                        },
-                                    },
-                                }));
+                            const amountText = typeof statChange?.Amount === 'string' || typeof statChange?.Amount === 'number'
+                                ? `${statChange.Amount}`
+                                : typeof statChange?.amount === 'string' || typeof statChange?.amount === 'number'
+                                    ? `${statChange.amount}`
+                                    : undefined;
+                            const valueText = typeof statChange?.Value === 'string'
+                                ? statChange.Value
+                                : typeof statChange?.value === 'string'
+                                    ? statChange.value
+                                    : undefined;
+                            const outcome = resolveStatChangeOutcome(actorName, statName, amountText, valueText, Object.values(save.actors));
+                            if (outcome) {
+                                outcomes.push(outcome);
                             }
                         }
 
@@ -971,7 +1093,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 console.log('Updating final entry');
                 const finalEntry = scriptEntries[scriptEntries.length - 1];
                 finalEntry.endScene = true;
-                finalEntry.outcomes = outcomes;
+                finalEntry.outcomes = [...(finalEntry.outcomes || []), ...outcomes];
                 console.log(finalEntry.outcomes);
             }
 
@@ -1020,15 +1142,30 @@ export function accumulateOutcomes(scriptEntries: ScriptEntry[], stage: Stage): 
         if (type === OutcomeType.ACTOR_STAT) {
             const actorId = `${outcome.details?.actorId || ''}`;
             const statName = `${outcome.details?.statName || Object.keys(outcome.details?.statMap || {})[0] || ''}`.trim();
-            const delta = Number(outcome.details?.changeValue ?? outcome.details?.statMap?.[statName] ?? 0);
-            if (!actorId || !statName || !Number.isFinite(delta) || delta === 0) {
+            if (!actorId || !statName) {
                 addOutcome(`other:${order.length}:${type}`, outcome);
                 continue;
             }
 
             const key = `actor-stat:${actorId}:${statName}`;
+
+            // Absolute value assignments (for text/option stats) replace any prior pending change for this actor/stat.
+            if (outcome.details?.absoluteValue !== undefined) {
+                if (!accumulator.has(key)) {
+                    order.push(key);
+                }
+                accumulator.set(key, outcome);
+                continue;
+            }
+
+            const delta = Number(outcome.details?.changeValue ?? outcome.details?.statMap?.[statName] ?? 0);
+            if (!Number.isFinite(delta) || delta === 0) {
+                addOutcome(`other:${order.length}:${type}`, outcome);
+                continue;
+            }
+
             const existing = accumulator.get(key) as Outcome | undefined;
-            if (existing) {
+            if (existing && existing.details?.absoluteValue === undefined) {
                 const previousDelta = Number(existing.details?.changeValue ?? existing.details?.statMap?.[statName] ?? 0);
                 const nextDelta = previousDelta + delta;
                 existing.details = {
@@ -1040,7 +1177,7 @@ export function accumulateOutcomes(scriptEntries: ScriptEntry[], stage: Stage): 
                     },
                 };
                 existing.description = `${existing.details?.actorName || 'Actor'}'s ${statName} changes by ${nextDelta > 0 ? '+' : ''}${nextDelta}.`;
-            } else {
+            } else if (!existing) {
                 addOutcome(key, new Outcome({
                     ...outcome,
                     details: {
@@ -1059,15 +1196,30 @@ export function accumulateOutcomes(scriptEntries: ScriptEntry[], stage: Stage): 
 
         if (type === OutcomeType.PLAYER_STAT) {
             const statName = `${outcome.details?.statName || Object.keys(outcome.details?.statMap || {})[0] || ''}`.trim();
-            const value = Number(outcome.details?.changeValue ?? outcome.details?.statMap?.[statName] ?? 0);
-            if (!statName || !Number.isFinite(value) || value === 0) {
+            if (!statName) {
                 addOutcome(`other:${order.length}:${type}`, outcome);
                 continue;
             }
 
             const key = `player-stat:${statName}`;
+
+            // Absolute value assignments (for text/option stats) replace any prior pending change for this stat.
+            if (outcome.details?.absoluteValue !== undefined) {
+                if (!accumulator.has(key)) {
+                    order.push(key);
+                }
+                accumulator.set(key, outcome);
+                continue;
+            }
+
+            const value = Number(outcome.details?.changeValue ?? outcome.details?.statMap?.[statName] ?? 0);
+            if (!Number.isFinite(value) || value === 0) {
+                addOutcome(`other:${order.length}:${type}`, outcome);
+                continue;
+            }
+
             const existing = accumulator.get(key) as Outcome | undefined;
-            if (existing) {
+            if (existing && existing.details?.absoluteValue === undefined) {
                 const nextValue = Number(existing.details?.changeValue ?? existing.details?.statMap?.[statName] ?? 0) + value;
                 existing.details = {
                     ...existing.details,
@@ -1077,8 +1229,8 @@ export function accumulateOutcomes(scriptEntries: ScriptEntry[], stage: Stage): 
                         [statName]: nextValue,
                     },
                 };
-                existing.description = `Player stat ${statName} changes by ${nextValue > 0 ? '+' : ''}${nextValue}.`;
-            } else {
+                existing.description = `${statName} changes by ${nextValue > 0 ? '+' : ''}${nextValue}.`;
+            } else if (!existing) {
                 addOutcome(key, new Outcome({
                     ...outcome,
                     details: {
