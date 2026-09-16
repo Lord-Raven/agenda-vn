@@ -2,6 +2,7 @@ import { FC } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Actor } from '../content/Actor';
 import { Outcome, OutcomeType } from '../content/Outcome';
+import { findStatOptionByValue, Stat, StatValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorPortrait } from './ActorPortrait';
 import { resolveStatValueText } from './StatDisplay';
@@ -10,6 +11,20 @@ interface OutcomeDisplayProps {
     outcomes: Outcome[];
     stage: () => Stage;
 }
+
+// Unlike resolveStatValueText (numeric stats only), this also handles option/text/checkbox StatValues.
+const formatStatValue = (stat: Stat, value: StatValue): string => {
+    if (stat.type === 'number') {
+        return resolveStatValueText(stat, Number(value));
+    }
+    if (stat.type === 'option') {
+        return findStatOptionByValue(stat, value)?.option.name || `${value ?? ''}`;
+    }
+    if (stat.type === 'checkbox') {
+        return value ? 'Yes' : 'No';
+    }
+    return `${value ?? ''}`;
+};
 
 export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => {
     if (!outcomes || outcomes.length === 0) {
@@ -52,7 +67,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     if (outcome.details?.absoluteValue !== undefined) {
                         const nextValue = outcome.details.absoluteValue;
                         bottomLine = stat
-                            ? `${resolveStatValueText(stat, currentValue ?? stat.default)} → ${resolveStatValueText(stat, nextValue)}`
+                            ? `${formatStatValue(stat, currentValue ?? stat.default)} → ${formatStatValue(stat, nextValue)}`
                             : `${currentValue ?? ''} → ${nextValue}`;
                     } else {
                         const delta = Number(outcome.details?.changeValue ?? 0);
@@ -71,7 +86,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     if (outcome.details?.absoluteValue !== undefined) {
                         const nextValue = outcome.details.absoluteValue;
                         bottomLine = stat
-                            ? `${resolveStatValueText(stat, currentValue ?? stat.default)} → ${resolveStatValueText(stat, nextValue)}`
+                            ? `${formatStatValue(stat, currentValue ?? stat.default)} → ${formatStatValue(stat, nextValue)}`
                             : `${currentValue ?? ''} → ${nextValue}`;
                     } else {
                         const delta = Number(outcome.details?.changeValue ?? 0);
