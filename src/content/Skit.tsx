@@ -109,13 +109,18 @@ export class ScriptEntry {
 
 const SKIT_GUIDANCE_FIELDS: StructuredFieldDefinition[] = [
     {
+        key: 'reasoning',
+        label: 'Reasoning',
+        description: 'Consider recent events and dialogue to draw conclusions about the nature and participants of the upcoming scene. Propose additional actor(s) to include below, if it makes sense.'
+    },
+    {
         key: 'guidance',
-        label: 'GUIDANCE',
-        description: 'A concise guidance summary for the upcoming scene: plot goals, challenges, slice-of-life vignettes, or intimate moments.',
+        label: 'Guidance',
+        description: 'A concise guidance summary for the upcoming scene: this could include plot goals, present challenges, offer slice-of-life vignettes, suggest intimate moments, or whatever feels appropriate to the moment.',
     },
     {
         key: 'participants',
-        label: 'PARTICIPANTS',
+        label: 'Participants',
         description: '<participant>Character Name</participant> for each character from Available Characters who will participate in the scene.',
     },
 ];
@@ -123,7 +128,7 @@ const SKIT_GUIDANCE_FIELDS: StructuredFieldDefinition[] = [
 const SKIT_SUMMARY_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'summary',
-        label: 'SUMMARY',
+        label: 'Summary',
         description: 'A concise summary of the scene\'s key events, revelations, decisions, and outcomes. Write in past tense and do not mention the analysis process.',
     },
 ];
@@ -407,14 +412,15 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         buildStructuredExampleResponse(
                             SKIT_GUIDANCE_FIELDS,
                             {
+                                reasoning: `Considering the recent events and dialogue, it seems appropriate to add Cyanea to the upcoming scene (Persephone is already listed as present in context). The scene joins ${playerName} already at the Amber Drop where Cyanea will join them promptly.`,
                                 guidance: `${playerName} is relaxing at the Amber Drop when Cyanea walks in. Persephone hovers nearby, pretending not to listen to their exchange, but inevitably cutting in when things take an unexpected turn.`,
-                                participants: '<participant>Cyanea</participant><participant>Persephone</participant>',
+                                participants: '<Participant>Cyanea</Participant>',
                             },
                             { includeEndTag: true }
                         ))
                     .format(),
                 10,
-                500,
+                1000,
                 SKIT_GUIDANCE_FIELDS,
             ).catch(err => {
                 console.error('Error generating skit guidance: ', err);

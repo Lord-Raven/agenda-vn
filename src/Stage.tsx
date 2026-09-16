@@ -62,35 +62,40 @@ export type SaveType = {
 const ACTOR_SEED_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'name',
-        label: 'NAME',
+        label: 'Name',
         description: 'A distinct first name for the character.',
     },
     {
         key: 'profile',
-        label: 'PROFILE',
+        label: 'Profile',
         description: '2-4 sentences describing personality, motives, or social role.',
     },
     {
         key: 'description',
-        label: 'DESCRIPTION',
+        label: 'Description',
         description: '1-3 sentences describing key visual traits to guide character art generation.',
     },
 ];
 
 const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
     {
+        key: 'reasoning',
+        label: 'Reasoning',
+        description: 'Consider recent events and dialogue to draw conclusions about the nature and participants of the upcoming scene.'
+    },
+    {
         key: 'guidance',
-        label: 'GUIDANCE',
+        label: 'Guidance',
         description: 'A concise intro scene direction that establishes the world, tone, and immediate hook for the player.',
     },
     {
         key: 'location',
-        label: 'LOCATION',
+        label: 'Location',
         description: 'A single location name selected from Available Locations.',
     },
     {
         key: 'participants',
-        label: 'PARTICIPANTS',
+        label: 'Participants',
         description: '<participant>Character Name</participant> for each character selected from Available Characters who should be present in the intro.',
     },
 ];
@@ -98,12 +103,12 @@ const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
 const LORE_UPDATE_CANDIDATE_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'reasoning',
-        label: 'REASONING',
+        label: 'Reasoning',
         description: 'Brief explanation of which characters, if any, have profile details that should be revised to reflect the player\'s identity, role, or choices.',
     },
     {
         key: 'characterGuidance',
-        label: 'CHARACTERS',
+        label: 'Characters',
         description: 'One brief line for each character whose profile should be updated, formatted as Character Name: specific guidance for the profile revision. Leave empty if none apply.',
     },
 ];
@@ -2300,6 +2305,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         buildStructuredExampleResponse(
                             INTRO_SKIT_FIELDS,
                             {
+                                reasoning: 'The scene should establish the world and its rules while engaging the player based on their background.',
                                 guidance: `${this.getPlayerActor()?.name || 'The player'} arrives expecting a normal beginning, but the first conversation immediately reveals this world is stranger, more intimate, and more precarious than it first appears.`,
                                 location: locations[0]?.name || 'Unknown Location',
                                 participants: '<participant>John Doe</participant><participant>Jane Smith</participant>',

@@ -151,9 +151,9 @@ export class PromptBuilder {
     return parts.join('');
   }
 
-  // helper: returns sanitized tag (letters, numbers, underscore, dash allowed)
+  // helper: returns sanitized tag (letters/diacritics, numbers, underscore, dash allowed)
   private sanitizeTag(tag: string): string {
-    return String(tag).trim().replace(/[^A-Za-z0-9_\-]/g, '') || '';
+    return String(tag).trim().replace(/[^\p{L}\p{N}_\-]/gu, '') || '';
   }
 
   // helper: stringify content into a stable string
