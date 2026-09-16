@@ -784,10 +784,13 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
 interface StatRatingProps {
     stat: Stat;
     value: number;
+    highlightDelta?: number;
     updateScore?: (value: number) => void;
     readOnly?: boolean;
     style?: React.CSSProperties;
 }
+
+type RatingPipHighlight = 'increase' | 'decrease';
 
 const resolvePipCount = (stat: Stat): number => {
     if (Number.isFinite(stat.max)) {
@@ -833,14 +836,20 @@ const renderStatIcon = (
     stat: Stat,
     pipValue: number,
     filled: boolean,
+    highlight?: RatingPipHighlight,
     updateScore?: (value: number) => void,
 ) => {
     const IconComponent = resolveIcon(stat.iconName);
     const label = `${stat.name} ${pipValue} of ${resolvePipCount(stat)}`;
-    const fillColor = filled ? (stat.displayColor || 'var(--agenda-highlight)') : 'rgba(11, 17, 28, 0.9)';
+    const highlightColor = highlight === 'decrease' ? '#ff5c73' : 'var(--agenda-highlight)';
+    const fillColor = highlight
+        ? highlightColor
+        : (filled ? (stat.displayColor || 'var(--agenda-highlight)') : 'rgba(11, 17, 28, 0.9)');
     const shadow = filled
         ? `drop-shadow(0 0 2px color-mix(in srgb, ${fillColor} 35%, transparent))`
-        : 'drop-shadow(0 0 7px rgba(0, 0, 0, 0.85))';
+        : (highlight === 'decrease'
+            ? 'drop-shadow(0 0 4px rgba(255, 92, 115, 0.65))'
+            : 'drop-shadow(0 0 7px rgba(0, 0, 0, 0.85))');
 
     return (
         <button
@@ -855,10 +864,10 @@ const renderStatIcon = (
             <IconComponent
                 style={{
                     ...iconStyleBase,
-                    opacity: filled ? 1 : 0.35,
+                    opacity: filled || highlight ? 1 : 0.35,
                     color: fillColor,
                     filter: shadow,
-                    transform: filled ? 'none' : 'translateY(1px)',
+                    transform: highlight === 'increase' ? 'scale(1.1)' : (filled ? 'none' : 'translateY(1px)'),
                 }}
             />
         </button>
@@ -870,11 +879,23 @@ export { RATING_ICON_OPTIONS, resolveIcon, type RatingIconKey };
 export const StatRating: FC<StatRatingProps> = ({
     stat,
     value,
+    highlightDelta,
     updateScore,
     style,
 }) => {
     const maxPips = resolvePipCount(stat);
     const filledPips = getFilledPipCount(value, maxPips);
+    const deltaPips = Number.isFinite(highlightDelta) ? Math.round(Number(highlightDelta)) : 0;
+    const previousFilledPips = getFilledPipCount(filledPips - deltaPips, maxPips);
+    const resolvePipHighlight = (pipValue: number): RatingPipHighlight | undefined => {
+        if (deltaPips > 0 && pipValue > previousFilledPips && pipValue <= filledPips) {
+            return 'increase';
+        }
+        if (deltaPips < 0 && pipValue > filledPips && pipValue <= previousFilledPips) {
+            return 'decrease';
+        }
+        return undefined;
+    };
 
     if (maxPips <= 10) {
         return (
@@ -893,7 +914,7 @@ export const StatRating: FC<StatRatingProps> = ({
                 >
                     {Array.from({ length: maxPips }, (_, index) => {
                         const pipValue = index + 1;
-                        return renderStatIcon(stat, pipValue, filledPips >= pipValue, updateScore);
+                        return renderStatIcon(stat, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore);
                     })}
                 </div>
             </div>
@@ -941,7 +962,7 @@ export const StatRating: FC<StatRatingProps> = ({
                                 gap: '3px',
                             }}
                         >
-                            {topPips.map((pipValue) => renderStatIcon(stat, pipValue, filledPips >= pipValue, updateScore))}
+                            {topPips.map((pipValue) => renderStatIcon(stat, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore))}
                         </div>
 
                         {bottomPips.length > 0 && (
@@ -954,7 +975,7 @@ export const StatRating: FC<StatRatingProps> = ({
                                     margin: '-2px auto 0',
                                 }}
                             >
-                                {bottomPips.map((pipValue) => renderStatIcon(stat, pipValue, filledPips >= pipValue, updateScore))}
+                                {bottomPips.map((pipValue) => renderStatIcon(stat, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore))}
                             </div>
                         )}
                     </div>

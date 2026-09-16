@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Actor } from '../content/Actor';
 import { Outcome, OutcomeType } from '../content/Outcome';
@@ -6,6 +6,7 @@ import { findStatOptionByValue, Stat, StatValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorPortrait } from './ActorPortrait';
 import { resolveStatValueText } from './StatDisplay';
+import { StatRating } from './StatRating';
 
 interface OutcomeDisplayProps {
     outcomes: Outcome[];
@@ -24,6 +25,28 @@ const formatStatValue = (stat: Stat, value: StatValue): string => {
         return value ? 'Yes' : 'No';
     }
     return `${value ?? ''}`;
+};
+
+const renderStatOutcomeValue = (stat: Stat | undefined, currentValue: StatValue | undefined, nextValue: StatValue, fallbackCurrentValue: StatValue | undefined): ReactNode => {
+    if (stat?.type === 'number' && stat.displayType === 'rating') {
+        const numericNextValue = Number(nextValue);
+        const numericCurrentValue = Number(currentValue ?? stat.default ?? 0);
+        if (Number.isFinite(numericNextValue)) {
+            const highlightDelta = Number.isFinite(numericCurrentValue) ? numericNextValue - numericCurrentValue : undefined;
+            return (
+                <StatRating
+                    stat={stat}
+                    value={numericNextValue}
+                    highlightDelta={highlightDelta}
+                    style={{ height: 24, width: 'min(100%, 170px)', justifyContent: 'flex-start' }}
+                />
+            );
+        }
+    }
+
+    return stat
+        ? `${formatStatValue(stat, currentValue ?? stat.default)} → ${formatStatValue(stat, nextValue)}`
+        : `${fallbackCurrentValue ?? ''} → ${nextValue}`;
 };
 
 export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => {
@@ -57,7 +80,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                 const isActorOutcome = !!actor && outcome.type !== OutcomeType.PLAYER_STAT && outcome.type !== OutcomeType.LORE_UPDATE && outcome.type !== OutcomeType.NEW_EVENT;
 
                 let topLine = outcome.description || '';
-                let bottomLine = '';
+                let bottomLine: ReactNode = '';
 
                 if (outcome.type === OutcomeType.ACTOR_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Stat';
@@ -66,17 +89,18 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     topLine = `${actor?.name || 'Actor'} · ${statName}`;
                     if (outcome.details?.absoluteValue !== undefined) {
                         const nextValue = outcome.details.absoluteValue;
-                        bottomLine = stat
-                            ? `${formatStatValue(stat, currentValue ?? stat.default)} → ${formatStatValue(stat, nextValue)}`
-                            : `${currentValue ?? ''} → ${nextValue}`;
+                        bottomLine = renderStatOutcomeValue(stat, currentValue, nextValue, currentValue);
                     } else {
                         const delta = Number(outcome.details?.changeValue ?? 0);
                         const numericCurrentValue = Number(currentValue ?? 0);
-                        const nextValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
+                        const previousValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
+                        const nextValue = previousValue + delta;
                         const arrow = '→';
-                        bottomLine = stat
-                            ? `${resolveStatValueText(stat, nextValue)} ${arrow} ${resolveStatValueText(stat, nextValue + delta)}`
-                            : `${nextValue} ${arrow} ${nextValue + delta}`;
+                        bottomLine = stat?.type === 'number' && stat.displayType === 'rating'
+                            ? renderStatOutcomeValue(stat, previousValue, nextValue, previousValue)
+                            : (stat
+                                ? `${resolveStatValueText(stat, previousValue)} ${arrow} ${resolveStatValueText(stat, nextValue)}`
+                                : `${previousValue} ${arrow} ${nextValue}`);
                     }
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Player Stat';
@@ -85,17 +109,18 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     topLine = `World · ${statName}`;
                     if (outcome.details?.absoluteValue !== undefined) {
                         const nextValue = outcome.details.absoluteValue;
-                        bottomLine = stat
-                            ? `${formatStatValue(stat, currentValue ?? stat.default)} → ${formatStatValue(stat, nextValue)}`
-                            : `${currentValue ?? ''} → ${nextValue}`;
+                        bottomLine = renderStatOutcomeValue(stat, currentValue, nextValue, currentValue);
                     } else {
                         const delta = Number(outcome.details?.changeValue ?? 0);
                         const numericCurrentValue = Number(currentValue ?? 0);
-                        const nextValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
+                        const previousValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
+                        const nextValue = previousValue + delta;
                         const arrow = '→';
-                        bottomLine = stat
-                            ? `${resolveStatValueText(stat, nextValue)} ${arrow} ${resolveStatValueText(stat, nextValue + delta)}`
-                            : `${nextValue} ${arrow} ${nextValue + delta}`;
+                        bottomLine = stat?.type === 'number' && stat.displayType === 'rating'
+                            ? renderStatOutcomeValue(stat, previousValue, nextValue, previousValue)
+                            : (stat
+                                ? `${resolveStatValueText(stat, previousValue)} ${arrow} ${resolveStatValueText(stat, nextValue)}`
+                                : `${previousValue} ${arrow} ${nextValue}`);
                     }
                 } else if (outcome.type === OutcomeType.LORE_UPDATE) {
                     topLine = 'Lore Update';
@@ -147,7 +172,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                             <Typography variant="caption" sx={{ color: 'var(--agenda-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                                 {topLine}
                             </Typography>
-                            <Typography variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <Typography component="div" variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {bottomLine || topLine}
                             </Typography>
                         </Box>
