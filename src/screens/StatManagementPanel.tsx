@@ -997,7 +997,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                                             {canBeVisibleInUi(stat) && (
                                                 <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                                     <label style={fieldLabelStyle}>Label Icon</label>
-                                                    {renderIconPicker(stat.labelIconName, (iconName) => updateActorStat(statIndex, { labelIconName: iconName || undefined }), true)}
+                                                    {renderIconPicker(stat.labelIconName, (iconName) => updateGlobalStat(statIndex, { labelIconName: iconName || undefined }), true)}
                                                 </div>
                                             )}
 

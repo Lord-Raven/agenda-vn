@@ -6,7 +6,7 @@ import { findStatOptionByValue, Stat, StatValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorPortrait } from './ActorPortrait';
 import { resolveStatValueText } from './StatDisplay';
-import { StatRating } from './StatRating';
+import { resolveIcon, StatRating } from './StatRating';
 
 interface OutcomeDisplayProps {
     outcomes: Outcome[];
@@ -47,6 +47,44 @@ const renderStatOutcomeValue = (stat: Stat | undefined, currentValue: StatValue 
     return stat
         ? `${formatStatValue(stat, currentValue ?? stat.default)} → ${formatStatValue(stat, nextValue)}`
         : `${fallbackCurrentValue ?? ''} → ${nextValue}`;
+};
+
+const getNumericStatChangeSign = (stat: Stat | undefined, outcome: Outcome, actor?: Actor): string => {
+    if (!stat || stat.type !== 'number') {
+        return '';
+    }
+
+    if (outcome.details?.absoluteValue !== undefined) {
+        const currentValue = Number(actor?.statMap?.[stat.id] ?? stat.default ?? 0);
+        const nextValue = Number(outcome.details.absoluteValue);
+        if (Number.isFinite(currentValue) && Number.isFinite(nextValue)) {
+            return nextValue > currentValue ? '+' : nextValue < currentValue ? '-' : '';
+        }
+        return '';
+    }
+
+    const delta = Number(outcome.details?.changeValue ?? 0);
+    if (Number.isFinite(delta)) {
+        return delta > 0 ? '+' : delta < 0 ? '-' : '';
+    }
+
+    return '';
+};
+
+const formatStatNameWithSign = (stat: Stat | undefined, outcome: Outcome, actor?: Actor): string => {
+    const statName = `${outcome.details?.statName || ''}`.trim() || 'Stat';
+    const sign = getNumericStatChangeSign(stat, outcome, actor);
+    return sign ? `${statName} ${sign}` : statName;
+};
+
+const renderStatNameLabel = (stat: Stat | undefined, label: string): ReactNode => {
+    const LabelIcon = stat?.labelIconName ? resolveIcon(stat.labelIconName) : null;
+    return (
+        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, maxWidth: '100%' }}>
+            {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
+            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</Box>
+        </Box>
+    );
 };
 
 interface OutcomeGroup {
@@ -103,7 +141,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                 const isActorOutcome = !!actor && outcome.type !== OutcomeType.PLAYER_STAT && outcome.type !== OutcomeType.LORE_UPDATE && outcome.type !== OutcomeType.NEW_EVENT;
                 const isGroupedActorStats = !!group.actor && group.outcomes.every(groupedOutcome => groupedOutcome.type === OutcomeType.ACTOR_STAT);
 
-                let topLine = outcome.description || '';
+                let topLine: ReactNode = outcome.description || '';
                 let bottomLine: ReactNode = '';
 
                 const renderActorStat = (actorStatOutcome: Outcome): ReactNode => {
@@ -132,7 +170,14 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                 } else if (outcome.type === OutcomeType.ACTOR_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Stat';
                     const stat = stage().getConfiguration().actorStats.find(candidate => candidate.name === statName);
-                    topLine = `${actor?.displayName || actor?.name || 'Actor'} · ${statName}`;
+                    const statLabel = renderStatNameLabel(stat, formatStatNameWithSign(stat, outcome, actor));
+                    topLine = (
+                        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, maxWidth: '100%' }}>
+                            <Box component="span" sx={{ color: 'var(--agenda-text-muted)' }}>{actor?.displayName || actor?.name || 'Actor'}</Box>
+                            <Box component="span" sx={{ color: 'var(--agenda-text-muted)' }}>·</Box>
+                            <Box component="span" sx={{ minWidth: 0, maxWidth: '100%' }}>{statLabel}</Box>
+                        </Box>
+                    );
                     bottomLine = renderActorStat(outcome);
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
                     const statName = `${outcome.details?.statName || ''}`.trim() || 'Player Stat';
@@ -206,16 +251,20 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                             </Typography>
                             {isGroupedActorStats ? (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, marginTop: 0.35 }}>
-                                    {group.outcomes.map((actorStatOutcome, statIndex) => (
-                                        <Box key={`${actorStatOutcome.details?.statName || 'stat'}-${statIndex}`} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingLeft: 1.25, borderLeft: '2px solid color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)' }}>
-                                            <Typography variant="caption" sx={{ color: 'var(--agenda-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {`${actorStatOutcome.details?.statName || ''}`.trim() || 'Stat'}
-                                            </Typography>
-                                            <Typography component="div" variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {renderActorStat(actorStatOutcome)}
-                                            </Typography>
-                                        </Box>
-                                    ))}
+                                    {group.outcomes.map((actorStatOutcome, statIndex) => {
+                                        const statName = `${actorStatOutcome.details?.statName || ''}`.trim() || 'Stat';
+                                        const stat = stage().getConfiguration().actorStats.find(candidate => candidate.name === statName);
+                                        return (
+                                            <Box key={`${actorStatOutcome.details?.statName || 'stat'}-${statIndex}`} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingLeft: 1.25, borderLeft: '2px solid color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)' }}>
+                                                <Typography variant="caption" sx={{ color: 'var(--agenda-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {renderStatNameLabel(stat, formatStatNameWithSign(stat, actorStatOutcome, actor))}
+                                                </Typography>
+                                                <Typography component="div" variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {renderActorStat(actorStatOutcome)}
+                                                </Typography>
+                                            </Box>
+                                        );
+                                    })}
                                 </Box>
                             ) : (
                                 <Typography component="div" variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
