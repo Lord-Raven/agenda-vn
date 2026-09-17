@@ -531,9 +531,9 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             let endScene = false;
             const outcomes: Outcome[] = [];
             let summary = '';
-            let parsedSceneLocationId = getCurrentLocation(skit, -1);
-            let parsedCurrentActors = getCurrentActors(skit, -1);
-            const parsedCurrentOutfits = getCurrentOutfits(skit, stage, -1);
+            let parsedSceneLocationId = getCurrentLocation(skit, skit.script.length - 1);
+            let parsedCurrentActors = getCurrentActors(skit, skit.script.length - 1);
+            const parsedCurrentOutfits = getCurrentOutfits(skit, stage, skit.script.length - 1);
 
             // Remove any initial "System:" prefix
             if (text.toLowerCase().startsWith('system:')) {

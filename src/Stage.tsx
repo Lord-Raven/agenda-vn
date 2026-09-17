@@ -2166,7 +2166,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 `${actor.name}: ${actor.profile || actor.description || 'No profile available.'}`,
             ))
             .addBlock('Response Format',
-                `<REASONING>Brief explanation of which characters, if any, have profile details that should be revised to reflect the player's identity, role, or choices.</REASONING>\n` +
+                `<Reasoning>Brief explanation of which characters, if any, have profile details that should be revised to reflect the player's identity, role, or choices.</Reasoning>\n` +
                 `<Characters>\n` +
                 `<Character>Character Name: specific guidance for the profile revision.</Character>\n` +
                 `<!-- Repeat the Character element once for each character whose profile should be updated. Leave Characters empty if none apply. -->\n` +
@@ -2175,7 +2175,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             )
             .addBlock('Example Response',
                 `System:\n` +
-                `<REASONING>Mirel's profile treats the player as a stranger, but the player is established as her employer, so her profile should be updated to reflect that relationship.</REASONING>\n` +
+                `<Reasoning>Mirel's profile treats the player as a stranger, but the player is established as her employer, so her profile should be updated to reflect that relationship.</Reasoning>\n` +
                 `<Characters>\n` +
                 `<Character>Mirel: Update her profile to reflect that the player is now her employer and that she has begun relying on them for access to old transit hubs.</Character>\n` +
                 `</Characters>\n` +
