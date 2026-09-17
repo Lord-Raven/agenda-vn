@@ -768,9 +768,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         delete this.generationPromises['newGame']; // Clear the dummy promise to allow the loading screen to finish.
 
+        console.log('Rebuilding upcoming events for new game');
         this.rebuildUpcomingEvents(newSave);
 
+        console.log('Saving new game');
         this.saveGame();
+        console.log('Done setting up new game: ');
+        console.log(this.generationPromises);
     }
 
     // Called when the calendar screen displays.
