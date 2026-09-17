@@ -74,7 +74,7 @@ export const buildCreatorNotesHtml = ({
     const slideshowMarkup = (imageSet: string[], animationKey: string, phaseOffsetSeconds: number) => {
         const images = resolvedLocationImages(imageSet, animationKey.length);
         const slides = images
-            .map((imageUrl, index) => `<img src="${escapeHtml(imageUrl)}" alt="" class="slideshow-slide" style="animation-delay:${index * slideIntervalSeconds + phaseOffsetSeconds}s;" />`)
+            .map((imageUrl, index) => `<img src="${escapeHtml(imageUrl || '')}" alt="" class="slideshow-slide" style="animation-delay:${index * slideIntervalSeconds + phaseOffsetSeconds}s;" />`)
             .join('');
         return `<div class="panel-img-col"><div class="photo-cycler photo-cycler-${animationKey}">${slides}</div></div>`;
     };
