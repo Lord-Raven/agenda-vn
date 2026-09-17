@@ -279,6 +279,13 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
         refreshEvents();
     };
 
+    const handleApplyToSave = () => {
+        const applied = stageInstance.applyConfigurationCalendarEventToSave(draft.id);
+        stageInstance.showPriorityMessage(applied
+            ? `${draft.name || 'Event'} applied to the active save.`
+            : `${draft.name || 'Event'} does not exist in the active save yet.`);
+    };
+
     const recurrenceEnabled = Boolean(draft.recurrence);
     const selectedActors = actors.filter((actor) => (draft.actorIds || []).includes(actor.id));
 
@@ -502,7 +509,12 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
                     <Button variant="danger" onClick={deleteDraft}>{isNewDraft ? 'Reset Draft' : 'Delete Event'}</Button>
-                    <Button variant="primary" onClick={saveDraft}>Save Event</Button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        {isCreatorMode && !isNewDraft && (
+                            <Button onClick={handleApplyToSave} variant="secondary">Apply</Button>
+                        )}
+                        <Button variant="primary" onClick={saveDraft}>Save Event</Button>
+                    </div>
                 </div>
             </GlassPanel>
         </div>

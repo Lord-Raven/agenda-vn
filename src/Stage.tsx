@@ -510,6 +510,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return true;
     }
 
+    applyConfigurationCalendarEventToSave(eventId: string): boolean {
+        const configuredEvent = this.getManagedCalendarEvents(true).find(event => event.id === eventId);
+        if (!configuredEvent) {
+            return false;
+        }
+        this.upsertCalendarEventSeries(configuredEvent, false);
+        return true;
+    }
+
     async load(): Promise<Partial<LoadResponse<InitStateType, ChatStateType, MessageStateType>>> {
 
         // Test whether userId has storage access to update this bot.
