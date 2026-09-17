@@ -11,7 +11,6 @@ import {
     buildStructuredResponseFormat,
     parseStructuredResponse,
     parseStructuredListValue,
-    parseXmlTagsToObjects,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
@@ -100,7 +99,6 @@ export class ScriptEntry {
     updatedActors?: string[]; // List of Actor IDs now in the skit as of this entry; if undefined, assume same as previous entry
     updatedLocationId?: string; // Updated location for this entry, if any; if undefined, assume same as previous entry
     outcomes: Outcome[] = []; // Optional array of outcomes or consequences resulting from this script entry; can be things like finding an item, maybe a stat or relationship change, etc.
-    endScene?: boolean = false; // Optional flag to indicate if this entry ends the scene
 
     constructor(props: any) {
         Object.assign(this, props);
@@ -189,7 +187,7 @@ export function getCurrentLocation(skit: Skit, upToEntryIndex: number): string {
     return currentLocation;
 }
 
-function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage?: Stage): string {
+export function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage?: Stage): string {
     return ((skit.script && skit.script.length > 0) || additionalEntries.length > 0) ?
         [...skit.script, ...additionalEntries].map(e => {
             const emotionText = Object.entries(e.actorEmotions || {}).map(([actorId, emotion]) => {
@@ -207,7 +205,7 @@ function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage
 }
 
 export function generateContext(skit: Skit|undefined, stage: Stage, historyLength: number): ((b: PromptBuilder) => any) {
-    const playerName = stage.getPlayerActor()?.name || 'J. Doe';
+    const playerName = stage.getPlayerActor()?.name || 'The Player';
     const save = stage.getSave();
     const location = skit ? save.atlas[skit.initialLocationId] : undefined;
     const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e => e.skit !== skit);
@@ -466,31 +464,40 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     `This scene is a brief visual novel skit within a video game; as such, the scene avoids major developments or concrete details which would fundamentally alter or subvert the mechanics of the game. ` +
                     (skit.script.length == 0 ? 'As this is the initial, establishing moment of a new scene, evaluate the current outfit and alternative outfits of each character and use Outfit ("wears") tags to update the characters to the most appropriate outfit for the moment. Begin the scene with appropriate tags at the "System:" prompt.' : 'Continue the scene at the "System:" prompt.') +
                     `Generally, focus upon interpersonal dynamics, character growth, and discovery or trials within this strange world.` +
-                    ((save.language || 'English').toLowerCase() !== 'english' ? `\n\nNote: The game is now being played in ${save.language}. Regardless of historic language use, generate this skit content in ${save.language} accordingly. Special emotion, outfit, and movement tags continue to use English (these are invisible to the user).` : '')
+                    ((save.language || 'English').toLowerCase() !== 'english' ? `\n\nNote: The game is now being played in ${save.language}. Regardless of historic language use, generate this skit content in ${save.language} accordingly. Special tags (emotion, outfit, movement, etc.) continue to use English (these are invisible to the user).` : '')
                 )
                 .addBlock('Script Format',
-                    `<Entry><Speaker>SPEAKER NAME</Speaker>[Appropriate Tags]<Message>Prose with "embedded dialogue" and actions.</Message></Entry>`)
+                    `<Entry><Speaker>[Speaker Name]</Speaker>[Appropriate Tags]<Message>Prose with "embedded dialogue" and actions.</Message></Entry>`)
                 .addBlock('Tags', (builder) =>
                     builder.addBlock('Tag Instruction',
                         `Embedded within this script, you may employ special tags to trigger various game mechanics. These tags are not presented to users, so the narrative content of the script should also organically mention characters entering, exiting, or relocating. Character names in tags or in the script are ALL CAPS.`)
                         .addBlock('Emotion Tags',
-                        `Emotion tags ("<Expression><Actor>[Character Name]</Actor><Mood>[EMOTION]</Mood></Expression>") should be used to indicate visible emotional shifts in a character's appearance using a single-word emotion name.`)
+                        `Emotion tags ("<Expression><Actor>[Character Name]</Actor><Mood>[Emotion]</Mood></Expression>") should be used to indicate visible emotional shifts in a character's appearance using a single-word emotion name.`)
                         .addBlock('Outfit Tags',
-                        `Outfit tags ("<OutfitChange><Actor>[Character Name]</Actor><Outfit>[OUTFIT NAME]</Outfit></OutfitChange>") should be used when a character changes outfit. ` +
-                            `When establishing a character at the beginning of a scene or when moving to this location with a movement tag, give special consideration to the inclusion of a 'wears' tag to explicitly call out an appropriate look. ` +
-                            `OUTFIT NAME must be found under the specified character—either their current outfit or one of their listed alternatives.`)
+                        `Outfit tags ("<OutfitChange><Actor>[Character Name]</Actor><Outfit>[Outfit Name]</Outfit></OutfitChange>") should be used when a character changes outfit. ` +
+                            `When establishing a character at the beginning of a scene or when moving to this location with a movement tag, give special consideration to the inclusion of an <OutfitChange> tag to explicitly call out an appropriate look. ` +
+                            `Outfit Name must be found under the specified character—either their current outfit or one of their listed alternatives.`)
                         .addBlock('Movement Tags',
-                            `A Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[HERE|location name|location ID]</Location></Movement>") must be included when a character enters or leaves the scene or the scene itself moves to another location. ` +
-                            `\n\nA Scene movement tag ("<Movement><Scene/><Location>[HERE|location name|location ID]</Location></Movement>") may be used when the scene transitions to another location. ` +
+                            `A Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[Here|Away|Location Name|Location ID]</Location></Movement>") must be included when a character enters or leaves the scene or the scene itself moves to another location. ` +
+                            `\n\nA Scene movement tag ("<Movement><Scene/><Location>[Here|Away|Location Name|Location ID]</Location></Movement>") may be used when the scene transitions to another location. ` +
                             `When this <Scene/> element is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
-                            `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "HERE" to move to the scene's location, or "AWAY" to leave this area. ` +
-                            `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when characters come or go or when the scene itself relocates.`)
+                            `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "Here" to move to the scene's location, or "Away" to leave this area. ` +
+                            `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when characters come or go or when the scene itself relocates. ` +
+                            `Consider the`)
                         .addBlock('Stat Change Tags',
                             `Stat change tags ("<StatChange><Actor>[Character Name]</Actor><Stat>[STAT NAME]</Stat><Amount>+/-x</Amount></StatChange>") should be used to indicate changes in a character's numeric stats as a result of events in the skit. ` +
                             `For stats that hold text or a selectable option rather than a number, use <Value>[NEW VALUE]</Value> instead of <Amount> to set the stat directly (e.g. "<StatChange><Actor>[Character Name]</Actor><Stat>[STAT NAME]</Stat><Value>[NEW VALUE]</Value></StatChange>"); NEW VALUE must match one of that stat's known options when applicable. ` +
                             `For global/world stats that aren't tied to any one character, omit the <Actor> element entirely (e.g. "<StatChange><Stat>[STAT NAME]</Stat><Amount>+/-x</Amount></StatChange>"). ` +
                             `Attach these tags to the specific entry where the change occurs, so the change reflects the moment it happens rather than being held until the scene ends. ` +
                             `See each character's stats for reference and use the known stat list for guidance on how to apply relevant changes based on skit activity or the implications thereof.`
+                        )
+                        .addBlock('Lore Update Tags',
+                            `Lore update tags flag existing lore entries that should be revised based on events in this entry. Include concise, specific guidance for the later lore revision. ` +
+                            `Use the exact lore entry title in <Entry>: <LoreUpdate><Entry>Lore Entry Name</Entry><Guidance>Specific revision guidance based on this entry's events.</Guidance></LoreUpdate>`
+                        )
+                        .addBlock('New Event Tags',
+                            `Use a NewEvent tag when this entry specifies or implies a future calendar event. Include the event name, date, location (ID or name), required characters (IDs or names), user-facing description, secret guidance, and optional finite recurrence. ` +
+                            `<NewEvent><Name>Event Name</Name><Date>YYYY-MM-DD</Date><Location>Location ID or Name</Location><RequiredCharacters><Character>[Character ID or Name]</Character></RequiredCharacters><Description>Brief user-facing description</Description><Secret>Additional secret guidance</Secret><Recurrence><Frequency>DAILY|WEEKLY|MONTHLY</Frequency><Interval>1</Interval><UntilDate>YYYY-MM-DD</UntilDate></Recurrence></NewEvent>`
                         )
 
 
@@ -528,9 +535,6 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
 
             // Strip all double asterisks; this is a temporary measure due to current model behavior.
             let text = response.replace(/\*\*/g, '').trim();
-            let endScene = false;
-            const outcomes: Outcome[] = [];
-            let summary = '';
             let parsedSceneLocationId = getCurrentLocation(skit, skit.script.length - 1);
             let parsedCurrentActors = getCurrentActors(skit, skit.script.length - 1);
             const parsedCurrentOutfits = getCurrentOutfits(skit, stage, skit.script.length - 1);
@@ -692,7 +696,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             };
 
             const stripMechanicTags = (input: string): string => input
-                .replace(/<(Expression|OutfitChange|Movement|StatChange)>[\s\S]*?<\/\1>/gi, '')
+                .replace(/<(Expression|OutfitChange|Movement|StatChange|LoreUpdate|NewEvent)>[\s\S]*?<\/\1>/gi, '')
                 .replace(/<[^>]+>/g, '')
                 .trim();
 
@@ -713,6 +717,74 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 return statOutcomes;
             };
 
+            const parseLoreUpdateTags = (input: string): Outcome[] => {
+                const loreOutcomes: Outcome[] = [];
+                for (const loreUpdateMatch of input.matchAll(/<LoreUpdate>([\s\S]*?)<\/LoreUpdate>/gi)) {
+                    const loreUpdateBody = loreUpdateMatch[1];
+                    const loreName = (/<Entry>([\s\S]*?)<\/Entry>/i.exec(loreUpdateBody)?.[1] || '').trim();
+                    const guidance = (/<Guidance>([\s\S]*?)<\/Guidance>/i.exec(loreUpdateBody)?.[1] || '').trim();
+                    const matchedLore = findBestNameMatch(loreName, save.lorebook || [], ['title']);
+                    if (!matchedLore) continue;
+
+                    loreOutcomes.push(new Outcome({
+                        type: OutcomeType.LORE_UPDATE,
+                        description: `Lore entry \"${matchedLore.title}\" should be reviewed for updates.`,
+                        details: {
+                            loreId: matchedLore.id,
+                            loreTitle: matchedLore.title,
+                            guidance,
+                        },
+                    }));
+                }
+                return loreOutcomes;
+            };
+
+            const parseNewEventTags = (input: string): Outcome[] => {
+                const eventOutcomes: Outcome[] = [];
+                for (const newEventMatch of input.matchAll(/<NewEvent>([\s\S]*?)<\/NewEvent>/gi)) {
+                    const newEventBody = newEventMatch[1];
+                    const readTag = (tag: string): string =>
+                        (new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(newEventBody)?.[1] || '').trim();
+                    const eventName = readTag('Name');
+                    if (!eventName) continue;
+
+                    const requiredCharactersBody = /<RequiredCharacters>([\s\S]*?)<\/RequiredCharacters>/i.exec(newEventBody)?.[1] || '';
+                    const requiredCharacters = Array.from(requiredCharactersBody.matchAll(/<Character>([\s\S]*?)<\/Character>/gi))
+                        .map(match => match[1].trim())
+                        .filter(Boolean);
+                    const recurrenceFrequency = readTag('Frequency');
+
+                    eventOutcomes.push(new Outcome({
+                        type: OutcomeType.NEW_EVENT,
+                        description: `New calendar event \"${eventName}\" was flagged.`,
+                        details: {
+                            event: {
+                                name: eventName,
+                                date: readTag('Date'),
+                                location: readTag('Location'),
+                                requiredCharacters,
+                                description: readTag('Description'),
+                                secret: readTag('Secret'),
+                                recurrence: recurrenceFrequency
+                                    ? {
+                                        frequency: recurrenceFrequency,
+                                        interval: readTag('Interval'),
+                                        untilDate: readTag('UntilDate'),
+                                    }
+                                    : undefined,
+                            },
+                        },
+                    }));
+                }
+                return eventOutcomes;
+            };
+
+            const parseEntryOutcomes = (input: string): Outcome[] => [
+                ...parseStatChangeTags(input),
+                ...parseLoreUpdateTags(input),
+                ...parseNewEventTags(input),
+            ];
+
             const parseXmlScriptEntries = (input: string): ScriptEntry[] => {
                 const entries: ScriptEntry[] = [];
                 const entryMatches = [...input.matchAll(/<Entry>([\s\S]*?)<\/Entry>/gi)];
@@ -727,7 +799,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     const message = messageBlock
                         .replace(/[“”]/g, '"')
                         .replace(/[‘’]/g, '\'')
-                        .replace(/<(Expression|OutfitChange|Movement|StatChange)>[\s\S]*?<\/\1>/gi, '')
+                        .replace(/<(Expression|OutfitChange|Movement|StatChange|LoreUpdate|NewEvent)>[\s\S]*?<\/\1>/gi, '')
                         .replace(/<[^>]+>/g, '')
                         .trim();
 
@@ -803,7 +875,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         actorOutfits,
                         updatedActors,
                         updatedLocationId,
-                        outcomes: parseStatChangeTags(entryBody),
+                        outcomes: parseEntryOutcomes(entryBody),
                     }));
                 }
 
@@ -889,232 +961,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 }
             });
 
-            // If this response contains an endScene, we will analyze the script for stat changes or other game mechanics to be applied. Add this to the ttsPromises to run in parallel.
-            console.log('Perform additional analysis.');
-            ttsPromises.push((async () => {
-                let endResponse = await stage.generateText(
-                    buildPrompt()
-                        .addBlock(`Instructions`,
-                            `Analyze the provided script and determine whether the depicted scene has run its course. ` +
-                            `Respond using XML tags. If complete, use <SceneStatus>END</SceneStatus>; otherwise use <SceneStatus>CONTINUE</SceneStatus>. ` +
-                            `Always include <Summary>...</Summary> with a concise explanation of the scene state and key developments. ` +
-                            `\n\nIf the scene is complete, include optional lore update tags to flag follow-up game mechanics.`
-                        )
-                        .addBlock('Stat Changes',
-                            `Indicate stat changes for any characters affected by the scene.\n` +
-                            `<StatChange><Actor>[Character Name]</Actor><Stat>[Stat Name]</Stat><Amount>+/-x</Amount></StatChange>\n` +
-                            `For text or option stats, use <Value>[New Value]</Value> instead of <Amount> to set the stat directly.\n` +
-                            `For global/world stats not tied to a character, omit <Actor> entirely.`
-                        )
-                        .addBlock('Lore Updates',
-                            `Indicate lore entries that may need to be updated as a result of the skit. Actual updates happen elsewhere; this only flags entries for review.\n` +
-                            `<LoreUpdate><Entry>Lore Entry Name</Entry></LoreUpdate>`
-                        )
-                        .addBlock('New Event',
-                            `Create a new calendar event if the scene specified or implied a future event. Include the event name, date, a location (ID or name), required characters (IDs or names), a brief user-facing description, and secret additional guidance.\n` +
-                            `Optional recurrence can be included if this should repeat for a finite period.\n` +
-                            `<NewEvent><Name>Event Name</Name><Date>YYYY-MM-DD</Date><Location>Location ID or Name</Location><RequiredCharacters><Character>[Character ID or Name]</Character><Character>[Another Character ID or Name]</Character></RequiredCharacters><Description>Brief user-facing description</Description><Secret>Additional secret guidance</Secret><Recurrence><Frequency>DAILY|WEEKLY|MONTHLY</Frequency><Interval>1</Interval><UntilDate>YYYY-MM-DD</UntilDate></Recurrence></NewEvent>`
-                        )
-                        .addBlock('Example Response',
-                            `<SceneAnalysis><SceneStatus>END</SceneStatus><Summary>This expedition took ${playerName} and Cyanea to the Shells, where they encountered Red Hood and uncovered a new forma: the Coral Razor. Red Hood vehemently disagreed with ${playerName} and Cyanea on how to handle this new threat.</Summary><LoreUpdate><Entry>The Shells</Entry></LoreUpdate><LoreUpdate><Entry>Cyanea</Entry></LoreUpdate><LoreUpdate><Entry>Red Hood</Entry></LoreUpdate></SceneAnalysis>\n#END#` +
-                            `\nExample Response:\n` +
-                            `<SceneAnalysis><SceneStatus>CONTINUE</SceneStatus><Summary>The scene is developing well, but it would be more satisfying with a clearer moment of resolution at the end. Consider whether ${playerName} could discover a clue or have a significant interaction with another character to create a more compelling ending.</Summary></SceneAnalysis>\n#END#`
-                        )
-                        .addBlock('Scene Script for Analysis',
-                            buildScriptLog(skit, scriptEntries, stage))
-                        .addBlock('Additional Context',
-                            generateContext(skit, stage, 0))
-                        .format(),
-                    1, 2000
-                );
-
-                if (endResponse) {
-                    // Strip double-asterisks. TODO: Remove this once other model issue is resolved.
-                    endResponse = endResponse.replace(/\*\*/g, '');
-
-                    const normalizedEndResponse = endResponse.replace(/[“”]/g, '"').replace(/[‘’]/g, '\'');
-                    const hasEndSceneTag = normalizedEndResponse.includes('<END SCENE>') || /<SceneStatus>\s*END\s*<\/SceneStatus>/i.test(normalizedEndResponse);
-
-                    if (hasEndSceneTag) {
-                        endScene = true;
-                        const parsedAnalysis = parseXmlTagsToObjects(normalizedEndResponse);
-                        const sceneAnalysis = parsedAnalysis?.SceneAnalysis || parsedAnalysis;
-                        const summaryText = typeof sceneAnalysis?.Summary === 'string'
-                            ? sceneAnalysis.Summary
-                            : typeof sceneAnalysis?.summary === 'string'
-                                ? sceneAnalysis.summary
-                                : '';
-                        summary = summaryText.trim();
-                        console.log('Model determined scene should end. Summary:', summary);
-
-                        const statChanges = Array.isArray(sceneAnalysis?.StatChange)
-                            ? sceneAnalysis.StatChange
-                            : sceneAnalysis?.StatChange
-                                ? [sceneAnalysis.StatChange]
-                                : [];
-
-                        for (const statChange of statChanges) {
-                            const actorName = typeof statChange?.Actor === 'string'
-                                ? statChange.Actor
-                                : typeof statChange?.actor === 'string'
-                                    ? statChange.actor
-                                    : '';
-                            const statName = typeof statChange?.Stat === 'string'
-                                ? statChange.Stat
-                                : typeof statChange?.stat === 'string'
-                                    ? statChange.stat
-                                    : '';
-                            const amountText = typeof statChange?.Amount === 'string' || typeof statChange?.Amount === 'number'
-                                ? `${statChange.Amount}`
-                                : typeof statChange?.amount === 'string' || typeof statChange?.amount === 'number'
-                                    ? `${statChange.amount}`
-                                    : undefined;
-                            const valueText = typeof statChange?.Value === 'string'
-                                ? statChange.Value
-                                : typeof statChange?.value === 'string'
-                                    ? statChange.value
-                                    : undefined;
-                            const outcome = resolveStatChangeOutcome(actorName, statName, amountText, valueText, Object.values(save.actors));
-                            if (outcome) {
-                                outcomes.push(outcome);
-                            }
-                        }
-
-                        const loreUpdates = Array.isArray(sceneAnalysis?.LoreUpdate)
-                            ? sceneAnalysis.LoreUpdate
-                            : sceneAnalysis?.LoreUpdate
-                                ? [sceneAnalysis.LoreUpdate]
-                                : [];
-
-                        for (const loreUpdate of loreUpdates) {
-                            const loreName = typeof loreUpdate?.Entry === 'string'
-                                ? loreUpdate.Entry
-                                : typeof loreUpdate?.entry === 'string'
-                                    ? loreUpdate.entry
-                                    : '';
-                            const matchedLore = findBestNameMatch(loreName, save.lorebook || [], ['title']);
-                            if (matchedLore) {
-                                console.log(`Lore update flagged for "${matchedLore.title}".`);
-                                outcomes.push(new Outcome({
-                                    type: OutcomeType.LORE_UPDATE,
-                                    description: `Lore entry \"${matchedLore.title}\" should be reviewed for updates.`,
-                                    details: {
-                                        loreId: matchedLore.id,
-                                        loreTitle: matchedLore.title,
-                                    },
-                                }));
-                            }
-                        }
-
-                        const newEvents = Array.isArray(sceneAnalysis?.NewEvent)
-                            ? sceneAnalysis.NewEvent
-                            : sceneAnalysis?.NewEvent
-                                ? [sceneAnalysis.NewEvent]
-                                : [];
-
-                        for (const newEvent of newEvents) {
-                            const eventName = typeof newEvent?.Name === 'string'
-                                ? newEvent.Name
-                                : typeof newEvent?.name === 'string'
-                                    ? newEvent.name
-                                    : '';
-                            const eventDate = typeof newEvent?.Date === 'string'
-                                ? newEvent.Date
-                                : typeof newEvent?.date === 'string'
-                                    ? newEvent.date
-                                    : '';
-                            const eventLocation = typeof newEvent?.Location === 'string'
-                                ? newEvent.Location
-                                : typeof newEvent?.location === 'string'
-                                    ? newEvent.location
-                                    : '';
-                            const eventDescription = typeof newEvent?.Description === 'string'
-                                ? newEvent.Description
-                                : typeof newEvent?.description === 'string'
-                                    ? newEvent.description
-                                    : '';
-                            const eventSecret = typeof newEvent?.Secret === 'string'
-                                ? newEvent.Secret
-                                : typeof newEvent?.secret === 'string'
-                                    ? newEvent.secret
-                                    : '';
-                            const recurrence = newEvent?.Recurrence || newEvent?.recurrence;
-                            const recurrenceFrequency = typeof recurrence?.Frequency === 'string'
-                                ? recurrence.Frequency
-                                : typeof recurrence?.frequency === 'string'
-                                    ? recurrence.frequency
-                                    : '';
-                            const recurrenceInterval = typeof recurrence?.Interval === 'string' || typeof recurrence?.Interval === 'number'
-                                ? recurrence.Interval
-                                : typeof recurrence?.interval === 'string' || typeof recurrence?.interval === 'number'
-                                    ? recurrence.interval
-                                    : '';
-                            const recurrenceUntilDate = typeof recurrence?.UntilDate === 'string'
-                                ? recurrence.UntilDate
-                                : typeof recurrence?.untilDate === 'string'
-                                    ? recurrence.untilDate
-                                    : '';
-
-                            const requiredCharactersRaw = newEvent?.RequiredCharacters || newEvent?.requiredCharacters;
-                            let requiredCharacters: string[] = [];
-                            if (Array.isArray(requiredCharactersRaw?.Character)) {
-                                requiredCharacters = requiredCharactersRaw.Character
-                                    .map((character: any) => `${character || ''}`.trim())
-                                    .filter(Boolean);
-                            } else if (typeof requiredCharactersRaw?.Character === 'string') {
-                                requiredCharacters = [requiredCharactersRaw.Character.trim()].filter(Boolean);
-                            } else if (Array.isArray(requiredCharactersRaw?.character)) {
-                                requiredCharacters = requiredCharactersRaw.character
-                                    .map((character: any) => `${character || ''}`.trim())
-                                    .filter(Boolean);
-                            } else if (typeof requiredCharactersRaw?.character === 'string') {
-                                requiredCharacters = [requiredCharactersRaw.character.trim()].filter(Boolean);
-                            }
-
-                            if (eventName) {
-                                outcomes.push(new Outcome({
-                                    type: OutcomeType.NEW_EVENT,
-                                    description: `New calendar event \"${eventName}\" was flagged.`,
-                                    details: {
-                                        event: {
-                                            name: eventName,
-                                            date: eventDate,
-                                            location: eventLocation,
-                                            requiredCharacters,
-                                            description: eventDescription,
-                                            secret: eventSecret,
-                                            recurrence: recurrenceFrequency
-                                                ? {
-                                                    frequency: recurrenceFrequency,
-                                                    interval: recurrenceInterval,
-                                                    untilDate: recurrenceUntilDate,
-                                                }
-                                                : undefined,
-                                        },
-                                    },
-                                }));
-                            }
-                        }
-                    }
-                }
-            })());
-
             // Wait for all TTS generation to complete
             await Promise.all(ttsPromises);
-
-            // Attach endScene and endProperties to the final entry if the scene ended
-            if (endScene && scriptEntries.length > 0) {
-                console.log('Updating final entry');
-                const finalEntry = scriptEntries[scriptEntries.length - 1];
-                finalEntry.endScene = true;
-                finalEntry.outcomes = [...(finalEntry.outcomes || []), ...outcomes];
-                console.log(finalEntry.outcomes);
-            }
-
-            if (endScene && !summary) {
-                console.log('Scene ended without a summary.');
-            }
-            skit.summary = summary;
 
             stage.pushMessage(text);
 

@@ -7,7 +7,7 @@ import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
 import { findStatOptionByValue, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeLocationListValue, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
-import { generateContext, generateSkitScript, generateSkitSummary, Skit } from "./content/Skit";
+import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
@@ -21,6 +21,7 @@ import {
     getStructuredFieldTags,
     parseStructuredResponse,
     parseStructuredListValue,
+    parseXmlTagsToObjects,
     StructuredFieldDefinition,
 } from "./utils/StructuredResponse.js";
 
@@ -1912,19 +1913,28 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (currentSkit) {
             currentSkit.over = true;
         }
+        const loreUpdatePromises: Promise<unknown>[] = [];
 
-        // This is where various outcomes of the skit are processed and applied to the save state
-        // Get the final entry of the skit and process outcomes:
+        // Flag additional lore updates asynchronously; the scene can finish without waiting for this request.
+        this.flagLoreForUpdate(currentSkit).catch(error => {
+            console.error('Error flagging lore updates for skit:', error);
+        });
+
+
+        // This is where various outcomes of the skit are processed and applied to the save state.
+        // Outcomes are attached to the message where they occurred, so process every entry.
         console.log(`Processing outcomes for skit:`);
-        const outcomes = currentSkit?.script[currentSkit.script.length - 1]?.outcomes || [];
+        const outcomes = currentSkit?.script.flatMap(entry => entry.outcomes || []) || [];
         console.log(outcomes);
+        const scheduledLoreIds = new Set<string>();
         for (const outcome of outcomes) {
             switch (outcome.type) {
                 case 'LORE_UPDATE':
-                    // For lore updates, we expect details to include a loreEntry with id, title, and content.
+                    // Lore revisions are intentionally started without delaying scene cleanup.
                     const loreEntry = findBestNameMatch(outcome.details?.loreTitle, save.lorebook || [], ['title']);
-                    if (loreEntry && loreEntry.updatable) {
-                        updateLoreEntry(loreEntry, this);
+                    if (loreEntry && loreEntry.updatable && !scheduledLoreIds.has(loreEntry.id)) {
+                        scheduledLoreIds.add(loreEntry.id);
+                        loreUpdatePromises.push(updateLoreEntry(loreEntry, this, outcome.details?.guidance));
                     }
                     break;
                 case 'ACTOR_STAT':
@@ -2014,6 +2024,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     break;
             }
         }
+        Promise.all(loreUpdatePromises).catch(error => {
+            console.error('Error processing skit lore updates:', error);
+        });
         
         // Generate a summary. No need to wait.
         this.summaryCheck();
@@ -2147,6 +2160,85 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         return lines.length > 0 ? lines.join('\n\n') : 'No player stat context is active.';
+    }
+
+    private async flagLoreForUpdate(skit?: Skit | null): Promise<void> {
+        if (!skit?.script?.length) {
+            return;
+        }
+
+        const save = this.getSave();
+        const loreEntries = (save.lorebook || []).filter(lore => lore.enabled && lore.updatable);
+        if (loreEntries.length === 0) {
+            return;
+        }
+
+        const alreadyFlagged = new Set(
+            skit.script
+                .flatMap(entry => entry.outcomes || [])
+                .filter(outcome => outcome.type === 'LORE_UPDATE')
+                .map(outcome => `${outcome.details?.loreTitle || ''}`.trim().toLowerCase())
+                .filter(Boolean),
+        );
+        const generationKey = `flagLoreForUpdate-${skit.id}`;
+        const generationPromise = this.generateText(
+            buildPrompt()
+                .addBlock('Instructions',
+                    `Review the completed skit and identify existing lore entries whose content may now be incomplete, inaccurate, or missing important information because of what happened in the scene. ` +
+                    `Only select entries that genuinely need revision. Do not invent lore entries, and do not select an entry merely because it was mentioned. ` +
+                    `For every selected entry, provide concise, specific guidance for revising that entry. If no entries require revision, return an empty <LoreUpdates></LoreUpdates> block.`
+                )
+                .addBlock('Response Format',
+                    `<LoreUpdates>\n` +
+                    `  <LoreUpdate><Entry>Exact Lore Entry Title</Entry><Guidance>Specific information to add, remove, or revise based on the scene.</Guidance></LoreUpdate>\n` +
+                    `  <!-- Repeat LoreUpdate for each entry that requires revision. -->\n` +
+                    `</LoreUpdates>\n#END#`
+                )
+                .addBlock('Example Response',
+                    `<LoreUpdates>\n` +
+                    `  <LoreUpdate><Entry>The Shells</Entry><Guidance>Add that the expedition uncovered a Coral Razor and record the disagreement over how the threat should be handled.</Guidance></LoreUpdate>\n` +
+                    `  <LoreUpdate><Entry>Cyanea</Entry><Guidance>Update her recent history to include the expedition and her changed understanding of the Coral Razor.</Guidance></LoreUpdate>\n` +
+                    `</LoreUpdates>\n#END#`
+                )
+                .addBlock('Lore Entries Available for Revision',
+                    loreEntries.map(lore => `${lore.title}:\n${lore.content}`).join('\n\n')
+                )
+                .addBlock('Skit Content', buildScriptLog(skit, [], this))
+                .addBlock('Additional Context', generateContext(skit, this, 3))
+                .format(),
+            20,
+            2000,
+        ).then(response => {
+            const parsed = parseXmlTagsToObjects(response);
+            const rawUpdates = parsed?.LoreUpdates?.LoreUpdate ?? parsed?.LoreUpdate ?? [];
+            const loreUpdates = Array.isArray(rawUpdates) ? rawUpdates : [rawUpdates];
+            const scheduled = new Set<string>(alreadyFlagged);
+
+            for (const loreUpdate of loreUpdates) {
+                const loreName = `${loreUpdate?.Entry || loreUpdate?.entry || ''}`.trim();
+                const guidance = `${loreUpdate?.Guidance || loreUpdate?.guidance || ''}`.trim();
+                if (!loreName || !guidance) {
+                    continue;
+                }
+
+                const loreEntry = findBestNameMatch(loreName, loreEntries, ['title']);
+                const loreKey = loreEntry?.title.trim().toLowerCase() || '';
+                if (!loreEntry || !loreKey || scheduled.has(loreKey)) {
+                    continue;
+                }
+
+                scheduled.add(loreKey);
+                console.log(`Lore update flagged for "${loreEntry.title}" after skit review.`);
+                updateLoreEntry(loreEntry, this, guidance).catch(error => {
+                    console.error(`Error updating lore entry ${loreEntry.title}`, error);
+                });
+            }
+        }).finally(() => {
+            delete this.generationPromises[generationKey];
+        });
+
+        this.generationPromises[generationKey] = generationPromise;
+        await generationPromise;
     }
 
     private buildLoreUpdateCandidatePrompt(save: SaveType, candidateActors: Actor[]): string {
