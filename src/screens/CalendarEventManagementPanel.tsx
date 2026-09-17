@@ -1,8 +1,8 @@
 import React, { FC, useMemo, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
-import { DoNotDisturb } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
+import { getEmotionImage } from '../content/Actor';
 import { Button, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { ActorPortrait } from '../components/ActorPortrait';
@@ -308,8 +308,8 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                                     cursor: 'pointer',
                                     borderColor: selectedEventId === event.id ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)',
                                     background: selectedEventId === event.id
-                                        ? 'linear-gradient(145deg, rgba(39, 58, 60, 0.92), rgba(21, 26, 40, 0.92))'
-                                        : 'linear-gradient(145deg, rgba(27, 33, 51, 0.92), rgba(21, 26, 40, 0.92))',
+                                        ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)'
+                                        : 'color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)',
                                 }}
                             >
                                 <div style={{ fontWeight: 700, marginBottom: 4 }}>{event.name}</div>
@@ -416,22 +416,12 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                                 key: actor.id,
                                 label: actor.name,
                                 category: actor.category?.trim() || 'Uncategorized',
-                                imageUrl: actor.outfits?.length ? (stageInstance.getSave()?.actors?.[actor.id]?.outfits?.[0] ? undefined : undefined) : undefined,
+                                imageUrl: getEmotionImage(actor, 'neutral', stageInstance, actor.outfitId) || getEmotionImage(actor, 'base', stageInstance, actor.outfitId) || '',
                             }))}
                             allowClear
                             emptyLabel="No actors"
                             title="Choose involved actors"
                             placeholder="Search actors"
-                            defaultOptionKeys={[]}
-                            renderButton={(selectedValue) => {
-                                const selectedActors = Array.isArray(selectedValue) ? selectedValue : [];
-                                const count = selectedActors.length;
-                                return (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: count > 0 ? 'var(--agenda-text-primary)' : 'var(--agenda-text-muted)' }}>
-                                        {count > 0 ? `${count} selected` : <><DoNotDisturb style={{ fontSize: 18 }} />No actors</>}
-                                    </span>
-                                );
-                            }}
                         />
                         {selectedActors.length > 0 && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>

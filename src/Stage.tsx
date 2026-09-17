@@ -879,8 +879,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 const candidateSeriesId = candidate.recurrenceParentId || candidate.id;
                 return candidateSeriesId !== seriesId;
             });
-            configuration.calendarEvents = [...remainingEvents, ...this.expandRecurringEvent(normalizedBaseEvent)]
+            const nextCalendarEvents = [...remainingEvents, ...this.expandRecurringEvent(normalizedBaseEvent)]
                 .sort((left, right) => this.compareCalendarEvents(left, right));
+            this.updateConfiguration({ calendarEvents: nextCalendarEvents });
             return normalizedBaseEvent;
         }
 
@@ -918,7 +919,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (remainingEvents.length === configuration.calendarEvents.length) {
                 return false;
             }
-            configuration.calendarEvents = remainingEvents;
+            this.updateConfiguration({ calendarEvents: remainingEvents });
             return true;
         }
 
