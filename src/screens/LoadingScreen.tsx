@@ -35,7 +35,6 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
     const [progress, setProgress] = useState(0);
     const [animatedMarkedCount, setAnimatedMarkedCount] = useState(0);
     const seenPromiseKeysRef = useRef<Set<string>>(new Set());
-    const hasObservedPromiseActivityRef = useRef(false);
 
     const bgQueueRef = useRef<string[]>([]);
     const bgQueueIndexRef = useRef(0);
@@ -70,10 +69,6 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
             const currentPromiseKeys = Object.keys(loadPromises || {});
             const currentPromiseKeySet = new Set(currentPromiseKeys);
 
-            if (currentPromiseKeys.length > 0) {
-                hasObservedPromiseActivityRef.current = true;
-            }
-
             currentPromiseKeys.forEach((key) => {
                 seenPromiseKeysRef.current.add(key);
             });
@@ -87,7 +82,10 @@ export const LoadingScreen: FC<LoadingScreenProps> = ({ stage, setScreenType }) 
 
             setProgress(Math.min((nextCompletedPromiseCount / normalizedAnticipatedPromiseCount) * 100, 100));
 
-            if (currentPromiseKeys.length === 0 && hasObservedPromiseActivityRef.current) {
+            // generationPromiseStartCount is monotonic, so it stays truthy even if all activity
+            // finished before this interval had a chance to observe the (now-deleted) promise keys.
+            const hasStartedLoading = currentStage.generationPromiseStartCount > 0;
+            if (currentPromiseKeys.length === 0 && hasStartedLoading) {
                 console.log('Done loading');
                 currentStage.saveGame();
                 setScreenType(currentStage.getCurrentSkit() ? ScreenType.SKIT : ScreenType.MAP);

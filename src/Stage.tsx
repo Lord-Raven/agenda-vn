@@ -269,7 +269,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     saveData: ChatStateType;
     primaryUser: User;
     primaryCharacter: Character;
-    generationPromises: {[key: string]: Promise<any|void>} = {};
+    // Monotonically incremented whenever a key is added to generationPromises, and never reset.
+    // Lets observers (e.g. LoadingScreen) reliably detect that loading activity occurred even if
+    // the interval polling generationPromises' keys never catches it while a key is present (e.g.
+    // when the activity starts and finishes entirely within a single microtask flush).
+    generationPromiseStartCount: number = 0;
+    generationPromises: {[key: string]: Promise<any|void>} = new Proxy({}, {
+        set: (target: {[key: string]: Promise<any|void>}, prop: string, value: Promise<any|void>) => {
+            target[prop] = value;
+            this.generationPromiseStartCount++;
+            return true;
+        },
+    });
     anticipatedLoadingPromiseCount: number = 4;
     isOwner: boolean = false;
 
