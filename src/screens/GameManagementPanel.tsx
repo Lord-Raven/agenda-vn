@@ -89,7 +89,6 @@ const clampStatValue = (value: number, stat: Stat): number => {
 export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => {
     const stageInstance = stage();
     const configuration = stageInstance.getConfiguration();
-    const defaultBackgroundImageUrl = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
 
     const [title, setTitle] = useState<string>(() => configuration.title || '');
     const [titleImageUrl, setTitleImageUrl] = useState<string>(() => configuration.titleImageUrl || '');
@@ -550,12 +549,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         />
                         {!backgroundImageUrl && (
                             <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 6 }}>
-                                Falls back to the existing default background image until you set one.
-                            </div>
-                        )}
-                        {backgroundImageUrl && backgroundImageUrl.trim() === defaultBackgroundImageUrl && (
-                            <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 6 }}>
-                                This matches the current built-in background image.
+                                Uses a soft gradient from the current theme until you set an image.
                             </div>
                         )}
                     </div>

@@ -15,8 +15,6 @@ export interface CreatorNotesHtmlProps {
     slideshowLocationIds?: string[];
 }
 
-const defaultBackgroundImageUrl = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
-
 const escapeHtml = (value: string) => {
     return value
         .replace(/&/g, '&amp;')
@@ -67,7 +65,7 @@ export const buildCreatorNotesHtml = ({
         .filter(Boolean)
         .slice(Math.floor(locationCount / 2), Math.floor((locationCount / 2) * 2));
     const resolvedLocationImages = (images: string[], fallbackIndex: number) => {
-        const base = images.length > 0 ? images : [backgroundImageUrl || titleImageUrl || defaultBackgroundImageUrl];
+        const base = images.length > 0 ? images : [backgroundImageUrl || titleImageUrl].filter(Boolean);
         return Array.from({ length: 3 }, (_, index) => base[(index + fallbackIndex) % base.length] || base[0]).filter(Boolean);
     };
     const slideIntervalSeconds = 5;

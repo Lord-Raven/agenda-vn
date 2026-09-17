@@ -20,7 +20,6 @@ interface MapScreenProps {
     isVerticalLayout: boolean;
 }
 
-const DEFAULT_BACKGROUND_IMAGE_URL = "https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png";
 const UNCATEGORIZED_LABEL = "Uncategorized";
 
 const normalizeCategory = (category?: string) => {
@@ -35,8 +34,11 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
     const [showContentManagement, setShowContentManagement] = useState(false);
 
     const stageInstance = stage();
-    const configuredBackgroundImageUrl = (stageInstance.getConfiguration().backgroundImageUrl || "").trim() || DEFAULT_BACKGROUND_IMAGE_URL;
+    const configuredBackgroundImageUrl = (stageInstance.getConfiguration().backgroundImageUrl || "").trim();
     const cachedBackgroundImageUrl = useCachedImageUrl(configuredBackgroundImageUrl);
+    const screenBackgroundImage = cachedBackgroundImageUrl
+        ? `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${cachedBackgroundImageUrl})`
+        : "radial-gradient(900px 560px at 18% 12%, color-mix(in srgb, var(--agenda-accent-primary) 22%, transparent), transparent 62%), radial-gradient(840px 520px at 82% 88%, color-mix(in srgb, var(--agenda-highlight) 18%, transparent), transparent 64%), linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%)";
     const save = stageInstance.getSave();
     const currentTimeOfDay = save.currentTimeOfDay || "morning";
     const activeMaps = useMemo(
@@ -129,7 +131,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                     flexDirection: "column",
                     gap: 1.5,
                     overflow: "hidden",
-                    backgroundImage: `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${cachedBackgroundImageUrl || ''})`,
+                    backgroundImage: screenBackgroundImage,
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                     backgroundRepeat: "no-repeat",

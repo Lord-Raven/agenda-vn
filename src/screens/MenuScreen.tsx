@@ -16,8 +16,6 @@ interface MenuScreenProps {
     setScreenType: (type: ScreenType) => void;
 }
 
-const DEFAULT_BACKGROUND_IMAGE_URL = 'https://avatars.charhub.io/avatars/uploads/images/gallery/file/5c990a43-3e56-455f-ba19-ba487eec4972/1a9f6a36-676f-4dc1-85ae-29bf7a97e538.png';
-
 export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     const [hoveredButton, setHoveredButton] = useState<string | null>(null);
     const [showSettings, setShowSettings] = useState(false);
@@ -29,7 +27,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     const [saveLoadMode, setSaveLoadMode] = React.useState<'save' | 'load'>('save');
     const configuredTitle = stage().getConfiguration().title || 'Agenda VN';
     const configuredTitleImageUrl = (stage().getConfiguration().titleImageUrl || '').trim();
-    const configuredBackgroundImageUrl = (stage().getConfiguration().backgroundImageUrl || '').trim() || DEFAULT_BACKGROUND_IMAGE_URL;
+    const configuredBackgroundImageUrl = (stage().getConfiguration().backgroundImageUrl || '').trim();
 
     // Check if a save exists (if there are any actors or the layout has been modified)
     const saveExists = () => {
@@ -154,8 +152,8 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
 
     return (
         <BlurredBackground
-            imageUrl={configuredBackgroundImageUrl}
-            overlay="linear-gradient(142deg, var(--agenda-atmoshere-start) 0%, var(--agenda-atmoshere-mid) 52%, var(--agenda-atmoshere-end) 100%)"
+            imageUrl={configuredBackgroundImageUrl || undefined}
+            overlay="radial-gradient(900px 560px at 18% 12%, color-mix(in srgb, var(--agenda-accent-primary) 22%, transparent), transparent 62%), radial-gradient(840px 520px at 82% 88%, color-mix(in srgb, var(--agenda-highlight) 18%, transparent), transparent 64%), linear-gradient(142deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 52%, var(--agenda-atmosphere-end) 100%)"
         >
             <Box 
                 sx={{

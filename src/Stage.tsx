@@ -745,23 +745,28 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .filter(actor => actor.id !== newSave.playerId)
             .slice(0, 1)
             .map(actor => actor.id);
+        const hasIntroSkitContent = Boolean(defaultLocationId) && defaultInitialActors.length > 0;
 
-        const introSkit = new Skit({
-            initialLocationId: generatedIntroSeed?.locationId || defaultLocationId,
-            guidance: generatedIntroSeed?.guidance || `${this.getPlayerActor()?.name || 'The player'} is briefly introduced to the concept of the world or setting.`,
-            script: [],
-            initialActors: generatedIntroSeed?.initialActorIds?.length ? generatedIntroSeed.initialActorIds : defaultInitialActors,
-            summary: ''
-        });
+        if (hasIntroSkitContent) {
+            const introSkit = new Skit({
+                initialLocationId: generatedIntroSeed?.locationId || defaultLocationId,
+                guidance: generatedIntroSeed?.guidance || `${this.getPlayerActor()?.name || 'The player'} is briefly introduced to the concept of the world or setting.`,
+                script: [],
+                initialActors: generatedIntroSeed?.initialActorIds?.length ? generatedIntroSeed.initialActorIds : defaultInitialActors,
+                summary: ''
+            });
+
+            // Push intro to timeline to start the game:
+            newSave.timeline.push({
+                calendarEventId: undefined,
+                date: newSave.currentDate || this.getStartingDate(newSave),
+                skit: introSkit
+            });
+        } else {
+            console.log('Skipping intro skit for blank or underpopulated new game');
+        }
 
         delete this.generationPromises['newGame']; // Clear the dummy promise to allow the loading screen to finish.
-
-        // Push intro to timeline to start the game:
-        newSave.timeline.push({
-            calendarEventId: undefined,
-            date: newSave.currentDate || this.getStartingDate(newSave),
-            skit: introSkit
-        });
 
         this.rebuildUpcomingEvents(newSave);
 
@@ -2381,7 +2386,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const locations = Object.values(save.atlas || {});
         const availableActors = Object.values(save.actors || {}).filter(actor => actor.id !== save.playerId);
 
-        if (!locations.length) {
+        if (!locations.length || !availableActors.length) {
             return null;
         }
 
