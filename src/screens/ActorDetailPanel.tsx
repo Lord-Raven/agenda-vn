@@ -424,6 +424,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const isDeactivatingRef = useRef(false);
     const didMountRef = useRef(false);
+    const isMountedRef = useRef(true);
 
     const cloneOutfits = (outfits: Outfit[]) => outfits.map((outfit) => ({
         ...outfit,
@@ -761,6 +762,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
     useEffect(() => {
         return () => {
+            isMountedRef.current = false;
             if (autoSaveTimeoutRef.current && !isDeactivatingRef.current) {
                 persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current, editedPerActorStatMapRef.current, editedPerActorValueRulesRef.current);
             }
@@ -810,6 +812,49 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const replaceOutfits = (nextOutfits: Outfit[]) => {
         setEditedOutfits(nextOutfits);
         actor.outfits = cloneOutfits(nextOutfits);
+    };
+
+    const persistGeneratedEmotionImage = (outfitId: string, emotion: Emotion, imageUrl: string) => {
+        const generatedOutfit = actor.outfits.find((outfit) => outfit.id === outfitId);
+        const storedActor = isCreatorMode
+            ? (stage().getConfiguration().actors || []).find((candidate) => candidate.id === actor.id)
+            : stage().getSave().actors[actor.id];
+
+        if (!generatedOutfit || !storedActor) {
+            return;
+        }
+
+        const nextOutfits = cloneOutfits(storedActor.outfits).map((outfit) => (
+            outfit.id === outfitId
+                ? {
+                    ...outfit,
+                    prompts: {
+                        ...(outfit.prompts || {}),
+                        [emotion]: generatedOutfit.prompts?.[emotion] || '',
+                    },
+                    emotionPack: {
+                        ...(outfit.emotionPack || {}),
+                        [emotion]: imageUrl,
+                    },
+                }
+                : outfit
+        ));
+
+        if (isCreatorMode) {
+            stage().updateConfiguration({
+                actors: (stage().getConfiguration().actors || []).map((candidate) => (
+                    candidate.id === actor.id ? new Actor({ ...candidate, outfits: nextOutfits }) : candidate
+                )),
+            });
+        } else {
+            storedActor.outfits = nextOutfits;
+            stage().saveGame();
+        }
+
+        if (isMountedRef.current) {
+            setEditedOutfits(cloneOutfits(nextOutfits));
+            editedOutfitsRef.current = cloneOutfits(nextOutfits);
+        }
     };
 
     const updateEmotionPrompt = (emotion: Emotion, prompt: string): string => {
@@ -1484,10 +1529,14 @@ ${indent}}`;
                 
                 try {
                     console.log('Regenerating emotion image with prompt:', getEmotionPrompt(emotion));
-                    await generateEmotionImage(actor, emotion, stage(), true, selectedOutfitId);
-                    syncEditedOutfitsFromActor();
-                    // Force a re-render to show the new image
-                    forceUpdate({});
+                    const imageUrl = await generateEmotionImage(actor, emotion, stage(), true, selectedOutfitId);
+                    if (!imageUrl) {
+                        throw new Error(`Failed to generate image for ${emotion}`);
+                    }
+                    persistGeneratedEmotionImage(selectedOutfitId, emotion, imageUrl);
+                    if (isMountedRef.current) {
+                        forceUpdate({});
+                    }
                 } catch (error) {
                     console.error(`Failed to regenerate ${emotion} emotion:`, error);
                     stage().showPriorityMessage(`Failed to regenerate ${emotion} emotion. Check console for details.`);
@@ -1749,10 +1798,15 @@ ${indent}}`;
                         }
                     }
 
-                    await generateEmotionImage(actor, emotion, stage(), true, selectedOutfitId);
+                    const imageUrl = await generateEmotionImage(actor, emotion, stage(), true, selectedOutfitId);
+                    if (!imageUrl) {
+                        throw new Error(`Failed to generate image for ${emotion}`);
+                    }
+                    persistGeneratedEmotionImage(selectedOutfitId, emotion, imageUrl);
                     generatedCount += 1;
-                    syncEditedOutfitsFromActor();
-                    forceUpdate({});
+                    if (isMountedRef.current) {
+                        forceUpdate({});
+                    }
                 } catch (error) {
                     failedCount += 1;
                     console.error(`Failed to fill ${emotion} emotion image:`, error);
