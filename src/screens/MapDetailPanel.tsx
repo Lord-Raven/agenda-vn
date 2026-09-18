@@ -8,6 +8,7 @@ import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
+import { ConditionCollection } from '../content/Condition';
 import { getLocationName } from '../content/Location';
 
 interface MapDetailPanelProps {
@@ -20,7 +21,7 @@ interface MapDetailPanelProps {
 
 const clampCoordinate = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 
-type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages'> & { focalX: number; focalY: number };
+type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages'> & { focalX: number; focalY: number; availabilityConditions: ConditionCollection[] };
 
 const createMapDraft = (map: GameMap): MapDraft => ({
     name: map.name,
@@ -30,6 +31,7 @@ const createMapDraft = (map: GameMap): MapDraft => ({
     imagePrompt: map.imagePrompt,
     imageUrl: map.imageUrl,
     alternativeImages: map.alternativeImages?.map(createAlternativeImage) || [],
+    availabilityConditions: (map.availabilityConditions || []).map((collection) => [...collection]),
     focalX: map.focalPoint?.x ?? 0.5,
     focalY: map.focalPoint?.y ?? 0.5,
 });
@@ -112,6 +114,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         persistedMap.imagePrompt = nextDraft.imagePrompt;
         persistedMap.imageUrl = nextDraft.imageUrl;
         persistedMap.alternativeImages = nextDraft.alternativeImages.map(createAlternativeImage);
+        persistedMap.availabilityConditions = nextDraft.availabilityConditions.map((collection) => [...collection]);
         persistedMap.focalPoint = { x: clampCoordinate(nextDraft.focalX), y: clampCoordinate(nextDraft.focalY) };
 
         const nextPriority = Number.isFinite(nextDraft.priority) ? nextDraft.priority : 0;
@@ -388,6 +391,16 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                 Description
                 <TextArea fullWidth rows={3} value={draft.description} onChange={event => updateDraft('description', event.target.value)} />
             </label>
+
+            <section>
+                <h2 style={{ fontSize: '1rem', margin: 0 }}>Availability</h2>
+                <ConditionEditor
+                    conditionCollections={draft.availabilityConditions}
+                    globalStats={stageInstance.getConfiguration().globalStats || []}
+                    actors={Object.values(save.actors || {})}
+                    onChange={(availabilityConditions) => updateDraft('availabilityConditions', availabilityConditions)}
+                />
+            </section>
 
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>

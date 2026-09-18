@@ -178,6 +178,7 @@ const cloneLocation = (location: Location, stripImagePrompts: boolean = false): 
 const cloneMap = (map: GameMap): GameMap => new GameMap({
     ...map,
     focalPoint: map.focalPoint ? { ...map.focalPoint } : undefined,
+    availabilityConditions: (map.availabilityConditions || []).map((collection) => [...collection]),
     links: (map.links || []).map((link) => ({
         ...link,
         coordinates: { ...link.coordinates },

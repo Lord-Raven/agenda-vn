@@ -1356,6 +1356,7 @@ ${indent}}`;
             }
 
             console.log(selectedFields);
+            console.log(distilledActor);
             if (selectedFields.name) {
                 actor.name = distilledActor.name || actor.name;
                 actor.displayName = distilledActor.displayName || distilledActor.name || actor.name;

@@ -2,7 +2,7 @@ import { CSSProperties, FC, Fragment, ReactNode, useEffect, useLayoutEffect, use
 import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
-import { getMapImageUrl, Map as GameMap } from '../content/Map';
+import { getMapImageUrl, isMapAvailable, Map as GameMap } from '../content/Map';
 import { getLocationImageUrl, getLocationName } from '../content/Location';
 import { getCurrentLocation } from '../content/Skit';
 import { Stage } from '../Stage';
@@ -103,7 +103,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
     const [mapViewportSize, setMapViewportSize] = useState({ width: 0, height: 0 });
     const [mapImageSize, setMapImageSize] = useState({ width: 0, height: 0 });
     const save = stage().getSave();
-    const sortedMaps = useMemo(() => [...maps].sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name)), [maps]);
+    const sortedMaps = useMemo(() => [...maps]
+        .filter(map => isMapAvailable(map, stage().getScheduleContext(save)))
+        .sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name)), [maps, save]);
 
     const latestLocationId = useMemo(() => {
         for (let index = save.timeline.length - 1; index >= 0; index -= 1) {

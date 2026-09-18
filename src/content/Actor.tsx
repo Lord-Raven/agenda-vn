@@ -547,7 +547,6 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
                 parsedData['color'] :
                 ['#788ebdff', '#d3aa68ff', '#75c275ff', '#c28891ff', '#55bbb2ff'][Math.floor(Math.random() * 5)];
 
-        const oldName = actor.name;
         // Fill in actor, but favor any current settings:
         actor.name = parsedData['name'] || actor.name || '';
         actor.displayName = actor.name;

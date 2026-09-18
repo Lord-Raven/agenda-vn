@@ -1,5 +1,5 @@
 import { v4 as generateUuid } from 'uuid';
-import { ConditionCollection } from './Condition';
+import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import type { Stage } from '../Stage';
 import { AlternativeImage, createAlternativeImage, getMatchingAlternativeImage } from './AlternativeImage';
 import { buildPrompt } from '../utils/PromptBuilder.js';
@@ -20,6 +20,9 @@ export function getMapImageUrl(map: Map | undefined, stage?: Stage): string {
     }
     return getMatchingAlternativeImage(map.alternativeImages, stage?.getSave())?.imageUrl || map.imageUrl || '';
 }
+
+export const isMapAvailable = (map: Map, context: ConditionContext): boolean =>
+    map.active !== false && evaluateConditionCollections(map.availabilityConditions, context);
 
 async function getDataUrl(imageUrl: string): Promise<string> {
     if (imageUrl.startsWith('/assets/')) {
@@ -141,12 +144,14 @@ export class Map {
     imageUrl: string = ''; // URL for the map image
     alternativeImages: AlternativeImage[] = [];
     focalPoint: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Focus within the editor's 16:9 preview space, used when the runtime viewport crops the image
+    availabilityConditions: ConditionCollection[] = [];
     links: MapLink[] = []; // Links to other maps or locations
 
     constructor(data?: Partial<Map>) {
         Object.assign(this, data || {});
         this.alternativeImages = (data?.alternativeImages || []).map(createAlternativeImage);
         this.focalPoint = { x: data?.focalPoint?.x ?? 0.5, y: data?.focalPoint?.y ?? 0.5 };
+        this.availabilityConditions = (data?.availabilityConditions || []).map((collection) => [...collection]);
         this.links = (data?.links || []).map((link) => ({
             ...link,
             parentId: data?.id || this.id,
