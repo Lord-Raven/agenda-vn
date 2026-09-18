@@ -1,7 +1,7 @@
 import React, { FC, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
-import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart } from '@mui/icons-material';
+import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2 } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorManagementPanel } from './ActorManagementPanel';
 import { LocationManagementPanel } from './LocationManagementPanel';
@@ -11,13 +11,14 @@ import { GameManagementPanel } from './GameManagementPanel';
 import { CalendarEventManagementPanel } from './CalendarEventManagementPanel';
 import { MapManagementPanel } from './MapManagementPanel';
 import { StatManagementPanel } from './StatManagementPanel';
+import { ItemManagementPanel } from './ItemManagementPanel';
 
 interface ContentManagementScreenProps {
     stage: () => Stage;
     onClose: () => void;
 }
 
-type TabType = 'game' | 'style' | 'stats' | 'lorebook' | 'actors' | 'locations' | 'maps' | 'calendarEvents';
+type TabType = 'game' | 'style' | 'stats' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
@@ -42,6 +43,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
     // Get all locations from the save atlas
     const locations = Object.values(stage().getSave().atlas || {})
         .filter(location => location.active !== false)
+        .sort(sortByName);
+
+    const items = (stage().getSave().inventory || [])
+        .filter(item => item.active !== false)
         .sort(sortByName);
 
     return (
@@ -232,6 +237,14 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     Maps ({(isCreatorMode ? stage().getConfiguration().maps : stage().getSave().maps)?.filter(map => map.active !== false).length || 0})
                                 </Button>
                                 <Button
+                                    onClick={() => setActiveTab('items')}
+                                    variant={activeTab === 'items' ? 'primary' : 'secondary'}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: activeTab === 'items' ? 1 : 0.6 }}
+                                >
+                                    <Inventory2 />
+                                    Items ({(isCreatorMode ? stage().getConfiguration().items : items).filter(item => item.active !== false).length})
+                                </Button>
+                                <Button
                                     onClick={() => setActiveTab('calendarEvents')}
                                     variant={activeTab === 'calendarEvents' ? 'primary' : 'secondary'}
                                     style={{
@@ -283,6 +296,11 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 {/* Locations Tab */}
                                 {activeTab === 'locations' && (
                                     <LocationManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
+                                )}
+
+                                {/* Items Tab */}
+                                {activeTab === 'items' && (
+                                    <ItemManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 
                                 {/* Maps Tab */}

@@ -1,7 +1,7 @@
 import { FC, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
-import { Stat, StatValue, StatUpdate, StatUpdateRule, isNumericDisplayType } from '../content/Stat';
+import { Stat, StatFunctionParameter, StatValue, StatUpdate, StatUpdateRule, isNumericDisplayType } from '../content/Stat';
 import { Condition, ConditionCollection } from '../content/Condition';
 import { Stage } from '../Stage';
 import { Button } from './UiComponents';
@@ -9,14 +9,20 @@ import { ConditionEditor, buildActorTargetOptions } from './ConditionEditor';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { StatValueInput } from './StatValueInput';
 import { LocationLike } from './LocationPortrait';
+import { ItemLike } from './ItemPortrait';
 
 interface StatUpdateRuleEditorProps {
     rules: StatUpdateRule[];
     globalStats: Stat[];
     actorStats: Stat[];
     actors: Array<{ id: string; name: string }>;
+    items?: ItemLike[];
     locations: LocationLike[];
     stage?: Stage | (() => Stage);
+    // When provided, editing occurs within a function stat's own rules (Stat.functionRules): actor-target
+    // pickers offer actor-typed parameters (via `param:<id>`), conditions can use them, and each update's value
+    // can be sourced from a scalar-typed parameter instead of a literal (see StatUpdate.valueParameterId).
+    functionParameters?: StatFunctionParameter[];
     onChange: (rules: StatUpdateRule[]) => void;
 }
 
@@ -87,11 +93,13 @@ const describeUpdate = (update: StatUpdate, stat: Stat | undefined): string => {
     return `${stat.name} ${verb} ${update.value}`;
 };
 
-export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, globalStats: globalStats, actorStats, actors, locations, stage, onChange }) => {
+export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, globalStats: globalStats, actorStats, actors, items = [], locations, stage, functionParameters = [], onChange }) => {
     const [collapsedRules, setCollapsedRules] = useState<Record<string, boolean>>({});
     // perActor stats have no single target here, so they cannot be written by a rule.
     const updatableActorStats = actorStats.filter(stat => !stat.perActor);
-    const actorTargetOptions = buildActorTargetOptions(actors, false).filter(option => option.key !== 'none');
+    const actorTargetOptions = buildActorTargetOptions(actors, false, functionParameters).filter(option => option.key !== 'none');
+    // Only scalar (non-actor) parameters can source a stat update's value; actor parameters are targeted via actorId.
+    const scalarFunctionParameters = functionParameters.filter(parameter => parameter.type !== 'actor');
 
     const createUpdate = (): StatUpdate => ({
         id: generateUuid(),
@@ -156,7 +164,9 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                     globalStats={globalStats}
                                     actorStats={actorStats}
                                     actors={actors}
+                                    items={items}
                                     locations={locations}
+                                    functionParameters={functionParameters}
                                     onChange={(conditions: ConditionCollection[]) => updateRule(rule.id, { conditions })}
                                 />
                                 {rule.conditions.length === 0 && (
@@ -168,7 +178,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                     const stat = resolveUpdateStat(update);
                                     const availableStats = statsForUpdate(update);
                                     return (
-                                        <div key={update.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 110px) minmax(120px, 1.2fr) minmax(120px, 1.3fr) minmax(100px, 110px) minmax(100px, 1fr) auto', gap: 8, alignItems: 'center', minWidth: 0 }}>
+                                        <div key={update.id} style={{ display: 'grid', gridTemplateColumns: `minmax(90px, 110px) minmax(120px, 1.2fr) minmax(120px, 1.3fr) minmax(100px, 110px)${scalarFunctionParameters.length > 0 ? ' minmax(110px, 140px)' : ''} minmax(100px, 1fr) auto`, gap: 8, alignItems: 'center', minWidth: 0 }}>
                                             <select
                                                 style={selectStyle}
                                                 value={update.targetType}
@@ -209,14 +219,32 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                                     <option value="set">Set to</option>
                                                 </select>
                                             ) : <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Set to</span>}
-                                            <StatValueInput
-                                                stat={stat}
-                                                value={update.value}
-                                                onChange={(value: StatValue) => updateStatUpdate(rule.id, update.id, { value })}
-                                                locations={locations}
-                                                stage={stage}
-                                                allowExpression
-                                            />
+                                            {scalarFunctionParameters.length > 0 && (
+                                                <select
+                                                    style={selectStyle}
+                                                    value={update.valueParameterId || ''}
+                                                    onChange={(event) => updateStatUpdate(rule.id, update.id, { valueParameterId: event.target.value || undefined })}
+                                                >
+                                                    <option value="">Literal value</option>
+                                                    {scalarFunctionParameters.map(parameter => <option key={parameter.id} value={parameter.id}>Param: {parameter.name || 'Unnamed'}</option>)}
+                                                </select>
+                                            )}
+                                            {update.valueParameterId ? (
+                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                                    Uses parameter value
+                                                </span>
+                                            ) : (
+                                                <StatValueInput
+                                                    stat={stat}
+                                                    value={update.value}
+                                                    onChange={(value: StatValue) => updateStatUpdate(rule.id, update.id, { value })}
+                                                    actors={actors}
+                                                    items={items}
+                                                    locations={locations}
+                                                    stage={stage}
+                                                    allowExpression
+                                                />
+                                            )}
                                             <Button
                                                 variant="danger"
                                                 onClick={() => updateRule(rule.id, { updates: rule.updates.filter(current => current.id !== update.id) })}

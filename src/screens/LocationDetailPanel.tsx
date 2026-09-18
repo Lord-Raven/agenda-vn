@@ -18,7 +18,8 @@ import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, LocationSe
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from '../components/ConditionEditor';
-import { getStatOptionValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
+import { getStatOptionValue, isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, resolveStatDefault } from '../content/Stat';
+import { StatValueInput } from '../components/StatValueInput';
 
 type LocationAvailabilityState = 'unavailable' | 'disabled';
 
@@ -138,6 +139,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
 
     const locationOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().locations || [] : Object.values(stage().getSave().atlas || {}))
         .filter((candidate) => candidate.active !== false), [stage]);
+    const actorOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {}))
+        .filter((candidate) => candidate.active !== false), [stage, isCreatorMode]);
+    const itemOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().items || [] : stage().getSave().inventory || [])
+        .filter((candidate) => candidate.active !== false), [stage, isCreatorMode]);
 
     const [editedLocation, setEditedLocation] = useState<{
         name: string;
@@ -307,7 +312,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         setEditedStatMap((prev) => {
             const next = createInitialLocationStatMap(location, locationStats);
             locationStats.forEach((stat) => {
-                if (stat.type === 'location' || stat.type === 'checkbox') {
+                if (isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || stat.type === 'checkbox') {
                     return;
                 }
                 const previousValue = Number(prev[stat.id]);
@@ -381,10 +386,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         }));
     };
 
-    const handleLocationStatLocationChange = (stat: Stat, locationId: string) => {
+    const handleLocationStatReferenceChange = (stat: Stat, value: StatValue) => {
         setEditedStatMap((prev) => ({
             ...prev,
-            [stat.id]: locationId,
+            [stat.id]: normalizeStatValue(value, stat),
         }));
     };
 
@@ -784,7 +789,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                 <ConditionEditor
                                     conditionCollections={editedLocation.availabilityCollections}
                                     globalStats={stage().getConfiguration().globalStats || []}
+                                    actorStats={stage().getConfiguration().actorStats || []}
                                     actors={Object.values(stage().getSave().actors || {})}
+                                    items={itemOptions}
+                                    locations={locationOptions}
                                     onChange={(availabilityCollections) => setEditedLocation(current => ({ ...current, availabilityCollections }))}
                                     collectionCategories={LOCATION_AVAILABILITY_STATE_OPTIONS}
                                     collectionCategoryValues={editedLocation.availabilityStates}
@@ -868,14 +876,18 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                             </label>
                                                         )}
 
-                                                        {stat.type === 'location' && (
-                                                            <LocationSelect
-                                                                value={typeof editedStatMap[stat.id] === 'string' ? String(editedStatMap[stat.id]) : ''}
-                                                                onChange={(locationId) => handleLocationStatLocationChange(stat, locationId)}
-                                                                locations={locationOptions}
-                                                                stage={stage}
-                                                                style={{ maxWidth: '220px' }}
-                                                            />
+                                                        {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) && (
+                                                            <div style={{ maxWidth: '220px', width: '100%' }}>
+                                                                <StatValueInput
+                                                                    stat={stat}
+                                                                    value={editedStatMap[stat.id]}
+                                                                    onChange={(value) => handleLocationStatReferenceChange(stat, value)}
+                                                                    actors={actorOptions}
+                                                                    items={itemOptions}
+                                                                    locations={locationOptions}
+                                                                    stage={stage}
+                                                                />
+                                                            </div>
                                                         )}
 
                                                         {stat.type === 'number' && stat.displayType === 'rating' && (
@@ -1223,7 +1235,10 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                                 <ConditionEditor
                                                                     conditionCollections={alternative.conditionCollections}
                                                                     globalStats={stage().getConfiguration().globalStats || []}
+                                                                    actorStats={stage().getConfiguration().actorStats || []}
                                                                     actors={Object.values(stage().getSave().actors || {})}
+                                                                    items={itemOptions}
+                                                                    locations={locationOptions}
                                                                     onChange={(conditionCollections) => updateAlternative(index, { conditionCollections })}
                                                                 />
                                                             </div>

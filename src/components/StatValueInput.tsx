@@ -1,20 +1,23 @@
 import { FC } from 'react';
-import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, isNumericDisplayType } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, isReferenceListDisplayType, resolveReferenceKind, Stat, StatValue, isNumericDisplayType } from '../content/Stat';
 import { Stage } from '../Stage';
-import { LocationMultiSelect, LocationSelect, TextInput } from './UiComponents';
+import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
+import { ItemLike } from './ItemPortrait';
 
 interface StatValueInputProps {
     stat?: Stat;
     value: StatValue;
     onChange: (value: StatValue) => void;
+    actors?: ActorLike[];
+    items?: ItemLike[];
     locations?: LocationLike[];
     stage?: Stage | (() => Stage);
     // When true, numeric stats accept dice/relative expressions (e.g. "1d6+1", "-2") instead of a plain number.
     allowExpression?: boolean;
 }
 
-export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, locations = [], stage, allowExpression = false }) => {
+export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false }) => {
     if (!stat) {
         return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
     }
@@ -44,22 +47,28 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
         return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
     }
 
-    if (stat.type === 'location') {
+    const referenceKind = resolveReferenceKind(stat.type);
+    if (referenceKind) {
+        if (isReferenceListDisplayType(stat.type)) {
+            return (
+                <ReferenceMultiSelect
+                    kind={referenceKind}
+                    values={Array.isArray(value) ? value : []}
+                    onChange={(ids) => onChange(ids)}
+                    actors={actors}
+                    items={items}
+                    locations={locations}
+                    stage={stage}
+                />
+            );
+        }
         return (
-            <LocationSelect
+            <ReferenceSelect
+                kind={referenceKind}
                 value={typeof value === 'string' ? value : ''}
-                onChange={(locationId) => onChange(locationId)}
-                locations={locations}
-                stage={stage}
-            />
-        );
-    }
-
-    if (stat.type === 'locationList') {
-        return (
-            <LocationMultiSelect
-                values={Array.isArray(value) ? value : []}
-                onChange={(locationIds) => onChange(locationIds)}
+                onChange={(id) => onChange(id)}
+                actors={actors}
+                items={items}
                 locations={locations}
                 stage={stage}
             />

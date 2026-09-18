@@ -8,13 +8,26 @@ import React, { FC, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Actor } from '../content/Actor';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HourglassTop, HourglassBottom, Place } from '@mui/icons-material';
+import { HourglassTop, HourglassBottom, Inventory2, Person, Place } from '@mui/icons-material';
 import { Box, lighten, Chip as MuiChip, Popover, Typography } from '@mui/material';
 import { useTooltip } from './TooltipContext';
 import { LocationPortrait, LocationLike } from './LocationPortrait';
+import { ActorPortrait } from './ActorPortrait';
+import { ItemLike, ItemPortrait } from './ItemPortrait';
 import { PickerOption, SearchableOptionPicker } from './SearchableOptionPicker';
 import { Stage } from '../Stage';
+import { ReferenceKind } from '../content/Stat';
 import { getFontSizeMultiplier } from '@lord-raven/novel-visualizer';
+
+export type ActorLike = Pick<Actor, 'id' | 'name'> & Partial<Pick<Actor, 'category' | 'outfitId' | 'outfits' | 'themeColor'>>;
+
+const toPortraitActor = (actor: ActorLike): Pick<Actor, 'id' | 'name' | 'outfitId' | 'outfits' | 'themeColor'> => ({
+	id: actor.id,
+	name: actor.name,
+	outfitId: actor.outfitId || '',
+	outfits: actor.outfits || [],
+	themeColor: actor.themeColor || '',
+});
 
 /* ===============================================
    PANEL COMPONENTS (Using MUI Paper with custom styling)
@@ -576,6 +589,236 @@ export const LocationMultiSelect: FC<LocationMultiSelectProps> = ({
 			/>
 		</div>
 	);
+};
+
+interface ActorSelectProps {
+	value: string;
+	onChange: (actorId: string) => void;
+	actors: ActorLike[];
+	stage?: Stage | (() => Stage);
+	allowClear?: boolean;
+	emptyLabel?: string;
+	title?: string;
+	style?: React.CSSProperties;
+}
+
+export const ActorSelect: FC<ActorSelectProps> = ({
+	value,
+	onChange,
+	actors,
+	stage,
+	allowClear = true,
+	emptyLabel = 'No actor',
+	title = 'Choose actor',
+	style,
+}) => {
+	const sortedActors = [...actors].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+	const isMissing = Boolean(value) && !sortedActors.some((actor) => actor.id === value);
+	const options: PickerOption[] = sortedActors.map((actor) => ({
+		key: actor.id,
+		label: actor.name || 'Unnamed actor',
+		category: actor.category?.trim() || 'Uncategorized',
+		renderAvatar: (size) => <ActorPortrait actor={toPortraitActor(actor)} stage={stage} size={size} />,
+	}));
+	if (isMissing) {
+		options.push({ key: value, label: 'Unknown actor', icon: Person });
+	}
+
+	return (
+		<div style={{ width: '100%', ...style }}>
+			<SearchableOptionPicker
+				value={value || undefined}
+				onChange={(nextValue) => onChange((Array.isArray(nextValue) ? nextValue[0] : nextValue) || '')}
+				options={options}
+				allowClear={allowClear}
+				emptyLabel={emptyLabel}
+				title={title}
+				placeholder="Search actors"
+			/>
+		</div>
+	);
+};
+
+interface ActorMultiSelectProps {
+	values: string[];
+	onChange: (actorIds: string[]) => void;
+	actors: ActorLike[];
+	stage?: Stage | (() => Stage);
+	emptyLabel?: string;
+	title?: string;
+	style?: React.CSSProperties;
+}
+
+export const ActorMultiSelect: FC<ActorMultiSelectProps> = ({
+	values,
+	onChange,
+	actors,
+	stage,
+	emptyLabel = 'No actors',
+	title = 'Choose actors',
+	style,
+}) => {
+	const sortedActors = [...actors].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+	const missingIds = values.filter((id) => id && !sortedActors.some((actor) => actor.id === id));
+	const options: PickerOption[] = sortedActors.map((actor) => ({
+		key: actor.id,
+		label: actor.name || 'Unnamed actor',
+		category: actor.category?.trim() || 'Uncategorized',
+		renderAvatar: (size) => <ActorPortrait actor={toPortraitActor(actor)} stage={stage} size={size} />,
+	}));
+	missingIds.forEach((id) => options.push({ key: id, label: 'Unknown actor', icon: Person }));
+
+	return (
+		<div style={{ width: '100%', ...style }}>
+			<SearchableOptionPicker
+				multiple
+				values={values}
+				onChange={(nextValue) => onChange(Array.isArray(nextValue) ? nextValue : (nextValue ? [nextValue] : []))}
+				options={options}
+				emptyLabel={emptyLabel}
+				title={title}
+				placeholder="Search actors"
+			/>
+		</div>
+	);
+};
+
+interface ItemSelectProps {
+	value: string;
+	onChange: (itemId: string) => void;
+	items: ItemLike[];
+	stage?: Stage | (() => Stage);
+	allowClear?: boolean;
+	emptyLabel?: string;
+	title?: string;
+	style?: React.CSSProperties;
+}
+
+export const ItemSelect: FC<ItemSelectProps> = ({
+	value,
+	onChange,
+	items,
+	stage,
+	allowClear = true,
+	emptyLabel = 'No item',
+	title = 'Choose item',
+	style,
+}) => {
+	const sortedItems = [...items].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+	const isMissing = Boolean(value) && !sortedItems.some((item) => item.id === value);
+	const options: PickerOption[] = sortedItems.map((item) => ({
+		key: item.id,
+		label: item.name || 'Unnamed item',
+		category: item.category?.trim() || 'Uncategorized',
+		renderAvatar: (size, active) => <ItemPortrait item={item} stage={stage} width={size} height={size} highlighted={active} />,
+	}));
+	if (isMissing) {
+		options.push({ key: value, label: 'Unknown item', icon: Inventory2 });
+	}
+
+	return (
+		<div style={{ width: '100%', ...style }}>
+			<SearchableOptionPicker
+				value={value || undefined}
+				onChange={(nextValue) => onChange((Array.isArray(nextValue) ? nextValue[0] : nextValue) || '')}
+				options={options}
+				allowClear={allowClear}
+				emptyLabel={emptyLabel}
+				title={title}
+				placeholder="Search items"
+			/>
+		</div>
+	);
+};
+
+interface ItemMultiSelectProps {
+	values: string[];
+	onChange: (itemIds: string[]) => void;
+	items: ItemLike[];
+	stage?: Stage | (() => Stage);
+	emptyLabel?: string;
+	title?: string;
+	style?: React.CSSProperties;
+}
+
+export const ItemMultiSelect: FC<ItemMultiSelectProps> = ({
+	values,
+	onChange,
+	items,
+	stage,
+	emptyLabel = 'No items',
+	title = 'Choose items',
+	style,
+}) => {
+	const sortedItems = [...items].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+	const missingIds = values.filter((id) => id && !sortedItems.some((item) => item.id === id));
+	const options: PickerOption[] = sortedItems.map((item) => ({
+		key: item.id,
+		label: item.name || 'Unnamed item',
+		category: item.category?.trim() || 'Uncategorized',
+		renderAvatar: (size, active) => <ItemPortrait item={item} stage={stage} width={size} height={size} highlighted={active} />,
+	}));
+	missingIds.forEach((id) => options.push({ key: id, label: 'Unknown item', icon: Inventory2 }));
+
+	return (
+		<div style={{ width: '100%', ...style }}>
+			<SearchableOptionPicker
+				multiple
+				values={values}
+				onChange={(nextValue) => onChange(Array.isArray(nextValue) ? nextValue : (nextValue ? [nextValue] : []))}
+				options={options}
+				emptyLabel={emptyLabel}
+				title={title}
+				placeholder="Search items"
+			/>
+		</div>
+	);
+};
+
+interface ReferenceSelectProps {
+	kind: ReferenceKind;
+	value: string;
+	onChange: (id: string) => void;
+	actors?: ActorLike[];
+	items?: ItemLike[];
+	locations?: LocationLike[];
+	stage?: Stage | (() => Stage);
+	allowClear?: boolean;
+	style?: React.CSSProperties;
+}
+
+// Dispatches to the Actor/Item/Location Select for a given ReferenceKind, so callers that only know a stat's
+// reference kind (see resolveReferenceKind) don't need their own actor/item/location branch.
+export const ReferenceSelect: FC<ReferenceSelectProps> = ({ kind, value, onChange, actors = [], items = [], locations = [], stage, allowClear, style }) => {
+	if (kind === 'actor') {
+		return <ActorSelect value={value} onChange={onChange} actors={actors} stage={stage} allowClear={allowClear} style={style} />;
+	}
+	if (kind === 'item') {
+		return <ItemSelect value={value} onChange={onChange} items={items} stage={stage} allowClear={allowClear} style={style} />;
+	}
+	return <LocationSelect value={value} onChange={onChange} locations={locations} stage={stage} allowClear={allowClear} style={style} />;
+};
+
+interface ReferenceMultiSelectProps {
+	kind: ReferenceKind;
+	values: string[];
+	onChange: (ids: string[]) => void;
+	actors?: ActorLike[];
+	items?: ItemLike[];
+	locations?: LocationLike[];
+	stage?: Stage | (() => Stage);
+	style?: React.CSSProperties;
+}
+
+// MultiSelect counterpart to ReferenceSelect (see resolveReferenceListDisplayType-style list stats).
+export const ReferenceMultiSelect: FC<ReferenceMultiSelectProps> = ({ kind, values, onChange, actors = [], items = [], locations = [], stage, style }) => {
+	if (kind === 'actor') {
+		return <ActorMultiSelect values={values} onChange={onChange} actors={actors} stage={stage} style={style} />;
+	}
+	if (kind === 'item') {
+		return <ItemMultiSelect values={values} onChange={onChange} items={items} stage={stage} style={style} />;
+	}
+	return <LocationMultiSelect values={values} onChange={onChange} locations={locations} stage={stage} style={style} />;
 };
 
 interface ColorPickerInputProps {

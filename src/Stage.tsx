@@ -4,7 +4,7 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { findStatOptionByValue, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeLocationListValue, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
+import { findStatOptionByValue, formatReferenceStatText, isFunctionStatType, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, Skit } from "./content/Skit";
@@ -130,12 +130,14 @@ export type GameConfiguration = {
     
     actors: Actor[], // All defined actors for a new game
     locations: Location[], // All defined locations for a new game
+    items: Item[], // All defined items for a new game
     maps: GameMap[], // All defined maps for a new game
     universalSchedule: ActorSchedule, // Universal schedule for all actors (applies to current and new games)
     lorebook: Lore[], // Lore entries to seed into new games
     calendarEvents: CalendarEvent[], // Calendar event series definitions to seed into new games
     actorStats: Stat[], // All custom actor stats and defaults (applies to current and new games)
     locationStats: Stat[], // All custom location stats and defaults (applies to current and new games)
+    itemStats: Stat[], // All custom item stats and defaults (applies to current and new games)
     globalStats: Stat[], // Stats that apply to the game in general (player or world state)
     globalStatValues: {[key: string]: StatValue}, // Selected/default values for global stats
     statUpdateRules: StatUpdateRule[], // Recurring stat changes applied as in-game time advances
@@ -173,6 +175,18 @@ const cloneLocation = (location: Location, stripImagePrompts: boolean = false): 
     })),
     focalPoint: location.focalPoint ? { ...location.focalPoint } : undefined,
     statMap: location.statMap && typeof location.statMap === 'object' ? { ...location.statMap } : {},
+});
+
+const cloneItem = (item: Item, stripImagePrompts: boolean = false): Item => new Item({
+    ...item,
+    imagePrompt: stripImagePrompts ? '' : item.imagePrompt,
+    alternativeImages: (item.alternativeImages || []).map(alternative => ({
+        ...alternative,
+        imagePrompt: stripImagePrompts ? '' : alternative.imagePrompt,
+        conditionCollections: (alternative.conditionCollections || []).map(collection => [...collection]),
+    })),
+    availabilityConditions: (item.availabilityConditions || []).map((collection) => [...collection]),
+    statMap: item.statMap && typeof item.statMap === 'object' ? { ...item.statMap } : {},
 });
 
 const cloneMap = (map: GameMap): GameMap => new GameMap({
@@ -226,10 +240,12 @@ export type PortableGameConfiguration = {
     startingDate: string;
     actorStats: Stat[];
     locationStats: Stat[];
+    itemStats: Stat[];
     globalStats: Stat[];
     globalStatValues: { [key: string]: StatValue };
     actors: Actor[];
     locations: Location[];
+    items: Item[];
     maps: GameMap[];
     lorebook: Lore[];
     calendarEvents: CalendarEvent[];
@@ -250,10 +266,12 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     startingDate: input.startingDate,
     actorStats: (input.actorStats || []).map(cloneStat),
     locationStats: (input.locationStats || []).map(cloneStat),
+    itemStats: (input.itemStats || []).map(cloneStat),
     globalStats: (input.globalStats || []).map(cloneStat),
     globalStatValues: { ...(input.globalStatValues || {}) },
     actors: (input.actors || []).map(actor => cloneActor(actor)),
     locations: (input.locations || []).map(location => cloneLocation(location)),
+    items: (input.items || []).map(item => cloneItem(item)),
     maps: (input.maps || []).map(cloneMap),
     lorebook: (input.lorebook || []).map(cloneLore),
     calendarEvents: (input.calendarEvents || []).map(cloneCalendarEvent),
@@ -323,12 +341,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return {
             actors: [],
             locations: [],
+            items: [],
             maps: [],
             universalSchedule: {},
             lorebook: [],
             calendarEvents: [],
             actorStats: [],
             locationStats: [],
+            itemStats: [],
             globalStats: [],
             globalStatValues: {},
             statUpdateRules: [],
@@ -370,12 +390,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 ...defaultConfiguration,
                 actors: [],
                 locations: [],
+                items: [],
                 maps: (activeSave?.maps || []).map(cloneMap),
                 universalSchedule: cloneActorSchedule(activeSave?.universalSchedule),
                 lorebook: (activeSave?.lorebook || []).map(cloneLore),
                 calendarEvents: [],
                 actorStats: (this.getConfiguration()?.actorStats || []).map(cloneStat),
                 locationStats: (this.getConfiguration()?.locationStats || []).map(cloneStat),
+                itemStats: (this.getConfiguration()?.itemStats || []).map(cloneStat),
                 globalStats: (this.getConfiguration()?.globalStats || []).map(cloneStat),
                 globalStatValues: { ...(activeSave?.globalStatValues || {}) },
                 statUpdateRules: cloneStatUpdateRules(this.getConfiguration()?.statUpdateRules),
@@ -391,12 +413,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const configuration = this.saveData.configuration;
         configuration.actors = (configuration.actors || defaultConfiguration.actors).map(actor => actor instanceof Actor ? actor : cloneActor(actor));
         configuration.locations = (configuration.locations || defaultConfiguration.locations).map(location => location instanceof Location ? location : cloneLocation(location));
+        configuration.items = (configuration.items || defaultConfiguration.items).map(item => item instanceof Item ? item : cloneItem(item));
         configuration.maps = (configuration.maps || defaultConfiguration.maps).map(map => map instanceof GameMap ? map : cloneMap(map));
         configuration.universalSchedule = configuration.universalSchedule || defaultConfiguration.universalSchedule;
         configuration.lorebook = configuration.lorebook || defaultConfiguration.lorebook;
         configuration.calendarEvents = configuration.calendarEvents || defaultConfiguration.calendarEvents;
         configuration.actorStats = configuration.actorStats || defaultConfiguration.actorStats;
         configuration.locationStats = configuration.locationStats || defaultConfiguration.locationStats;
+        configuration.itemStats = configuration.itemStats || defaultConfiguration.itemStats;
         configuration.globalStats = configuration.globalStats || defaultConfiguration.globalStats;
         configuration.globalStatValues = configuration.globalStatValues || defaultConfiguration.globalStatValues;
         configuration.statUpdateRules = configuration.statUpdateRules || defaultConfiguration.statUpdateRules;
@@ -445,6 +469,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             ...updates,
             actors: (updates.actors ?? current.actors).map(actor => actor instanceof Actor ? actor : cloneActor(actor)),
             locations: (updates.locations ?? current.locations).map(location => location instanceof Location ? location : cloneLocation(location)),
+            items: (updates.items ?? current.items).map(item => item instanceof Item ? item : cloneItem(item)),
             maps: (updates.maps ?? current.maps).map(map => map instanceof GameMap ? map : cloneMap(map)),
         };
 
@@ -458,6 +483,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             };
             this.syncActorStats(currentSave);
             this.syncLocationStats(currentSave);
+            this.syncItemStats(currentSave);
             this.syncGlobalStats(currentSave);
         }
         this.syncUniversalSchedule();
@@ -485,6 +511,23 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
         save.atlas[locationId] = cloneLocation(configuredLocation, true);
         this.syncLocationStats(save);
+        this.saveGame();
+        return true;
+    }
+
+    applyConfigurationItemToSave(itemId: string): boolean {
+        const configuredItem = (this.getConfiguration().items || []).find(item => item.id === itemId);
+        const save = this.getSave();
+        const index = (save.inventory || []).findIndex(item => item.id === itemId);
+        if (!configuredItem) {
+            return false;
+        }
+        if (index === -1) {
+            save.inventory = [...(save.inventory || []), cloneItem(configuredItem, true)];
+        } else {
+            save.inventory[index] = cloneItem(configuredItem, true);
+        }
+        this.syncItemStats(save);
         this.saveGame();
         return true;
     }
@@ -622,13 +665,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 atlas[seededLocation.id] = seededLocation;
             });
 
+        const inventory: Item[] = (configuration.items || [])
+            .filter(item => item?.active !== false)
+            .map(configuredItem => cloneItem(configuredItem, true));
+
         const draftSaveContext = {
             playerId: this.primaryUser.anonymizedId,
             actors,
             atlas,
             maps: (configuration.maps || []).filter(map => map.active !== false).map(cloneMap),
             universalSchedule: cloneActorSchedule(configuration.universalSchedule),
-            inventory: [],
+            inventory,
             timeline: [],
             timestamp: Date.now(),
         } as SaveType;
@@ -639,7 +686,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         // Resolve each global stat's starting value from its defaultValueRules (first match wins), falling
         // back to the configured value/default; used to seed a brand new save.
-        const configuredGlobalStats = (configuration.globalStats || []).filter(stat => stat?.name?.trim());
+        const configuredGlobalStats = (configuration.globalStats || []).filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
         const globalStatValues: { [key: string]: StatValue } = {};
         const globalStatContext: ConditionContext = {
             actors: Object.values(actors),
@@ -662,7 +709,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             atlas,
             maps: (configuration.maps || []).filter(map => map.active !== false).map(cloneMap),
             universalSchedule: cloneActorSchedule(configuration.universalSchedule),
-            inventory: [],
+            inventory: inventory.map(item => cloneItem(item, true)),
             timeline: [],
             timestamp: Date.now(),
             currentDate: startingDate,
@@ -716,6 +763,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         this.syncActorStats(newSave);
         this.syncLocationStats(newSave);
+        this.syncItemStats(newSave);
         this.syncGlobalStats(newSave);
 
         if (!newSave.currentDate && persistedConfiguration.startingDate) {
@@ -1654,7 +1702,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private syncActorStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().actorStats || [])
-            .filter(stat => stat?.name?.trim());
+            .filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
         const scalarStats = configuredStats.filter(stat => !stat.perActor);
         const perActorStats = configuredStats.filter(stat => stat.perActor);
         const statIds = new Set(scalarStats.map(stat => stat.id));
@@ -1708,7 +1756,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private syncLocationStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().locationStats || [])
-            .filter(stat => stat?.name?.trim());
+            .filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
         const statIds = new Set(configuredStats.map(stat => stat.id));
 
         Object.values(save.atlas || {}).forEach(location => {
@@ -1729,8 +1777,32 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         });
     }
 
+    private syncItemStats(save: SaveType) {
+        const configuredStats = (this.getConfiguration().itemStats || [])
+            .filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
+        const statIds = new Set(configuredStats.map(stat => stat.id));
+
+        save.inventory = (save.inventory || []).map(item => item instanceof Item ? item : cloneItem(item));
+        save.inventory.forEach(item => {
+            if (!item.statMap || typeof item.statMap !== 'object') {
+                item.statMap = {};
+            }
+
+            configuredStats.forEach(stat => {
+                const existingValue = item.statMap[stat.id];
+                item.statMap[stat.id] = normalizeStatValue(existingValue, stat);
+            });
+
+            Object.keys(item.statMap).forEach(statId => {
+                if (!statIds.has(statId)) {
+                    delete item.statMap[statId];
+                }
+            });
+        });
+    }
+
     private syncGlobalStats(save: SaveType) {
-        const configuredStats = (this.getConfiguration().globalStats || []).filter(stat => stat?.name?.trim());
+        const configuredStats = (this.getConfiguration().globalStats || []).filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
         const currentValues = save.globalStatValues && typeof save.globalStatValues === 'object'
             ? save.globalStatValues
             : {};
@@ -2158,9 +2230,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             const value = normalizeStatValue(save.globalStatValues?.[stat.id], stat);
             const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
-            const valueText = selectedOption?.option.name || (stat.type === 'location'
-                ? (save.atlas?.[String(value)]?.name || '')
-                : (typeof value === 'number' ? String(value) : value));
+            const valueText = selectedOption?.option.name || (resolveReferenceKind(stat.type)
+                ? formatReferenceStatText(stat, value, { actors: save.actors, items: save.inventory, locations: save.atlas })
+                : (typeof value === 'string' ? value : (typeof value === 'number' ? String(value) : value)));
 
             if (stat.type === 'option') {
                 const optionDescription = resolveStatText(selectedOption?.option.description, this).trim();
@@ -2573,10 +2645,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             startingDate: configuration.startingDate,
             actorStats: configuration.actorStats,
             locationStats: configuration.locationStats,
+            itemStats: configuration.itemStats,
             globalStats: configuration.globalStats,
             globalStatValues,
             actors: (configuration.actors || []).filter(actor => actor.active !== false),
             locations: (configuration.locations || []).filter(location => location.active !== false),
+            items: (configuration.items || []).filter(item => item.active !== false),
             maps: (configuration.maps || []).filter(map => map.active !== false),
             lorebook: configuration.lorebook || [],
             calendarEvents: configuration.calendarEvents || [],

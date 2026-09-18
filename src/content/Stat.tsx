@@ -32,21 +32,110 @@ export const resolveConditionalFlag = (flag: ConditionalFlag | undefined, contex
     return evaluateConditionCollections(flag.conditions, context) ? flag.value : !flag.value;
 };
 
-// 'location' stats hold a location ID (a key into the save's atlas) rather than a display value.
-// 'locationList' stats hold a set of location IDs (chosen via a multi-select picker) rather than a single value.
-export type StatType = 'number' | 'option' | 'text' | 'checkbox' | 'location' | 'locationList';
+// Reference stats hold content IDs rather than display values. List variants hold a set of IDs. 'function'
+// stats hold no value at all - they are a callable definition (parameters + rule set) invoked with concrete
+// argument values, rather than something read/written as a scalar. See StatFunctionParameter/functionRules.
+export type StatType = 'number' | 'option' | 'text' | 'checkbox' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'function';
 export type StatDisplayType = 'straight' | 'percentage' | 'bar' | 'rating' | 'letter grade';
 export type StatValue = number | string | boolean | string[];
 
 export const isNumericDisplayType = (type: StatType): boolean => type === 'number';
 
+export const isFunctionStatType = (type: StatType): boolean => type === 'function';
+
 export const isLocationDisplayType = (type: StatType): boolean => type === 'location';
 
 export const isLocationListDisplayType = (type: StatType): boolean => type === 'locationList';
 
-export const normalizeLocationListValue = (value: unknown): string[] => (
+export const isActorDisplayType = (type: StatType): boolean => type === 'actor';
+
+export const isActorListDisplayType = (type: StatType): boolean => type === 'actorList';
+
+export const isItemDisplayType = (type: StatType): boolean => type === 'item';
+
+export const isItemListDisplayType = (type: StatType): boolean => type === 'itemList';
+
+export const isReferenceDisplayType = (type: StatType): boolean => type === 'actor' || type === 'item' || type === 'location';
+
+export const isReferenceListDisplayType = (type: StatType): boolean => type === 'actorList' || type === 'itemList' || type === 'locationList';
+
+export const normalizeReferenceListValue = (value: unknown): string[] => (
     Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 );
+
+// The kind of content a reference stat (scalar or list) points to; shared by every place that needs to pick
+// per-kind behavior (which entity collection, which UI select component, which portrait, etc.) instead of
+// re-deriving it from a 6-way StatType comparison.
+export type ReferenceKind = 'actor' | 'item' | 'location';
+
+export const resolveReferenceKind = (type: StatType): ReferenceKind | undefined => {
+    if (type === 'actor' || type === 'actorList') {
+        return 'actor';
+    }
+    if (type === 'item' || type === 'itemList') {
+        return 'item';
+    }
+    if (type === 'location' || type === 'locationList') {
+        return 'location';
+    }
+    return undefined;
+};
+
+// Duck-typed collections used to resolve a reference id to its entity's display name; accepts either the
+// Record<id, entity> shape (Actor/Location saves) or a plain array (e.g. an Item inventory).
+export type ReferenceEntityLookup = {
+    actors?: Record<string, { name?: string }> | Array<{ id?: string; name?: string }>;
+    items?: Record<string, { name?: string }> | Array<{ id?: string; name?: string }>;
+    locations?: Record<string, { name?: string }> | Array<{ id?: string; name?: string }>;
+};
+
+const findEntityName = (collection: Record<string, { name?: string }> | Array<{ id?: string; name?: string }> | undefined, id: string): string | undefined => {
+    if (!collection || !id) {
+        return undefined;
+    }
+    return Array.isArray(collection) ? collection.find((entry) => entry?.id === id)?.name : collection[id]?.name;
+};
+
+// Resolves a reference stat's target id to its entity's display name via whichever collection matches the
+// stat's kind (see resolveReferenceKind); returns undefined (rather than a fallback) so callers can decide
+// what "not found" should look like.
+export const resolveReferenceEntityName = (type: StatType, id: string, lookup: ReferenceEntityLookup): string | undefined => {
+    const kind = resolveReferenceKind(type);
+    return kind ? findEntityName(lookup[`${kind}s` as keyof ReferenceEntityLookup], id) : undefined;
+};
+
+// Applies `resolveName` to the id(s) held by a reference-typed stat's value - a single id for scalar types,
+// every id (joined with ", ") for list types - so callers only need to supply how to turn one id into text.
+// Non-reference stats pass `value` through as plain text.
+export const mapReferenceStatValue = (
+    stat: { type: StatType },
+    value: StatValue,
+    resolveName: (kind: ReferenceKind, id: string) => string,
+): string => {
+    const kind = resolveReferenceKind(stat.type);
+    if (!kind) {
+        return typeof value === 'string' ? value : '';
+    }
+    if (isReferenceListDisplayType(stat.type)) {
+        return normalizeReferenceListValue(value).map((id) => resolveName(kind, id)).filter(Boolean).join(', ');
+    }
+    return resolveName(kind, String(value ?? ''));
+};
+
+// Convenience wrapper over mapReferenceStatValue + resolveReferenceEntityName for the common case of a plain
+// actors/items/locations lookup; `fallback` (literal or per-kind function) is used when an id isn't found.
+export const formatReferenceStatText = (
+    stat: { type: StatType },
+    value: StatValue,
+    lookup: ReferenceEntityLookup,
+    fallback: string | ((kind: ReferenceKind) => string) = '',
+): string => (
+    mapReferenceStatValue(stat, value, (kind, id) => (
+        resolveReferenceEntityName(stat.type, id, lookup) || (typeof fallback === 'function' ? fallback(kind) : fallback)
+    ))
+);
+
+export const normalizeLocationListValue = normalizeReferenceListValue;
 
 // Resolves the effective display style for a numeric stat, defaulting to a plain number.
 export const resolveStatDisplayType = (stat: Stat): StatDisplayType => (stat.type === 'number' ? (stat.displayType || 'straight') : 'straight');
@@ -151,6 +240,34 @@ export type StatValueRule = {
     conditions: ConditionCollection[];
 };
 
+// The type of a single named argument accepted by a 'function' stat. Deliberately a subset of StatType:
+// function parameters are always concrete inputs supplied by the caller at invocation time, so nesting
+// another function as a parameter type makes no sense.
+export type StatFunctionParameterType = 'number' | 'option' | 'text' | 'checkbox' | 'actor' | 'item' | 'location';
+
+// A single named input a 'function' stat's rules can reference (e.g. an Item's "onUse" function taking an
+// Actor parameter representing the target actor it was used on). Parameters are referenced from conditions
+// and stat updates via the `param:<parameterId>` convention on ActorConditionTarget/actor-target fields (for
+// 'actor' typed parameters) or the dedicated FunctionParameterCondition (for scalar-typed parameters), and
+// from StatUpdate.valueParameterId (to source a write's value from the parameter instead of a literal).
+export type StatFunctionParameter = {
+    id: string;
+    name: string;
+    description: string;
+    type: StatFunctionParameterType;
+    options?: StatOption[]; // only meaningful when type is 'option'
+};
+
+export const cloneStatFunctionParameter = (parameter: any): StatFunctionParameter => ({
+    id: parameter?.id || generateUuid(),
+    name: `${parameter?.name || ''}`,
+    description: `${parameter?.description || ''}`,
+    type: ['number', 'option', 'text', 'checkbox', 'actor', 'item', 'location'].includes(parameter?.type) ? parameter.type : 'actor',
+    options: Array.isArray(parameter?.options) ? parameter.options.map((option: any) => ({ id: option?.id, name: `${option?.name || ''}`, description: `${option?.description || ''}` })) : undefined,
+});
+
+export const cloneStatFunctionParameters = (parameters: unknown): StatFunctionParameter[] => (Array.isArray(parameters) ? parameters : []).map(cloneStatFunctionParameter);
+
 // Represents a custom stat that applies to all actors in the game.
 export type Stat = {
     id: string;
@@ -165,6 +282,15 @@ export type Stat = {
     // For global stats: rules used to resolve this stat's initial value when a new game starts, evaluated in
     // order (first matching wins); falls back to `default` if none match. See applyGlobalStatDefaults.
     defaultValueRules?: StatValueRule[];
+    // Only meaningful when type is 'function': the named inputs callers must supply when invoking this
+    // function (see StatFunctionParameter).
+    parameters?: StatFunctionParameter[];
+    // Only meaningful when type is 'function': the default rule set run on invocation, in order (all matching
+    // rules' updates are applied, unlike the "first match wins" StatValueRule flavors) - see StatUpdateRule.
+    // Conditions/updates within these rules may reference `parameters` via the `param:<parameterId>` actor
+    // target convention and StatUpdate.valueParameterId. Entities that own this stat (e.g. an Item) may
+    // override this default per-instance; see resolveFunctionRules.
+    functionRules?: StatUpdateRule[];
     llmSees: ConditionalFlag; // If true (the resolved value), this stat can be included in context provided to the LLM; if false, this stat is omitted from context (intended for purely mechanical use); if false, llmMaintained is also treated as false.
     llmMaintained: ConditionalFlag; // If true (the resolved value), this stat can be updated by the LLM in skit outcomes (see Skit.tsx).
     guidance: string; // Guidance for the LLM on how to handle this stat. If llmSees is false, the blank for editing this can be omitted from StatManagementPanel.
@@ -198,7 +324,9 @@ export const resolveStatText = (
 
 export const cloneStatValueRule = (rule: StatValueRule): StatValueRule => ({
     id: rule.id,
-    value: typeof rule.value === 'boolean' || typeof rule.value === 'number' || typeof rule.value === 'string' ? rule.value : 0,
+    value: Array.isArray(rule.value)
+        ? normalizeReferenceListValue(rule.value)
+        : (typeof rule.value === 'boolean' || typeof rule.value === 'number' || typeof rule.value === 'string' ? rule.value : 0),
     conditions: (rule.conditions || []).map((collection) => [...collection]),
 });
 
@@ -211,11 +339,13 @@ export const cloneStat = (stat: Stat): Stat => ({
     perActor: stat.perActor === true,
     perActorDefaultRules: cloneStatValueRules(stat.perActorDefaultRules),
     defaultValueRules: cloneStatValueRules(stat.defaultValueRules),
+    parameters: cloneStatFunctionParameters(stat.parameters),
+    functionRules: cloneStatUpdateRules(stat.functionRules),
     llmSees: cloneConditionalFlag(stat.llmSees, true),
     llmMaintained: cloneConditionalFlag(stat.llmMaintained, true),
     guidance: stat.guidance,
-    default: stat.type === 'locationList'
-        ? normalizeLocationListValue(stat.default)
+    default: isReferenceListDisplayType(stat.type)
+        ? normalizeReferenceListValue(stat.default)
         : (typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0))),
     type: stat.type,
     displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
@@ -240,6 +370,10 @@ export const isStatLlmMaintained = (stat: Stat, context: ConditionContext): bool
 );
 
 export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): StatValue => {
+    if (isFunctionStatType(stat.type)) {
+        return ''; // function stats are a callable definition, not a scalar value
+    }
+
     if (stat.type === 'option') {
         const defaultOption = findStatOptionByValue(stat, stat.default);
         if (defaultOption) {
@@ -248,11 +382,11 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
         return stat.options?.[0] ? resolveStatOptionId(stat.options[0], 0) : '';
     }
 
-    if (stat.type === 'locationList') {
-        return normalizeLocationListValue(stat.default);
+    if (isReferenceListDisplayType(stat.type)) {
+        return normalizeReferenceListValue(stat.default);
     }
 
-    if (stat.type === 'text' || stat.type === 'location') {
+    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
         return typeof stat.default === 'string' ? stat.default : '';
     }
 
@@ -268,6 +402,10 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
 };
 
 export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValueOptions = {}): StatValue => {
+    if (isFunctionStatType(stat.type)) {
+        return ''; // function stats are a callable definition, not a scalar value
+    }
+
     if (stat.type === 'option') {
         const selectedOption = findStatOptionByValue(stat, value);
         if (selectedOption) {
@@ -277,11 +415,11 @@ export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValu
         return typeof fallback === 'string' ? fallback : '';
     }
 
-    if (stat.type === 'locationList') {
-        return Array.isArray(value) ? normalizeLocationListValue(value) : normalizeLocationListValue(resolveStatDefault(stat, options));
+    if (isReferenceListDisplayType(stat.type)) {
+        return Array.isArray(value) ? normalizeReferenceListValue(value) : normalizeReferenceListValue(resolveStatDefault(stat, options));
     }
 
-    if (stat.type === 'text' || stat.type === 'location') {
+    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
         if (typeof value === 'string') {
             return value;
         }
@@ -341,10 +479,15 @@ export type StatUpdate = {
     id: string;
     targetType: StatUpdateTargetType;
     // Only meaningful for 'actor' updates: 'any' targets every active actor, otherwise a specific actor id.
+    // Within a function stat's rules, this may also be `param:<parameterId>` to target the actor supplied as
+    // that (actor-typed) function parameter - see StatFunctionParameter.
     actorId: ActorConditionTarget;
     statId: string;
     operation: StatUpdateOperation;
     value: StatValue;
+    // Only meaningful within a function stat's rules: when set, this update's written value is sourced from
+    // the named function parameter at invocation time instead of the literal `value` above.
+    valueParameterId?: string;
 };
 
 // A recurring "every <calendar condition> do these things" rule; conditions are the same ConditionCollections
@@ -361,7 +504,10 @@ export const cloneStatUpdate = (update: any): StatUpdate => ({
     actorId: `${update?.actorId || 'any'}`,
     statId: `${update?.statId || ''}`,
     operation: update?.operation === 'set' ? 'set' : 'adjust',
-    value: typeof update?.value === 'boolean' || typeof update?.value === 'number' || typeof update?.value === 'string' ? update.value : 0,
+    value: Array.isArray(update?.value)
+        ? normalizeReferenceListValue(update.value)
+        : (typeof update?.value === 'boolean' || typeof update?.value === 'number' || typeof update?.value === 'string' ? update.value : 0),
+    valueParameterId: update?.valueParameterId ? `${update.valueParameterId}` : undefined,
 });
 
 export const cloneStatUpdateRule = (rule: any): StatUpdateRule => ({
@@ -373,6 +519,27 @@ export const cloneStatUpdateRule = (rule: any): StatUpdateRule => ({
 });
 
 export const cloneStatUpdateRules = (rules: unknown): StatUpdateRule[] => (Array.isArray(rules) ? rules : []).map(cloneStatUpdateRule);
+
+// A per-instance override of a function stat's default rule set, keyed by the function stat's id (e.g.
+// Item.functionRuleOverrides['onUse-stat-id'] holds one item's own implementation of that item stat's
+// "onUse" function). Mirrors the ActorStat.perActor override pattern (see PerActorValueRuleMap).
+export type FunctionRuleOverrideMap = { [statId: string]: StatUpdateRule[] };
+
+export const cloneFunctionRuleOverrideMap = (map: unknown): FunctionRuleOverrideMap => {
+    const source = (map && typeof map === 'object') ? map as Record<string, unknown> : {};
+    const next: FunctionRuleOverrideMap = {};
+    for (const statId of Object.keys(source)) {
+        next[statId] = cloneStatUpdateRules(source[statId]);
+    }
+    return next;
+};
+
+// Resolves the effective rule set for invoking a function stat on a given entity instance: an explicit,
+// non-empty override on that instance takes precedence, otherwise the stat definition's own functionRules.
+export const resolveFunctionRules = (stat: Stat, overrides: FunctionRuleOverrideMap | undefined): StatUpdateRule[] => {
+    const override = overrides?.[stat.id];
+    return override && override.length > 0 ? override : (stat.functionRules || []);
+};
 
 // Resolves the value a stat update writes, given the target's current value. Numeric stats evaluate the
 // update's value as a dice/relative expression, so 'adjust' adds the rolled amount while 'set' replaces with

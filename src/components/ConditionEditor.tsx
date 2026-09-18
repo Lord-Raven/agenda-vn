@@ -1,19 +1,25 @@
 import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, LinkOffRounded, LinkRounded, PersonOffOutlined, SwapHoriz } from '@mui/icons-material';
-import { findStatOptionByValue, getStatOptionValue, Stat } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, isReferenceDisplayType, resolveReferenceKind, Stat, StatFunctionParameter } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
-import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
-import { Button, LocationSelect, TextInput } from './UiComponents';
+import { ActorConditionTarget, buildFunctionParameterTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
+import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationLike } from './LocationPortrait';
+import { ItemLike } from './ItemPortrait';
 
 interface ConditionEditorProps {
     conditionCollections: ConditionCollection[];
     globalStats: Stat[];
     actorStats?: Stat[];
-    actors?: Array<{ id: string; name: string; category?: string }>;
+    actors?: ActorLike[];
+    items?: ItemLike[];
     locations?: LocationLike[];
     allowVariableActorTarget?: boolean;
+    // When provided, adds a "Function Parameter" condition type (for non-actor typed parameters) and lets
+    // actor-target pickers (actorStat's actor, actorIdentity) target actor-typed parameters via `param:<id>`.
+    // Only meaningful while editing a function stat's own rules (Stat.functionRules).
+    functionParameters?: StatFunctionParameter[];
     onChange: (conditionCollections: ConditionCollection[]) => void;
     // When provided, renders a dropdown per condition collection (on its first row) letting the caller
     // tag each collection with an arbitrary category (e.g. which availability state it applies to).
@@ -67,7 +73,7 @@ const iconButtonStyle = {
 const getConditionRowTemplate = (condition: Condition, hasCollectionCategories: boolean) => {
     const parameterColumns = condition.type === 'actorStat'
         ? ['minmax(120px, 1fr)', 'minmax(120px, 1fr)']
-        : condition.type === 'calendar' || condition.type === 'globalStat'
+        : condition.type === 'calendar' || condition.type === 'globalStat' || condition.type === 'functionParameter'
             ? ['minmax(120px, 1fr)']
             : [];
     return [
@@ -93,18 +99,21 @@ const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
         const defaultOption = findStatOptionByValue(stat, stat.default);
         return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
     }
-    if (stat.type === 'location') {
+    if (isReferenceDisplayType(stat.type)) {
         return typeof stat.default === 'string' ? stat.default : '';
     }
     return typeof stat.default === 'number' ? stat.default : 0;
 };
 
-export const buildActorTargetOptions = (actors: Array<{ id: string; name: string; category?: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] }>, allowVariableActorTarget: boolean) => {
+export const buildActorTargetOptions = (actors: Array<{ id: string; name: string; category?: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] }>, allowVariableActorTarget: boolean, functionParameters: StatFunctionParameter[] = []) => {
     const options: Array<{ key: string; label: string; category?: string; icon?: typeof AllInclusive; imageUrl?: string }> = [];
     if (allowVariableActorTarget) {
         options.push({ key: 'variable', label: 'Variable', icon: SwapHoriz });
     }
     options.push({ key: 'any', label: 'Any', icon: AllInclusive }, { key: 'none', label: 'None', icon: PersonOffOutlined });
+    options.push(...functionParameters.filter((parameter) => parameter.type === 'actor').map((parameter) => (
+        { key: buildFunctionParameterTarget(parameter.id), label: `Param: ${parameter.name || 'Unnamed'}`, category: 'Function Parameters', icon: SwapHoriz }
+    )));
     options.push(...actors.map((actor) => {
         const portraitUrl = actor.imageUrl || (
             actor.outfits && actor.outfits.length > 0
@@ -116,10 +125,27 @@ export const buildActorTargetOptions = (actors: Array<{ id: string; name: string
     return options;
 };
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], actors = [], locations = [], allowVariableActorTarget = false, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true }) => {
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], actors = [], items = [], locations = [], allowVariableActorTarget = false, functionParameters = [], onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true }) => {
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
-    const actorTargetOptions = buildActorTargetOptions(actors, allowVariableActorTarget);
+    const actorTargetOptions = buildActorTargetOptions(actors, allowVariableActorTarget, functionParameters);
     const concreteActorOptions = actorTargetOptions.filter((option) => !['variable', 'any', 'none'].includes(option.key));
+    const scalarFunctionParameters = functionParameters.filter((parameter) => parameter.type !== 'actor');
+
+    const getDefaultParameterConditionValue = (parameter: StatFunctionParameter | undefined): string | number | boolean => {
+        if (!parameter) {
+            return 0;
+        }
+        if (parameter.type === 'checkbox') {
+            return false;
+        }
+        if (parameter.type === 'option') {
+            return parameter.options?.[0] ? getStatOptionValue(parameter.options[0], 0) : '';
+        }
+        if (parameter.type === 'text') {
+            return '';
+        }
+        return 0;
+    };
 
     const updateCondition = (collectionIndex: number, conditionIndex: number, condition: Condition) => {
         onChange(conditionCollections.map((collection, currentCollectionIndex) => currentCollectionIndex === collectionIndex
@@ -193,6 +219,24 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                 />
             );
         }
+        if (condition.type === 'functionParameter') {
+            const parameter = scalarFunctionParameters.find(candidate => candidate.id === condition.parameterId);
+            if (parameter?.type === 'option') {
+                const selectedOption = findStatOptionByValue({ type: 'option', options: parameter.options } as Stat, condition.value);
+                return <select style={selectStyle} value={selectedOption?.value || ''} onChange={(event) => updateValue(event.target.value)}>{(parameter.options || []).map((option, optionIndex) => {
+                    const optionValue = getStatOptionValue(option, optionIndex);
+                    return <option key={optionValue} value={optionValue}>{option.name}</option>;
+                })}</select>;
+            }
+            if (parameter?.type === 'checkbox') {
+                return <input type="checkbox" checked={Boolean(condition.value === true || condition.value === 'true')} onChange={(event) => updateValue(event.target.checked)} />;
+            }
+            return <TextInput type="text" value={condition.value as number | string} placeholder={parameter?.type === 'text' ? 'Text value' : 'e.g. 3 or 1d6+1'} onChange={(event) => {
+                const raw = event.target.value;
+                const numeric = Number(raw);
+                updateValue(raw.trim() !== '' && Number.isFinite(numeric) && parameter?.type !== 'text' ? numeric : raw);
+            }} />;
+        }
         if (condition.type === 'calendar' && condition.field === 'timeOfDay') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['morning', 'afternoon', 'evening', 'night'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
         }
@@ -210,8 +254,9 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (stat?.type === 'checkbox') {
             return <input type="checkbox" checked={Boolean(condition.value === true || condition.value === 'true')} onChange={(event) => updateValue(event.target.checked)} />;
         }
-        if (stat?.type === 'location') {
-            return <LocationSelect value={String(condition.value ?? '')} onChange={(locationId) => updateValue(locationId)} locations={locations} style={{ width: '100%', minWidth: 0 }} />;
+        const referenceKind = stat ? resolveReferenceKind(stat.type) : undefined;
+        if (referenceKind) {
+            return <ReferenceSelect kind={referenceKind} value={String(condition.value ?? '')} onChange={(id) => updateValue(id)} actors={actors} items={items} locations={locations} style={{ width: '100%', minWidth: 0 }} />;
         }
         return <TextInput type="text" value={condition.value as number | string} placeholder="e.g. 3 or 1d6+1" onChange={(event) => {
             const raw = event.target.value;
@@ -261,7 +306,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             style={selectStyle}
                             value={condition.type}
                             onChange={(event) => {
-                                const nextType = event.target.value as 'calendar' | 'globalStat' | 'actorStat' | 'actorIdentity';
+                                const nextType = event.target.value as 'calendar' | 'globalStat' | 'actorStat' | 'actorIdentity' | 'functionParameter';
                                 if (nextType === 'calendar') {
                                     updateCondition(collectionIndex, conditionIndex, { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' });
                                     return;
@@ -276,6 +321,11 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                     updateCondition(collectionIndex, conditionIndex, { type: 'actorIdentity', comparison: 'equals', value: concreteActorOptions[0]?.key || '' });
                                     return;
                                 }
+                                if (nextType === 'functionParameter') {
+                                    const parameter = scalarFunctionParameters[0];
+                                    updateCondition(collectionIndex, conditionIndex, { type: 'functionParameter', parameterId: parameter?.id || '', comparison: 'equals', value: getDefaultParameterConditionValue(parameter) });
+                                    return;
+                                }
                                 const actorStat = actorStats[0];
                                 updateCondition(collectionIndex, conditionIndex, { type: 'actorStat', actorId: target, statId: actorStat?.id || '', comparison: 'equals', value: getDefaultConditionValue(actorStat) });
                             }}
@@ -284,6 +334,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             <option value="globalStat">Global Stat</option>
                             <option value="actorStat">Actor Stat</option>
                             {allowVariableActorTarget && <option value="actorIdentity">Actor Identity</option>}
+                            {scalarFunctionParameters.length > 0 && <option value="functionParameter">Function Parameter</option>}
                         </select>
                         {condition.type === 'calendar' ? (
                             <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 })}>
@@ -309,6 +360,14 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                 updateCondition(collectionIndex, conditionIndex, { ...condition, statId: event.target.value, value: getDefaultConditionValue(stat) } as Condition);
                             }}>
                                 {(condition.type === 'globalStat' ? globalStats : actorStats).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
+                            </select>
+                        )}
+                        {condition.type === 'functionParameter' && (
+                            <select style={selectStyle} value={condition.parameterId} onChange={(event) => {
+                                const parameter = scalarFunctionParameters.find(candidate => candidate.id === event.target.value);
+                                updateCondition(collectionIndex, conditionIndex, { ...condition, parameterId: event.target.value, value: getDefaultParameterConditionValue(parameter) } as Condition);
+                            }}>
+                                {scalarFunctionParameters.map(parameter => <option key={parameter.id} value={parameter.id}>{parameter.name || 'Unnamed'}</option>)}
                             </select>
                         )}
                         {condition.type === 'calendar' && (

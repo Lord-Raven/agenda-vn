@@ -2,7 +2,7 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { findStatOptionByValue, getStatOptionValue, isNumericDisplayType, Stat, StatValue, StatValueRule, normalizeLocationListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, Stat, StatValue, StatValueRule, normalizeReferenceListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ACTOR_VOICES, ACTOR_VOICE_GENDER_LABELS, ActorVoice, formatActorVoiceLabel, getActorVoice, getActorVoiceVolume, normalizeVoiceModulation, VoiceModulation } from '../content/ActorVoice';
@@ -12,7 +12,7 @@ import { ConditionContext } from '../content/Condition';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add, Female, Male, Transgender, RecordVoiceOver } from '@mui/icons-material';
 import { PickerOption, SearchableOptionPicker } from '../components/SearchableOptionPicker';
-import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, LocationMultiSelect, LocationSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { StatRating } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
@@ -171,11 +171,11 @@ const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: st
 };
 
 const normalizeActorStatModifierAmount = (stat: Stat, amount: unknown): StatValue => {
-    if (stat.type === 'text' || stat.type === 'location' || stat.type === 'option') {
+    if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
         return typeof amount === 'string' ? amount : String(resolveStatDefault(stat));
     }
-    if (stat.type === 'locationList') {
-        return Array.isArray(amount) ? normalizeLocationListValue(amount) : normalizeLocationListValue(resolveStatDefault(stat));
+    if (isReferenceListDisplayType(stat.type)) {
+        return Array.isArray(amount) ? normalizeReferenceListValue(amount) : normalizeReferenceListValue(resolveStatDefault(stat));
     }
     if (stat.type === 'checkbox') {
         return typeof amount === 'boolean' ? amount : Boolean(resolveStatDefault(stat));
@@ -228,6 +228,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
     const locationOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().locations || [] : Object.values(stage().getSave().atlas || {}))
         .filter((location) => location.active !== false), [stage]);
+    const actorOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {}))
+        .filter((candidate) => candidate.active !== false), [stage, isCreatorMode]);
+    const itemOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().items || [] : stage().getSave().inventory || [])
+        .filter((candidate) => candidate.active !== false), [stage, isCreatorMode]);
 
     const perActorStats = useMemo(() => {
         const configured = stage().getConfiguration().actorStats || [];
@@ -912,17 +916,17 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }));
             return;
         }
-        if (stat.type === 'text' || stat.type === 'location' || stat.type === 'option') {
+        if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
             setEditedStatMap((prev) => ({
                 ...prev,
                 [stat.id]: typeof value === 'string' ? value : String(value),
             }));
             return;
         }
-        if (stat.type === 'locationList') {
+        if (isReferenceListDisplayType(stat.type)) {
             setEditedStatMap((prev) => ({
                 ...prev,
-                [stat.id]: Array.isArray(value) ? normalizeLocationListValue(value) : [],
+                [stat.id]: Array.isArray(value) ? normalizeReferenceListValue(value) : [],
             }));
             return;
         }
@@ -941,17 +945,17 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }));
             return;
         }
-        if (stat.type === 'text' || stat.type === 'location' || stat.type === 'option') {
+        if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
                 [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: typeof value === 'string' ? value : String(value) },
             }));
             return;
         }
-        if (stat.type === 'locationList') {
+        if (isReferenceListDisplayType(stat.type)) {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
-                [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: Array.isArray(value) ? normalizeLocationListValue(value) : [] },
+                [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: Array.isArray(value) ? normalizeReferenceListValue(value) : [] },
             }));
             return;
         }
@@ -1105,21 +1109,14 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         if (stat.type === 'text') {
             return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
         }
-        if (stat.type === 'location') {
+        if (isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) {
             return (
-                <LocationSelect
-                    value={typeof value === 'string' ? value : ''}
-                    onChange={(locationId) => onChange(locationId)}
-                    locations={locationOptions}
-                    stage={stage}
-                />
-            );
-        }
-        if (stat.type === 'locationList') {
-            return (
-                <LocationMultiSelect
-                    values={Array.isArray(value) ? value : []}
-                    onChange={(locationIds) => onChange(locationIds)}
+                <StatValueInput
+                    stat={stat}
+                    value={value}
+                    onChange={onChange}
+                    actors={actorOptions}
+                    items={itemOptions}
                     locations={locationOptions}
                     stage={stage}
                 />
@@ -2268,24 +2265,18 @@ ${indent}}`;
                                                                 />
                                                             )}
 
-                                                            {stat.type === 'location' && (
-                                                                <LocationSelect
-                                                                    value={typeof editorValue === 'string' ? String(editorValue) : ''}
-                                                                    onChange={(locationId) => handleActorStatEditorValueChange(stat, locationId)}
-                                                                    locations={locationOptions}
-                                                                    stage={stage}
-                                                                    style={{ maxWidth: '220px' }}
-                                                                />
-                                                            )}
-
-                                                            {stat.type === 'locationList' && (
-                                                                <LocationMultiSelect
-                                                                    values={Array.isArray(editorValue) ? editorValue : []}
-                                                                    onChange={(locationIds) => handleActorStatEditorValueChange(stat, locationIds)}
-                                                                    locations={locationOptions}
-                                                                    stage={stage}
-                                                                    style={{ maxWidth: '220px' }}
-                                                                />
+                                                            {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) && (
+                                                                <div style={{ maxWidth: '220px', width: '100%' }}>
+                                                                    <StatValueInput
+                                                                        stat={stat}
+                                                                        value={editorValue}
+                                                                        onChange={(nextValue) => handleActorStatEditorValueChange(stat, nextValue)}
+                                                                        actors={actorOptions}
+                                                                        items={itemOptions}
+                                                                        locations={locationOptions}
+                                                                        stage={stage}
+                                                                    />
+                                                                </div>
                                                             )}
 
                                                             {stat.type === 'number' && stat.displayType === 'rating' && (
@@ -2373,7 +2364,7 @@ ${indent}}`;
                                                                     </div>
                                                                 )}
 
-                                                                {isCreatorMode && (isNumericDisplayType(stat.type) || stat.type === 'text' || stat.type === 'location' || stat.type === 'locationList') && (
+                                                                {isCreatorMode && (isNumericDisplayType(stat.type) || stat.type === 'text' || isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) && (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                                     <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
                                                                         Default Modifiers
@@ -2402,6 +2393,8 @@ ${indent}}`;
                                                                                         stat={stat}
                                                                                         value={modifier.amount}
                                                                                         onChange={(nextValue) => updateActorStatModifierAmount(stat, modifier.id, nextValue)}
+                                                                                        actors={actorOptions}
+                                                                                        items={itemOptions}
                                                                                         locations={locationOptions}
                                                                                         stage={stage}
                                                                                     />
@@ -2418,7 +2411,9 @@ ${indent}}`;
                                                                             <ConditionEditor
                                                                                 conditionCollections={modifier.conditions}
                                                                                 globalStats={[...actorStats, ...(stage().getConfiguration().globalStats || [])]}
+                                                                                actorStats={actorStats}
                                                                                 actors={Object.values(stage().getSave().actors || {})}
+                                                                                items={itemOptions}
                                                                                 locations={locationOptions}
                                                                                 onChange={(conditions) => updateActorStatModifierConditions(stat, modifier.id, conditions)}
                                                                             />
@@ -2554,6 +2549,7 @@ ${indent}}`;
                                                                             globalStats={[...actorStats, ...(stage().getConfiguration().globalStats || [])]}
                                                                             actorStats={actorStats}
                                                                             actors={Object.values(stage().getSave().actors || {})}
+                                                                            items={itemOptions}
                                                                             locations={locationOptions}
                                                                             allowVariableActorTarget
                                                                             onChange={(conditions) => updatePerActorValueRule(stat, rule.id, { conditions })}

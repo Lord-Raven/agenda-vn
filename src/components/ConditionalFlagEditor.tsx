@@ -4,6 +4,7 @@ import { Stat } from '../content/Stat';
 import { ConditionalFlag } from '../content/Stat';
 import { ConditionEditor } from './ConditionEditor';
 import { LocationLike } from './LocationPortrait';
+import { ItemLike } from './ItemPortrait';
 import { Button } from './UiComponents';
 import { useTooltip } from './TooltipContext';
 
@@ -16,6 +17,7 @@ interface ConditionalFlagEditorProps {
     globalStats: Stat[];
     actorStats?: Stat[];
     actors?: Array<{ id: string; name: string; category?: string }>;
+    items?: ItemLike[];
     locations?: LocationLike[];
     allowVariableActorTarget?: boolean;
     fieldLabelStyle?: React.CSSProperties;
@@ -33,6 +35,7 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
     globalStats,
     actorStats = [],
     actors = [],
+    items = [],
     locations = [],
     allowVariableActorTarget = false,
     fieldLabelStyle,
@@ -73,6 +76,7 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
                     globalStats={globalStats}
                     actorStats={actorStats}
                     actors={actors}
+                    items={items}
                     locations={locations}
                     allowVariableActorTarget={allowVariableActorTarget}
                     onChange={(conditions) => onChange({ ...flag, conditions })}

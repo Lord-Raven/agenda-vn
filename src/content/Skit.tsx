@@ -14,7 +14,7 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
-import { findStatOptionByValue, isStatLlmMaintained, isStatLlmSeen, normalizeStatValue } from './Stat';
+import { findStatOptionByValue, isStatLlmMaintained, isStatLlmSeen, mapReferenceStatValue, normalizeStatValue, StatType, StatValue } from './Stat';
 import { build } from "vite";
 
 const getDayDifference = (startDate: string, endDate: string): number => {
@@ -25,6 +25,22 @@ const getDayDifference = (startDate: string, endDate: string): number => {
     }
     return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
 };
+
+const getActorName = (actorId: string, stage: Stage): string => stage.getSave().actors?.[actorId]?.name || '';
+
+const getItemName = (itemId: string, stage: Stage): string => (stage.getSave().inventory || []).find(item => item.id === itemId)?.name || '';
+
+const formatReferenceStatValue = (stat: { type: StatType }, value: unknown, stage: Stage): string => (
+    mapReferenceStatValue(stat, value as StatValue, (kind, id) => {
+        if (kind === 'actor') {
+            return getActorName(id, stage);
+        }
+        if (kind === 'item') {
+            return getItemName(id, stage);
+        }
+        return getLocationName(id, stage);
+    })
+);
 
 // Date should be timezone agnostic here.
 export const formatDateLabel = (currentDate?: string): string => {
@@ -233,9 +249,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
         const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
-        const valueText = selectedOption?.option.name || (stat.type === 'location'
-            ? getLocationName(String(value), stage)
-            : (typeof value === 'number' ? String(value) : String(value || '')));
+        const valueText = selectedOption?.option.name || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
             return '';
         }
@@ -263,9 +277,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
         const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
-        const valueText = selectedOption?.option.name || (stat.type === 'location'
-            ? getLocationName(String(value), stage)
-            : (typeof value === 'number' ? String(value) : String(value || '')));
+        const valueText = selectedOption?.option.name || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
             return '';
         }

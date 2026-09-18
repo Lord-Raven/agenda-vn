@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { Stage, buildPortableGameConfiguration } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
-import { findStatOptionByValue, getStatOptionValue, Stat, StatType, StatValue, cloneStat, isNumericDisplayType, normalizeLocationListValue } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, Stat, StatType, StatValue, cloneStat, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -20,11 +20,11 @@ const resolveStatDefaultValue = (stat: Stat): StatValue => {
         return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
     }
 
-    if (stat.type === 'locationList') {
-        return normalizeLocationListValue(stat.default);
+    if (isReferenceListDisplayType(stat.type)) {
+        return normalizeReferenceListValue(stat.default);
     }
 
-    if (stat.type === 'text' || stat.type === 'location') {
+    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
         return typeof stat.default === 'string' ? stat.default : '';
     }
 
@@ -44,11 +44,11 @@ const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.type === 'locationList') {
-        return Array.isArray(value) ? normalizeLocationListValue(value) : resolveStatDefaultValue(stat);
+    if (isReferenceListDisplayType(stat.type)) {
+        return Array.isArray(value) ? normalizeReferenceListValue(value) : resolveStatDefaultValue(stat);
     }
 
-    if (stat.type === 'text' || stat.type === 'location') {
+    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
         if (typeof value === 'string') {
             return value;
         }
@@ -114,6 +114,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [locationStats, setLocationStats] = useState<Stat[]>(() =>
         (configuration.locationStats || []).map(cloneStat),
     );
+    const [itemStats, setItemStats] = useState<Stat[]>(() =>
+        (configuration.itemStats || []).map(cloneStat),
+    );
     const [globalStatValues, setGlobalStatValues] = useState<{ [key: string]: StatValue }>(() => ({
         ...configuration.globalStatValues,
     }));
@@ -157,6 +160,12 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             .map(location => JSON.parse(JSON.stringify(location)));
     }, [configuration.locations]);
 
+    const activeItems = useMemo(() => {
+        return (configuration.items || [])
+            .filter(item => item.active !== false)
+            .map(item => JSON.parse(JSON.stringify(item)));
+    }, [configuration.items]);
+
     const slideshowLocationOptions = useMemo(() => {
         return activeLocations.map(location => ({
             key: location.id,
@@ -188,10 +197,12 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             startingDate,
             actorStats,
             locationStats,
+            itemStats,
             globalStats,
             globalStatValues: validGlobalStatValues,
             actors: activeActors,
             locations: activeLocations,
+            items: activeItems,
             maps: activeMaps,
             lorebook: configuration.lorebook || [],
             calendarEvents: managedCalendarEvents,
@@ -201,6 +212,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         });
     }, [
         activeActors,
+        activeItems,
         activeLocations,
         activeMaps,
         actorStats,
@@ -210,6 +222,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         creatorNotes,
         managedCalendarEvents,
         globalStats,
+        itemStats,
         locationStats,
         slideshowLocationIds,
         validGlobalStatValues,
@@ -279,11 +292,13 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         stageInstance.updateConfiguration({
             actors: activeActors,
             locations: activeLocations,
+            items: activeItems,
             maps: activeMaps,
             lorebook: (configuration.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
             calendarEvents: managedCalendarEvents,
             actorStats,
             locationStats,
+            itemStats,
             globalStats: globalStats,
             globalStatValues: validGlobalStatValues,
             uiSettings: configuration.uiSettings,
@@ -300,7 +315,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             slideshowLocationIds,
         });
 
-    }, [activeActors, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, managedCalendarEvents, globalStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
+    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;

@@ -1,13 +1,14 @@
 import { FC, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SaveType, Stage } from '../Stage';
-import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, applyUserPlaceholder, isNumericDisplayType } from '../content/Stat';
+import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, applyUserPlaceholder, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue } from '../content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../content/Style';
-import { GlassPanel, Title, Button, ColorPickerInput, LocationSelect, TextArea, TextInput } from '../components/UiComponents';
+import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
 import { resolveIcon } from '../components/StatRating';
 import { ScreenType } from './BaseScreen';
+import { StatValueInput } from '../components/StatValueInput';
 
 export const DEFAULT_PLAYER_THEME_COLOR = '#66bbee';
 
@@ -50,7 +51,11 @@ const resolveStatDefaultValue = (stat: Stat): StatValue => {
         return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
     }
 
-    if (stat.type === 'text' || stat.type === 'location') {
+    if (isReferenceListDisplayType(stat.type)) {
+        return normalizeReferenceListValue(stat.default);
+    }
+
+    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
         return typeof stat.default === 'string' ? stat.default : '';
     }
 
@@ -70,7 +75,11 @@ const normalizeGlobalStatValue = (value: unknown, stat: Stat): StatValue => {
         return resolveStatDefaultValue(stat);
     }
 
-    if (stat.type === 'text' || stat.type === 'location') {
+    if (isReferenceListDisplayType(stat.type)) {
+        return Array.isArray(value) ? normalizeReferenceListValue(value) : resolveStatDefaultValue(stat);
+    }
+
+    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
         if (typeof value === 'string') {
             return value;
         }
@@ -264,7 +273,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         setShowLanguageSuggestions(false);
     };
 
-    const handleGlobalStatValueChange = (stat: Stat, nextValue: string | number) => {
+    const handleGlobalStatValueChange = (stat: Stat, nextValue: StatValue) => {
         if (!stat.id || !(stat.name || '').trim()) {
             return;
         }
@@ -571,14 +580,15 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     </div>
                                                 )}
 
-                                                {stat.type === 'location' && (
-                                                    <LocationSelect
-                                                        value={typeof selectedValue === 'string' ? selectedValue : ''}
-                                                        onChange={(locationId) => handleGlobalStatValueChange(stat, locationId)}
-                                                        locations={Object.values(stageInstance.getSave().atlas || {})
-                                                            .filter((location) => location.active !== false)}
+                                                {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) && (
+                                                    <StatValueInput
+                                                        stat={stat}
+                                                        value={selectedValue}
+                                                        onChange={(value) => handleGlobalStatValueChange(stat, value)}
+                                                        actors={Object.values(stageInstance.getSave().actors || {}).filter((actor) => actor.active !== false)}
+                                                        items={(stageInstance.getSave().inventory || []).filter((item) => item.active !== false)}
+                                                        locations={Object.values(stageInstance.getSave().atlas || {}).filter((location) => location.active !== false)}
                                                         stage={stage}
-                                                        style={{ fontSize: '13px' }}
                                                     />
                                                 )}
 

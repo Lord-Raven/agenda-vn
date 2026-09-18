@@ -1,7 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emotion';
 import { Stage } from '../Stage';
-import { Stat, StatValue, StatValueRule, cloneStatValueRules, isNumericDisplayType, isStatLlmSeen, normalizeLocationListValue, normalizeStatValue, resolveStatDefault, resolvePerActorValueRule, resolveStatText } from './Stat';
+import { Stat, StatValue, StatValueRule, cloneStatValueRules, formatReferenceStatText, isNumericDisplayType, isStatLlmSeen, normalizeLocationListValue, normalizeStatValue, resolveReferenceKind, resolveStatDefault, resolvePerActorValueRule, resolveStatText } from './Stat';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -927,12 +927,12 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage, isC
     actor.profile = lore;
 }
 
-const formatActorStatValue = (value: StatValue, stat: Stat, atlas?: { [key: string]: { name: string } }): string => {
+const formatActorStatValue = (value: StatValue, stat: Stat, atlas?: { [key: string]: { name: string } }, actors?: { [key: string]: { name: string } }, inventory?: Array<{ id: string; name: string }>): string => {
     if (stat.type === 'checkbox') {
         return value === true ? 'yes' : 'no';
     }
-    if (stat.type === 'location') {
-        return atlas?.[String(value)]?.name || 'unknown location';
+    if (resolveReferenceKind(stat.type)) {
+        return formatReferenceStatText(stat, value, { actors, items: inventory, locations: atlas }, (kind) => `unknown ${kind}`);
     }
     if (isNumericDisplayType(stat.type)) {
         const min = typeof stat.min === 'number' ? stat.min : undefined;
@@ -989,7 +989,7 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
         const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim() && isStatLlmSeen(stat, actorStatContext));
         const scalarStatLines = actorStats
             .filter(stat => !stat.perActor && actor.statMap?.[stat.id] !== undefined)
-            .map(stat => `${stat.name}: ${formatActorStatValue(normalizeStatValue(actor.statMap[stat.id], stat), stat, save.atlas)}`);
+            .map(stat => `${stat.name}: ${formatActorStatValue(normalizeStatValue(actor.statMap[stat.id], stat), stat, save.atlas, save.actors, save.inventory)}`);
         if (scalarStatLines.length > 0) {
             builder.addBlock('Stats', scalarStatLines.join('\n'));
         }
@@ -1009,7 +1009,7 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
                     currentActor: { id: target.id, name: target.name, statMap: target.statMap },
                 };
                 const values = perActorStats
-                    .map(stat => `${stat.name}: ${formatActorStatValue(resolvePerActorStatValue(actor, stat, target.id, context), stat, save.atlas)}`)
+                    .map(stat => `${stat.name}: ${formatActorStatValue(resolvePerActorStatValue(actor, stat, target.id, context), stat, save.atlas, save.actors, save.inventory)}`)
                     .join('; ');
                 return `${target.displayName || target.name} - ${values}`;
             });
