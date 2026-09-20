@@ -508,8 +508,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `Use the exact lore entry title in <Entry>: <LoreUpdate><Entry>Lore Entry Name</Entry><Guidance>Specific revision guidance based on this entry's events.</Guidance></LoreUpdate>`
                         )
                         .addBlock('New Event Tags',
-                            `Use a NewEvent tag when this entry specifies or implies a future calendar event. Include the event name, date, location (ID or name), required characters (IDs or names), user-facing description, secret guidance, and optional finite recurrence. ` +
-                            `<NewEvent><Name>Event Name</Name><Date>YYYY-MM-DD</Date><Location>Location ID or Name</Location><RequiredCharacters><Character>[Character ID or Name]</Character></RequiredCharacters><Description>Brief user-facing description</Description><Secret>Additional secret guidance</Secret><Recurrence><Frequency>DAILY|WEEKLY|MONTHLY</Frequency><Interval>1</Interval><UntilDate>YYYY-MM-DD</UntilDate></Recurrence></NewEvent>`
+                            `Use a NewEvent tag when this entry specifies or implies a future calendar event. Include the event name, date, location (ID or name), required characters (IDs or names), user-facing description, secret guidance, whether it is mandatory, and optional finite recurrence. Mandatory events enforced at their start time by the game, so this flag should be used only for events that are essential to the plot or mechanics of the game. ` +
+                            `<NewEvent><Name>Event Name</Name><Date>YYYY-MM-DD</Date><Location>Location ID or Name</Location><RequiredCharacters><Character>[Character ID or Name]</Character></RequiredCharacters><Description>Brief user-facing description</Description><Secret>Additional secret guidance</Secret><Mandatory>true|false</Mandatory><Recurrence><Frequency>DAILY|WEEKLY|MONTHLY</Frequency><Interval>1</Interval><UntilDate>YYYY-MM-DD</UntilDate></Recurrence></NewEvent>`
                         )
 
 
@@ -777,6 +777,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                                 requiredCharacters,
                                 description: readTag('Description'),
                                 secret: readTag('Secret'),
+                                mandatory: readTag('Mandatory'),
                                 recurrence: recurrenceFrequency
                                     ? {
                                         frequency: recurrenceFrequency,

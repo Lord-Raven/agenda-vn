@@ -128,9 +128,14 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
 
         console.log('handleClose called. Ended early:', endedEarly, 'Finalized skit length:', finalizedSkit.script.length);
         setSkit(finalizedSkit);
-        stage().endSkit();
+        const nextSkit = stage().endSkit();
+        if (nextSkit) {
+            setSkit(nextSkit);
+            setAccumulatedOutcomes([]);
+            return;
+        }
         setScreenType(ScreenType.MAP);
-    }, [stage, setScreenType]);
+    }, [skit, stage, setScreenType]);
 
 	const handleSkitSubmit = useCallback(async (input: string, skitArg: Skit, index: number) => {
 		index = Math.max(0, index);

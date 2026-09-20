@@ -339,6 +339,9 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                                 <div style={{ fontWeight: 700, marginBottom: 4 }}>{event.name}</div>
                                 <div style={{ fontSize: '13px', color: 'var(--agenda-text-muted)' }}>{formatDisplayDate(event.date)}</div>
                                 <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{durationSummary(event.duration)}</div>
+                                {event.mandatory && (
+                                    <div style={{ fontSize: '12px', color: 'var(--agenda-accent-primary)', fontWeight: 700 }}>Mandatory</div>
+                                )}
                                 <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{recurrenceSummary(event.recurrence, formatDisplayDate)}</div>
                             </button>
                         )}
@@ -475,6 +478,17 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                                 ))}
                             </div>
                         )}
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--agenda-text-muted)' }}>
+                            <input
+                                type="checkbox"
+                                checked={draft.mandatory === true}
+                                onChange={(e) => updateDraft({ mandatory: e.target.checked })}
+                            />
+                            Mandatory Event
+                        </label>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1' }}>

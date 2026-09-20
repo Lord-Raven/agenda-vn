@@ -984,7 +984,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actorIds,
             participantActorIds: [...actorIds],
             description: '',
-            guidance: ''
+            guidance: '',
+            mandatory: false,
         };
     }
 
@@ -1162,6 +1163,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .filter((event) => event.locationId === locationId)
             .filter((event) => event.date === currentDate)
             .filter((event) => event.duration.includes(currentTimeOfDay))
+            .sort((left, right) => this.compareCalendarEvents(left, right))[0] || null;
+    }
+
+    private getCurrentMandatoryEvent(save: SaveType): CalendarEvent | null {
+        const currentDate = save.currentDate || this.getStartingDate(save);
+        const currentTimeOfDay = save.currentTimeOfDay || 'morning';
+
+        return [...(save.upcomingEvents || [])]
+            .filter(event => event.mandatory === true)
+            .filter(event => event.date === currentDate)
+            .filter(event => this.normalizeCalendarEventDuration(event.duration).includes(currentTimeOfDay))
             .sort((left, right) => this.compareCalendarEvents(left, right))[0] || null;
     }
 
@@ -1542,6 +1554,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             participantActorIds: [...actorIds],
             description,
             guidance,
+            mandatory: event.mandatory === true,
             recurrence: this.normalizeCalendarEventRecurrence(event.recurrence, date),
             recurrenceParentId: undefined,
             recurrenceInstanceIndex: undefined,
@@ -1683,6 +1696,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const description = `${source.description ?? source.Description ?? `${eventName} at ${matchedLocation.name}.`}`.trim();
         const hiddenAgenda = `${source.secret ?? source.Secret ?? source.hiddenAgenda ?? source.guidance ?? source.Guidance ?? description}`.trim();
+        const mandatoryValue = source.mandatory ?? source.Mandatory;
         const recurrence = this.normalizeCalendarEventRecurrence(
             source.recurrence ?? source.Recurrence,
             resolvedDate,
@@ -1698,6 +1712,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             participantActorIds: [...actorIds],
             description,
             guidance: hiddenAgenda,
+            mandatory: mandatoryValue === true || ['true', 'yes', '1'].includes(`${mandatoryValue || ''}`.trim().toLowerCase()),
             recurrence,
         };
     }
@@ -1749,6 +1764,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             duration: this.normalizeCalendarEventDuration(event.duration),
             description: event.description || event.guidance || `${event.name} at ${save.atlas[event.locationId]?.name || 'an unknown location'}.`,
             guidance: event.guidance || event.description || event.name,
+            mandatory: event.mandatory === true,
             recurrence: this.normalizeCalendarEventRecurrence(event.recurrence, event.date),
             recurrenceParentId: event.recurrenceParentId || undefined,
             recurrenceInstanceIndex: Number.isFinite(event.recurrenceInstanceIndex)
@@ -2072,7 +2088,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return skit;
     }
 
-    endSkit() {
+    endSkit(): Skit | null {
         const save = this.getSave();
         const currentSkit = this.getCurrentSkit();
         if (currentSkit) {
@@ -2211,6 +2227,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.showPriorityMessage('Calendar updated with new upcoming events.');
 
         this.saveGame();
+
+        const mandatoryEvent = this.getCurrentMandatoryEvent(save);
+        return mandatoryEvent ? this.startCalendarEventSkit(mandatoryEvent.id) : null;
     }
 
     // Callback to show priority messages in the tooltip bar

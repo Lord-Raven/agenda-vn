@@ -7,6 +7,7 @@ export type CalendarEvent = {
     actorIds: string[];
     description: string;
     guidance: string;
+    mandatory?: boolean;
     participantActorIds?: string[];
     recurrence?: CalendarEventRecurrence;
     recurrenceParentId?: string;
