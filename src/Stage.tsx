@@ -153,8 +153,12 @@ export type GameConfiguration = {
     versionNotes: string; // Optional notes about the current version of the game, its world, or its characters; this replaces version details in MenuScreen and is inserted after creator notes in Creator Notes HTML.
     castActorIds: string[]; // Optional allowlist of actor ids for the Creator Notes HTML cast section; if empty, all active actors are included.
     slideshowLocationIds: string[]; // Optional allowlist of location ids for the Creator Notes HTML slideshow; if empty, active locations are used in their existing order.
+    dateMode: DateMode; // Whether the game tracks real calendar dates or an abstract turn/day counter
 
 }
+
+// 'calendar' shows real calendar dates and month grids; 'turnBased' hides real dates behind a Day N counter and a timeline view.
+export type DateMode = 'calendar' | 'turnBased';
 
 const cloneActor = (actor: Actor, stripImagePrompts: boolean = false): Actor => new Actor({
     ...actor,
@@ -252,6 +256,7 @@ export type PortableGameConfiguration = {
     uiSettings: UiSettings;
     castActorIds: string[];
     slideshowLocationIds: string[];
+    dateMode: DateMode;
 };
 
 // Shared by the GameManagementPanel's JSON export/preview and Stage's storage sync so both always agree on shape.
@@ -278,6 +283,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     uiSettings: cloneUiSettings(input.uiSettings || DEFAULT_UI_SETTINGS),
     castActorIds: [...(input.castActorIds || [])],
     slideshowLocationIds: [...(input.slideshowLocationIds || [])],
+    dateMode: input.dateMode === 'turnBased' ? 'turnBased' : 'calendar',
 });
 
 export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateType, ConfigType> {
@@ -364,6 +370,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             versionNotes: '',
             castActorIds: [],
             slideshowLocationIds: [],
+            dateMode: 'calendar',
         };
     }
 
@@ -436,6 +443,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         configuration.versionNotes = configuration.versionNotes || defaultConfiguration.versionNotes;
         configuration.castActorIds = configuration.castActorIds || defaultConfiguration.castActorIds;
         configuration.slideshowLocationIds = configuration.slideshowLocationIds || defaultConfiguration.slideshowLocationIds;
+        configuration.dateMode = configuration.dateMode === 'turnBased' ? 'turnBased' : 'calendar';
 
         this.syncUniversalSchedule();
     }
@@ -1265,6 +1273,31 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         parsedBaseDate.setUTCDate(parsedBaseDate.getUTCDate() + days);
         return this.formatDate(parsedBaseDate);
+    }
+
+    // Whether the active configuration hides real calendar dates behind an abstract Day N counter.
+    getDateMode(): DateMode {
+        return this.getConfiguration().dateMode === 'turnBased' ? 'turnBased' : 'calendar';
+    }
+
+    // Converts a YYYY-MM-DD date into the 1-based day number relative to the configured starting date.
+    getDayNumberForDate(dateKey: string): number {
+        const startingDate = this.getConfiguration().startingDate || this.formatDate(new Date());
+        const start = new Date(`${startingDate}T00:00:00Z`);
+        const target = new Date(`${dateKey}T00:00:00Z`);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(target.getTime())) {
+            return 1;
+        }
+
+        const diffDays = Math.round((target.getTime() - start.getTime()) / 86400000);
+        return diffDays + 1;
+    }
+
+    // Converts a 1-based day number back into a YYYY-MM-DD date relative to the configured starting date.
+    getDateForDayNumber(dayNumber: number): string {
+        const startingDate = this.getConfiguration().startingDate || this.formatDate(new Date());
+        const normalizedDayNumber = Number.isFinite(dayNumber) ? Math.floor(dayNumber) : 1;
+        return this.addDays(startingDate, normalizedDayNumber - 1);
     }
 
     private addMonths(baseDate: string, months: number): string {
@@ -2657,6 +2690,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             uiSettings: configuration.uiSettings,
             castActorIds: configuration.castActorIds || [],
             slideshowLocationIds: configuration.slideshowLocationIds || [],
+            dateMode: configuration.dateMode,
         });
     }
 

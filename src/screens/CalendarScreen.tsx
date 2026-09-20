@@ -32,6 +32,7 @@ const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const CALENDAR_ROW_COUNT = 6;
 const MAX_EVENT_LINES_PER_DAY = 3;
 const TIME_OF_DAY_ORDER: CalendarTimeOfDay[] = ["morning", "afternoon", "evening", "night"];
+const TIMELINE_PAGE_SIZE = 14;
 
 const parseDateKey = (dateText: string) => new Date(`${dateText}T00:00:00Z`);
 
@@ -64,7 +65,7 @@ const formatDate = (dateText: string) => {
     });
 };
 
-const formatRecurrenceSummary = (recurrence?: CalendarEventRecurrence | null) => {
+const formatRecurrenceSummary = (recurrence: CalendarEventRecurrence | null | undefined, formatDateLabel: (dateKey: string) => string = formatDate) => {
     if (!recurrence) {
         return "";
     }
@@ -75,7 +76,7 @@ const formatRecurrenceSummary = (recurrence?: CalendarEventRecurrence | null) =>
         : recurrence.frequency === "weekly"
             ? (interval === 1 ? "week" : "weeks")
             : (interval === 1 ? "month" : "months");
-    return `Repeats every ${interval} ${unit} until ${formatDate(recurrence.untilDate)}`;
+    return `Repeats every ${interval} ${unit} until ${formatDateLabel(recurrence.untilDate)}`;
 };
 
 const formatTimeOfDay = (timeOfDay: CalendarTimeOfDay) => `${timeOfDay[0].toUpperCase()}${timeOfDay.slice(1)}`;
@@ -180,6 +181,9 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const currentDate = parseDateKey(currentDateKey);
     const currentTimeOfDay = save.currentTimeOfDay || 'morning';
     const currentSlotIndex = Math.max(TIME_OF_DAY_ORDER.indexOf(currentTimeOfDay), 0);
+    const isTurnBased = stageInstance.getDateMode() === 'turnBased';
+    const currentDayNumber = stageInstance.getDayNumberForDate(currentDateKey);
+    const formatDateLabel = (dateKey: string) => (isTurnBased ? `Day ${stageInstance.getDayNumberForDate(dateKey)}` : formatDate(dateKey));
 
     const allEvents = useMemo(
         () => [...(save.upcomingEvents || [])].sort((left, right) => compareEventSchedule(left, right)),
@@ -187,11 +191,20 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     );
 
     const [viewMonth, setViewMonth] = useState(() => startOfMonth(currentDate));
+    const [timelineStartDay, setTimelineStartDay] = useState(() => Math.max(1, currentDayNumber - Math.floor(TIMELINE_PAGE_SIZE / 2)));
     const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [activeDateKey, setActiveDateKey] = useState<string | null>(null);
 
     const eventsByDate = useMemo(() => groupEventsByDate(allEvents), [allEvents]);
+    const timelineDayNumbers = useMemo(
+        () => Array.from({ length: TIMELINE_PAGE_SIZE }, (_, index) => timelineStartDay + index).filter((dayNumber) => dayNumber >= 1),
+        [timelineStartDay],
+    );
+    const timelineDateKeys = useMemo(
+        () => timelineDayNumbers.map((dayNumber) => stageInstance.getDateForDayNumber(dayNumber)),
+        [timelineDayNumbers, stageInstance],
+    );
     const monthGrid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
     const todayDateCellIndex = useMemo(
         () => monthGrid.findIndex((gridDate) => formatDateKey(gridDate) === currentDateKey),
@@ -246,6 +259,18 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
         setViewMonth(nextMonth);
     };
 
+    const jumpToToday = () => {
+        setTimelineStartDay(Math.max(1, currentDayNumber - Math.floor(TIMELINE_PAGE_SIZE / 2)));
+    };
+
+    const changeTimelinePage = (offset: number) => {
+        setTimelineStartDay((previousStartDay) => Math.max(1, previousStartDay + (offset * TIMELINE_PAGE_SIZE)));
+    };
+
+    const goToPreviousPeriod = () => (isTurnBased ? changeTimelinePage(-1) : changeMonth(-1));
+    const goToNextPeriod = () => (isTurnBased ? changeTimelinePage(1) : changeMonth(1));
+    const jumpToCurrentPeriod = () => (isTurnBased ? jumpToToday() : jumpToCurrentMonth());
+
     const openEvent = (eventId: string) => {
         const opened = stageInstance.startCalendarEventSkit(eventId);
         if (opened) {
@@ -286,8 +311,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             <>
                                 <Button
                                     variant="secondary"
-                                    onClick={() => changeMonth(-1)}
-                                    onMouseEnter={() => setTooltip("Previous month", ArrowBackRounded)}
+                                    onClick={goToPreviousPeriod}
+                                    onMouseEnter={() => setTooltip(isTurnBased ? "Previous days" : "Previous month", ArrowBackRounded)}
                                     onMouseLeave={clearTooltip}
                                     style={{ padding: "8px 10px" }}
                                 >
@@ -295,8 +320,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 </Button>
                                 <Button
                                     variant="secondary"
-                                    onClick={jumpToCurrentMonth}
-                                    onMouseEnter={() => setTooltip("Jump to current month", TodayRounded)}
+                                    onClick={jumpToCurrentPeriod}
+                                    onMouseEnter={() => setTooltip(isTurnBased ? "Jump to today" : "Jump to current month", TodayRounded)}
                                     onMouseLeave={clearTooltip}
                                     style={{ padding: "8px 10px" }}
                                 >
@@ -304,8 +329,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 </Button>
                                 <Button
                                     variant="secondary"
-                                    onClick={() => changeMonth(1)}
-                                    onMouseEnter={() => setTooltip("Next month", ArrowForwardRounded)}
+                                    onClick={goToNextPeriod}
+                                    onMouseEnter={() => setTooltip(isTurnBased ? "Next days" : "Next month", ArrowForwardRounded)}
                                     onMouseLeave={clearTooltip}
                                     style={{ padding: "8px 10px" }}
                                 >
@@ -343,6 +368,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                     />
                 </Box>
 
+                {!isTurnBased && (
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                         <Box
                             sx={{
@@ -595,6 +621,83 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                             })}
                         </Box>
                     </GlassPanel>
+                )}
+
+                {isTurnBased && (
+                    <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, padding: "12px", display: "flex", flexDirection: "column", gap: 1, overflow: "hidden" }}>
+                        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
+                            {timelineDateKeys.map((dateKey) => {
+                                const dayNumber = stageInstance.getDayNumberForDate(dateKey);
+                                const isToday = dateKey === currentDateKey;
+                                const dayEvents = eventsByDate.get(dateKey) || [];
+                                const hasEvents = dayEvents.length > 0;
+
+                                return (
+                                    <Box
+                                        key={dateKey}
+                                        onClick={hasEvents ? () => openDateDetails(dateKey) : undefined}
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1.5,
+                                            border: "1px solid var(--agenda-panel-border)",
+                                            borderRadius: "10px",
+                                            padding: "10px 12px",
+                                            cursor: hasEvents ? "pointer" : "default",
+                                            background: isToday
+                                                ? "color-mix(in srgb, var(--agenda-highlight) 14%, transparent)"
+                                                : "color-mix(in srgb, var(--agenda-surface-base) 70%, transparent)",
+                                            boxShadow: isToday ? "inset 0 0 0 2px color-mix(in srgb, var(--agenda-highlight) 42%, transparent)" : "none",
+                                        }}
+                                    >
+                                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 64 }}>
+                                            <Typography sx={{ color: isToday ? "var(--agenda-highlight)" : "var(--agenda-text-primary)", fontWeight: 700, fontSize: "0.95rem" }}>
+                                                Day {dayNumber}
+                                            </Typography>
+                                            {isToday && (
+                                                <Typography sx={{ color: "var(--agenda-highlight)", fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                                                    Today
+                                                </Typography>
+                                            )}
+                                        </Box>
+
+                                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, flex: 1, minWidth: 0 }}>
+                                            {!hasEvents && (
+                                                <Typography sx={{ color: "var(--agenda-text-muted)", fontSize: "0.78rem", fontStyle: "italic", opacity: 0.7 }}>
+                                                    No events
+                                                </Typography>
+                                            )}
+                                            {dayEvents.map((eventItem) => {
+                                                const participants = (eventItem.actorIds || eventItem.participantActorIds || [])
+                                                    .map((actorId) => save.actors[actorId])
+                                                    .filter(Boolean) as Actor[];
+                                                const leadActor = participants[0];
+                                                const eventPast = isPastEvent(eventItem, currentDateKey, currentSlotIndex);
+
+                                                return (
+                                                    <Box
+                                                        key={eventItem.id}
+                                                        sx={{
+                                                            border: `1px solid ${leadActor?.themeColor || "var(--agenda-accent-primary)"}`,
+                                                            backgroundColor: leadActor?.themeColor ? `${leadActor.themeColor}22` : "color-mix(in srgb, var(--agenda-accent-primary) 14%, transparent)",
+                                                            borderRadius: "7px",
+                                                            padding: "3px 9px",
+                                                            opacity: eventPast ? 0.45 : 1,
+                                                        }}
+                                                    >
+                                                        <Typography sx={{ color: "var(--agenda-text-primary)", fontSize: "0.75rem", fontWeight: 700 }}>
+                                                            {eventItem.recurrence ? "↻ " : ""}{eventItem.name} · {formatDurationSummary(eventItem)}
+                                                        </Typography>
+                                                    </Box>
+                                                );
+                                            })}
+                                        </Box>
+                                    </Box>
+                                );
+                            })}
+                        </Box>
+                    </GlassPanel>
+                )}
             </Box>
 
             <AnimatePresence>
@@ -640,7 +743,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2, flexWrap: "wrap" }}>
                                     <Box>
                                         <Typography sx={{ color: "var(--agenda-text-primary)", fontWeight: 700, fontSize: { xs: "1rem", md: "1.2rem" } }}>
-                                            Events on {formatDate(selectedDateKey)}
+                                            Events on {formatDateLabel(selectedDateKey)}
                                         </Typography>
                                         <Typography sx={{ color: "var(--agenda-text-muted)", fontSize: "0.88rem" }}>
                                             Select an event, then confirm to begin.
@@ -761,7 +864,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                                                         </Typography>
                                                         {eventItem.recurrence && (
                                                             <Typography sx={{ color: "var(--agenda-text-muted)", fontSize: "0.67rem", mt: 0.3, opacity: 0.86 }}>
-                                                                {formatRecurrenceSummary(eventItem.recurrence)}
+                                                                {formatRecurrenceSummary(eventItem.recurrence, formatDateLabel)}
                                                             </Typography>
                                                         )}
                                                     </motion.button>

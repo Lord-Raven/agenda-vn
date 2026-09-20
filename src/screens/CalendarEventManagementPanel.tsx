@@ -61,7 +61,7 @@ const addDaysToDateKey = (dateKey: string, days: number): string => {
     return parsed.toISOString().slice(0, 10);
 };
 
-const recurrenceSummary = (recurrence?: CalendarEventRecurrence): string => {
+const recurrenceSummary = (recurrence: CalendarEventRecurrence | undefined, formatDateLabel: (dateKey: string) => string = (dateKey) => dateKey): string => {
     if (!recurrence) {
         return 'Does not repeat';
     }
@@ -72,7 +72,7 @@ const recurrenceSummary = (recurrence?: CalendarEventRecurrence): string => {
         : recurrence.frequency === 'weekly'
             ? (interval === 1 ? 'week' : 'weeks')
             : (interval === 1 ? 'month' : 'months');
-    return `Every ${interval} ${unit} until ${recurrence.untilDate}`;
+    return `Every ${interval} ${unit} until ${formatDateLabel(recurrence.untilDate)}`;
 };
 
 const monthYearForEvent = (dateKey: string): { id: string; label: string; sortKey: number } => {
@@ -106,6 +106,23 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const shouldReduceMotion = useReducedMotion();
+    const isTurnBased = stageInstance.getDateMode() === 'turnBased';
+    const formatDisplayDate = (dateKey: string) => (isTurnBased ? `Day ${stageInstance.getDayNumberForDate(dateKey)}` : dateKey);
+    const groupInfoForEvent = (dateKey: string): { id: string; label: string; sortKey: number } => {
+        if (isTurnBased) {
+            const dayNumber = stageInstance.getDayNumberForDate(dateKey);
+            const weekIndex = Math.floor((dayNumber - 1) / 7);
+            const rangeStart = (weekIndex * 7) + 1;
+            const rangeEnd = rangeStart + 6;
+            return {
+                id: `week-${weekIndex}`,
+                label: `Days ${rangeStart}-${rangeEnd}`,
+                sortKey: weekIndex,
+            };
+        }
+
+        return monthYearForEvent(dateKey);
+    };
 
     const actors = useMemo(
         () => (isCreatorMode ? stageInstance.getConfiguration().actors || [] : Object.values(save.actors || {}))
@@ -133,7 +150,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
         const grouped = new Map<string, { id: string; title: string; sortKey: number; entries: CalendarEvent[] }>();
 
         for (const event of events) {
-            const group = monthYearForEvent(event.date);
+            const group = groupInfoForEvent(event.date);
             const existing = grouped.get(group.id);
             if (existing) {
                 existing.entries.push(event);
@@ -161,11 +178,11 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                 }),
             }))
             .sort((left, right) => {
-                const leftSort = monthYearForEvent(left.entries[0]?.date || '').sortKey;
-                const rightSort = monthYearForEvent(right.entries[0]?.date || '').sortKey;
+                const leftSort = groupInfoForEvent(left.entries[0]?.date || '').sortKey;
+                const rightSort = groupInfoForEvent(right.entries[0]?.date || '').sortKey;
                 return leftSort - rightSort;
             });
-    }, [events]);
+    }, [events, isTurnBased]);
 
     const refreshEvents = (nextSelectedId?: string) => {
         const refreshed = stageInstance.getManagedCalendarEvents(isCreatorMode).map(cloneEvent);
@@ -320,15 +337,15 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                                 }}
                             >
                                 <div style={{ fontWeight: 700, marginBottom: 4 }}>{event.name}</div>
-                                <div style={{ fontSize: '13px', color: 'var(--agenda-text-muted)' }}>{event.date}</div>
+                                <div style={{ fontSize: '13px', color: 'var(--agenda-text-muted)' }}>{formatDisplayDate(event.date)}</div>
                                 <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{durationSummary(event.duration)}</div>
-                                <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{recurrenceSummary(event.recurrence)}</div>
+                                <div style={{ fontSize: '12px', color: 'var(--agenda-text-muted)' }}>{recurrenceSummary(event.recurrence, formatDisplayDate)}</div>
                             </button>
                         )}
                         getEntryKey={(event) => event.id}
                         shouldReduceMotion={Boolean(shouldReduceMotion)}
                         emptyListMessage="No saved events."
-                        sectionEmptyMessage="No events in this month."
+                        sectionEmptyMessage={isTurnBased ? "No events in this range." : "No events in this month."}
                     />
                 </div>
             </GlassPanel>
@@ -348,13 +365,23 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Date</label>
-                        <TextInput
-                            fullWidth
-                            type="date"
-                            value={draft.date}
-                            onChange={(e) => updateDraft({ date: e.target.value })}
-                        />
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>{isTurnBased ? 'Day' : 'Date'}</label>
+                        {isTurnBased ? (
+                            <TextInput
+                                fullWidth
+                                type="number"
+                                min={1}
+                                value={String(stageInstance.getDayNumberForDate(draft.date))}
+                                onChange={(e) => updateDraft({ date: stageInstance.getDateForDayNumber(Math.max(1, Number(e.target.value) || 1)) })}
+                            />
+                        ) : (
+                            <TextInput
+                                fullWidth
+                                type="date"
+                                value={draft.date}
+                                onChange={(e) => updateDraft({ date: e.target.value })}
+                            />
+                        )}
                     </div>
 
                     <div>
@@ -491,17 +518,32 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                                     placeholder="Interval"
                                 />
 
-                                <TextInput
-                                    fullWidth
-                                    type="date"
-                                    value={draft.recurrence.untilDate}
-                                    onChange={(e) => updateDraft({
-                                        recurrence: {
-                                            ...draft.recurrence!,
-                                            untilDate: e.target.value,
-                                        },
-                                    })}
-                                />
+                                {isTurnBased ? (
+                                    <TextInput
+                                        fullWidth
+                                        type="number"
+                                        min={1}
+                                        value={String(stageInstance.getDayNumberForDate(draft.recurrence.untilDate))}
+                                        onChange={(e) => updateDraft({
+                                            recurrence: {
+                                                ...draft.recurrence!,
+                                                untilDate: stageInstance.getDateForDayNumber(Math.max(1, Number(e.target.value) || 1)),
+                                            },
+                                        })}
+                                    />
+                                ) : (
+                                    <TextInput
+                                        fullWidth
+                                        type="date"
+                                        value={draft.recurrence.untilDate}
+                                        onChange={(e) => updateDraft({
+                                            recurrence: {
+                                                ...draft.recurrence!,
+                                                untilDate: e.target.value,
+                                            },
+                                        })}
+                                    />
+                                )}
                             </div>
                         )}
                     </div>

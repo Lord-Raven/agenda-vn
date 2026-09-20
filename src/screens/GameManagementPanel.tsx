@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
-import { Stage, buildPortableGameConfiguration } from '../Stage';
+import { DateMode, Stage, buildPortableGameConfiguration } from '../Stage';
 import { v4 as generateUuid } from 'uuid';
 import { findStatOptionByValue, getStatOptionValue, Stat, StatType, StatValue, cloneStat, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
@@ -104,6 +104,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [castActorIds, setCastActorIds] = useState<string[]>(() => [...(configuration.castActorIds || [])]);
     const [slideshowLocationIds, setSlideshowLocationIds] = useState<string[]>(() => [...(configuration.slideshowLocationIds || [])]);
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
+    const [dateMode, setDateMode] = useState<DateMode>(() => configuration.dateMode === 'turnBased' ? 'turnBased' : 'calendar');
     const [artStyle, setArtStyle] = useState<string>(() => configuration.artStyle || '');
     const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
         (configuration.globalStats || []).map(cloneStat),
@@ -209,6 +210,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             uiSettings: stageInstance.getUiSettings(),
             castActorIds,
             slideshowLocationIds,
+            dateMode,
         });
     }, [
         activeActors,
@@ -220,6 +222,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         backgroundImageUrl,
         castActorIds,
         creatorNotes,
+        dateMode,
         managedCalendarEvents,
         globalStats,
         itemStats,
@@ -313,9 +316,10 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             artStyle,
             castActorIds,
             slideshowLocationIds,
+            dateMode,
         });
 
-    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
+    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;
@@ -456,6 +460,30 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             value={startingDate}
                             onChange={(e) => setStartingDate(e.target.value)}
                         />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Time Structure</label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <Button
+                                variant={dateMode === 'calendar' ? 'primary' : 'secondary'}
+                                onClick={() => setDateMode('calendar')}
+                                style={{ flex: 1 }}
+                            >
+                                Calendar-Based
+                            </Button>
+                            <Button
+                                variant={dateMode === 'turnBased' ? 'primary' : 'secondary'}
+                                onClick={() => setDateMode('turnBased')}
+                                style={{ flex: 1 }}
+                            >
+                                Turn-Based
+                            </Button>
+                        </div>
+                        <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 6 }}>
+                            {dateMode === 'calendar'
+                                ? 'The calendar screen shows real dates, and events are scheduled by date.'
+                                : 'The calendar screen becomes a timeline of numbered days starting at Day 1; real dates are tracked internally but never shown to the player.'}
+                        </div>
                     </div>
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Creator Notes</label>
