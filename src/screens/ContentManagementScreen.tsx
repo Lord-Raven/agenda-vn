@@ -140,6 +140,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                             {/* Tab Navigation */}
                             <div style={{
                                 display: 'flex',
+                                flexWrap: 'wrap',
                                 gap: '10px',
                                 marginBottom: '20px',
                                 borderBottom: '2px solid var(--agenda-line-strong)',
@@ -152,8 +153,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                         style={{
                                             display: 'flex',
                                             alignItems: 'center',
+                                            flex: '0 0 auto',
                                             gap: '8px',
                                             opacity: activeTab === 'game' ? 1 : 0.6,
+                                            whiteSpace: 'nowrap',
                                         }}
                                     >
                                         <Tune />
@@ -167,8 +170,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                         style={{
                                             display: 'flex',
                                             alignItems: 'center',
+                                            flex: '0 0 auto',
                                             gap: '8px',
                                             opacity: activeTab === 'style' ? 1 : 0.6,
+                                            whiteSpace: 'nowrap',
                                         }}
                                     >
                                         <Palette />
@@ -182,8 +187,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                         style={{
                                             display: 'flex',
                                             alignItems: 'center',
+                                            flex: '0 0 auto',
                                             gap: '8px',
                                             opacity: activeTab === 'stats' ? 1 : 0.6,
+                                            whiteSpace: 'nowrap',
                                         }}
                                     >
                                         <BarChart />
@@ -197,8 +204,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                         style={{
                                             display: 'flex',
                                             alignItems: 'center',
+                                            flex: '0 0 auto',
                                             gap: '8px',
                                             opacity: activeTab === 'controls' ? 1 : 0.6,
+                                            whiteSpace: 'nowrap',
                                         }}
                                     >
                                         <Tune />
@@ -211,8 +220,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
+                                        flex: '0 0 auto',
                                         gap: '8px',
                                         opacity: activeTab === 'lorebook' ? 1 : 0.6,
+                                        whiteSpace: 'nowrap',
                                     }}
                                 >
                                     <Book />
@@ -224,8 +235,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
+                                        flex: '0 0 auto',
                                         gap: '8px',
                                         opacity: activeTab === 'actors' ? 1 : 0.6,
+                                        whiteSpace: 'nowrap',
                                     }}
                                 >
                                     <Person />
@@ -237,8 +250,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
+                                        flex: '0 0 auto',
                                         gap: '8px',
                                         opacity: activeTab === 'locations' ? 1 : 0.6,
+                                        whiteSpace: 'nowrap',
                                     }}
                                 >
                                     <Place />
@@ -247,7 +262,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 <Button
                                     onClick={() => setActiveTab('maps')}
                                     variant={activeTab === 'maps' ? 'primary' : 'secondary'}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: activeTab === 'maps' ? 1 : 0.6 }}
+                                    style={{ display: 'flex', alignItems: 'center', flex: '0 0 auto', gap: '8px', opacity: activeTab === 'maps' ? 1 : 0.6, whiteSpace: 'nowrap' }}
                                 >
                                     <MapIcon />
                                     Maps ({(isCreatorMode ? stage().getConfiguration().maps : stage().getSave().maps)?.filter(map => map.active !== false).length || 0})
@@ -255,7 +270,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 <Button
                                     onClick={() => setActiveTab('items')}
                                     variant={activeTab === 'items' ? 'primary' : 'secondary'}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: activeTab === 'items' ? 1 : 0.6 }}
+                                    style={{ display: 'flex', alignItems: 'center', flex: '0 0 auto', gap: '8px', opacity: activeTab === 'items' ? 1 : 0.6, whiteSpace: 'nowrap' }}
                                 >
                                     <Inventory2 />
                                     Items ({(isCreatorMode ? stage().getConfiguration().items : items).filter(item => item.active !== false).length})
@@ -266,8 +281,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
+                                        flex: '0 0 auto',
                                         gap: '8px',
                                         opacity: activeTab === 'calendarEvents' ? 1 : 0.6,
+                                        whiteSpace: 'nowrap',
                                     }}
                                 >
                                     <CalendarMonth />

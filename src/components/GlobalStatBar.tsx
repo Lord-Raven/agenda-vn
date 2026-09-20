@@ -35,6 +35,9 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
     const currentDate = save?.currentDate || stageInstance.getConfiguration()?.startingDate || new Date().toISOString().slice(0, 10);
     const currentTimeOfDay = save?.currentTimeOfDay || "morning";
     const DateTimeIcon = getDateTimeIcon(currentTimeOfDay);
+    const dateLabel = stageInstance.getDateMode() === "turnBased"
+        ? `Day ${stageInstance.getDayNumberForDate(currentDate)}`
+        : formatDateLabel(currentDate);
 
     return (
         <Box
@@ -80,7 +83,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
                             whiteSpace: "nowrap",
                         }}
                     >
-                        {formatDateLabel(currentDate)}
+                        {dateLabel}
                     </Typography>
                     <DateTimeIcon sx={{ fontSize: "1.1rem", color: "var(--agenda-highlight)" }} />
                 </Box>
