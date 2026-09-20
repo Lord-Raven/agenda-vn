@@ -29,9 +29,9 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     const configuredTitleImageUrl = (stage().getConfiguration().titleImageUrl || '').trim();
     const configuredBackgroundImageUrl = (stage().getConfiguration().backgroundImageUrl || '').trim();
 
-    // Check if a save exists (if there are any actors or the layout has been modified)
+    // Check if a save exists
     const saveExists = () => {
-        return stage().getSave() && Object.keys(stage().getSave().actors).length > 2;
+        return stage().getSave() && stage().getSave().actors && Object.keys(stage().getSave().actors).length > 0;
     };
 
     // Handle escape key to continue game if available
@@ -39,13 +39,10 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape' && !disableAllButtons) {
                 if (showSettings) {
-                    console.log('close settings');
                     handleSettingsCancel();
                 } else if (showSaveLoad) {
-                    console.log('close save/load');
                     setShowSaveLoad(false);
                 } else if (saveExists() && !showSettings) {
-                    console.log('continue');
                     handleContinue();
                 }
             }
