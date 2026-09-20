@@ -211,6 +211,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             castActorIds,
             slideshowLocationIds,
             dateMode,
+            controls: configuration.controls || [],
         });
     }, [
         activeActors,
@@ -230,6 +231,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         slideshowLocationIds,
         validGlobalStatValues,
         configuration.lorebook,
+        configuration.controls,
         stageInstance,
         startingDate,
         title,

@@ -4,9 +4,10 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { findStatOptionByValue, formatReferenceStatText, isFunctionStatType, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
+import { findStatOptionByValue, formatReferenceStatText, isFunctionStatType, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
+import { Control, ControlPlacement, isControlAvailable } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
@@ -141,6 +142,7 @@ export type GameConfiguration = {
     globalStats: Stat[], // Stats that apply to the game in general (player or world state)
     globalStatValues: {[key: string]: StatValue}, // Selected/default values for global stats
     statUpdateRules: StatUpdateRule[], // Recurring stat changes applied as in-game time advances
+    controls: Control[], // UI controls displayed at the top/bottom of the map screen (buttons, stat displays, stat editors)
     uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
     titleImageUrl: string, // URL of a title image for the game
@@ -191,6 +193,12 @@ const cloneItem = (item: Item, stripImagePrompts: boolean = false): Item => new 
     })),
     availabilityConditions: (item.availabilityConditions || []).map((collection) => [...collection]),
     statMap: item.statMap && typeof item.statMap === 'object' ? { ...item.statMap } : {},
+});
+
+const cloneControl = (control: Control): Control => new Control({
+    ...control,
+    availabilityConditions: (control.availabilityConditions || []).map((collection) => [...collection]),
+    actions: (control.actions || []).map(cloneStatUpdate),
 });
 
 const cloneMap = (map: GameMap): GameMap => new GameMap({
@@ -257,6 +265,7 @@ export type PortableGameConfiguration = {
     castActorIds: string[];
     slideshowLocationIds: string[];
     dateMode: DateMode;
+    controls: Control[];
 };
 
 // Shared by the GameManagementPanel's JSON export/preview and Stage's storage sync so both always agree on shape.
@@ -284,6 +293,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     castActorIds: [...(input.castActorIds || [])],
     slideshowLocationIds: [...(input.slideshowLocationIds || [])],
     dateMode: input.dateMode === 'turnBased' ? 'turnBased' : 'calendar',
+    controls: (input.controls || []).map((control) => new Control(control)),
 });
 
 export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateType, ConfigType> {
@@ -358,6 +368,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             globalStats: [],
             globalStatValues: {},
             statUpdateRules: [],
+            controls: [],
             uiSettings: cloneUiSettings(DEFAULT_UI_SETTINGS),
             title: 'Agenda VN',
             titleImageUrl: '',
@@ -408,6 +419,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 globalStats: (this.getConfiguration()?.globalStats || []).map(cloneStat),
                 globalStatValues: { ...(activeSave?.globalStatValues || {}) },
                 statUpdateRules: cloneStatUpdateRules(this.getConfiguration()?.statUpdateRules),
+                controls: (this.getConfiguration()?.controls || []).map((control) => new Control(control)),
                 uiSettings: cloneUiSettings(activeSave?.uiSettings || {}),
             };
             this.syncUniversalSchedule();
@@ -431,6 +443,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         configuration.globalStats = configuration.globalStats || defaultConfiguration.globalStats;
         configuration.globalStatValues = configuration.globalStatValues || defaultConfiguration.globalStatValues;
         configuration.statUpdateRules = configuration.statUpdateRules || defaultConfiguration.statUpdateRules;
+        configuration.controls = (configuration.controls || defaultConfiguration.controls).map((control) => control instanceof Control ? control : cloneControl(control));
         configuration.uiSettings = configuration.uiSettings || defaultConfiguration.uiSettings;
         configuration.startingDate = configuration.startingDate || defaultConfiguration.startingDate;
         configuration.title = configuration.title || defaultConfiguration.title;
@@ -467,6 +480,32 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     getScheduleContext(save: SaveType): ScheduleContext {
         const configuration = this.getConfiguration();
         return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats };
+    }
+
+    // Resolves the active (available) controls for the given placement, in configured order, for rendering
+    // on the map screen (see MapScreen/DefinedMapView and ControlBar).
+    getVisibleControls(placement: ControlPlacement): Control[] {
+        const context = this.getScheduleContext(this.getSave());
+        return (this.getConfiguration().controls || []).filter((control) => control.placement === placement && isControlAvailable(control, context));
+    }
+
+    // Applies a 'button' control's defined stat updates (its "function") and saves.
+    runControlActions(control: Control) {
+        const save = this.getSave();
+        (control.actions || []).forEach((update) => this.applyStatUpdate(save, update));
+        this.saveGame();
+    }
+
+    // Directly sets a global stat's value (used by 'statEditor' controls) and saves.
+    setGlobalStatValue(statId: string, value: StatValue) {
+        const stat = (this.getConfiguration().globalStats || []).find((candidate) => candidate.id === statId);
+        if (!stat) {
+            return;
+        }
+        const save = this.getSave();
+        save.globalStatValues = save.globalStatValues || {};
+        save.globalStatValues[stat.id] = normalizeStatValue(value, stat);
+        this.saveGame();
     }
 
     updateConfiguration(updates: Partial<GameConfiguration>) {
@@ -2689,6 +2728,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             calendarEvents: configuration.calendarEvents || [],
             uiSettings: configuration.uiSettings,
             castActorIds: configuration.castActorIds || [],
+            controls: (configuration.controls || []).filter((control) => control.active !== false),
             slideshowLocationIds: configuration.slideshowLocationIds || [],
             dateMode: configuration.dateMode,
         });

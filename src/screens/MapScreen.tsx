@@ -11,6 +11,7 @@ import { Button, GlassPanel } from "../components/UiComponents";
 import { DefinedMapView } from "./DefinedMapView";
 import { LocationActorPortraits } from "../components/LocationActorPortraits";
 import { GlobalStatBar } from "../components/GlobalStatBar";
+import { ControlDock } from "../components/ControlDock";
 import { useCachedImageUrl } from "../utils/ImageCache";
 import { CachedBackgroundUrl } from "../components/CachedImage";
 
@@ -394,6 +395,8 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                         })}
                     </Box>
                 </GlassPanel>
+
+                <ControlDock stage={stage} />
             </Box>
 
             {showContentManagement && (

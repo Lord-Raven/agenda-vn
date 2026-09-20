@@ -12,13 +12,14 @@ import { CalendarEventManagementPanel } from './CalendarEventManagementPanel';
 import { MapManagementPanel } from './MapManagementPanel';
 import { StatManagementPanel } from './StatManagementPanel';
 import { ItemManagementPanel } from './ItemManagementPanel';
+import { ControlManagementPanel } from './ControlManagementPanel';
 
 interface ContentManagementScreenProps {
     stage: () => Stage;
     onClose: () => void;
 }
 
-type TabType = 'game' | 'style' | 'stats' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
+type TabType = 'game' | 'style' | 'stats' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
@@ -26,7 +27,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
     const [activeTab, setActiveTab] = useState<TabType>('actors');
 
     useEffect(() => {
-        if (!isCreatorMode && (activeTab === 'game' || activeTab === 'style' || activeTab === 'stats')) {
+        if (!isCreatorMode && (activeTab === 'game' || activeTab === 'style' || activeTab === 'stats' || activeTab === 'controls')) {
             setActiveTab('actors');
         }
     }, [activeTab, isCreatorMode]);
@@ -189,6 +190,21 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                         Stats
                                     </Button>
                                 )}
+                                {isCreatorMode && (
+                                    <Button
+                                        onClick={() => setActiveTab('controls')}
+                                        variant={activeTab === 'controls' ? 'primary' : 'secondary'}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            opacity: activeTab === 'controls' ? 1 : 0.6,
+                                        }}
+                                    >
+                                        <Tune />
+                                        Controls ({(stage().getConfiguration().controls || []).filter(control => control.active !== false).length})
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={() => setActiveTab('lorebook')}
                                     variant={activeTab === 'lorebook' ? 'primary' : 'secondary'}
@@ -311,6 +327,11 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 {/* Stats Tab */}
                                 {activeTab === 'stats' && (
                                     <StatManagementPanel stage={stage} />
+                                )}
+
+                                {/* Controls Tab */}
+                                {activeTab === 'controls' && (
+                                    <ControlManagementPanel stage={stage} />
                                 )}
                             </div>
                         </GlassPanel>

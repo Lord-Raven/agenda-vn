@@ -13,6 +13,7 @@ import { Button } from '../components/UiComponents';
 import { evaluateConditionCollections } from '../content/Condition';
 import { LocationActorPortraits } from '../components/LocationActorPortraits';
 import { GlobalStatBar } from '../components/GlobalStatBar';
+import { ControlDock } from '../components/ControlDock';
 import { useCachedImageUrl } from '../utils/ImageCache';
 import { CachedBackgroundUrl } from '../components/CachedImage';
 
@@ -381,6 +382,8 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                             </motion.div>
                         </AnimatePresence>
                 </Box>
+
+                <ControlDock stage={stage} />
             </Box>
             {showContentManagement && <ContentManagementScreen stage={stage} onClose={() => { stage().saveGame(); setShowContentManagement(false); }} />}
         </>
