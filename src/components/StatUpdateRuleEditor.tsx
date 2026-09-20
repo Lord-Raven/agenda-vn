@@ -1,7 +1,7 @@
 import { FC, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
-import { Stat, StatFunctionParameter, StatValue, StatUpdate, StatUpdateRule, isNumericDisplayType } from '../content/Stat';
+import { Stat, StatFunctionParameter, StatValue, StatUpdate, StatUpdateRule, isFunctionStatType, isNumericDisplayType } from '../content/Stat';
 import { Condition, ConditionCollection } from '../content/Condition';
 import { Stage } from '../Stage';
 import { Button } from './UiComponents';
@@ -87,7 +87,10 @@ const describeTrigger = (rule: StatUpdateRule): string => {
 
 const describeUpdate = (update: StatUpdate, stat: Stat | undefined): string => {
     if (!stat) {
-        return 'Unassigned stat';
+        return update.kind === 'function' ? 'Unassigned function' : 'Unassigned stat';
+    }
+    if (update.kind === 'function') {
+        return `Invoke ${stat.name}`;
     }
     const verb = update.operation === 'set' || !isNumericDisplayType(stat.type) ? 'set to' : 'adjust by';
     return `${stat.name} ${verb} ${update.value}`;
@@ -131,7 +134,14 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
     };
 
     const statsForUpdate = (update: StatUpdate): Stat[] => update.targetType === 'player' ? globalStats : updatableActorStats;
-    const resolveUpdateStat = (update: StatUpdate): Stat | undefined => statsForUpdate(update).find(stat => stat.id === update.statId);
+    const functionStatsForTargetType = (targetType: StatUpdate['targetType']): Stat[] => (
+        (targetType === 'player' ? globalStats : actorStats).filter(stat => isFunctionStatType(stat.type))
+    );
+    const resolveUpdateStat = (update: StatUpdate): Stat | undefined => (
+        update.kind === 'function'
+            ? functionStatsForTargetType(update.targetType).find(stat => stat.id === update.statId)
+            : statsForUpdate(update).find(stat => stat.id === update.statId)
+    );
 
     return (
         <div style={{ display: 'grid', gap: 10 }}>
@@ -175,84 +185,172 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
 
                                 <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13, marginTop: 4 }}>Then</label>
                                 {rule.updates.map((update) => {
+                                    const kind = update.kind === 'function' ? 'function' : 'stat';
                                     const stat = resolveUpdateStat(update);
                                     const availableStats = statsForUpdate(update);
+                                    const availableFunctionStats = functionStatsForTargetType(update.targetType);
                                     return (
-                                        <div key={update.id} style={{ display: 'grid', gridTemplateColumns: `minmax(90px, 110px) minmax(120px, 1.2fr) minmax(120px, 1.3fr) minmax(100px, 110px)${scalarFunctionParameters.length > 0 ? ' minmax(110px, 140px)' : ''} minmax(100px, 1fr) auto`, gap: 8, alignItems: 'center', minWidth: 0 }}>
-                                            <select
-                                                style={selectStyle}
-                                                value={update.targetType}
-                                                onChange={(event) => {
-                                                    const targetType = event.target.value as StatUpdate['targetType'];
-                                                    const nextStats = targetType === 'player' ? globalStats : updatableActorStats;
-                                                    updateStatUpdate(rule.id, update.id, { targetType, statId: nextStats[0]?.id || '', value: 0 });
-                                                }}
-                                            >
-                                                <option value="actor">Actor</option>
-                                                <option value="player">Player</option>
-                                            </select>
-                                            {update.targetType === 'actor' ? (
-                                                <SearchableOptionPicker
-                                                    value={update.actorId}
-                                                    onChange={(nextValue) => updateStatUpdate(rule.id, update.id, { actorId: (Array.isArray(nextValue) ? nextValue[0] : nextValue) || 'any' })}
-                                                    options={actorTargetOptions}
-                                                    defaultOptionKeys={['any']}
-                                                    allowClear={false}
-                                                    title="Choose actor target"
-                                                    placeholder="Search actors"
-                                                />
-                                            ) : <div />}
-                                            <select
-                                                style={selectStyle}
-                                                value={update.statId}
-                                                onChange={(event) => updateStatUpdate(rule.id, update.id, { statId: event.target.value, value: 0 })}
-                                            >
-                                                {availableStats.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
-                                            </select>
-                                            {stat && isNumericDisplayType(stat.type) ? (
+                                        <div key={update.id} style={{ display: 'grid', gap: 8, padding: 8, border: '1px dashed var(--agenda-line-subtle)', borderRadius: 6 }}>
+                                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                                                 <select
-                                                    style={selectStyle}
-                                                    value={update.operation}
-                                                    onChange={(event) => updateStatUpdate(rule.id, update.id, { operation: event.target.value as StatUpdate['operation'] })}
+                                                    style={{ ...selectStyle, width: 'auto', minWidth: 150 }}
+                                                    value={kind}
+                                                    onChange={(event) => {
+                                                        const nextKind = event.target.value as 'stat' | 'function';
+                                                        if (nextKind === 'function') {
+                                                            const functionStats = functionStatsForTargetType(update.targetType);
+                                                            updateStatUpdate(rule.id, update.id, { kind: 'function', statId: functionStats[0]?.id || '', parameterValues: {}, parameterValueSources: {} });
+                                                        } else {
+                                                            const nextStats = statsForUpdate(update);
+                                                            updateStatUpdate(rule.id, update.id, { kind: 'stat', statId: nextStats[0]?.id || '', value: 0 });
+                                                        }
+                                                    }}
                                                 >
-                                                    <option value="adjust">Adjust by</option>
-                                                    <option value="set">Set to</option>
+                                                    <option value="stat">Update a stat</option>
+                                                    <option value="function">Invoke a function</option>
                                                 </select>
-                                            ) : <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Set to</span>}
-                                            {scalarFunctionParameters.length > 0 && (
                                                 <select
-                                                    style={selectStyle}
-                                                    value={update.valueParameterId || ''}
-                                                    onChange={(event) => updateStatUpdate(rule.id, update.id, { valueParameterId: event.target.value || undefined })}
+                                                    style={{ ...selectStyle, width: 'auto', minWidth: 100 }}
+                                                    value={update.targetType}
+                                                    onChange={(event) => {
+                                                        const targetType = event.target.value as StatUpdate['targetType'];
+                                                        if (kind === 'function') {
+                                                            const functionStats = functionStatsForTargetType(targetType);
+                                                            updateStatUpdate(rule.id, update.id, { targetType, statId: functionStats[0]?.id || '', parameterValues: {}, parameterValueSources: {} });
+                                                        } else {
+                                                            const nextStats = targetType === 'player' ? globalStats : updatableActorStats;
+                                                            updateStatUpdate(rule.id, update.id, { targetType, statId: nextStats[0]?.id || '', value: 0 });
+                                                        }
+                                                    }}
                                                 >
-                                                    <option value="">Literal value</option>
-                                                    {scalarFunctionParameters.map(parameter => <option key={parameter.id} value={parameter.id}>Param: {parameter.name || 'Unnamed'}</option>)}
+                                                    <option value="actor">Actor</option>
+                                                    <option value="player">Player</option>
                                                 </select>
-                                            )}
-                                            {update.valueParameterId ? (
-                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                                    Uses parameter value
-                                                </span>
+                                                {update.targetType === 'actor' ? (
+                                                    <div style={{ flex: '1 1 180px', minWidth: 160 }}>
+                                                        <SearchableOptionPicker
+                                                            value={update.actorId}
+                                                            onChange={(nextValue) => updateStatUpdate(rule.id, update.id, { actorId: (Array.isArray(nextValue) ? nextValue[0] : nextValue) || 'any' })}
+                                                            options={actorTargetOptions}
+                                                            defaultOptionKeys={['any']}
+                                                            allowClear={false}
+                                                            title="Choose actor target"
+                                                            placeholder="Search actors"
+                                                        />
+                                                    </div>
+                                                ) : null}
+                                                <div style={{ flex: '1 1 auto' }} />
+                                                <Button
+                                                    variant="danger"
+                                                    onClick={() => updateRule(rule.id, { updates: rule.updates.filter(current => current.id !== update.id) })}
+                                                    aria-label="Delete stat update"
+                                                    style={iconButtonStyle}
+                                                >
+                                                    <Delete fontSize="small" />
+                                                </Button>
+                                            </div>
+
+                                            {kind === 'stat' ? (
+                                                <div style={{ display: 'grid', gridTemplateColumns: `minmax(120px, 1.3fr) minmax(100px, 110px)${scalarFunctionParameters.length > 0 ? ' minmax(110px, 140px)' : ''} minmax(100px, 1fr)`, gap: 8, alignItems: 'center', minWidth: 0 }}>
+                                                    <select
+                                                        style={selectStyle}
+                                                        value={update.statId}
+                                                        onChange={(event) => updateStatUpdate(rule.id, update.id, { statId: event.target.value, value: 0 })}
+                                                    >
+                                                        {availableStats.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                                                    </select>
+                                                    {stat && isNumericDisplayType(stat.type) ? (
+                                                        <select
+                                                            style={selectStyle}
+                                                            value={update.operation}
+                                                            onChange={(event) => updateStatUpdate(rule.id, update.id, { operation: event.target.value as StatUpdate['operation'] })}
+                                                        >
+                                                            <option value="adjust">Adjust by</option>
+                                                            <option value="set">Set to</option>
+                                                        </select>
+                                                    ) : <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Set to</span>}
+                                                    {scalarFunctionParameters.length > 0 && (
+                                                        <select
+                                                            style={selectStyle}
+                                                            value={update.valueParameterId || ''}
+                                                            onChange={(event) => updateStatUpdate(rule.id, update.id, { valueParameterId: event.target.value || undefined })}
+                                                        >
+                                                            <option value="">Literal value</option>
+                                                            {scalarFunctionParameters.map(parameter => <option key={parameter.id} value={parameter.id}>Param: {parameter.name || 'Unnamed'}</option>)}
+                                                        </select>
+                                                    )}
+                                                    {update.valueParameterId ? (
+                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                                            Uses parameter value
+                                                        </span>
+                                                    ) : (
+                                                        <StatValueInput
+                                                            stat={stat}
+                                                            value={update.value}
+                                                            onChange={(value: StatValue) => updateStatUpdate(rule.id, update.id, { value })}
+                                                            actors={actors}
+                                                            items={items}
+                                                            locations={locations}
+                                                            stage={stage}
+                                                            allowExpression
+                                                        />
+                                                    )}
+                                                </div>
                                             ) : (
-                                                <StatValueInput
-                                                    stat={stat}
-                                                    value={update.value}
-                                                    onChange={(value: StatValue) => updateStatUpdate(rule.id, update.id, { value })}
-                                                    actors={actors}
-                                                    items={items}
-                                                    locations={locations}
-                                                    stage={stage}
-                                                    allowExpression
-                                                />
+                                                <div style={{ display: 'grid', gap: 6 }}>
+                                                    <select
+                                                        style={selectStyle}
+                                                        value={update.statId}
+                                                        onChange={(event) => updateStatUpdate(rule.id, update.id, { statId: event.target.value, parameterValues: {}, parameterValueSources: {} })}
+                                                    >
+                                                        {availableFunctionStats.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                                                    </select>
+                                                    {availableFunctionStats.length === 0 && (
+                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>No function stats defined for this target.</span>
+                                                    )}
+                                                    {stat?.parameters?.map((parameter) => {
+                                                        const sourceOptions = functionParameters.filter(candidate => candidate.type === parameter.type);
+                                                        const sourceId = update.parameterValueSources?.[parameter.id] || '';
+                                                        const syntheticStat = { type: parameter.type, options: parameter.options } as Stat;
+                                                        return (
+                                                            <div key={parameter.id} style={{ display: 'grid', gridTemplateColumns: `minmax(90px, 140px)${sourceOptions.length > 0 ? ' minmax(110px, 140px)' : ''} minmax(120px, 1fr)`, gap: 8, alignItems: 'center' }}>
+                                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>{parameter.name || 'Unnamed'}</span>
+                                                                {sourceOptions.length > 0 && (
+                                                                    <select
+                                                                        style={selectStyle}
+                                                                        value={sourceId}
+                                                                        onChange={(event) => updateStatUpdate(rule.id, update.id, {
+                                                                            parameterValueSources: { ...(update.parameterValueSources || {}), [parameter.id]: event.target.value },
+                                                                        })}
+                                                                    >
+                                                                        <option value="">Literal value</option>
+                                                                        {sourceOptions.map(candidate => <option key={candidate.id} value={candidate.id}>Param: {candidate.name || 'Unnamed'}</option>)}
+                                                                    </select>
+                                                                )}
+                                                                {sourceId ? (
+                                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Uses parameter value</span>
+                                                                ) : (
+                                                                    <StatValueInput
+                                                                        stat={syntheticStat}
+                                                                        value={update.parameterValues?.[parameter.id] ?? ''}
+                                                                        onChange={(value: StatValue) => updateStatUpdate(rule.id, update.id, {
+                                                                            parameterValues: { ...(update.parameterValues || {}), [parameter.id]: value },
+                                                                        })}
+                                                                        actors={actors}
+                                                                        items={items}
+                                                                        locations={locations}
+                                                                        stage={stage}
+                                                                        allowExpression
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {stat && (stat.parameters || []).length === 0 && (
+                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>This function takes no parameters.</span>
+                                                    )}
+                                                </div>
                                             )}
-                                            <Button
-                                                variant="danger"
-                                                onClick={() => updateRule(rule.id, { updates: rule.updates.filter(current => current.id !== update.id) })}
-                                                aria-label="Delete stat update"
-                                                style={iconButtonStyle}
-                                            >
-                                                <Delete fontSize="small" />
-                                            </Button>
                                         </div>
                                     );
                                 })}

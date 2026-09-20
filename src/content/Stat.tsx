@@ -473,21 +473,61 @@ export const resolveStatValueRule = resolvePerActorValueRule;
 export type StatUpdateTargetType = 'player' | 'actor';
 export type StatUpdateOperation = 'set' | 'adjust';
 
-// A single stat write performed by a StatUpdateRule. Shares StatValue (and, for numeric stats, the same
-// dice/relative expression support) with StatValueRule so both rule flavors can use the same editors.
+// Whether a StatUpdateRule action writes a stat directly ('stat', the original/default behavior) or invokes
+// a 'function' typed stat instead (running that stat's own functionRules, see resolveInvocationParameterValues).
+export type StatUpdateActionKind = 'stat' | 'function';
+
+// A single action performed by a StatUpdateRule: either a stat write ('stat', the original behavior) or a
+// function stat invocation ('function'). Shares StatValue (and, for numeric stats, the same dice/relative
+// expression support) with StatValueRule so both rule flavors can use the same editors.
 export type StatUpdate = {
     id: string;
+    // Defaults to 'stat' when absent (back-compat with existing saved rules/actions).
+    kind?: StatUpdateActionKind;
     targetType: StatUpdateTargetType;
+    // Which entity owns the target stat ('stat' kind) or the function stat being invoked ('function' kind).
     // Only meaningful for 'actor' updates: 'any' targets every active actor, otherwise a specific actor id.
     // Within a function stat's rules, this may also be `param:<parameterId>` to target the actor supplied as
     // that (actor-typed) function parameter - see StatFunctionParameter.
     actorId: ActorConditionTarget;
+    // Only meaningful when kind is 'stat': the stat being written. When kind is 'function': the function-typed
+    // stat being invoked.
     statId: string;
     operation: StatUpdateOperation;
     value: StatValue;
     // Only meaningful within a function stat's rules: when set, this update's written value is sourced from
     // the named function parameter at invocation time instead of the literal `value` above.
     valueParameterId?: string;
+    // Only meaningful when kind is 'function': literal argument values to supply for the invoked function's
+    // parameters, keyed by parameter id (see StatFunctionParameter). Overridden per-parameter by
+    // `parameterValueSources` when present.
+    parameterValues?: Record<string, StatValue>;
+    // Only meaningful when kind is 'function' and this update lives within another function stat's own rules:
+    // sources a given invoked parameter's value from one of the enclosing function's own parameters instead
+    // of a literal, keyed by invoked-parameter id -> enclosing-parameter id.
+    parameterValueSources?: Record<string, string>;
+};
+
+export const isFunctionInvocationUpdate = (update: StatUpdate): boolean => update.kind === 'function';
+
+// Resolves the concrete argument values to invoke `functionStat` with for a 'function' kind StatUpdate: each
+// parameter's value is sourced from the enclosing function's own invocation (via `parameterValueSources`,
+// read off `context.parameterValues`) when set, otherwise from the update's own literal `parameterValues`.
+export const resolveInvocationParameterValues = (
+    update: StatUpdate,
+    functionStat: Stat,
+    context: ConditionContext,
+): Record<string, StatValue> => {
+    const result: Record<string, StatValue> = {};
+    for (const parameter of functionStat.parameters || []) {
+        const sourceParameterId = update.parameterValueSources?.[parameter.id];
+        if (sourceParameterId && context.parameterValues && sourceParameterId in context.parameterValues) {
+            result[parameter.id] = context.parameterValues[sourceParameterId];
+        } else {
+            result[parameter.id] = update.parameterValues?.[parameter.id] ?? '';
+        }
+    }
+    return result;
 };
 
 // A recurring "every <calendar condition> do these things" rule; conditions are the same ConditionCollections
@@ -500,6 +540,7 @@ export type StatUpdateRule = {
 
 export const cloneStatUpdate = (update: any): StatUpdate => ({
     id: update?.id || generateUuid(),
+    kind: update?.kind === 'function' ? 'function' : 'stat',
     targetType: update?.targetType === 'player' ? 'player' : 'actor',
     actorId: `${update?.actorId || 'any'}`,
     statId: `${update?.statId || ''}`,
@@ -508,6 +549,8 @@ export const cloneStatUpdate = (update: any): StatUpdate => ({
         ? normalizeReferenceListValue(update.value)
         : (typeof update?.value === 'boolean' || typeof update?.value === 'number' || typeof update?.value === 'string' ? update.value : 0),
     valueParameterId: update?.valueParameterId ? `${update.valueParameterId}` : undefined,
+    parameterValues: (update?.parameterValues && typeof update.parameterValues === 'object') ? { ...update.parameterValues } : undefined,
+    parameterValueSources: (update?.parameterValueSources && typeof update.parameterValueSources === 'object') ? { ...update.parameterValueSources } : undefined,
 });
 
 export const cloneStatUpdateRule = (rule: any): StatUpdateRule => ({

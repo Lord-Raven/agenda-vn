@@ -1,10 +1,10 @@
 import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
-import { ConditionCollection, ConditionContext, evaluateConditionCollections } from "./content/Condition";
+import { ConditionCollection, ConditionContext, evaluateConditionCollections, parseFunctionParameterTarget } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { findStatOptionByValue, formatReferenceStatText, isFunctionStatType, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
+import { findStatOptionByValue, formatReferenceStatText, isFunctionStatType, resolveReferenceKind, resolveFunctionRules, resolveInvocationParameterValues, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { Control, ControlPlacement, isControlAvailable } from "./content/Control";
@@ -125,6 +125,10 @@ const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'eveni
 // Upper bound on how many in-game periods a single calendar advance will replay stat update rules for, so a
 // large jump (or malformed dates) cannot spin indefinitely.
 const MAX_STAT_UPDATE_PERIODS = 128;
+
+// Upper bound on how deeply a StatUpdateRule's function invocation can recurse (a function's own rules
+// invoking another function, etc.), so a cyclical setup (e.g. A invokes B invokes A) cannot spin indefinitely.
+const MAX_FUNCTION_INVOCATION_DEPTH = 8;
 
 // Represents a configuration that is used to initialize new games, but can also influence existing games.
 export type GameConfiguration = {
@@ -492,7 +496,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // Applies a 'button' control's defined stat updates (its "function") and saves.
     runControlActions(control: Control) {
         const save = this.getSave();
-        (control.actions || []).forEach((update) => this.applyStatUpdate(save, update));
+        const context = this.getScheduleContext(save);
+        (control.actions || []).forEach((update) => this.applyStatUpdateAction(save, update, context));
         this.saveGame();
     }
 
@@ -1488,11 +1493,92 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             const context: ConditionContext = { ...this.getScheduleContext(save), currentDate: date, currentTimeOfDay: timeOfDay };
             rules
                 .filter(rule => evaluateConditionCollections(rule.conditions, context))
-                .forEach(rule => (rule.updates || []).forEach(update => this.applyStatUpdate(save, update)));
+                .forEach(rule => (rule.updates || []).forEach(update => this.applyStatUpdateAction(save, update, context)));
         }
     }
 
-    private applyStatUpdate(save: SaveType, update: StatUpdate) {
+    // Applies a single StatUpdateRule action: a direct stat write ('stat' kind, the original behavior) or a
+    // function stat invocation ('function' kind, see invokeFunctionUpdate). `depth` guards against runaway
+    // recursion when a function's own rules invoke further functions.
+    private applyStatUpdateAction(save: SaveType, update: StatUpdate, context: ConditionContext, depth: number = 0) {
+        if (update.kind === 'function') {
+            this.invokeFunctionUpdate(save, update, context, depth);
+            return;
+        }
+        this.applyStatUpdate(save, update, context);
+    }
+
+    // Resolves the actor(s) an update/invocation targets for a given ActorConditionTarget: the 'any'/'none'
+    // meta-targets, 'variable' (context.currentActor, e.g. while invoking a function on a specific actor),
+    // `param:<parameterId>` (the actor supplied as that function parameter, sourced from context.parameterValues),
+    // or a literal actor id.
+    private resolveUpdateTargetActors(save: SaveType, actorId: string, context: ConditionContext): Actor[] {
+        const activeActors = Object.values(save.actors || {}).filter(actor => actor.active !== false);
+        if (actorId === 'any') {
+            return activeActors;
+        }
+        if (actorId === 'none') {
+            return [];
+        }
+        if (actorId === 'variable') {
+            return context.currentActor ? activeActors.filter(actor => actor.id === context.currentActor?.id) : [];
+        }
+        const parameterId = parseFunctionParameterTarget(actorId);
+        if (parameterId) {
+            const resolvedActorId = context.parameterValues?.[parameterId];
+            return typeof resolvedActorId === 'string' ? activeActors.filter(actor => actor.id === resolvedActorId) : [];
+        }
+        return activeActors.filter(actor => actor.id === actorId);
+    }
+
+    // Invokes the function-typed stat targeted by a 'function' kind StatUpdate: resolves its argument values
+    // (see resolveInvocationParameterValues) and runs its functionRules (see runFunctionStatRules) once for
+    // the player (targetType 'player') or once per resolved actor (targetType 'actor').
+    private invokeFunctionUpdate(save: SaveType, update: StatUpdate, context: ConditionContext, depth: number) {
+        if (depth >= MAX_FUNCTION_INVOCATION_DEPTH) {
+            return;
+        }
+        const configuration = this.getConfiguration();
+        const stat = (update.targetType === 'player' ? (configuration.globalStats || []) : (configuration.actorStats || []))
+            .find(candidate => candidate.id === update.statId);
+        if (!stat || !isFunctionStatType(stat.type)) {
+            return;
+        }
+        const parameterValues = resolveInvocationParameterValues(update, stat, context);
+
+        if (update.targetType === 'player') {
+            this.runFunctionStatRules(save, stat, undefined, parameterValues, context, depth);
+            return;
+        }
+
+        this.resolveUpdateTargetActors(save, update.actorId, context).forEach(actor => {
+            const actorContext: ConditionContext = { ...context, currentActor: actor };
+            this.runFunctionStatRules(save, stat, undefined, parameterValues, actorContext, depth);
+        });
+    }
+
+    // Runs every matching rule (not just the first) of a function stat's effective rule set (its own
+    // functionRules, or a per-instance override - only Item currently supports overrides) against a context
+    // carrying the invocation's argument values, applying each rule's actions in turn.
+    private runFunctionStatRules(
+        save: SaveType,
+        stat: Stat,
+        overrides: Parameters<typeof resolveFunctionRules>[1],
+        parameterValues: Record<string, StatValue>,
+        baseContext: ConditionContext,
+        depth: number,
+    ) {
+        const rules = resolveFunctionRules(stat, overrides);
+        if (rules.length === 0) {
+            return;
+        }
+        const context: ConditionContext = { ...baseContext, parameterValues, functionParameters: stat.parameters || [] };
+        rules
+            .filter(rule => evaluateConditionCollections(rule.conditions, context))
+            .forEach(rule => (rule.updates || []).forEach(ruleUpdate => this.applyStatUpdateAction(save, ruleUpdate, context, depth + 1)));
+    }
+
+    private applyStatUpdate(save: SaveType, update: StatUpdate, context: ConditionContext = {}) {
         const configuration = this.getConfiguration();
 
         if (update.targetType === 'player') {
@@ -1500,8 +1586,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (!stat) {
                 return;
             }
+            const resolvedUpdate = update.valueParameterId ? { ...update, value: context.parameterValues?.[update.valueParameterId] ?? update.value } : update;
             save.globalStatValues = save.globalStatValues || {};
-            save.globalStatValues[stat.id] = applyStatUpdateValue(save.globalStatValues[stat.id], update, stat);
+            save.globalStatValues[stat.id] = applyStatUpdateValue(save.globalStatValues[stat.id], resolvedUpdate, stat);
             return;
         }
 
@@ -1511,13 +1598,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return;
         }
 
-        Object.values(save.actors || {})
-            .filter(actor => actor.active !== false)
-            .filter(actor => update.actorId === 'any' || actor.id === update.actorId)
-            .forEach(actor => {
-                actor.statMap = actor.statMap || {};
-                actor.statMap[stat.id] = applyStatUpdateValue(actor.statMap[stat.id], update, stat);
-            });
+        const resolvedUpdate = update.valueParameterId ? { ...update, value: context.parameterValues?.[update.valueParameterId] ?? update.value } : update;
+        this.resolveUpdateTargetActors(save, update.actorId, context).forEach(actor => {
+            actor.statMap = actor.statMap || {};
+            actor.statMap[stat.id] = applyStatUpdateValue(actor.statMap[stat.id], resolvedUpdate, stat);
+        });
     }
 
     private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType, useConfiguration: boolean = false): CalendarEvent {
