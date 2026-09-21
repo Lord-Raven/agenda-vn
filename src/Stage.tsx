@@ -1262,11 +1262,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     updateUiSettings(updates: Partial<UiSettings>) {
         const save = this.getSave();
         this.ensureCalendarState(save);
-        save.uiSettings = {
+        const uiSettings = {
             ...DEFAULT_UI_SETTINGS,
             ...(save.uiSettings || {}),
             ...updates,
         };
+        save.uiSettings = uiSettings;
+        this.updateConfiguration({ uiSettings: cloneUiSettings(uiSettings) });
         this.saveGame();
     }
 

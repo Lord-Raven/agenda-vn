@@ -101,9 +101,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             return;
         }
 
-        // Commit synchronously so closing the panel (which triggers an immediate saveGame()) never
-        // races with a pending debounced update and discards the latest edit.
-        stageInstance.updateConfiguration({ uiSettings });
+        stageInstance.updateUiSettings(uiSettings);
         applyUiSettingsToRoot(uiSettings);
     }, [stageInstance, uiSettings]);
 
@@ -175,7 +173,6 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             const nextSettings = mergeGeneratedUiSettings(uiSettings, parsed);
 
             setUiSettings(nextSettings);
-            stageInstance.updateConfiguration({ uiSettings: nextSettings });
             applyUiSettingsToRoot(nextSettings);
             stageInstance.showPriorityMessage('Generated style palette and font settings from game context.');
         } catch (error) {
