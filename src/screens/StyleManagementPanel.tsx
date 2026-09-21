@@ -101,12 +101,10 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             return;
         }
 
-        const saveTimer = window.setTimeout(() => {
-            stageInstance.updateConfiguration({ uiSettings });
-            applyUiSettingsToRoot(uiSettings);
-        }, 200);
-
-        return () => window.clearTimeout(saveTimer);
+        // Commit synchronously so closing the panel (which triggers an immediate saveGame()) never
+        // races with a pending debounced update and discards the latest edit.
+        stageInstance.updateConfiguration({ uiSettings });
+        applyUiSettingsToRoot(uiSettings);
     }, [stageInstance, uiSettings]);
 
     const handleGenerateStyles = async () => {
