@@ -381,11 +381,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const [expandedPerActorStatNames, setExpandedPerActorStatNames] = useState<Set<string>>(new Set());
     const [expandedStatNames, setExpandedStatNames] = useState<Set<string>>(new Set());
     const [selectedOutfitId, setSelectedOutfitId] = useState<string>(() => {
-        const outfits = getClonedOutfits();
-        if (actor.outfitId && outfits.some((outfit) => outfit.id === actor.outfitId)) {
+        if (actor.outfitId && editedOutfits.some((outfit) => outfit.id === actor.outfitId)) {
             return actor.outfitId;
         }
-        return outfits[0]?.id || '';
+        return editedOutfits[0]?.id || '';
     });
 
     const [actorDetailGenerationSelection, setActorDetailGenerationSelection] = useState<ActorDetailGenerationSelection>(() => ({
