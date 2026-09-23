@@ -130,6 +130,12 @@ const MAX_STAT_UPDATE_PERIODS = 128;
 // invoking another function, etc.), so a cyclical setup (e.g. A invokes B invokes A) cannot spin indefinitely.
 const MAX_FUNCTION_INVOCATION_DEPTH = 8;
 
+// Simple (string) metadata fields a function script may read/write directly on an actor/location via
+// getField/setField, bypassing the Stat system entirely. Deliberately excludes complex fields (schedule,
+// outfits, statMap, availabilityConditions, etc.) that have their own structure/semantics.
+const ACTOR_SCRIPT_FIELDS: (keyof Actor)[] = ['name', 'displayName', 'role', 'birthDate', 'summary', 'description', 'background', 'profile', 'category', 'themeColor', 'themeFontFamily', 'voiceId'];
+const LOCATION_SCRIPT_FIELDS: (keyof Location)[] = ['name', 'description', 'category', 'imagePrompt', 'imageUrl', 'themeColor'];
+
 // Represents a configuration that is used to initialize new games, but can also influence existing games.
 export type GameConfiguration = {
     
@@ -1548,11 +1554,19 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // Wraps a live entity (actor/location/item) and its configured stat definitions into a FunctionScriptEntity
-    // whose get/set accessors read/write the entity's own statMap by stat name.
-    private buildEntityScriptAccessor(name: string, kind: FunctionScriptEntity['kind'], statMap: { [key: string]: StatValue }, stats: Stat[]): FunctionScriptEntity {
+    // whose get/set accessors read/write the entity's own statMap by stat name. When `fieldAllowlist` is given
+    // (actor/location only), also exposes getField/setField for that allowlist of simple metadata fields.
+    private buildEntityScriptAccessor(
+        entity: { name: string; statMap: { [key: string]: StatValue } },
+        kind: FunctionScriptEntity['kind'],
+        stats: Stat[],
+        fieldAllowlist?: string[],
+    ): FunctionScriptEntity {
+        const statMap = entity.statMap;
+        const entityFields = entity as unknown as Record<string, unknown>;
         const findStat = (statName: string) => stats.find(candidate => candidate.name.trim().toLowerCase() === `${statName || ''}`.trim().toLowerCase());
-        return {
-            name,
+        const accessor: FunctionScriptEntity = {
+            name: entity.name,
             kind,
             get: (statName: string) => {
                 const stat = findStat(statName);
@@ -1566,21 +1580,51 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 statMap[stat.id] = normalizeStatValue(value, stat);
             },
         };
+        if (fieldAllowlist) {
+            const findField = (fieldName: string) => fieldAllowlist.find(candidate => candidate.toLowerCase() === `${fieldName || ''}`.trim().toLowerCase());
+            accessor.getField = (fieldName: string) => {
+                const field = findField(fieldName);
+                return field ? String(entityFields[field] ?? '') : undefined;
+            };
+            accessor.setField = (fieldName: string, value: string) => {
+                const field = findField(fieldName);
+                if (field) {
+                    entityFields[field] = `${value ?? ''}`;
+                }
+            };
+        }
+        return accessor;
     }
 
     private findActorScriptEntity(save: SaveType, name: string): FunctionScriptEntity | undefined {
         const actor = Object.values(save.actors || {}).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return actor ? this.buildEntityScriptAccessor(actor.name, 'actor', actor.statMap, this.getConfiguration().actorStats || []) : undefined;
+        return actor ? this.buildEntityScriptAccessor(actor, 'actor', this.getConfiguration().actorStats || [], ACTOR_SCRIPT_FIELDS) : undefined;
     }
 
     private findLocationScriptEntity(save: SaveType, name: string): FunctionScriptEntity | undefined {
         const location = Object.values(save.atlas || {}).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return location ? this.buildEntityScriptAccessor(location.name, 'location', location.statMap, this.getConfiguration().locationStats || []) : undefined;
+        return location ? this.buildEntityScriptAccessor(location, 'location', this.getConfiguration().locationStats || [], LOCATION_SCRIPT_FIELDS) : undefined;
     }
 
     private findItemScriptEntity(save: SaveType, name: string): FunctionScriptEntity | undefined {
         const item = (save.inventory || []).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return item ? this.buildEntityScriptAccessor(item.name, 'item', item.statMap, this.getConfiguration().itemStats || []) : undefined;
+        return item ? this.buildEntityScriptAccessor(item, 'item', this.getConfiguration().itemStats || []) : undefined;
+    }
+
+    // Every active (non-deleted) actor/location, wrapped as FunctionScriptEntity, for scripts that need to
+    // loop over the full cast (e.g. `actors().forEach(a => ...)`).
+    private buildActorScriptEntities(save: SaveType): FunctionScriptEntity[] {
+        const actorStats = this.getConfiguration().actorStats || [];
+        return Object.values(save.actors || {})
+            .filter(actor => actor.active !== false)
+            .map(actor => this.buildEntityScriptAccessor(actor, 'actor', actorStats, ACTOR_SCRIPT_FIELDS));
+    }
+
+    private buildLocationScriptEntities(save: SaveType): FunctionScriptEntity[] {
+        const locationStats = this.getConfiguration().locationStats || [];
+        return Object.values(save.atlas || {})
+            .filter(location => location.active !== false)
+            .map(location => this.buildEntityScriptAccessor(location, 'location', locationStats, LOCATION_SCRIPT_FIELDS));
     }
 
     // Builds the full binding set a function stat's script executes with; `call` looks up another function
@@ -1611,6 +1655,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             getActor: (name: string) => this.findActorScriptEntity(save, name),
             getLocation: (name: string) => this.findLocationScriptEntity(save, name),
             getItem: (name: string) => this.findItemScriptEntity(save, name),
+            actors: () => this.buildActorScriptEntities(save),
+            locations: () => this.buildLocationScriptEntities(save),
             call,
         };
     }
@@ -1646,7 +1692,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         this.resolveUpdateTargetActors(save, update.actorId, context).forEach(actor => {
-            const target = this.buildEntityScriptAccessor(actor.name, 'actor', actor.statMap, configuration.actorStats || []);
+            const target = this.buildEntityScriptAccessor(actor, 'actor', configuration.actorStats || [], ACTOR_SCRIPT_FIELDS);
             this.runFunctionStatScript(save, stat, target, undefined, depth);
         });
     }

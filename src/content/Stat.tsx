@@ -240,20 +240,25 @@ export type StatValueRule = {
     conditions: ConditionCollection[];
 };
 
-// An entity a function script's `target` (or a `getActor`/`getLocation`/`getItem` lookup) resolves to: its
-// own stats can be read/written by name via `get`/`set`, scoped to whichever stat definitions (`kind`) apply.
+// An entity a function script's `target` (or a `getActor`/`getLocation`/`getItem`/`actors`/`locations`
+// lookup) resolves to: its own stats can be read/written by name via `get`/`set`, scoped to whichever stat
+// definitions (`kind`) apply. `getField`/`setField` (actor/location only) read/write a small allowlist of
+// simple metadata fields (e.g. name, role, description) directly, bypassing the Stat system.
 export type FunctionScriptEntity = {
     name: string;
     kind: 'actor' | 'location' | 'item';
     get: (statName: string) => StatValue | undefined;
     set: (statName: string, value: StatValue) => void;
+    getField?: (fieldName: string) => string | undefined;
+    setField?: (fieldName: string, value: string) => void;
 };
 
 // The bindings a function stat's script body executes with (via `new Function`, see runFunctionScript):
 // `get`/`set` read/write global stats by name; `target` (when bound) is the entity this invocation concerns
 // (e.g. the actor a StatUpdate targeted, or an Item's own stats); `getActor`/`getLocation`/`getItem` look up
-// any other named entity's stats; `call` invokes another function stat by name (global, or - if a target/
-// explicit entity is given - one scoped to that entity's kind), returning its return value.
+// any other named entity's stats; `actors`/`locations` list every active (non-deleted) actor/location entity
+// for looping; `call` invokes another function stat by name (global, or - if a target/explicit entity is
+// given - one scoped to that entity's kind), returning its return value.
 export type FunctionScriptBindings = {
     get: (statName: string) => StatValue | undefined;
     set: (statName: string, value: StatValue) => void;
@@ -261,6 +266,8 @@ export type FunctionScriptBindings = {
     getActor: (name: string) => FunctionScriptEntity | undefined;
     getLocation: (name: string) => FunctionScriptEntity | undefined;
     getItem: (name: string) => FunctionScriptEntity | undefined;
+    actors: () => FunctionScriptEntity[];
+    locations: () => FunctionScriptEntity[];
     call: (name: string, target?: FunctionScriptEntity) => unknown;
 };
 
@@ -273,8 +280,13 @@ export const runFunctionScript = (script: string | undefined, bindings: Function
         return undefined;
     }
     try {
-        const scriptFunction = new Function('get', 'set', 'target', 'getActor', 'getLocation', 'getItem', 'call', body);
-        return scriptFunction(bindings.get, bindings.set, bindings.target, bindings.getActor, bindings.getLocation, bindings.getItem, bindings.call);
+        const scriptFunction = new Function(
+            'get', 'set', 'target', 'getActor', 'getLocation', 'getItem', 'actors', 'locations', 'call', body,
+        );
+        return scriptFunction(
+            bindings.get, bindings.set, bindings.target, bindings.getActor, bindings.getLocation, bindings.getItem,
+            bindings.actors, bindings.locations, bindings.call,
+        );
     } catch (error) {
         console.error(`Function stat script error: ${(error as Error)?.message || error}`);
         return undefined;

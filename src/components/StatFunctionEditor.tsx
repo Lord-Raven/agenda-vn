@@ -28,8 +28,28 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
             <TextArea
                 value={script}
                 onChange={(event) => onScriptChange(event.target.value)}
-                rows={10}
-                placeholder={'set(\'Gold\', get(\'Gold\') + 10);\nif (target) {\n    target.set(\'Affinity\', target.get(\'Affinity\') + 1);\n}'}
+                rows={16}
+                placeholder={[
+                    'set(\'Gold\', get(\'Gold\') + 10);',
+                    'if (target) {',
+                    '    target.set(\'Affinity\', target.get(\'Affinity\') + 1);',
+                    '}',
+                    '',
+                    '// Loop through every active actor and location:',
+                    'actors().forEach(actor => {',
+                    '    if (actor.get(\'Affinity\') > 50) {',
+                    '        actor.setField(\'role\', \'Trusted Ally\');',
+                    '    }',
+                    '});',
+                    '',
+                    'let totalPopulation = 0;',
+                    'locations().forEach(location => {',
+                    '    totalPopulation += location.get(\'Population\') || 0;',
+                    '});',
+                    'set(\'World Population\', totalPopulation);',
+                    '',
+                    'return totalPopulation;',
+                ].join('\n')}
                 style={{ width: '100%', resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
             />
         </div>
