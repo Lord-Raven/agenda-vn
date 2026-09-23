@@ -2,41 +2,16 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatDisplayType, StatType, StatValue, StatValueRule, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, findStatOptionByValue, getStatOptionValue, isFunctionStatType, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue, cloneStat } from '../content/Stat';
-import { Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
-import { IconPicker } from '../components/StatRating';
+import { Stat, StatValue, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, findStatOptionByValue, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue, cloneStat } from '../content/Stat';
+import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
-import { ConditionEditor } from '../components/ConditionEditor';
-import { ConditionalFlagEditor } from '../components/ConditionalFlagEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
-import { StatFunctionEditor } from '../components/StatFunctionEditor';
-import { StatValueInput } from '../components/StatValueInput';
-import { Add, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-material';
+import { resolveStatDefaultValue, StatEntryEditor } from '../components/StatEntryEditor';
+import { Add } from '@mui/icons-material';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
 }
-
-const resolveStatDefaultValue = (stat: Stat): StatValue => {
-    if (stat.type === 'option') {
-        const defaultOption = findStatOptionByValue(stat, stat.default);
-        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
-    }
-
-    if (isReferenceListDisplayType(stat.type)) {
-        return normalizeReferenceListValue(stat.default);
-    }
-
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
-        return typeof stat.default === 'string' ? stat.default : '';
-    }
-
-    if (stat.type === 'checkbox') {
-        return typeof stat.default === 'boolean' ? stat.default : false;
-    }
-
-    return Number.isFinite(stat.default) ? Number(stat.default) : 0;
-};
 
 const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
     if (stat.type === 'option') {
@@ -97,48 +72,12 @@ const defaultGlobalStat = (): Stat => ({
     iconName: 'star',
 });
 
-const defaultActorStat = (): Stat => ({
+const defaultTypedStat = (): Stat => ({
     id: generateUuid(),
     name: 'Name',
     description: 'A user-facing description of this stat.',
     perActor: false,
     perActorDefaultRules: [],
-    guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
-    default: 50,
-    type: 'number',
-    displayType: 'percentage',
-    min: 0,
-    max: 100,
-    options: [],
-    setByPlayer: false,
-    exposed: { value: false, conditions: [] },
-    llmSees: { value: true, conditions: [] },
-    llmMaintained: { value: true, conditions: [] },
-    iconName: 'star',
-});
-
-const defaultLocationStat = (): Stat => ({
-    id: generateUuid(),
-    name: 'Name',
-    description: 'A user-facing description of this stat.',
-    guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
-    default: 50,
-    type: 'number',
-    displayType: 'percentage',
-    min: 0,
-    max: 100,
-    options: [],
-    setByPlayer: false,
-    exposed: { value: false, conditions: [] },
-    llmSees: { value: true, conditions: [] },
-    llmMaintained: { value: true, conditions: [] },
-    iconName: 'star',
-});
-
-const defaultItemStat = (): Stat => ({
-    id: generateUuid(),
-    name: 'Name',
-    description: 'A user-facing description of this stat.',
     guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
     default: 50,
     type: 'number',
@@ -168,176 +107,6 @@ const clampStatValue = (value: number, stat: Stat): number => {
         resolved = Math.min(stat.max, resolved);
     }
     return resolved;
-};
-
-const canBeVisibleInUi = (stat: Stat): boolean => stat.exposed.value === true || stat.exposed.conditions.length > 0;
-
-const renderStatTypeOptions = () => (
-    <>
-        <option value="actor">Actor</option>
-        <option value="actorList">Actor List</option>
-        <option value="checkbox">Checkbox</option>
-        <option value="function">Function</option>
-        <option value="item">Item</option>
-        <option value="itemList">Item List</option>
-        <option value="location">Location</option>
-        <option value="locationList">Location List</option>
-        <option value="number">Number</option>
-        <option value="option">Option</option>
-        <option value="text">Text</option>
-    </>
-);
-
-const normalizeGlobalStatShape = (stat: Stat): Stat => {
-    if (isFunctionStatType(stat.type)) {
-        return {
-            ...stat,
-            default: '',
-            options: [],
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            perActor: false,
-            defaultValueRules: [],
-            script: stat.script || '',
-        };
-    }
-
-    if (stat.type === 'option') {
-        const options = (stat.options || [])
-            .filter(option => option.name.trim())
-            .map((option, optionIndex) => ({ ...option, id: getStatOptionValue(option, optionIndex) }));
-        const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
-        return {
-            ...stat,
-            options,
-            default: defaultValue,
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
-        };
-    }
-
-    if (isReferenceListDisplayType(stat.type)) {
-        return {
-            ...stat,
-            default: normalizeReferenceListValue(stat.default),
-            options: [],
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
-        };
-    }
-
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
-        return {
-            ...stat,
-            default: typeof stat.default === 'string' ? stat.default : '',
-            options: [],
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
-        };
-    }
-
-    if (stat.type === 'checkbox') {
-        return {
-            ...stat,
-            default: typeof stat.default === 'boolean' ? stat.default : false,
-            options: [],
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
-        };
-    }
-
-    return {
-        ...stat,
-        default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
-        options: [],
-        displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
-        iconName: stat.iconName || 'star',
-    };
-};
-
-const normalizeActorStatShape = (stat: Stat): Stat => {
-    if (isFunctionStatType(stat.type)) {
-        return {
-            ...stat,
-            default: '',
-            options: [],
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            perActor: false,
-            perActorDefaultRules: [],
-            script: stat.script || '',
-        };
-    }
-
-    if (stat.type === 'option') {
-        const options = (stat.options || [])
-            .filter(option => option.name.trim())
-            .map((option, optionIndex) => ({ ...option, id: getStatOptionValue(option, optionIndex) }));
-        const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
-        return {
-            ...stat,
-            options,
-            default: defaultValue,
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
-        };
-    }
-
-    if (isReferenceListDisplayType(stat.type)) {
-        return {
-            ...stat,
-            default: normalizeReferenceListValue(stat.default),
-            options: [],
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
-        };
-    }
-
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
-        return {
-            ...stat,
-            default: typeof stat.default === 'string' ? stat.default : '',
-            options: [],
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
-        };
-    }
-
-    if (stat.type === 'checkbox') {
-        return {
-            ...stat,
-            default: typeof stat.default === 'boolean' ? stat.default : false,
-            options: [],
-            min: undefined,
-            max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
-        };
-    }
-
-    return {
-        ...stat,
-        default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
-        options: [],
-        displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
-        iconName: stat.iconName || 'star',
-    };
 };
 
 export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => {
@@ -637,132 +406,11 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         setCollapsedGlobalStats(prev => swapArrayItems(prev, index, targetIndex));
     };
 
-    const updateGlobalStatOption = (statIndex: number, optionIndex: number, patch: { name?: string; description?: string }) => {
-        setGlobalStats(prev => prev.map((stat, idx) => {
-            if (idx !== statIndex) {
-                return stat;
-            }
-
-            const currentOptions = [...(stat.options || [])];
-            const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
-            const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), ...patch };
-            currentOptions[optionIndex] = nextOption;
-            return { ...stat, options: currentOptions };
-        }));
-    };
-
-    const removeGlobalStatOption = (statIndex: number, optionIndex: number) => {
-        setGlobalStats(prev => prev.map((stat, idx) => {
-            if (idx !== statIndex) {
-                return stat;
-            }
-
-            const options = (stat.options || []).filter((_, idx2) => idx2 !== optionIndex);
-            const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
-
-            return {
-                ...stat,
-                options,
-                default: defaultValue,
-            };
-        }));
-    };
-
-    const addGlobalStatOption = (statIndex: number) => {
-        setGlobalStats(prev => prev.map((stat, idx) => {
-            if (idx !== statIndex) {
-                return stat;
-            }
-
-            const options = [...(stat.options || [])];
-            const nextLabel = `Option ${options.length + 1}`;
-            options.push({
-                id: generateUuid(),
-                name: nextLabel,
-                description: '',
-            });
-
-            return {
-                ...stat,
-                options,
-                default: typeof stat.default === 'string' && stat.default.trim() ? stat.default : getStatOptionValue(options[options.length - 1], options.length - 1),
-            };
-        }));
-    };
-
     const updateActorStat = (index: number, patch: Partial<Stat>) => {
         setActorStats(prev => prev.map((stat, idx) => (
             idx === index ? { ...stat, ...patch } : stat
         )));
     };
-
-    const addGlobalStatDefaultRule = (index: number) => {
-        setGlobalStats(prev => prev.map((stat, idx) => {
-            if (idx !== index) {
-                return stat;
-            }
-            const rule: StatValueRule = { id: generateUuid(), value: resolveStatDefaultValue(stat), conditions: [] };
-            return { ...stat, defaultValueRules: [...(stat.defaultValueRules || []), rule] };
-        }));
-    };
-
-    const removeGlobalStatDefaultRule = (index: number, ruleId: string) => {
-        setGlobalStats(prev => prev.map((stat, idx) => (
-            idx === index ? { ...stat, defaultValueRules: (stat.defaultValueRules || []).filter(rule => rule.id !== ruleId) } : stat
-        )));
-    };
-
-    const updateGlobalStatDefaultRule = (index: number, ruleId: string, patch: Partial<StatValueRule>) => {
-        setGlobalStats(prev => prev.map((stat, idx) => (
-            idx === index
-                ? { ...stat, defaultValueRules: (stat.defaultValueRules || []).map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule) }
-                : stat
-        )));
-    };
-
-    const addActorStatPerActorRule = (index: number) => {
-        setActorStats(prev => prev.map((stat, idx) => {
-            if (idx !== index) {
-                return stat;
-            }
-            const rule: StatValueRule = { id: generateUuid(), value: resolveStatDefaultValue(stat), conditions: [] };
-            return { ...stat, perActorDefaultRules: [...(stat.perActorDefaultRules || []), rule] };
-        }));
-    };
-
-    const removeActorStatPerActorRule = (index: number, ruleId: string) => {
-        setActorStats(prev => prev.map((stat, idx) => (
-            idx === index ? { ...stat, perActorDefaultRules: (stat.perActorDefaultRules || []).filter(rule => rule.id !== ruleId) } : stat
-        )));
-    };
-
-    const updateActorStatPerActorRule = (index: number, ruleId: string, patch: Partial<StatValueRule>) => {
-        setActorStats(prev => prev.map((stat, idx) => (
-            idx === index
-                ? { ...stat, perActorDefaultRules: (stat.perActorDefaultRules || []).map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule) }
-                : stat
-        )));
-    }; 
-
-    const renderIconPicker = (value: string | undefined, onChange: (iconName: string | undefined) => void, allowClear = false) => (
-        <IconPicker value={value} onChange={onChange} allowClear={allowClear} />
-    );
-
-    const renderRuleValueInput = (stat: Stat, rule: StatValueRule, onChange: (value: StatValue) => void) => (
-        <StatValueInput stat={stat} value={rule.value} onChange={onChange} actors={actorOptions} items={itemOptions} locations={locationOptions} stage={stage} />
-    );
-
-    const renderReferenceDefaultInput = (stat: Stat, onChange: (value: StatValue) => void) => (
-        <StatValueInput
-            stat={stat}
-            value={stat.default}
-            onChange={onChange}
-            actors={actorOptions}
-            items={itemOptions}
-            locations={locationOptions}
-            stage={stage}
-        />
-    );
 
     const removeActorStat = (index: number) => {
         setActorStats(prev => prev.filter((_, idx) => idx !== index));
@@ -836,6 +484,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
         setCollapsedItemStats(prev => swapArrayItems(prev, index, targetIndex));
     };
 
+    const conditionActors = Object.values(save.actors || {});
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <GlassPanel variant="default" style={{ padding: '18px' }}>
@@ -853,394 +503,34 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     </Button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {globalStats.map((stat, statIndex) => {
-                        const normalizedStat = normalizeGlobalStatShape(stat);
-                        const optionEntries = normalizedStat.options || [];
-
-                        return (
-                            <div key={`player-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                    <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
-                                        {stat.name?.trim() || `Global Stat ${statIndex + 1}`}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                        <Button variant="secondary" disabled={statIndex === 0} onClick={() => moveGlobalStat(statIndex, -1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                                            <KeyboardArrowUp fontSize="small" />
-                                        </Button>
-                                        <Button variant="secondary" disabled={statIndex === globalStats.length - 1} onClick={() => moveGlobalStat(statIndex, 1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                                            <KeyboardArrowDown fontSize="small" />
-                                        </Button>
-                                        <Button variant="secondary" onClick={() => toggleGlobalStat(statIndex)}>
-                                            {collapsedGlobalStats[statIndex] ? 'Expand' : 'Collapse'}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {!collapsedGlobalStats[statIndex] && (
-                                    <>
-                                        <div style={{ marginTop: 10 }}>
-                                            <div style={inlineFieldStyle}>
-                                                <label style={fieldLabelStyle}>Name</label>
-                                                <TextInput
-                                                    fullWidth
-                                                    value={stat.name}
-                                                    onChange={(e) => setGlobalStatName(statIndex, e.target.value)}
-                                                    placeholder="Setting name"
-                                                />
-                                            </div>
-
-                                            <ConditionalFlagEditor
-                                                label="Visible In UI"
-                                                enabledLabel="Exposed"
-                                                disabledLabel="Hidden"
-                                                flag={stat.exposed}
-                                                onChange={(exposed) => updateGlobalStat(statIndex, { exposed })}
-                                                globalStats={[...globalStats, ...actorStats]}
-                                                actorStats={actorStats}
-                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                items={itemOptions}
-                                                locations={locationOptions}
-                                                fieldLabelStyle={fieldLabelStyle}
-                                                inlineFieldStyle={inlineFieldStyle}
-                                            />
-
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Editable In Settings</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.setByPlayer === true}
-                                                        onChange={(e) => updateGlobalStat(statIndex, { setByPlayer: e.target.checked })}
-                                                    />
-                                                    Set by Player
-                                                </label>
-                                            </div>
-
-                                            <ConditionalFlagEditor
-                                                label="Send to LLM"
-                                                enabledLabel="Included in LLM context"
-                                                disabledLabel="Omitted from LLM context"
-                                                flag={stat.llmSees}
-                                                onChange={(llmSees) => updateGlobalStat(statIndex, { llmSees })}
-                                                globalStats={[...globalStats, ...actorStats]}
-                                                actorStats={actorStats}
-                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                items={itemOptions}
-                                                locations={locationOptions}
-                                                fieldLabelStyle={fieldLabelStyle}
-                                                inlineFieldStyle={inlineFieldStyle}
-                                            />
-
-                                            {stat.llmSees.value !== false && (
-                                                <ConditionalFlagEditor
-                                                    label="Generatively Maintained"
-                                                    enabledLabel="LLM may update this stat via outcomes"
-                                                    disabledLabel="LLM may not update this stat"
-                                                    flag={stat.llmMaintained}
-                                                    onChange={(llmMaintained) => updateGlobalStat(statIndex, { llmMaintained })}
-                                                    globalStats={[...globalStats, ...actorStats]}
-                                                    actorStats={actorStats}
-                                                    actors={Object.values(stageInstance.getSave().actors || {})}
-                                                    items={itemOptions}
-                                                    locations={locationOptions}
-                                                    fieldLabelStyle={fieldLabelStyle}
-                                                    inlineFieldStyle={inlineFieldStyle}
-                                                />
-                                            )}
-
-                                            {(stat.exposed.value === true || stat.setByPlayer === true) && (
-                                                <div style={inlineFieldTopStyle}>
-                                                    <label style={fieldLabelStyle}>Description</label>
-                                                    <TextArea
-                                                        value={stat.description}
-                                                        onChange={(e) => updateGlobalStat(statIndex, { description: e.target.value })}
-                                                        rows={2}
-                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            <div style={inlineFieldTopStyle}>
-                                                <label style={fieldLabelStyle}>Guidance</label>
-                                                <TextArea
-                                                    value={stat.guidance}
-                                                    onChange={(e) => updateGlobalStat(statIndex, { guidance: e.target.value })}
-                                                    rows={2}
-                                                    style={{ width: '100%', resize: 'vertical' }}
-                                                />
-                                            </div>
-
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Type</label>
-                                                <select
-                                                    className="input-base"
-                                                    value={stat.type}
-                                                    onChange={(e) => {
-                                                        const nextType = e.target.value as Stat['type'];
-                                                        updateGlobalStat(statIndex, normalizeGlobalStatShape({
-                                                            ...stat,
-                                                            type: nextType,
-                                                        }));
-                                                    }}
-                                                >
-                                                    {renderStatTypeOptions()}
-                                                </select>
-                                            </div>
-
-                                            {normalizedStat.type === 'function' && (
-                                                <StatFunctionEditor
-                                                    script={normalizedStat.script || ''}
-                                                    onScriptChange={(script) => updateGlobalStat(statIndex, { script })}
-                                                />
-                                            )}
-
-                                            {normalizedStat.type === 'number' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Display</label>
-                                                    <select
-                                                        className="input-base"
-                                                        value={normalizedStat.displayType || 'straight'}
-                                                        onChange={(e) => {
-                                                            const nextDisplayType = e.target.value as StatDisplayType;
-                                                            updateGlobalStat(statIndex, {
-                                                                displayType: nextDisplayType,
-                                                                iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
-                                                            });
-                                                        }}
-                                                    >
-                                                        <option value="straight">Straight Number</option>
-                                                        <option value="percentage">Percentage</option>
-                                                        <option value="bar">Bar</option>
-                                                        <option value="rating">Rating</option>
-                                                        <option value="letter grade">Letter Grade</option>
-                                                    </select>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'number' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Display Color</label>
-                                                    <ColorPickerInput
-                                                        value={normalizedStat.displayColor || ''}
-                                                        onChange={(displayColor) => updateGlobalStat(statIndex, { displayColor })}
-                                                        popoverTitle="Choose Display Color"
-                                                        inputStyle={{ width: '100%' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'option' && (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
-                                                    <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
-                                                        <label style={fieldLabelStyle}>Default Option</label>
-                                                        <select
-                                                            className="input-base"
-                                                            value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                            onChange={(e) => updateGlobalStat(statIndex, { default: e.target.value })}
-                                                        >
-                                                            {optionEntries.map((option, idx) => (
-                                                                <option key={getStatOptionValue(option, idx)} value={getStatOptionValue(option, idx)}>
-                                                                    {option.name}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-
-                                                    {optionEntries.map((option, optionIndex) => (
-                                                        <div key={`${statIndex}-option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
-                                                            <div style={inlineFieldStyle}>
-                                                                <label style={fieldLabelStyle}>Option Name</label>
-                                                                <TextInput
-                                                                    fullWidth
-                                                                    value={option.name}
-                                                                    onChange={(e) => updateGlobalStatOption(statIndex, optionIndex, { name: e.target.value })}
-                                                                    placeholder="Option name"
-                                                                />
-                                                            </div>
-                                                            {(stat.exposed.value === true || stat.setByPlayer === true) && (
-                                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                                    <label style={fieldLabelStyle}>Option Description</label>
-                                                                    <TextArea
-                                                                        value={option.description}
-                                                                        onChange={(e) => updateGlobalStatOption(statIndex, optionIndex, { description: e.target.value })}
-                                                                        rows={2}
-                                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            <div style={{ marginTop: 8 }}>
-                                                                <Button variant="danger" onClick={() => removeGlobalStatOption(statIndex, optionIndex)}>
-                                                                    Remove Option
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    <Button variant="secondary" onClick={() => addGlobalStatOption(statIndex)}>
-                                                        Add Option
-                                                    </Button>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'text' && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value</label>
-                                                    <TextArea
-                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                        onChange={(e) => updateGlobalStat(statIndex, { default: e.target.value })}
-                                                        rows={2}
-                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {isReferenceDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Reference</label>
-                                                    {renderReferenceDefaultInput(normalizedStat, (defaultValue) => updateGlobalStat(statIndex, { default: defaultValue }))}
-                                                </div>
-                                            )}
-
-                                            {isReferenceListDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default References</label>
-                                                    {renderReferenceDefaultInput(normalizedStat, (defaultValue) => updateGlobalStat(statIndex, { default: defaultValue }))}
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'checkbox' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value</label>
-                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={normalizedStat.default === true}
-                                                            onChange={(e) => updateGlobalStat(statIndex, { default: e.target.checked })}
-                                                        />
-                                                        Checked
-                                                    </label>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Rating Icon</label>
-                                                    {renderIconPicker(normalizedStat.iconName, (iconName) => updateGlobalStat(statIndex, { iconName }))}
-                                                </div>
-                                            )}
-
-                                            {canBeVisibleInUi(stat) && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Label Icon</label>
-                                                    {renderIconPicker(stat.labelIconName, (iconName) => updateGlobalStat(statIndex, { labelIconName: iconName || undefined }), true)}
-                                                </div>
-                                            )}
-
-                                            {isNumericDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                    <label style={fieldLabelStyle}>Properties</label>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Default</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={String(Number.isFinite(normalizedStat.default) ? Number(normalizedStat.default) : 0)}
-                                                                onChange={(e) => updateGlobalStat(statIndex, { default: Number(e.target.value) || 0 })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Min</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={typeof normalizedStat.min === 'number' ? String(normalizedStat.min) : ''}
-                                                                onChange={(e) => updateGlobalStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Max</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={typeof normalizedStat.max === 'number' ? String(normalizedStat.max) : ''}
-                                                                onChange={(e) => updateGlobalStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {normalizedStat.type !== 'function' && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 10 }}>
-                                            <label style={fieldLabelStyle}>Default Value Rules</label>
-                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                Evaluated in order when a new game starts. The first matching rule wins and seeds this stat's starting value; falls back to the Default above if none match.
-                                            </span>
-                                            {(stat.defaultValueRules || []).length === 0 && (
-                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                    No rules. The Default value above is used to start every new game.
-                                                </span>
-                                            )}
-                                            {(stat.defaultValueRules || []).map((rule) => (
-                                                <div
-                                                    key={rule.id}
-                                                    style={{
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        gap: '6px',
-                                                        padding: '8px',
-                                                        border: '1px solid var(--agenda-line-subtle)',
-                                                        borderRadius: 6,
-                                                    }}
-                                                >
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Value</span>
-                                                        {renderRuleValueInput(stat, rule, (value) => updateGlobalStatDefaultRule(statIndex, rule.id, { value }))}
-                                                        <Button
-                                                            variant="danger"
-                                                            onClick={() => removeGlobalStatDefaultRule(statIndex, rule.id)}
-                                                            style={{ marginLeft: 'auto' }}
-                                                        >
-                                                            Delete
-                                                        </Button>
-                                                    </div>
-                                                    <ConditionEditor
-                                                        conditionCollections={rule.conditions}
-                                                        globalStats={[...globalStats, ...actorStats]}
-                                                        actorStats={actorStats}
-                                                        actors={Object.values(stageInstance.getSave().actors || {})}
-                                                        items={itemOptions}
-                                                        locations={locationOptions}
-                                                        onChange={(conditions) => updateGlobalStatDefaultRule(statIndex, rule.id, { conditions })}
-                                                    />
-                                                    {rule.conditions.length === 0 && (
-                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                            Always matches (should typically be the last rule).
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ))}
-                                            <Button
-                                                variant="secondary"
-                                                onClick={() => addGlobalStatDefaultRule(statIndex)}
-                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifySelf: 'start' }}
-                                            >
-                                                <Add fontSize="small" /> Add rule
-                                            </Button>
-                                        </div>
-                                        )}
-
-                                        <div style={{ marginTop: 10 }}>
-                                            <Button variant="danger" onClick={() => removeGlobalStat(statIndex)}>Remove Global Stat</Button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
-
+                    {globalStats.map((stat, statIndex) => (
+                        <StatEntryEditor
+                            key={`player-stat-${statIndex}`}
+                            stat={stat}
+                            index={statIndex}
+                            total={globalStats.length}
+                            typeLabel="Global Stat"
+                            category="global"
+                            collapsed={collapsedGlobalStats[statIndex]}
+                            onToggleCollapse={() => toggleGlobalStat(statIndex)}
+                            onMove={(direction) => moveGlobalStat(statIndex, direction)}
+                            onRemove={() => removeGlobalStat(statIndex)}
+                            onPatch={(patch) => updateGlobalStat(statIndex, patch)}
+                            onNameChange={(name) => setGlobalStatName(statIndex, name)}
+                            selfStats={globalStats}
+                            globalStats={globalStats}
+                            actorStats={actorStats}
+                            conditionActors={conditionActors}
+                            valueActors={actorOptions}
+                            items={itemOptions}
+                            locations={locationOptions}
+                            stage={stage}
+                            fieldLabelStyle={fieldLabelStyle}
+                            inlineFieldStyle={inlineFieldStyle}
+                            inlineFieldTopStyle={inlineFieldTopStyle}
+                            compactChipLabelStyle={compactChipLabelStyle}
+                        />
+                    ))}
                 </div>
             </GlassPanel>
 
@@ -1250,7 +540,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     <Button
                         variant="secondary"
                         onClick={() => {
-                            setActorStats(prev => [...prev, defaultActorStat()]);
+                            setActorStats(prev => [...prev, defaultTypedStat()]);
                             setCollapsedActorStats(prev => [...prev, false]);
                         }}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
@@ -1259,461 +549,33 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     </Button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {actorStats.map((stat, statIndex) => {
-                        const normalizedStat = normalizeActorStatShape(stat);
-                        const optionEntries = normalizedStat.options || [];
-
-                        return (
-                            <div key={`actor-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                    <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
-                                        {stat.name?.trim() || `Actor Stat ${statIndex + 1}`}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                        <Button variant="secondary" disabled={statIndex === 0} onClick={() => moveActorStat(statIndex, -1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                                            <KeyboardArrowUp fontSize="small" />
-                                        </Button>
-                                        <Button variant="secondary" disabled={statIndex === actorStats.length - 1} onClick={() => moveActorStat(statIndex, 1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                                            <KeyboardArrowDown fontSize="small" />
-                                        </Button>
-                                        <Button variant="secondary" onClick={() => toggleActorStat(statIndex)}>
-                                            {collapsedActorStats[statIndex] ? 'Expand' : 'Collapse'}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {!collapsedActorStats[statIndex] && (
-                                    <>
-                                        <div style={{ marginTop: 10 }}>
-                                            <div style={inlineFieldStyle}>
-                                                <label style={fieldLabelStyle}>Name</label>
-                                                <TextInput
-                                                    fullWidth
-                                                    value={stat.name}
-                                                    onChange={(e) => updateActorStat(statIndex, { name: e.target.value })}
-                                                    placeholder="Stat name"
-                                                />
-                                            </div>
-
-                                            <ConditionalFlagEditor
-                                                label="Visible In UI"
-                                                enabledLabel="Exposed"
-                                                disabledLabel="Hidden"
-                                                flag={stat.exposed}
-                                                onChange={(exposed) => updateActorStat(statIndex, { exposed })}
-                                                globalStats={[...actorStats, ...globalStats]}
-                                                actorStats={actorStats}
-                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                items={itemOptions}
-                                                locations={locationOptions}
-                                                allowVariableActorTarget
-                                                fieldLabelStyle={fieldLabelStyle}
-                                                inlineFieldStyle={inlineFieldStyle}
-                                            />
-
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Per Actor</label>
-                                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={stat.perActor === true}
-                                                        onChange={(e) => updateActorStat(statIndex, { perActor: e.target.checked })}
-                                                    />
-                                                    Maps other actors to distinct values
-                                                </label>
-                                            </div>
-
-                                            <ConditionalFlagEditor
-                                                label="Send to LLM"
-                                                enabledLabel="Included in LLM context"
-                                                disabledLabel="Omitted from LLM context"
-                                                flag={stat.llmSees}
-                                                onChange={(llmSees) => updateActorStat(statIndex, { llmSees })}
-                                                globalStats={[...actorStats, ...globalStats]}
-                                                actorStats={actorStats}
-                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                items={itemOptions}
-                                                locations={locationOptions}
-                                                allowVariableActorTarget
-                                                fieldLabelStyle={fieldLabelStyle}
-                                                inlineFieldStyle={inlineFieldStyle}
-                                            />
-
-                                            {(stat.llmSees.value === true || stat.llmSees.conditions?.length > 0) && (
-                                                <ConditionalFlagEditor
-                                                    label="Generatively Maintained"
-                                                    enabledLabel="LLM may update this stat via outcomes"
-                                                    disabledLabel="LLM may not update this stat"
-                                                    flag={stat.llmMaintained}
-                                                    onChange={(llmMaintained) => updateActorStat(statIndex, { llmMaintained })}
-                                                    globalStats={[...actorStats, ...globalStats]}
-                                                    actorStats={actorStats}
-                                                    actors={Object.values(stageInstance.getSave().actors || {})}
-                                                    items={itemOptions}
-                                                    locations={locationOptions}
-                                                    allowVariableActorTarget
-                                                    fieldLabelStyle={fieldLabelStyle}
-                                                    inlineFieldStyle={inlineFieldStyle}
-                                                />
-                                            )}
-
-                                            {stat.exposed.value === true && (
-                                                <div style={inlineFieldTopStyle}>
-                                                    <label style={fieldLabelStyle}>Description</label>
-                                                    <TextArea
-                                                        value={stat.description}
-                                                        onChange={(e) => updateActorStat(statIndex, { description: e.target.value })}
-                                                        rows={2}
-                                                        placeholder="Describe what this stat represents."
-                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {(stat.llmSees.value === true || stat.llmSees.conditions?.length > 0) && (
-                                                <div style={inlineFieldTopStyle}>
-                                                <label style={fieldLabelStyle}>Guidance</label>
-                                                <TextArea
-                                                    value={stat.guidance}
-                                                    onChange={(e) => updateActorStat(statIndex, { guidance: e.target.value })}
-                                                    rows={2}
-                                                    placeholder="Guidance for using this stat in generated narrative."
-                                                    style={{ width: '100%', resize: 'vertical' }}
-                                                />
-                                            </div>
-                                            )}
-
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Type</label>
-                                                <select
-                                                    className="input-base"
-                                                    value={normalizedStat.type}
-                                                    onChange={(e) => {
-                                                        const nextType = e.target.value as Stat['type'];
-                                                        updateActorStat(statIndex, normalizeActorStatShape({
-                                                            ...stat,
-                                                            type: nextType,
-                                                        }));
-                                                    }}
-                                                >
-                                                    {renderStatTypeOptions()}
-                                                </select>
-                                            </div>
-
-                                            {normalizedStat.type === 'function' && (
-                                                <StatFunctionEditor
-                                                    script={normalizedStat.script || ''}
-                                                    onScriptChange={(script) => updateActorStat(statIndex, { script })}
-                                                />
-                                            )}
-
-                                            {normalizedStat.type === 'number' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Display</label>
-                                                    <select
-                                                        className="input-base"
-                                                        value={normalizedStat.displayType || 'straight'}
-                                                        onChange={(e) => {
-                                                            const nextDisplayType = e.target.value as StatDisplayType;
-                                                            updateActorStat(statIndex, {
-                                                                displayType: nextDisplayType,
-                                                                iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
-                                                            });
-                                                        }}
-                                                    >
-                                                        <option value="straight">Straight Number</option>
-                                                        <option value="percentage">Percentage</option>
-                                                        <option value="bar">Bar</option>
-                                                        <option value="rating">Rating</option>
-                                                        <option value="letter grade">Letter Grade</option>
-                                                    </select>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'number' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Display Color</label>
-                                                    <ColorPickerInput
-                                                        value={normalizedStat.displayColor || ''}
-                                                        onChange={(displayColor) => updateActorStat(statIndex, { displayColor })}
-                                                        popoverTitle="Choose Display Color"
-                                                        inputStyle={{ width: '100%' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'option' && (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
-                                                    <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
-                                                        <label style={fieldLabelStyle}>Default Option</label>
-                                                        <select
-                                                            className="input-base"
-                                                            value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                            onChange={(e) => updateActorStat(statIndex, { default: e.target.value })}
-                                                        >
-                                                            {optionEntries.map((option, idx) => (
-                                                                <option key={getStatOptionValue(option, idx)} value={getStatOptionValue(option, idx)}>
-                                                                    {option.name}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-
-                                                    {optionEntries.map((option, optionIndex) => (
-                                                        <div key={`${statIndex}-actor-option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
-                                                            <div style={inlineFieldStyle}>
-                                                                <label style={fieldLabelStyle}>Option Name</label>
-                                                                <TextInput
-                                                                    fullWidth
-                                                                    value={option.name}
-                                                                    onChange={(e) => {
-                                                                        setActorStats(prev => prev.map((item, idx) => {
-                                                                            if (idx !== statIndex) {
-                                                                                return item;
-                                                                            }
-
-                                                                            const currentOptions = [...(item.options || [])];
-                                                                            const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
-                                                                            const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), name: e.target.value };
-                                                                            currentOptions[optionIndex] = nextOption;
-                                                                            return { ...item, options: currentOptions };
-                                                                        }));
-                                                                    }}
-                                                                    placeholder="Option name"
-                                                                />
-                                                            </div>
-                                                            {stat.exposed.value === true && (
-                                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                                    <label style={fieldLabelStyle}>Option Description</label>
-                                                                    <TextArea
-                                                                        value={option.description}
-                                                                        onChange={(e) => {
-                                                                            setActorStats(prev => prev.map((item, idx) => {
-                                                                                if (idx !== statIndex) {
-                                                                                    return item;
-                                                                                }
-
-                                                                                const currentOptions = [...(item.options || [])];
-                                                                                const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
-                                                                                const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), description: e.target.value };
-                                                                                currentOptions[optionIndex] = nextOption;
-                                                                                return { ...item, options: currentOptions };
-                                                                            }));
-                                                                        }}
-                                                                        rows={2}
-                                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            <div style={{ marginTop: 8 }}>
-                                                                <Button variant="danger" onClick={() => {
-                                                                    setActorStats(prev => prev.map((item, idx) => {
-                                                                        if (idx !== statIndex) {
-                                                                            return item;
-                                                                        }
-
-                                                                        const options = (item.options || []).filter((_, idx2) => idx2 !== optionIndex);
-                                                                        const defaultValue = findStatOptionByValue({ ...item, options }, item.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
-
-                                                                        return {
-                                                                            ...item,
-                                                                            options,
-                                                                            default: defaultValue,
-                                                                        };
-                                                                    }));
-                                                                }}>
-                                                                    Remove Option
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    <Button variant="secondary" onClick={() => {
-                                                        setActorStats(prev => prev.map((item, idx) => {
-                                                            if (idx !== statIndex) {
-                                                                return item;
-                                                            }
-
-                                                            const options = [...(item.options || [])];
-                                                            const nextLabel = `Option ${options.length + 1}`;
-                                                            options.push({
-                                                                id: generateUuid(),
-                                                                name: nextLabel,
-                                                                description: '',
-                                                            });
-
-                                                            return {
-                                                                ...item,
-                                                                options,
-                                                                default: typeof item.default === 'string' && item.default.trim() ? item.default : getStatOptionValue(options[options.length - 1], options.length - 1),
-                                                            };
-                                                        }));
-                                                    }}>
-                                                        Add Option
-                                                    </Button>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'text' && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value</label>
-                                                    <TextArea
-                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                        onChange={(e) => updateActorStat(statIndex, { default: e.target.value })}
-                                                        rows={2}
-                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {isReferenceDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Reference</label>
-                                                    {renderReferenceDefaultInput(normalizedStat, (defaultValue) => updateActorStat(statIndex, { default: defaultValue }))}
-                                                </div>
-                                            )}
-
-                                            {isReferenceListDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default References</label>
-                                                    {renderReferenceDefaultInput(normalizedStat, (defaultValue) => updateActorStat(statIndex, { default: defaultValue }))}
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'checkbox' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value</label>
-                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={normalizedStat.default === true}
-                                                            onChange={(e) => updateActorStat(statIndex, { default: e.target.checked })}
-                                                        />
-                                                        Checked
-                                                    </label>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Rating Icon</label>
-                                                    {renderIconPicker(normalizedStat.iconName, (iconName) => updateActorStat(statIndex, { iconName }))}
-                                                </div>
-                                            )}
-
-                                            {canBeVisibleInUi(stat) && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Label Icon</label>
-                                                    {renderIconPicker(stat.labelIconName, (iconName) => updateActorStat(statIndex, { labelIconName: iconName || undefined }), true)}
-                                                </div>
-                                            )}
-
-                                            {isNumericDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                    <label style={fieldLabelStyle}>Properties</label>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Default</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={String(Number.isFinite(normalizedStat.default) ? Number(normalizedStat.default) : 0)}
-                                                                onChange={(e) => updateActorStat(statIndex, { default: Number(e.target.value) || 0 })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Min</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={typeof normalizedStat.min === 'number' ? String(normalizedStat.min) : ''}
-                                                                onChange={(e) => updateActorStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Max</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={typeof normalizedStat.max === 'number' ? String(normalizedStat.max) : ''}
-                                                                onChange={(e) => updateActorStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {stat.perActor && (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value Rules</label>
-                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                        Evaluated in order for the target actor being considered (use "Variable" actor targets to inspect the target's own stats). The first matching rule wins; falls back to Default above if none match. An actor's own rules (configured on its detail page) take precedence over these.
-                                                    </span>
-                                                    {(stat.perActorDefaultRules || []).length === 0 && (
-                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                            No rules. The Default value below is used for every target.
-                                                        </span>
-                                                    )}
-                                                    {(stat.perActorDefaultRules || []).map((rule) => (
-                                                        <div
-                                                            key={rule.id}
-                                                            style={{
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                gap: '6px',
-                                                                padding: '8px',
-                                                                border: '1px solid var(--agenda-line-subtle)',
-                                                                borderRadius: 6,
-                                                            }}
-                                                        >
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Value</span>
-                                                                {renderRuleValueInput(stat, rule, (value) => updateActorStatPerActorRule(statIndex, rule.id, { value }))}
-                                                                <Button
-                                                                    variant="danger"
-                                                                    onClick={() => removeActorStatPerActorRule(statIndex, rule.id)}
-                                                                    style={{ marginLeft: 'auto' }}
-                                                                >
-                                                                    Delete
-                                                                </Button>
-                                                            </div>
-                                                            <ConditionEditor
-                                                                conditionCollections={rule.conditions}
-                                                                globalStats={[...actorStats, ...globalStats]}
-                                                                actorStats={actorStats}
-                                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                                items={itemOptions}
-                                                                locations={locationOptions}
-                                                                allowVariableActorTarget
-                                                                onChange={(conditions) => updateActorStatPerActorRule(statIndex, rule.id, { conditions })}
-                                                            />
-                                                            {rule.conditions.length === 0 && (
-                                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                                    Always matches (should typically be the last rule).
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    <Button
-                                                        variant="secondary"
-                                                        onClick={() => addActorStatPerActorRule(statIndex)}
-                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifySelf: 'start' }}
-                                                    >
-                                                        <Add fontSize="small" /> Add rule
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div style={{ marginTop: 10 }}>
-                                            <Button variant="danger" onClick={() => removeActorStat(statIndex)}>Remove Actor Stat</Button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
-
+                    {actorStats.map((stat, statIndex) => (
+                        <StatEntryEditor
+                            key={`actor-stat-${statIndex}`}
+                            stat={stat}
+                            index={statIndex}
+                            total={actorStats.length}
+                            typeLabel="Actor Stat"
+                            category="actor"
+                            collapsed={collapsedActorStats[statIndex]}
+                            onToggleCollapse={() => toggleActorStat(statIndex)}
+                            onMove={(direction) => moveActorStat(statIndex, direction)}
+                            onRemove={() => removeActorStat(statIndex)}
+                            onPatch={(patch) => updateActorStat(statIndex, patch)}
+                            selfStats={actorStats}
+                            globalStats={globalStats}
+                            actorStats={actorStats}
+                            conditionActors={conditionActors}
+                            valueActors={actorOptions}
+                            items={itemOptions}
+                            locations={locationOptions}
+                            stage={stage}
+                            fieldLabelStyle={fieldLabelStyle}
+                            inlineFieldStyle={inlineFieldStyle}
+                            inlineFieldTopStyle={inlineFieldTopStyle}
+                            compactChipLabelStyle={compactChipLabelStyle}
+                        />
+                    ))}
                 </div>
             </GlassPanel>
 
@@ -1723,7 +585,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     <Button
                         variant="secondary"
                         onClick={() => {
-                            setLocationStats(prev => [...prev, defaultLocationStat()]);
+                            setLocationStats(prev => [...prev, defaultTypedStat()]);
                             setCollapsedLocationStats(prev => [...prev, false]);
                         }}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
@@ -1732,383 +594,33 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     </Button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {locationStats.map((stat, statIndex) => {
-                        const normalizedStat = normalizeActorStatShape(stat);
-                        const optionEntries = normalizedStat.options || [];
-
-                        return (
-                            <div key={`location-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                    <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
-                                        {stat.name?.trim() || `Location Stat ${statIndex + 1}`}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                        <Button variant="secondary" disabled={statIndex === 0} onClick={() => moveLocationStat(statIndex, -1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                                            <KeyboardArrowUp fontSize="small" />
-                                        </Button>
-                                        <Button variant="secondary" disabled={statIndex === locationStats.length - 1} onClick={() => moveLocationStat(statIndex, 1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                                            <KeyboardArrowDown fontSize="small" />
-                                        </Button>
-                                        <Button variant="secondary" onClick={() => toggleLocationStat(statIndex)}>
-                                            {collapsedLocationStats[statIndex] ? 'Expand' : 'Collapse'}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {!collapsedLocationStats[statIndex] && (
-                                    <>
-                                        <div style={{ marginTop: 10 }}>
-                                            <div style={inlineFieldStyle}>
-                                                <label style={fieldLabelStyle}>Name</label>
-                                                <TextInput
-                                                    fullWidth
-                                                    value={stat.name}
-                                                    onChange={(e) => updateLocationStat(statIndex, { name: e.target.value })}
-                                                    placeholder="Stat name"
-                                                />
-                                            </div>
-
-                                            <ConditionalFlagEditor
-                                                label="Visible In UI"
-                                                enabledLabel="Exposed"
-                                                disabledLabel="Hidden"
-                                                flag={stat.exposed}
-                                                onChange={(exposed) => updateLocationStat(statIndex, { exposed })}
-                                                globalStats={[...locationStats, ...globalStats]}
-                                                actorStats={actorStats}
-                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                items={itemOptions}
-                                                locations={locationOptions}
-                                                fieldLabelStyle={fieldLabelStyle}
-                                                inlineFieldStyle={inlineFieldStyle}
-                                            />
-
-                                            <ConditionalFlagEditor
-                                                label="Send to LLM"
-                                                enabledLabel="Included in LLM context"
-                                                disabledLabel="Omitted from LLM context"
-                                                flag={stat.llmSees}
-                                                onChange={(llmSees) => updateLocationStat(statIndex, { llmSees })}
-                                                globalStats={[...locationStats, ...globalStats]}
-                                                actorStats={actorStats}
-                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                items={itemOptions}
-                                                locations={locationOptions}
-                                                fieldLabelStyle={fieldLabelStyle}
-                                                inlineFieldStyle={inlineFieldStyle}
-                                            />
-
-                                            {stat.llmSees.value !== false && (
-                                                <ConditionalFlagEditor
-                                                    label="Generatively Maintained"
-                                                    enabledLabel="LLM may update this stat via outcomes"
-                                                    disabledLabel="LLM may not update this stat"
-                                                    flag={stat.llmMaintained}
-                                                    onChange={(llmMaintained) => updateLocationStat(statIndex, { llmMaintained })}
-                                                    globalStats={[...locationStats, ...globalStats]}
-                                                    actorStats={actorStats}
-                                                    actors={Object.values(stageInstance.getSave().actors || {})}
-                                                    items={itemOptions}
-                                                    locations={locationOptions}
-                                                    fieldLabelStyle={fieldLabelStyle}
-                                                    inlineFieldStyle={inlineFieldStyle}
-                                                />
-                                            )}
-
-                                            {stat.exposed.value === true && (
-                                                <div style={inlineFieldTopStyle}>
-                                                    <label style={fieldLabelStyle}>Description</label>
-                                                    <TextArea
-                                                        value={stat.description}
-                                                        onChange={(e) => updateLocationStat(statIndex, { description: e.target.value })}
-                                                        rows={2}
-                                                        placeholder="Describe what this stat represents."
-                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            <div style={inlineFieldTopStyle}>
-                                                <label style={fieldLabelStyle}>Guidance</label>
-                                                <TextArea
-                                                    value={stat.guidance}
-                                                    onChange={(e) => updateLocationStat(statIndex, { guidance: e.target.value })}
-                                                    rows={2}
-                                                    placeholder="Guidance for using this stat in generated narrative."
-                                                    style={{ width: '100%', resize: 'vertical' }}
-                                                />
-                                            </div>
-
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Type</label>
-                                                <select
-                                                    className="input-base"
-                                                    value={normalizedStat.type}
-                                                    onChange={(e) => {
-                                                        const nextType = e.target.value as Stat['type'];
-                                                        updateLocationStat(statIndex, normalizeActorStatShape({
-                                                            ...stat,
-                                                            type: nextType,
-                                                        }));
-                                                    }}
-                                                >
-                                                    {renderStatTypeOptions()}
-                                                </select>
-                                            </div>
-
-                                            {normalizedStat.type === 'function' && (
-                                                <StatFunctionEditor
-                                                    script={normalizedStat.script || ''}
-                                                    onScriptChange={(script) => updateLocationStat(statIndex, { script })}
-                                                />
-                                            )}
-
-                                            {normalizedStat.type === 'number' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Display</label>
-                                                    <select
-                                                        className="input-base"
-                                                        value={normalizedStat.displayType || 'straight'}
-                                                        onChange={(e) => {
-                                                            const nextDisplayType = e.target.value as StatDisplayType;
-                                                            updateLocationStat(statIndex, {
-                                                                displayType: nextDisplayType,
-                                                                iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
-                                                            });
-                                                        }}
-                                                    >
-                                                        <option value="straight">Straight Number</option>
-                                                        <option value="percentage">Percentage</option>
-                                                        <option value="bar">Bar</option>
-                                                        <option value="rating">Rating</option>
-                                                        <option value="letter grade">Letter Grade</option>
-                                                    </select>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'number' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Display Color</label>
-                                                    <ColorPickerInput
-                                                        value={normalizedStat.displayColor || ''}
-                                                        onChange={(displayColor) => updateLocationStat(statIndex, { displayColor })}
-                                                        popoverTitle="Choose Display Color"
-                                                        inputStyle={{ width: '100%' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'option' && (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
-                                                    <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
-                                                        <label style={fieldLabelStyle}>Default Option</label>
-                                                        <select
-                                                            className="input-base"
-                                                            value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                            onChange={(e) => updateLocationStat(statIndex, { default: e.target.value })}
-                                                        >
-                                                            {optionEntries.map((option, idx) => (
-                                                                <option key={getStatOptionValue(option, idx)} value={getStatOptionValue(option, idx)}>
-                                                                    {option.name}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-
-                                                    {optionEntries.map((option, optionIndex) => (
-                                                        <div key={`${statIndex}-location-option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
-                                                            <div style={inlineFieldStyle}>
-                                                                <label style={fieldLabelStyle}>Option Name</label>
-                                                                <TextInput
-                                                                    fullWidth
-                                                                    value={option.name}
-                                                                    onChange={(e) => {
-                                                                        setLocationStats(prev => prev.map((item, idx) => {
-                                                                            if (idx !== statIndex) {
-                                                                                return item;
-                                                                            }
-
-                                                                            const currentOptions = [...(item.options || [])];
-                                                                            const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
-                                                                            const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), name: e.target.value };
-                                                                            currentOptions[optionIndex] = nextOption;
-                                                                            return { ...item, options: currentOptions };
-                                                                        }));
-                                                                    }}
-                                                                    placeholder="Option name"
-                                                                />
-                                                            </div>
-                                                            {stat.exposed.value === true && (
-                                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                                    <label style={fieldLabelStyle}>Option Description</label>
-                                                                    <TextArea
-                                                                        value={option.description}
-                                                                        onChange={(e) => {
-                                                                            setLocationStats(prev => prev.map((item, idx) => {
-                                                                                if (idx !== statIndex) {
-                                                                                    return item;
-                                                                                }
-
-                                                                                const currentOptions = [...(item.options || [])];
-                                                                                const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
-                                                                                const nextOption = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), description: e.target.value };
-                                                                                currentOptions[optionIndex] = nextOption;
-                                                                                return { ...item, options: currentOptions };
-                                                                            }));
-                                                                        }}
-                                                                        rows={2}
-                                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            <div style={{ marginTop: 8 }}>
-                                                                <Button variant="danger" onClick={() => {
-                                                                    setLocationStats(prev => prev.map((item, idx) => {
-                                                                        if (idx !== statIndex) {
-                                                                            return item;
-                                                                        }
-
-                                                                        const options = (item.options || []).filter((_, idx2) => idx2 !== optionIndex);
-                                                                        const defaultValue = findStatOptionByValue({ ...item, options }, item.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
-
-                                                                        return {
-                                                                            ...item,
-                                                                            options,
-                                                                            default: defaultValue,
-                                                                        };
-                                                                    }));
-                                                                }}>
-                                                                    Remove Option
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    <Button variant="secondary" onClick={() => {
-                                                        setLocationStats(prev => prev.map((item, idx) => {
-                                                            if (idx !== statIndex) {
-                                                                return item;
-                                                            }
-
-                                                            const options = [...(item.options || [])];
-                                                            const nextLabel = `Option ${options.length + 1}`;
-                                                            options.push({
-                                                                id: generateUuid(),
-                                                                name: nextLabel,
-                                                                description: '',
-                                                            });
-
-                                                            return {
-                                                                ...item,
-                                                                options,
-                                                                default: typeof item.default === 'string' && item.default.trim() ? item.default : getStatOptionValue(options[options.length - 1], options.length - 1),
-                                                            };
-                                                        }));
-                                                    }}>
-                                                        Add Option
-                                                    </Button>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'text' && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value</label>
-                                                    <TextArea
-                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                        onChange={(e) => updateLocationStat(statIndex, { default: e.target.value })}
-                                                        rows={2}
-                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {isReferenceDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Reference</label>
-                                                    {renderReferenceDefaultInput(normalizedStat, (defaultValue) => updateLocationStat(statIndex, { default: defaultValue }))}
-                                                </div>
-                                            )}
-
-                                            {isReferenceListDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default References</label>
-                                                    {renderReferenceDefaultInput(normalizedStat, (defaultValue) => updateLocationStat(statIndex, { default: defaultValue }))}
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'checkbox' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value</label>
-                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={normalizedStat.default === true}
-                                                            onChange={(e) => updateLocationStat(statIndex, { default: e.target.checked })}
-                                                        />
-                                                        Checked
-                                                    </label>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Rating Icon</label>
-                                                    {renderIconPicker(normalizedStat.iconName, (iconName) => updateLocationStat(statIndex, { iconName }))}
-                                                </div>
-                                            )}
-
-                                            {canBeVisibleInUi(stat) && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Label Icon</label>
-                                                    {renderIconPicker(stat.labelIconName, (iconName) => updateLocationStat(statIndex, { labelIconName: iconName || undefined }), true)}
-                                                </div>
-                                            )}
-
-                                            {isNumericDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                    <label style={fieldLabelStyle}>Properties</label>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Default</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={String(Number.isFinite(normalizedStat.default) ? Number(normalizedStat.default) : 0)}
-                                                                onChange={(e) => updateLocationStat(statIndex, { default: Number(e.target.value) || 0 })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Min</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={typeof normalizedStat.min === 'number' ? String(normalizedStat.min) : ''}
-                                                                onChange={(e) => updateLocationStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Max</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={typeof normalizedStat.max === 'number' ? String(normalizedStat.max) : ''}
-                                                                onChange={(e) => updateLocationStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div style={{ marginTop: 10 }}>
-                                            <Button variant="danger" onClick={() => removeLocationStat(statIndex)}>Remove Location Stat</Button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
-
+                    {locationStats.map((stat, statIndex) => (
+                        <StatEntryEditor
+                            key={`location-stat-${statIndex}`}
+                            stat={stat}
+                            index={statIndex}
+                            total={locationStats.length}
+                            typeLabel="Location Stat"
+                            category="location"
+                            collapsed={collapsedLocationStats[statIndex]}
+                            onToggleCollapse={() => toggleLocationStat(statIndex)}
+                            onMove={(direction) => moveLocationStat(statIndex, direction)}
+                            onRemove={() => removeLocationStat(statIndex)}
+                            onPatch={(patch) => updateLocationStat(statIndex, patch)}
+                            selfStats={locationStats}
+                            globalStats={globalStats}
+                            actorStats={actorStats}
+                            conditionActors={conditionActors}
+                            valueActors={actorOptions}
+                            items={itemOptions}
+                            locations={locationOptions}
+                            stage={stage}
+                            fieldLabelStyle={fieldLabelStyle}
+                            inlineFieldStyle={inlineFieldStyle}
+                            inlineFieldTopStyle={inlineFieldTopStyle}
+                            compactChipLabelStyle={compactChipLabelStyle}
+                        />
+                    ))}
                 </div>
             </GlassPanel>
 
@@ -2118,7 +630,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     <Button
                         variant="secondary"
                         onClick={() => {
-                            setItemStats(prev => [...prev, defaultItemStat()]);
+                            setItemStats(prev => [...prev, defaultTypedStat()]);
                             setCollapsedItemStats(prev => [...prev, false]);
                         }}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
@@ -2127,383 +639,35 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     </Button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {itemStats.map((stat, statIndex) => {
-                        const normalizedStat = normalizeActorStatShape(stat);
-                        const optionEntries = normalizedStat.options || [];
-
-                        return (
-                            <div key={`item-stat-${statIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 10 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                    <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>
-                                        {stat.name?.trim() || `Item Stat ${statIndex + 1}`}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                        <Button variant="secondary" disabled={statIndex === 0} onClick={() => moveItemStat(statIndex, -1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                                            <KeyboardArrowUp fontSize="small" />
-                                        </Button>
-                                        <Button variant="secondary" disabled={statIndex === itemStats.length - 1} onClick={() => moveItemStat(statIndex, 1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                                            <KeyboardArrowDown fontSize="small" />
-                                        </Button>
-                                        <Button variant="secondary" onClick={() => toggleItemStat(statIndex)}>
-                                            {collapsedItemStats[statIndex] ? 'Expand' : 'Collapse'}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {!collapsedItemStats[statIndex] && (
-                                    <>
-                                        <div style={{ marginTop: 10 }}>
-                                            <div style={inlineFieldStyle}>
-                                                <label style={fieldLabelStyle}>Name</label>
-                                                <TextInput
-                                                    fullWidth
-                                                    value={stat.name}
-                                                    onChange={(e) => updateItemStat(statIndex, { name: e.target.value })}
-                                                    placeholder="Stat name"
-                                                />
-                                            </div>
-
-                                            <ConditionalFlagEditor
-                                                label="Visible In UI"
-                                                enabledLabel="Exposed"
-                                                disabledLabel="Hidden"
-                                                flag={stat.exposed}
-                                                onChange={(exposed) => updateItemStat(statIndex, { exposed })}
-                                                globalStats={[...itemStats, ...globalStats]}
-                                                actorStats={actorStats}
-                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                items={itemOptions}
-                                                locations={locationOptions}
-                                                fieldLabelStyle={fieldLabelStyle}
-                                                inlineFieldStyle={inlineFieldStyle}
-                                            />
-
-                                            <ConditionalFlagEditor
-                                                label="Send to LLM"
-                                                enabledLabel="Included in LLM context"
-                                                disabledLabel="Omitted from LLM context"
-                                                flag={stat.llmSees}
-                                                onChange={(llmSees) => updateItemStat(statIndex, { llmSees })}
-                                                globalStats={[...itemStats, ...globalStats]}
-                                                actorStats={actorStats}
-                                                actors={Object.values(stageInstance.getSave().actors || {})}
-                                                items={itemOptions}
-                                                locations={locationOptions}
-                                                fieldLabelStyle={fieldLabelStyle}
-                                                inlineFieldStyle={inlineFieldStyle}
-                                            />
-
-                                            {stat.llmSees.value !== false && (
-                                                <ConditionalFlagEditor
-                                                    label="Generatively Maintained"
-                                                    enabledLabel="LLM may update this stat via outcomes"
-                                                    disabledLabel="LLM may not update this stat"
-                                                    flag={stat.llmMaintained}
-                                                    onChange={(llmMaintained) => updateItemStat(statIndex, { llmMaintained })}
-                                                    globalStats={[...itemStats, ...globalStats]}
-                                                    actorStats={actorStats}
-                                                    actors={Object.values(stageInstance.getSave().actors || {})}
-                                                    items={itemOptions}
-                                                    locations={locationOptions}
-                                                    fieldLabelStyle={fieldLabelStyle}
-                                                    inlineFieldStyle={inlineFieldStyle}
-                                                />
-                                            )}
-
-                                            {stat.exposed.value === true && (
-                                                <div style={inlineFieldTopStyle}>
-                                                    <label style={fieldLabelStyle}>Description</label>
-                                                    <TextArea
-                                                        value={stat.description}
-                                                        onChange={(e) => updateItemStat(statIndex, { description: e.target.value })}
-                                                        rows={2}
-                                                        placeholder="Describe what this stat represents."
-                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            <div style={inlineFieldTopStyle}>
-                                                <label style={fieldLabelStyle}>Guidance</label>
-                                                <TextArea
-                                                    value={stat.guidance}
-                                                    onChange={(e) => updateItemStat(statIndex, { guidance: e.target.value })}
-                                                    rows={2}
-                                                    placeholder="Guidance for using this stat in generated narrative."
-                                                    style={{ width: '100%', resize: 'vertical' }}
-                                                />
-                                            </div>
-
-                                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                <label style={fieldLabelStyle}>Type</label>
-                                                <select
-                                                    className="input-base"
-                                                    value={normalizedStat.type}
-                                                    onChange={(e) => {
-                                                        const nextType = e.target.value as Stat['type'];
-                                                        updateItemStat(statIndex, normalizeActorStatShape({
-                                                            ...stat,
-                                                            type: nextType,
-                                                        }));
-                                                    }}
-                                                >
-                                                    {renderStatTypeOptions()}
-                                                </select>
-                                            </div>
-
-                                            {normalizedStat.type === 'function' && (
-                                                <StatFunctionEditor
-                                                    script={normalizedStat.script || ''}
-                                                    onScriptChange={(script) => updateItemStat(statIndex, { script })}
-                                                    scriptLabel="Default Script"
-                                                    scriptDescription="Run when this item's function is invoked, unless overridden on a specific item's own detail page."
-                                                />
-                                            )}
-
-                                            {normalizedStat.type === 'number' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Display</label>
-                                                    <select
-                                                        className="input-base"
-                                                        value={normalizedStat.displayType || 'straight'}
-                                                        onChange={(e) => {
-                                                            const nextDisplayType = e.target.value as StatDisplayType;
-                                                            updateItemStat(statIndex, {
-                                                                displayType: nextDisplayType,
-                                                                iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
-                                                            });
-                                                        }}
-                                                    >
-                                                        <option value="straight">Straight Number</option>
-                                                        <option value="percentage">Percentage</option>
-                                                        <option value="bar">Bar</option>
-                                                        <option value="rating">Rating</option>
-                                                        <option value="letter grade">Letter Grade</option>
-                                                    </select>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'number' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Display Color</label>
-                                                    <ColorPickerInput
-                                                        value={normalizedStat.displayColor || ''}
-                                                        onChange={(displayColor) => updateItemStat(statIndex, { displayColor })}
-                                                        popoverTitle="Choose Display Color"
-                                                        inputStyle={{ width: '100%' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'option' && (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
-                                                    <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
-                                                        <label style={fieldLabelStyle}>Default Option</label>
-                                                        <select
-                                                            className="input-base"
-                                                            value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                            onChange={(e) => updateItemStat(statIndex, { default: e.target.value })}
-                                                        >
-                                                            {optionEntries.map((option, idx) => (
-                                                                <option key={getStatOptionValue(option, idx)} value={getStatOptionValue(option, idx)}>
-                                                                    {option.name}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-
-                                                    {optionEntries.map((option, optionIndex) => (
-                                                        <div key={`${statIndex}-item-option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
-                                                            <div style={inlineFieldStyle}>
-                                                                <label style={fieldLabelStyle}>Option Name</label>
-                                                                <TextInput
-                                                                    fullWidth
-                                                                    value={option.name}
-                                                                    onChange={(e) => {
-                                                                        setItemStats(prev => prev.map((item, idx) => {
-                                                                            if (idx !== statIndex) {
-                                                                                return item;
-                                                                            }
-
-                                                                            const currentOptions = [...(item.options || [])];
-                                                                            const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
-                                                                            currentOptions[optionIndex] = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), name: e.target.value };
-                                                                            return { ...item, options: currentOptions };
-                                                                        }));
-                                                                    }}
-                                                                    placeholder="Option name"
-                                                                />
-                                                            </div>
-                                                            {stat.exposed.value === true && (
-                                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                                    <label style={fieldLabelStyle}>Option Description</label>
-                                                                    <TextArea
-                                                                        value={option.description}
-                                                                        onChange={(e) => {
-                                                                            setItemStats(prev => prev.map((item, idx) => {
-                                                                                if (idx !== statIndex) {
-                                                                                    return item;
-                                                                                }
-
-                                                                                const currentOptions = [...(item.options || [])];
-                                                                                const currentOption = currentOptions[optionIndex] || { id: generateUuid(), name: '', description: '' };
-                                                                                currentOptions[optionIndex] = { ...currentOption, id: getStatOptionValue(currentOption, optionIndex), description: e.target.value };
-                                                                                return { ...item, options: currentOptions };
-                                                                            }));
-                                                                        }}
-                                                                        rows={2}
-                                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            <div style={{ marginTop: 8 }}>
-                                                                <Button variant="danger" onClick={() => {
-                                                                    setItemStats(prev => prev.map((item, idx) => {
-                                                                        if (idx !== statIndex) {
-                                                                            return item;
-                                                                        }
-
-                                                                        const options = (item.options || []).filter((_, idx2) => idx2 !== optionIndex);
-                                                                        const defaultValue = findStatOptionByValue({ ...item, options }, item.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
-
-                                                                        return {
-                                                                            ...item,
-                                                                            options,
-                                                                            default: defaultValue,
-                                                                        };
-                                                                    }));
-                                                                }}>
-                                                                    Remove Option
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    <Button variant="secondary" onClick={() => {
-                                                        setItemStats(prev => prev.map((item, idx) => {
-                                                            if (idx !== statIndex) {
-                                                                return item;
-                                                            }
-
-                                                            const options = [...(item.options || [])];
-                                                            const nextLabel = `Option ${options.length + 1}`;
-                                                            options.push({
-                                                                id: generateUuid(),
-                                                                name: nextLabel,
-                                                                description: '',
-                                                            });
-
-                                                            return {
-                                                                ...item,
-                                                                options,
-                                                                default: typeof item.default === 'string' && item.default.trim() ? item.default : getStatOptionValue(options[options.length - 1], options.length - 1),
-                                                            };
-                                                        }));
-                                                    }}>
-                                                        Add Option
-                                                    </Button>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'text' && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value</label>
-                                                    <TextArea
-                                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                                        onChange={(e) => updateItemStat(statIndex, { default: e.target.value })}
-                                                        rows={2}
-                                                        style={{ width: '100%', resize: 'vertical' }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {isReferenceDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Reference</label>
-                                                    {renderReferenceDefaultInput(normalizedStat, (defaultValue) => updateItemStat(statIndex, { default: defaultValue }))}
-                                                </div>
-                                            )}
-
-                                            {isReferenceListDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default References</label>
-                                                    {renderReferenceDefaultInput(normalizedStat, (defaultValue) => updateItemStat(statIndex, { default: defaultValue }))}
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'checkbox' && (
-                                                <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Default Value</label>
-                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={normalizedStat.default === true}
-                                                            onChange={(e) => updateItemStat(statIndex, { default: e.target.checked })}
-                                                        />
-                                                        Checked
-                                                    </label>
-                                                </div>
-                                            )}
-
-                                            {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Rating Icon</label>
-                                                    {renderIconPicker(normalizedStat.iconName, (iconName) => updateItemStat(statIndex, { iconName }))}
-                                                </div>
-                                            )}
-
-                                            {canBeVisibleInUi(stat) && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                                    <label style={fieldLabelStyle}>Label Icon</label>
-                                                    {renderIconPicker(stat.labelIconName, (iconName) => updateItemStat(statIndex, { labelIconName: iconName || undefined }), true)}
-                                                </div>
-                                            )}
-
-                                            {isNumericDisplayType(normalizedStat.type) && (
-                                                <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                    <label style={fieldLabelStyle}>Properties</label>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Default</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={String(Number.isFinite(normalizedStat.default) ? Number(normalizedStat.default) : 0)}
-                                                                onChange={(e) => updateItemStat(statIndex, { default: Number(e.target.value) || 0 })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Min</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={typeof normalizedStat.min === 'number' ? String(normalizedStat.min) : ''}
-                                                                onChange={(e) => updateItemStat(statIndex, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div style={compactChipLabelStyle}>Max</div>
-                                                            <TextInput
-                                                                fullWidth
-                                                                type="number"
-                                                                value={typeof normalizedStat.max === 'number' ? String(normalizedStat.max) : ''}
-                                                                onChange={(e) => updateItemStat(statIndex, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div style={{ marginTop: 10 }}>
-                                            <Button variant="danger" onClick={() => removeItemStat(statIndex)}>Remove Item Stat</Button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
-
+                    {itemStats.map((stat, statIndex) => (
+                        <StatEntryEditor
+                            key={`item-stat-${statIndex}`}
+                            stat={stat}
+                            index={statIndex}
+                            total={itemStats.length}
+                            typeLabel="Item Stat"
+                            category="item"
+                            collapsed={collapsedItemStats[statIndex]}
+                            onToggleCollapse={() => toggleItemStat(statIndex)}
+                            onMove={(direction) => moveItemStat(statIndex, direction)}
+                            onRemove={() => removeItemStat(statIndex)}
+                            onPatch={(patch) => updateItemStat(statIndex, patch)}
+                            selfStats={itemStats}
+                            globalStats={globalStats}
+                            actorStats={actorStats}
+                            conditionActors={conditionActors}
+                            valueActors={actorOptions}
+                            items={itemOptions}
+                            locations={locationOptions}
+                            stage={stage}
+                            scriptLabel="Default Script"
+                            scriptDescription="Run when this item's function is invoked, unless overridden on a specific item's own detail page."
+                            fieldLabelStyle={fieldLabelStyle}
+                            inlineFieldStyle={inlineFieldStyle}
+                            inlineFieldTopStyle={inlineFieldTopStyle}
+                            compactChipLabelStyle={compactChipLabelStyle}
+                        />
+                    ))}
                 </div>
             </GlassPanel>
 
