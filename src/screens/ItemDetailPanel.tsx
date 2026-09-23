@@ -12,12 +12,12 @@ import {
 } from '../content/Item';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 import { ConditionCollection } from '../content/Condition';
-import { cloneFunctionRuleOverrideMap, FunctionRuleOverrideMap, isFunctionStatType, resolveFunctionRules, Stat, StatUpdateRule, StatValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
+import { cloneFunctionScriptOverrideMap, FunctionScriptOverrideMap, isFunctionStatType, resolveFunctionScript, Stat, StatValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { StatValueInput } from '../components/StatValueInput';
-import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
+import { StatFunctionEditor } from '../components/StatFunctionEditor';
 
 const createInitialItemStatMap = (item: Item, itemStats: Stat[]): { [key: string]: StatValue } => {
     const nextMap: { [key: string]: StatValue } = {};
@@ -74,7 +74,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         availabilityConditions: (item.availabilityConditions || []).map((collection) => [...collection] as ConditionCollection),
     });
     const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: StatValue }>(() => createInitialItemStatMap(item, scalarItemStats));
-    const [editedFunctionRuleOverrides, setEditedFunctionRuleOverrides] = useState<FunctionRuleOverrideMap>(() => cloneFunctionRuleOverrideMap(item.functionRuleOverrides));
+    const [editedFunctionScriptOverrides, setEditedFunctionScriptOverrides] = useState<FunctionScriptOverrideMap>(() => cloneFunctionScriptOverrideMap(item.functionScriptOverrides));
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [isUploadingAlternativeImages, setIsUploadingAlternativeImages] = useState<Record<number, boolean>>({});
     const [collapsedAlternativeImages, setCollapsedAlternativeImages] = useState<boolean[]>(() =>
@@ -83,11 +83,11 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
     const [expandedStatIds, setExpandedStatIds] = useState<Set<string>>(new Set());
     const editedItemRef = useRef(editedItem);
     const editedStatMapRef = useRef(editedStatMap);
-    const editedFunctionRuleOverridesRef = useRef(editedFunctionRuleOverrides);
+    const editedFunctionScriptOverridesRef = useRef(editedFunctionScriptOverrides);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
-    const persistItem = (nextItem: typeof editedItem, nextStatMap: { [key: string]: StatValue }, nextFunctionRuleOverrides: FunctionRuleOverrideMap = editedFunctionRuleOverridesRef.current) => {
+    const persistItem = (nextItem: typeof editedItem, nextStatMap: { [key: string]: StatValue }, nextFunctionScriptOverrides: FunctionScriptOverrideMap = editedFunctionScriptOverridesRef.current) => {
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
             autoSaveTimeoutRef.current = null;
@@ -104,11 +104,11 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         persistedItem.alternativeImages = nextItem.alternativeImages.map(createAlternativeImage);
         persistedItem.availabilityConditions = nextItem.availabilityConditions.map((collection) => [...collection]);
         persistedItem.statMap = persistedItem.statMap && typeof persistedItem.statMap === 'object' ? { ...persistedItem.statMap } : {};
-        persistedItem.functionRuleOverrides = cloneFunctionRuleOverrideMap(nextFunctionRuleOverrides);
+        persistedItem.functionScriptOverrides = cloneFunctionScriptOverrideMap(nextFunctionScriptOverrides);
         const activeFunctionStatIds = new Set(functionItemStats.map((stat) => stat.id));
-        Object.keys(persistedItem.functionRuleOverrides).forEach((statId) => {
+        Object.keys(persistedItem.functionScriptOverrides).forEach((statId) => {
             if (!activeFunctionStatIds.has(statId)) {
-                delete persistedItem.functionRuleOverrides[statId];
+                delete persistedItem.functionScriptOverrides[statId];
             }
         });
 
@@ -156,12 +156,12 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
     }, [editedStatMap]);
 
     useEffect(() => {
-        editedFunctionRuleOverridesRef.current = editedFunctionRuleOverrides;
-    }, [editedFunctionRuleOverrides]);
+        editedFunctionScriptOverridesRef.current = editedFunctionScriptOverrides;
+    }, [editedFunctionScriptOverrides]);
 
     useEffect(() => {
         setEditedStatMap(createInitialItemStatMap(item, scalarItemStats));
-        setEditedFunctionRuleOverrides(cloneFunctionRuleOverrideMap(item.functionRuleOverrides));
+        setEditedFunctionScriptOverrides(cloneFunctionScriptOverrideMap(item.functionScriptOverrides));
     }, [item, scalarItemStats]);
 
     useEffect(() => {
@@ -175,7 +175,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         }
 
         autoSaveTimeoutRef.current = window.setTimeout(() => {
-            persistItem(editedItemRef.current, editedStatMapRef.current, editedFunctionRuleOverridesRef.current);
+            persistItem(editedItemRef.current, editedStatMapRef.current, editedFunctionScriptOverridesRef.current);
         }, 300);
 
         return () => {
@@ -183,12 +183,12 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                 clearTimeout(autoSaveTimeoutRef.current);
             }
         };
-    }, [editedItem, editedStatMap, editedFunctionRuleOverrides]);
+    }, [editedItem, editedStatMap, editedFunctionScriptOverrides]);
 
     useEffect(() => {
         return () => {
             if (autoSaveTimeoutRef.current) {
-                persistItem(editedItemRef.current, editedStatMapRef.current, editedFunctionRuleOverridesRef.current);
+                persistItem(editedItemRef.current, editedStatMapRef.current, editedFunctionScriptOverridesRef.current);
             }
         };
     }, []);
@@ -497,8 +497,8 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                 <h2 style={sectionHeadingStyle}>Item Functions</h2>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                     {functionItemStats.map((stat) => {
-                                        const hasOverride = (editedFunctionRuleOverrides[stat.id] || []).length > 0;
-                                        const activeRules = resolveFunctionRules(stat, editedFunctionRuleOverrides);
+                                        const hasOverride = !!(editedFunctionScriptOverrides[stat.id] || '').trim();
+                                        const activeScript = resolveFunctionScript(stat, editedFunctionScriptOverrides);
                                         return (
                                             <div
                                                 key={stat.id}
@@ -517,7 +517,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                                     {hasOverride && (
                                                         <Button
                                                             variant="secondary"
-                                                            onClick={() => setEditedFunctionRuleOverrides((current) => {
+                                                            onClick={() => setEditedFunctionScriptOverrides((current) => {
                                                                 const next = { ...current };
                                                                 delete next[stat.id];
                                                                 return next;
@@ -533,18 +533,11 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                                     </div>
                                                 )}
                                                 <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                    {hasOverride ? "This item overrides the stat's default rules." : "Using the stat's default rules; editing below creates an override for this item."}
+                                                    {hasOverride ? "This item overrides the stat's default script." : "Using the stat's default script; editing below creates an override for this item."}
                                                 </span>
-                                                <StatUpdateRuleEditor
-                                                    rules={activeRules}
-                                                    globalStats={stage().getConfiguration().globalStats || []}
-                                                    actorStats={stage().getConfiguration().actorStats || []}
-                                                    actors={actorOptions}
-                                                    items={itemOptions}
-                                                    locations={locationOptions}
-                                                    stage={stage}
-                                                    functionParameters={stat.parameters || []}
-                                                    onChange={(rules) => setEditedFunctionRuleOverrides((current) => ({ ...current, [stat.id]: rules }))}
+                                                <StatFunctionEditor
+                                                    script={activeScript}
+                                                    onScriptChange={(script) => setEditedFunctionScriptOverrides((current) => ({ ...current, [stat.id]: script }))}
                                                 />
                                             </div>
                                         );

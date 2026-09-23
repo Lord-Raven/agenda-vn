@@ -2,7 +2,7 @@ import { v4 as generateUuid } from 'uuid';
 import { AlternativeImage, createAlternativeImage } from './AlternativeImage';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import { createLoreEntry } from './Lore';
-import { cloneFunctionRuleOverrideMap, FunctionRuleOverrideMap, StatValue } from './Stat';
+import { cloneFunctionScriptOverrideMap, FunctionScriptOverrideMap, StatValue } from './Stat';
 import { Stage } from '../Stage';
 import { findBestNameMatch } from './Actor';
 
@@ -132,9 +132,9 @@ export class Item {
     availabilityConditions: ConditionCollection[] = [];
     statMap: { [key: string]: StatValue } = {};
     // Per-instance overrides of this item's function-type stats (e.g. a custom "onUse" implementation), keyed
-    // by the function stat's id; falls back to that stat definition's own functionRules when absent/empty.
-    // See resolveFunctionRules.
-    functionRuleOverrides: FunctionRuleOverrideMap = {};
+    // by the function stat's id; falls back to that stat definition's own script when absent/empty.
+    // See resolveFunctionScript.
+    functionScriptOverrides: FunctionScriptOverrideMap = {};
 
     constructor(props: any) {
         Object.assign(this, props);
@@ -145,7 +145,7 @@ export class Item {
         this.alternativeImages = Array.isArray(this.alternativeImages) ? this.alternativeImages.map(createAlternativeImage) : [];
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map((collection) => [...collection]) : [];
         this.statMap = this.statMap && typeof this.statMap === 'object' ? { ...this.statMap } : {};
-        this.functionRuleOverrides = cloneFunctionRuleOverrideMap(this.functionRuleOverrides);
+        this.functionScriptOverrides = cloneFunctionScriptOverrideMap(this.functionScriptOverrides);
         if (!this.themeColor) {
             const colors = ['#8ab0cc', '#89cd87', '#7a7b6b', '#b98f6e', '#2e354d'];
             this.themeColor = colors[Math.floor(Math.random() * colors.length)];

@@ -1,17 +1,10 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
-import { normalizeStatValue, type Stat, type StatFunctionParameter, type StatValue } from './Stat';
+import { normalizeStatValue, type Stat, type StatValue } from './Stat';
 
 export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual';
-// 'any'/'none'/'variable' are meta-targets (see resolveConditionActorSubjects); a `param:<parameterId>` string
-// targets the actor supplied as that (actor-typed) function stat parameter (see StatFunctionParameter);
-// anything else is a specific actor id.
+// 'any'/'none'/'variable' are meta-targets (see resolveConditionActorSubjects); anything else is a specific
+// actor id.
 export type ActorConditionTarget = 'any' | 'none' | 'variable' | string;
-
-export const FUNCTION_PARAMETER_TARGET_PREFIX = 'param:';
-export const buildFunctionParameterTarget = (parameterId: string): ActorConditionTarget => `${FUNCTION_PARAMETER_TARGET_PREFIX}${parameterId}`;
-export const parseFunctionParameterTarget = (target: ActorConditionTarget): string | undefined => (
-    target.startsWith(FUNCTION_PARAMETER_TARGET_PREFIX) ? target.slice(FUNCTION_PARAMETER_TARGET_PREFIX.length) : undefined
-);
 
 export type CalendarCondition = {
     type: 'calendar';
@@ -44,17 +37,7 @@ export type ActorIdentityCondition = {
     value: string;
 };
 
-// Compares a scalar-typed (non-actor) function stat parameter's supplied value - only meaningful while
-// evaluating a function stat's conditions/rules, where context.parameterValues holds the invocation's
-// argument values and context.functionParameters holds their type definitions (see StatFunctionParameter).
-export type FunctionParameterCondition = {
-    type: 'functionParameter';
-    parameterId: string;
-    comparison: ConditionComparison;
-    value: string | number | boolean;
-};
-
-export type Condition = CalendarCondition | GlobalStatCondition | ActorStatCondition | ActorIdentityCondition | FunctionParameterCondition;
+export type Condition = CalendarCondition | GlobalStatCondition | ActorStatCondition | ActorIdentityCondition;
 
 // A ConditionCollection is an array of Condition objects, where all conditions must be satisfied for the collection to be considered true.
 export type ConditionCollection = Condition[];
@@ -68,10 +51,6 @@ export type ConditionContext = {
     actors?: Array<{ id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string }> | Record<string, { id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string }>;
     currentActor?: { id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string };
     actorStatValues?: Record<string, Record<string, StatValue>>;
-    // Set only while invoking a function stat: the argument values supplied for this call, keyed by parameter
-    // id, and the parameter definitions themselves (needed to type-normalize 'option' parameter comparisons).
-    parameterValues?: Record<string, StatValue>;
-    functionParameters?: StatFunctionParameter[];
 };
 
 const TIME_OF_DAY_VALUES: Record<CalendarTimeOfDay, number> = {
@@ -242,13 +221,6 @@ const resolveConditionActorSubjects = (actorId: ActorConditionTarget, context: C
         return { mode: 'single', actors: resolvedCurrentActor ? [resolvedCurrentActor] : [] };
     }
 
-    const parameterId = parseFunctionParameterTarget(actorId);
-    if (parameterId !== undefined) {
-        const parameterActorId = context.parameterValues?.[parameterId];
-        const targetActor = typeof parameterActorId === 'string' ? actorList.find((actor) => actor?.id === parameterActorId) : undefined;
-        return { mode: 'single', actors: targetActor ? [targetActor] : [] };
-    }
-
     const targetActor = actorList.find((actor) => actor?.id === actorId);
     return { mode: 'single', actors: targetActor ? [targetActor] : [] };
 };
@@ -271,19 +243,6 @@ export const evaluateActorIdentityCondition = (condition: ActorIdentityCondition
     return !!resolvedCurrentActor && compareValues(resolvedCurrentActor.id, condition.value, condition.comparison);
 };
 
-// Compares a function stat's parameter value at invocation time (see FunctionParameterCondition); 'option'
-// typed parameters are normalized against the parameter's own option list so option ids/legacy names match.
-export const evaluateFunctionParameterCondition = (condition: FunctionParameterCondition, context: ConditionContext): boolean => {
-    const parameter = context.functionParameters?.find(candidate => candidate.id === condition.parameterId);
-    const actual = context.parameterValues?.[condition.parameterId];
-    if (parameter?.type === 'option') {
-        const normalizedActual = normalizeStatValue(actual, { type: 'option', options: parameter.options } as Stat);
-        const normalizedExpected = normalizeStatValue(resolveConditionValue(condition, context), { type: 'option', options: parameter.options } as Stat) as string;
-        return compareValues(normalizedActual, normalizedExpected, condition.comparison);
-    }
-    return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
-};
-
 export const evaluateCondition = (condition: Condition, context: ConditionContext): boolean => {
     if (condition.type === 'calendar') {
         const actual = getCalendarValue(condition, context);
@@ -298,10 +257,6 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
 
     if (condition.type === 'actorIdentity') {
         return evaluateActorIdentityCondition(condition, context);
-    }
-
-    if (condition.type === 'functionParameter') {
-        return evaluateFunctionParameterCondition(condition, context);
     }
 
     return evaluateActorStatCondition(condition, context);
@@ -320,11 +275,4 @@ export const evaluateConditionCollections = (conditionCollections: ConditionColl
 
 export const hasVariableActorTarget = (conditionCollections: ConditionCollection[] | undefined): boolean => {
     return !!conditionCollections?.some((collection) => collection.some((condition) => condition.type === 'actorIdentity' || (condition.type === 'actorStat' && condition.actorId === 'variable')));
-};
-
-// Checks for any condition that references a function stat parameter (either directly via 'functionParameter',
-// or indirectly via an actorStat condition targeting `param:<id>`) - used to skip evaluating conditions when
-// no invocation context (parameterValues/functionParameters) is available.
-export const hasFunctionParameterTarget = (conditionCollections: ConditionCollection[] | undefined): boolean => {
-    return !!conditionCollections?.some((collection) => collection.some((condition) => condition.type === 'functionParameter' || (condition.type === 'actorStat' && parseFunctionParameterTarget(condition.actorId) !== undefined)));
 };

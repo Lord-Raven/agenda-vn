@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatDisplayType, StatType, StatValue, StatValueRule, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, cloneStatFunctionParameters, findStatOptionByValue, getStatOptionValue, isFunctionStatType, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue, cloneStat } from '../content/Stat';
+import { Stat, StatDisplayType, StatType, StatValue, StatValueRule, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, findStatOptionByValue, getStatOptionValue, isFunctionStatType, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue, cloneStat } from '../content/Stat';
 import { Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { IconPicker } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
@@ -199,8 +199,7 @@ const normalizeGlobalStatShape = (stat: Stat): Stat => {
             displayType: undefined,
             perActor: false,
             defaultValueRules: [],
-            parameters: cloneStatFunctionParameters(stat.parameters),
-            functionRules: cloneStatUpdateRules(stat.functionRules),
+            script: stat.script || '',
         };
     }
 
@@ -276,8 +275,7 @@ const normalizeActorStatShape = (stat: Stat): Stat => {
             displayType: undefined,
             perActor: false,
             perActorDefaultRules: [],
-            parameters: cloneStatFunctionParameters(stat.parameters),
-            functionRules: cloneStatUpdateRules(stat.functionRules),
+            script: stat.script || '',
         };
     }
 
@@ -991,16 +989,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
 
                                             {normalizedStat.type === 'function' && (
                                                 <StatFunctionEditor
-                                                    parameters={normalizedStat.parameters || []}
-                                                    onParametersChange={(parameters) => updateGlobalStat(statIndex, { parameters })}
-                                                    rules={normalizedStat.functionRules || []}
-                                                    onRulesChange={(functionRules) => updateGlobalStat(statIndex, { functionRules })}
-                                                    globalStats={globalStats}
-                                                    actorStats={actorStats}
-                                                    actors={actorOptions}
-                                                    items={itemOptions}
-                                                    locations={locationOptions}
-                                                    stage={stage}
+                                                    script={normalizedStat.script || ''}
+                                                    onScriptChange={(script) => updateGlobalStat(statIndex, { script })}
                                                 />
                                             )}
 
@@ -1412,16 +1402,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
 
                                             {normalizedStat.type === 'function' && (
                                                 <StatFunctionEditor
-                                                    parameters={normalizedStat.parameters || []}
-                                                    onParametersChange={(parameters) => updateActorStat(statIndex, { parameters })}
-                                                    rules={normalizedStat.functionRules || []}
-                                                    onRulesChange={(functionRules) => updateActorStat(statIndex, { functionRules })}
-                                                    globalStats={globalStats}
-                                                    actorStats={actorStats}
-                                                    actors={actorOptions}
-                                                    items={itemOptions}
-                                                    locations={locationOptions}
-                                                    stage={stage}
+                                                    script={normalizedStat.script || ''}
+                                                    onScriptChange={(script) => updateActorStat(statIndex, { script })}
                                                 />
                                             )}
 
@@ -1876,16 +1858,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
 
                                             {normalizedStat.type === 'function' && (
                                                 <StatFunctionEditor
-                                                    parameters={normalizedStat.parameters || []}
-                                                    onParametersChange={(parameters) => updateLocationStat(statIndex, { parameters })}
-                                                    rules={normalizedStat.functionRules || []}
-                                                    onRulesChange={(functionRules) => updateLocationStat(statIndex, { functionRules })}
-                                                    globalStats={globalStats}
-                                                    actorStats={actorStats}
-                                                    actors={actorOptions}
-                                                    items={itemOptions}
-                                                    locations={locationOptions}
-                                                    stage={stage}
+                                                    script={normalizedStat.script || ''}
+                                                    onScriptChange={(script) => updateLocationStat(statIndex, { script })}
                                                 />
                                             )}
 
@@ -2279,18 +2253,10 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
 
                                             {normalizedStat.type === 'function' && (
                                                 <StatFunctionEditor
-                                                    parameters={normalizedStat.parameters || []}
-                                                    onParametersChange={(parameters) => updateItemStat(statIndex, { parameters })}
-                                                    rules={normalizedStat.functionRules || []}
-                                                    onRulesChange={(functionRules) => updateItemStat(statIndex, { functionRules })}
-                                                    globalStats={globalStats}
-                                                    actorStats={actorStats}
-                                                    actors={actorOptions}
-                                                    items={itemOptions}
-                                                    locations={locationOptions}
-                                                    stage={stage}
-                                                    rulesLabel="Default Rules"
-                                                    rulesDescription="Run in order when this item's function is invoked, unless overridden on a specific item's own detail page."
+                                                    script={normalizedStat.script || ''}
+                                                    onScriptChange={(script) => updateItemStat(statIndex, { script })}
+                                                    scriptLabel="Default Script"
+                                                    scriptDescription="Run when this item's function is invoked, unless overridden on a specific item's own detail page."
                                                 />
                                             )}
 
