@@ -661,7 +661,6 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                             locations={locationOptions}
                             stage={stage}
                             scriptLabel="Default Script"
-                            scriptDescription="Run when this item's function is invoked, unless overridden on a specific item's own detail page."
                             fieldLabelStyle={fieldLabelStyle}
                             inlineFieldStyle={inlineFieldStyle}
                             inlineFieldTopStyle={inlineFieldTopStyle}

@@ -8,7 +8,6 @@ interface StatFunctionEditorProps {
     // Label used for the script field; entities that support per-instance overrides of a function (e.g. Item)
     // should describe this as the default/fallback implementation.
     scriptLabel?: string;
-    scriptDescription?: string;
 }
 
 const fieldLabelStyle = { color: 'var(--agenda-text-muted)', fontSize: 12 };
@@ -20,7 +19,7 @@ const fieldLabelStyle = { color: 'var(--agenda-text-muted)', fontSize: 12 };
 // `items()`, and other function stats via `call(name)`. It may optionally `return` a value for the caller to use.
 export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
     script, onScriptChange,
-    scriptLabel = 'Script', scriptDescription = 'Plain JavaScript, run when this function is invoked. Read/write stats via get(name)/set(name, value), modify bound target metadata via target.getField(name)/target.setField(name, value), loop active actors/locations/items via actors()/locations()/items(), and call other functions via call(name). May optionally return a value.',
+    scriptLabel = 'Script',
 }) => {
     const [helpOpen, setHelpOpen] = useState(false);
     const [helpAnchor, setHelpAnchor] = useState<HTMLElement | null>(null);
@@ -70,14 +69,13 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
                     ?
                 </IconButton>
             </div>
-            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 11 }}>{scriptDescription}</span>
             <Popover
                 open={helpOpen}
                 anchorEl={helpAnchor}
                 onClose={() => setHelpOpen(false)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                slotProps={{ paper: { style: { maxWidth: 420, padding: 12, background: 'var(--agenda-panel-bg)', color: 'var(--agenda-text-primary)', border: '1px solid color-mix(in srgb, var(--agenda-text-muted) 35%, transparent)' } } }}
+                slotProps={{ paper: { style: { maxWidth: 420, padding: 12, backgroundColor: 'var(--agenda-panel-bg)', opacity: 1, color: 'var(--agenda-text-primary)', border: '1px solid color-mix(in srgb, var(--agenda-text-muted) 35%, transparent)' } } }}
                 disableAutoFocus
                 disableEnforceFocus
                 keepMounted

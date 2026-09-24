@@ -169,7 +169,6 @@ interface StatEntryEditorProps {
     locations: LocationLike[];
     stage: () => Stage;
     scriptLabel?: string;
-    scriptDescription?: string;
     fieldLabelStyle: React.CSSProperties;
     inlineFieldStyle: React.CSSProperties;
     inlineFieldTopStyle: React.CSSProperties;
@@ -183,7 +182,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     stat, index, total, typeLabel, category,
     collapsed, onToggleCollapse, onMove, onRemove, onPatch, onNameChange,
     selfStats, globalStats, actorStats, conditionActors, valueActors, items, locations, stage,
-    scriptLabel, scriptDescription,
+    scriptLabel,
     fieldLabelStyle, inlineFieldStyle, inlineFieldTopStyle, compactChipLabelStyle,
 }) => {
     const normalizedStat = normalizeStatShape(stat);
@@ -313,7 +312,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 script={normalizedStat.script || ''}
                                 onScriptChange={(script) => onPatch({ script })}
                                 scriptLabel={scriptLabel}
-                                scriptDescription={scriptDescription}
                             />
                         )}
 
