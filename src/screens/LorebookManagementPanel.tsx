@@ -416,7 +416,8 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
 
         const nextTriggers = [...selectedLore.triggers];
         nextTriggers.splice(editingTriggerIndex, 1, ...nextValues);
-        updateSelectedLore({ triggers: nextTriggers });
+        // Remove non-distinct entries:
+        updateSelectedLore({ triggers: Array.from(new Set(nextTriggers)) });
         cancelTriggerEdit();
     };
 

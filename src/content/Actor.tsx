@@ -638,6 +638,8 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
     loreEntry.title = actor.name;
     loreEntry.content = actor.profile;
     loreEntry.triggers = [...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)), ...actor.name.split(' ').filter(word => word.length > 2 && word.charAt(word.length - 1) !== '.')];
+    // Remove non-distinct entries:
+    loreEntry.triggers = Array.from(new Set(loreEntry.triggers));
 
     if (!isCreatorMode) {
         stage.getSave().lorebook = stage.getSave().lorebook || [];

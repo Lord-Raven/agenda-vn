@@ -109,6 +109,8 @@ export function upsertItemLoreEntry(item: Item, oldName: string, stage: Stage, i
         ...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)),
         ...item.name.split(' '),
     ];
+    // Remove non-distinct entries:
+    loreEntry.triggers = Array.from(new Set(loreEntry.triggers));
 
     if (isCreatorMode) {
         stage.updateConfiguration({ lorebook });

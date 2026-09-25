@@ -166,6 +166,8 @@ export function upsertLocationLoreEntry(location: Location, oldName: string, sta
 		...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)),
 		...location.name.split(' '),
 	];
+	// Remove non-distinct entries:
+    loreEntry.triggers = Array.from(new Set(loreEntry.triggers));
 	
 	// Persist the lorebook changes back to configuration or save
 	if (isCreatorMode) {
