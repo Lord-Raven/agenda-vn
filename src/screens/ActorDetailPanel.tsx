@@ -1589,6 +1589,24 @@ ${indent}}`;
         }
     };
 
+    const handleEmotionImageUrlChange = (emotion: Emotion, imageUrl: string) => {
+        if (!selectedOutfitId) {
+            return;
+        }
+
+        setEditedOutfits((previous) => previous.map((outfit) => (
+            outfit.id === selectedOutfitId
+                ? {
+                    ...outfit,
+                    emotionPack: {
+                        ...(outfit.emotionPack || {}),
+                        [emotion]: imageUrl,
+                    },
+                }
+                : outfit
+        )));
+    };
+
     const handleOpenImageDialog = (target: ImageTarget) => {
         setImageDialog({ open: true, target });
         if (target === 'base') {
@@ -3471,38 +3489,59 @@ ${indent}}`;
                                 </div>
                             )}
                             {imageDialog.target && imageDialog.target !== 'base' && (
-                                <div>
-                                    <label
-                                        style={{
-                                            display: 'block',
-                                            color: 'var(--agenda-highlight)',
-                                            fontSize: '13px',
-                                            fontWeight: 'bold',
-                                            marginBottom: '8px',
-                                        }}
-                                    >
-                                        Emotion Prompt
-                                    </label>
-                                    <TextArea
-                                        value={emotionPromptDraft}
-                                        onChange={(e) => handleEmotionPromptDraftChange(e.target.value)}
-                                        placeholder="Describe the character's expression, gesture, or pose for this emotion; leave blank to have a prompt generated for you."
-                                        style={{
-                                            width: '100%',
-                                            boxSizing: 'border-box',
-                                            minHeight: '120px',
-                                            padding: '12px',
-                                            fontSize: '13px',
-                                            backgroundColor: 'var(--agenda-surface-raised)',
-                                            border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                                            borderRadius: '5px',
-                                            color: 'var(--agenda-text-primary)',
-                                            fontFamily: 'inherit',
-                                            resize: 'vertical',
-                                            lineHeight: 1.5,
-                                        }}
-                                    />
-                                </div>
+                                <>
+                                    <div>
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '13px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Emotion Image URL
+                                        </label>
+                                        <TextInput
+                                            fullWidth
+                                            value={currentImageUrl}
+                                            onChange={(e) => handleEmotionImageUrlChange(imageDialog.target as Emotion, e.target.value)}
+                                            placeholder="https://... or leave empty"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '13px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Emotion Prompt
+                                        </label>
+                                        <TextArea
+                                            value={emotionPromptDraft}
+                                            onChange={(e) => handleEmotionPromptDraftChange(e.target.value)}
+                                            placeholder="Describe the character's expression, gesture, or pose for this emotion; leave blank to have a prompt generated for you."
+                                            style={{
+                                                width: '100%',
+                                                boxSizing: 'border-box',
+                                                minHeight: '120px',
+                                                padding: '12px',
+                                                fontSize: '13px',
+                                                backgroundColor: 'var(--agenda-surface-raised)',
+                                                border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
+                                                borderRadius: '5px',
+                                                color: 'var(--agenda-text-primary)',
+                                                fontFamily: 'inherit',
+                                                resize: 'vertical',
+                                                lineHeight: 1.5,
+                                            }}
+                                        />
+                                    </div>
+                                </>
                             )}
                             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', alignSelf: 'flex-start' }}>
                                 <Button

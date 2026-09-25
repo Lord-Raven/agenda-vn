@@ -608,6 +608,13 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
 }
 
 export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage, isCreatorMode: boolean = false): void {
+    const lorebook = isCreatorMode ? stage.getConfiguration().lorebook : stage.getSave().lorebook;
+    lorebook?.forEach((entry) => {
+        if (entry.type === oldName) {
+            entry.type = actor.name;
+        }
+    });
+
     let loreEntry = getLinkedActorLore(actor, stage, isCreatorMode);
     // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
     if (!loreEntry) {
