@@ -8,9 +8,10 @@ interface LocationActorPortraitsProps {
     stage: Stage;
     size?: number;
     onHoverChange?: (hovering: boolean) => void;
+    labelSide?: 'left' | 'right';
 }
 
-export const LocationActorPortraits: FC<LocationActorPortraitsProps> = ({ locationId, stage, size = 36, onHoverChange }) => {
+export const LocationActorPortraits: FC<LocationActorPortraitsProps> = ({ locationId, stage, size = 36, onHoverChange, labelSide = 'right' }) => {
     const [hoveredActorId, setHoveredActorId] = useState<string | null>(null);
     const save = stage.getSave();
     const scheduleContext = stage.getScheduleContext(save);
@@ -65,8 +66,9 @@ export const LocationActorPortraits: FC<LocationActorPortraitsProps> = ({ locati
                             <span
                                 style={{
                                     position: 'absolute',
-                                    left: '100%',
-                                    marginLeft: 6,
+                                    ...(labelSide === 'left'
+                                        ? { right: '100%', marginRight: 6 }
+                                        : { left: '100%', marginLeft: 6 }),
                                     whiteSpace: 'nowrap',
                                     padding: '2px 8px',
                                     borderRadius: 6,

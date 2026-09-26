@@ -3145,7 +3145,20 @@ ${indent}}`;
                                 </div>
                             </section>
 
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                            <div style={{
+                                position: 'sticky',
+                                bottom: 0,
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '10px',
+                                marginTop: '10px',
+                                paddingTop: '12px',
+                                paddingBottom: '4px',
+                                background: 'color-mix(in srgb, var(--agenda-surface-base) 92%, transparent)',
+                                backdropFilter: 'blur(6px)',
+                                borderTop: '1px solid var(--agenda-line-subtle)',
+                                zIndex: 1,
+                            }}>
                                 {isCreatorMode && (
                                     <Button onClick={handleApplyToSave} variant="secondary">
                                         Apply

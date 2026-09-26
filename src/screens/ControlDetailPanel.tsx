@@ -156,13 +156,13 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         onDeactivate?.(control.id);
     };
 
-    const statsForUpdate = (update: StatUpdate): Stat[] => update.targetType === 'player' ? updatableGlobalStats : updatableActorStats;
+    const statsForUpdate = (update: StatUpdate): Stat[] => update.targetType === 'global' ? updatableGlobalStats : updatableActorStats;
     const resolveUpdateStat = (update: StatUpdate): Stat | undefined => statsForUpdate(update).find((stat) => stat.id === update.statId);
 
     const addAction = () => {
         const newUpdate: StatUpdate = {
             id: generateUuid(),
-            targetType: 'player',
+            targetType: 'global',
             actorId: 'any',
             statId: updatableGlobalStats[0]?.id || '',
             operation: 'adjust',
@@ -301,11 +301,11 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                                 value={update.targetType}
                                                 onChange={(e) => {
                                                     const targetType = e.target.value as StatUpdate['targetType'];
-                                                    const nextStats = targetType === 'player' ? updatableGlobalStats : updatableActorStats;
+                                                    const nextStats = targetType === 'global' ? updatableGlobalStats : updatableActorStats;
                                                     updateAction(update.id, { targetType, statId: nextStats[0]?.id || '', value: 0 });
                                                 }}
                                             >
-                                                <option value="player">Player</option>
+                                                <option value="global">Global</option>
                                                 <option value="actor">Actor</option>
                                             </select>
                                             {update.targetType === 'actor' ? (

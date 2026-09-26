@@ -100,7 +100,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
 
     const createUpdate = (): StatUpdate => ({
         id: generateUuid(),
-        targetType: updatableActorStats.length > 0 ? 'actor' : 'player',
+        targetType: updatableActorStats.length > 0 ? 'actor' : 'global',
         actorId: 'any',
         statId: (updatableActorStats.length > 0 ? updatableActorStats[0] : globalStats[0])?.id || '',
         operation: 'adjust',
@@ -127,9 +127,9 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
         onChange(nextRules);
     };
 
-    const statsForUpdate = (update: StatUpdate): Stat[] => update.targetType === 'player' ? globalStats : updatableActorStats;
+    const statsForUpdate = (update: StatUpdate): Stat[] => update.targetType === 'global' ? globalStats : updatableActorStats;
     const functionStatsForTargetType = (targetType: StatUpdate['targetType']): Stat[] => (
-        (targetType === 'player' ? globalStats : actorStats).filter(stat => isFunctionStatType(stat.type))
+        (targetType === 'global' ? globalStats : actorStats).filter(stat => isFunctionStatType(stat.type))
     );
     const resolveUpdateStat = (update: StatUpdate): Stat | undefined => (
         update.kind === 'function'
@@ -211,13 +211,13 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                                             const functionStats = functionStatsForTargetType(targetType);
                                                             updateStatUpdate(rule.id, update.id, { targetType, statId: functionStats[0]?.id || '' });
                                                         } else {
-                                                            const nextStats = targetType === 'player' ? globalStats : updatableActorStats;
+                                                            const nextStats = targetType === 'global' ? globalStats : updatableActorStats;
                                                             updateStatUpdate(rule.id, update.id, { targetType, statId: nextStats[0]?.id || '', value: 0 });
                                                         }
                                                     }}
                                                 >
                                                     <option value="actor">Actor</option>
-                                                    <option value="player">Player</option>
+                                                    <option value="global">Global</option>
                                                 </select>
                                                 {update.targetType === 'actor' ? (
                                                     <div style={{ flex: '1 1 180px', minWidth: 160 }}>

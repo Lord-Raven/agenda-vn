@@ -176,19 +176,6 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                 </Box>
 
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                    <Box sx={{ display: "flex", justifyContent: "flex-start", alignItems: "flex-start", gap: 1.5, flexWrap: "wrap" }}>
-                        <Typography
-                            sx={{
-                                color: "var(--agenda-text-muted)",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.12em",
-                                fontSize: "0.72rem",
-                            }}
-                        >
-                            {LOCATION_TIME_OF_DAY_LABELS[currentTimeOfDay]} locations
-                        </Typography>
-                    </Box>
-
                     <Box
                         sx={{
                             display: "flex",
@@ -212,17 +199,6 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                         )}
 
                         <Box sx={{ textAlign: "center", minWidth: 0 }}>
-                            <Typography
-                                sx={{
-                                    color: "var(--agenda-text-muted)",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.14em",
-                                    fontSize: "0.72rem",
-                                    mb: 0.4,
-                                }}
-                            >
-                                Category
-                            </Typography>
                             <Typography
                                 sx={{
                                     color: "var(--agenda-text-primary)",
@@ -303,7 +279,12 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                             onClick={openLocation}
                                             initial={{ opacity: 0, y: 16 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            transition={{ duration: 0.22, delay: Math.min(index * 0.04, 0.18) }}
+                                            whileHover={canVisit ? { x: 10 } : undefined}
+                                            transition={{
+                                                opacity: { duration: 0.22, delay: Math.min(index * 0.04, 0.18) },
+                                                y: { duration: 0.22, delay: Math.min(index * 0.04, 0.18) },
+                                                x: { duration: 0.2, ease: 'easeOut' },
+                                            }}
                                             style={{ width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'inherit', cursor: canVisit ? 'pointer' : 'not-allowed', opacity: canVisit ? 1 : 0.56 }}
                                         >
                                             <Box
@@ -322,7 +303,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                                 }}
                                             >
                                         <Box sx={{ position: "absolute", top: 12, right: 12, zIndex: 2 }}>
-                                            <LocationActorPortraits locationId={location.id} stage={stageInstance} size={isVerticalLayout ? 34 : 40} />
+                                            <LocationActorPortraits locationId={location.id} stage={stageInstance} size={isVerticalLayout ? 34 : 40} labelSide="left" />
                                         </Box>
                                         <Box
                                             sx={{
@@ -354,17 +335,6 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                             >
                                                 <Typography
                                                     sx={{
-                                                        color: "var(--agenda-text-muted)",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.12em",
-                                                        fontSize: "0.68rem",
-                                                        mb: 0.35,
-                                                    }}
-                                                >
-                                                    {normalizeCategory(location.category)}
-                                                </Typography>
-                                                <Typography
-                                                    sx={{
                                                         color: "var(--agenda-text-primary)",
                                                         fontFamily: "var(--agenda-font-flavor)",
                                                         fontWeight: 700,
@@ -375,16 +345,18 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                                 >
                                                     {location.name || "Unnamed Location"}
                                                 </Typography>
-                                                <Typography
-                                                    sx={{
-                                                        color: currentEvent ? "var(--agenda-highlight)" : "var(--agenda-text-muted)",
-                                                        fontSize: "0.76rem",
-                                                        fontWeight: currentEvent ? 700 : 500,
-                                                        mt: 0.5,
-                                                    }}
-                                                >
-                                                    {currentEvent ? currentEvent.name : canVisit ? "Open for visits" : "Closed"}
-                                                </Typography>
+                                                {currentEvent || !canVisit ? (
+                                                    <Typography
+                                                        sx={{
+                                                            color: currentEvent ? "var(--agenda-highlight)" : "var(--agenda-text-muted)",
+                                                            fontSize: "0.76rem",
+                                                            fontWeight: currentEvent ? 700 : 500,
+                                                            mt: 0.5,
+                                                        }}
+                                                    >
+                                                        {currentEvent ? currentEvent.name : "Unavailable"}
+                                                    </Typography>
+                                                ) : null}
                                             </Box>
                                         </Box>
                                             </Box>

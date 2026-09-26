@@ -105,7 +105,7 @@ export const ACTOR_VOICES: ActorVoice[] = [
     { id: 'dbfdae01-cb99-4b72-b969-2d9221006369', gender: 'female', accent: 'French', description: 'Fried and crisp', volumeModifier: 1, tags: ['fried', 'crisp'] },
     { id: '049a0c40-cb2c-4c0c-9ff3-c51c73b38a5c', gender: 'female', accent: 'French', description: 'Soft and sibilant', volumeModifier: 1, tags: ['soft', 'sibilant'] },
     { id: '9faa7022-690e-4cbf-b89d-38357af3249b', gender: 'female', accent: 'French', description: 'Mature and raspy', volumeModifier: 1, tags: ['mature', 'raspy'] },
-    { id: 'd534c4bc-b799-4652-8bb9-10ef17cbe814', gender: 'female', accent: 'French', description: 'Mature and androgynous', volumeModifier: 1, tags: ['mature', 'androgynous'] },
+    { id: 'd534c4bc-b799-4652-8bb9-10ef17cbe814', gender: 'non-binary', accent: 'French', description: 'Dark and mature', volumeModifier: 1, tags: ['mature', 'dark'] },
     { id: '75cc0825-68d1-4910-b777-f76f1b93e2bf', gender: 'male', accent: 'French', description: 'Resonant and playful', volumeModifier: 1, tags: ['resonant', 'playful'] },
     { id: 'ecd74a78-ec98-4dc0-b724-7a53b46ea688', gender: 'female', accent: 'French', description: 'Gentle and bubbly', volumeModifier: 1, tags: ['gentle', 'bubbly'] },
     { id: '205d9492-c99f-4de6-b4ef-64010f5649d8', gender: 'female', accent: 'French', description: 'Bright and childish', volumeModifier: 1, tags: ['bright', 'childish'] },

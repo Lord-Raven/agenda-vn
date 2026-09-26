@@ -347,7 +347,8 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </div>
                         )}
 
-                        {category === 'actor' && (
+                        {/*Temporarily removing this feature:
+                        category === 'actor' && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Per Actor</label>
                                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
@@ -359,7 +360,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                     Maps other actors to distinct values
                                 </label>
                             </div>
-                        )}
+                        )*/}
 
                         <ConditionalFlagEditor
                             label="Send to LLM"

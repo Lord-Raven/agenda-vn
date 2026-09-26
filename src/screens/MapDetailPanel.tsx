@@ -366,7 +366,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         : draft.alternativeImages[previewSelection]?.imageUrl || draft.imageUrl;
 
     return (
-        <div style={{ padding: '20px', display: 'grid', gap: '16px', flex: 1, minHeight: 0 }}>
+        <div style={{ padding: '20px', display: 'grid', gap: '16px', flex: 'none', minHeight: '100%', boxSizing: 'border-box' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px', gap: '12px' }}>
                 <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
                     Name
@@ -631,21 +631,35 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                 </div>
             </div>
 
-            {isCreatorMode && (
-                <Button
-                    variant="secondary"
-                    onClick={() => {
-                        const applied = stageInstance.applyConfigurationMapToSave(map.id);
-                        stageInstance.showPriorityMessage(applied
-                            ? `${map.name || 'Map'} applied to the active save.`
-                            : `${map.name || 'Map'} does not exist in the active save yet.`);
-                    }}
-                    style={{ justifySelf: 'end' }}
-                >
-                    Apply
-                </Button>
-            )}
-            <Button variant="danger" onClick={() => persist(() => { map.active = false; onDeactivate(); })} style={{ justifySelf: 'end' }}>Deactivate Map</Button>
+            <div style={{
+                position: 'sticky',
+                bottom: 0,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+                marginTop: '10px',
+                paddingTop: '12px',
+                paddingBottom: '4px',
+                background: 'color-mix(in srgb, var(--agenda-surface-base) 92%, transparent)',
+                backdropFilter: 'blur(6px)',
+                borderTop: '1px solid var(--agenda-line-subtle)',
+                zIndex: 1,
+            }}>
+                {isCreatorMode && (
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            const applied = stageInstance.applyConfigurationMapToSave(map.id);
+                            stageInstance.showPriorityMessage(applied
+                                ? `${map.name || 'Map'} applied to the active save.`
+                                : `${map.name || 'Map'} does not exist in the active save yet.`);
+                        }}
+                    >
+                        Apply
+                    </Button>
+                )}
+                <Button variant="danger" onClick={() => persist(() => { map.active = false; onDeactivate(); })}>Deactivate Map</Button>
+            </div>
         </div>
     );
 };

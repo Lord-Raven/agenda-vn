@@ -359,14 +359,10 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                 style={{ position: 'relative', width: '100%', minHeight: 0 }}
             >
                 <GlassPanel variant="default" style={{ overflow: 'visible', position: 'relative', padding: '20px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ marginBottom: '20px' }}>
                         <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                             Item Details: {editedItem.name}
                         </Title>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                            {isCreatorMode && <Button variant="secondary" onClick={handleApplyToSave}>Apply to Save</Button>}
-                            <Button variant="danger" onClick={handleDeactivateItem}>Deactivate</Button>
-                        </div>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', flex: 1 }}>
@@ -695,6 +691,23 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                 })}
                             </div>
                         </section>
+                    </div>
+                    <div style={{
+                        position: 'sticky',
+                        bottom: 0,
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: '10px',
+                        marginTop: '10px',
+                        paddingTop: '12px',
+                        paddingBottom: '4px',
+                        background: 'color-mix(in srgb, var(--agenda-surface-base) 92%, transparent)',
+                        backdropFilter: 'blur(6px)',
+                        borderTop: '1px solid var(--agenda-line-subtle)',
+                        zIndex: 1,
+                    }}>
+                        {isCreatorMode && <Button variant="secondary" onClick={handleApplyToSave}>Apply to Save</Button>}
+                        <Button variant="danger" onClick={handleDeactivateItem}>Deactivate</Button>
                     </div>
                 </GlassPanel>
             </motion.div>
