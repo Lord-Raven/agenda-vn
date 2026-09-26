@@ -489,7 +489,7 @@ export const resolvePerActorValueRule = (
 // resolved but there is no per-actor target involved (e.g. a global stat's defaultValueRules at game start).
 export const resolveStatValueRule = resolvePerActorValueRule;
 
-export type StatUpdateTargetType = 'player' | 'actor';
+export type StatUpdateTargetType = 'global' | 'actor';
 export type StatUpdateOperation = 'set' | 'adjust';
 
 // Whether a StatUpdateRule action writes a stat directly ('stat', the original/default behavior) or invokes
@@ -527,7 +527,7 @@ export type StatUpdateRule = {
 export const cloneStatUpdate = (update: any): StatUpdate => ({
     id: update?.id || generateUuid(),
     kind: update?.kind === 'function' ? 'function' : 'stat',
-    targetType: update?.targetType === 'player' ? 'player' : 'actor',
+    targetType: update?.targetType === 'global' ? 'global' : 'actor',
     actorId: `${update?.actorId || 'any'}`,
     statId: `${update?.statId || ''}`,
     operation: update?.operation === 'set' ? 'set' : 'adjust',
