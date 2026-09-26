@@ -439,8 +439,12 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                     conditionCollections={link.conditionCollections || []}
                                     globalStats={stageInstance.getConfiguration().globalStats || []}
                                     actorStats={stageInstance.getConfiguration().actorStats || []}
+                                    locationStats={stageInstance.getConfiguration().locationStats || []}
+                                    itemStats={stageInstance.getConfiguration().itemStats || []}
                                     actors={Object.values(stageInstance.getSave().actors || {})}
-                                    allowVariableActorTarget
+                                    locations={Object.values(stageInstance.getSave().atlas || {})}
+                                    items={stageInstance.getSave().inventory || []}
+                                    variableContentType="actor"
                                     onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
                                 />
                             </div>
@@ -616,8 +620,12 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                             conditionCollections={alternative.conditionCollections}
                                             globalStats={stageInstance.getConfiguration().globalStats || []}
                                             actorStats={stageInstance.getConfiguration().actorStats || []}
+                                            locationStats={stageInstance.getConfiguration().locationStats || []}
+                                            itemStats={stageInstance.getConfiguration().itemStats || []}
                                             actors={Object.values(stageInstance.getSave().actors || {})}
-                                            allowVariableActorTarget
+                                            locations={Object.values(stageInstance.getSave().atlas || {})}
+                                            items={stageInstance.getSave().inventory || []}
+                                            variableContentType="actor"
                                             onChange={conditionCollections => updateAlternative(index, { conditionCollections })}
                                         />
                                         <Button variant="secondary" onClick={() => generateVariantImage(index)} disabled={isGeneratingVariant} style={{ justifySelf: 'end', display: 'flex', gap: 8, alignItems: 'center' }}>

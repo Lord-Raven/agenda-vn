@@ -2,10 +2,10 @@ import { FC, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { Stat, StatValue, StatUpdate, StatUpdateRule, isFunctionStatType, isNumericDisplayType } from '../content/Stat';
-import { Condition, ConditionCollection } from '../content/Condition';
+import { ContentType, CONTENT_TYPES, Condition, ConditionCollection } from '../content/Condition';
 import { Stage } from '../Stage';
 import { Button } from './UiComponents';
-import { ConditionEditor, buildActorTargetOptions } from './ConditionEditor';
+import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from './ConditionEditor';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { StatValueInput } from './StatValueInput';
 import { LocationLike } from './LocationPortrait';
@@ -15,6 +15,8 @@ interface StatUpdateRuleEditorProps {
     rules: StatUpdateRule[];
     globalStats: Stat[];
     actorStats: Stat[];
+    locationStats?: Stat[];
+    itemStats?: Stat[];
     actors: Array<{ id: string; name: string }>;
     items?: ItemLike[];
     locations: LocationLike[];
@@ -92,16 +94,17 @@ const describeUpdate = (update: StatUpdate, stat: Stat | undefined): string => {
     return `${stat.name} ${verb} ${update.value}`;
 };
 
-export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, globalStats: globalStats, actorStats, actors, items = [], locations, stage, onChange }) => {
+export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, globalStats: globalStats, actorStats, locationStats = [], itemStats = [], actors, items = [], locations, stage, onChange }) => {
     const [collapsedRules, setCollapsedRules] = useState<Record<string, boolean>>({});
     // perActor stats have no single target here, so they cannot be written by a rule.
     const updatableActorStats = actorStats.filter(stat => !stat.perActor);
-    const actorTargetOptions = buildActorTargetOptions(actors, false).filter(option => option.key !== 'none');
+    const entitiesByContentType: Record<ContentType, Array<{ id: string; name: string }>> = { actor: actors, location: locations, item: items };
+    const targetOptionsFor = (contentType: ContentType) => buildContentTargetOptions(contentType, entitiesByContentType[contentType], { allowNone: false });
 
     const createUpdate = (): StatUpdate => ({
         id: generateUuid(),
         targetType: updatableActorStats.length > 0 ? 'actor' : 'global',
-        actorId: 'any',
+        targetId: 'any',
         statId: (updatableActorStats.length > 0 ? updatableActorStats[0] : globalStats[0])?.id || '',
         operation: 'adjust',
         value: 0,
@@ -127,9 +130,17 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
         onChange(nextRules);
     };
 
-    const statsForUpdate = (update: StatUpdate): Stat[] => update.targetType === 'global' ? globalStats : updatableActorStats;
+    const statsForTargetType = (targetType: StatUpdate['targetType'], includePerActor: boolean = false): Stat[] => {
+        switch (targetType) {
+            case 'global': return globalStats;
+            case 'location': return locationStats;
+            case 'item': return itemStats;
+            default: return includePerActor ? actorStats : updatableActorStats;
+        }
+    };
+    const statsForUpdate = (update: StatUpdate): Stat[] => statsForTargetType(update.targetType);
     const functionStatsForTargetType = (targetType: StatUpdate['targetType']): Stat[] => (
-        (targetType === 'global' ? globalStats : actorStats).filter(stat => isFunctionStatType(stat.type))
+        statsForTargetType(targetType, true).filter(stat => isFunctionStatType(stat.type))
     );
     const resolveUpdateStat = (update: StatUpdate): Stat | undefined => (
         update.kind === 'function'
@@ -167,6 +178,8 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                     conditionCollections={rule.conditions}
                                     globalStats={globalStats}
                                     actorStats={actorStats}
+                                    locationStats={locationStats}
+                                    itemStats={itemStats}
                                     actors={actors}
                                     items={items}
                                     locations={locations}
@@ -209,26 +222,26 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                                         const targetType = event.target.value as StatUpdate['targetType'];
                                                         if (kind === 'function') {
                                                             const functionStats = functionStatsForTargetType(targetType);
-                                                            updateStatUpdate(rule.id, update.id, { targetType, statId: functionStats[0]?.id || '' });
+                                                            updateStatUpdate(rule.id, update.id, { targetType, targetId: 'any', statId: functionStats[0]?.id || '' });
                                                         } else {
-                                                            const nextStats = targetType === 'global' ? globalStats : updatableActorStats;
-                                                            updateStatUpdate(rule.id, update.id, { targetType, statId: nextStats[0]?.id || '', value: 0 });
+                                                            const nextStats = statsForTargetType(targetType);
+                                                            updateStatUpdate(rule.id, update.id, { targetType, targetId: 'any', statId: nextStats[0]?.id || '', value: 0 });
                                                         }
                                                     }}
                                                 >
-                                                    <option value="actor">Actor</option>
                                                     <option value="global">Global</option>
+                                                    {CONTENT_TYPES.map(contentType => <option key={contentType} value={contentType}>{CONTENT_TYPE_LABELS[contentType]}</option>)}
                                                 </select>
-                                                {update.targetType === 'actor' ? (
+                                                {update.targetType !== 'global' ? (
                                                     <div style={{ flex: '1 1 180px', minWidth: 160 }}>
                                                         <SearchableOptionPicker
-                                                            value={update.actorId}
-                                                            onChange={(nextValue) => updateStatUpdate(rule.id, update.id, { actorId: (Array.isArray(nextValue) ? nextValue[0] : nextValue) || 'any' })}
-                                                            options={actorTargetOptions}
+                                                            value={update.targetId}
+                                                            onChange={(nextValue) => updateStatUpdate(rule.id, update.id, { targetId: (Array.isArray(nextValue) ? nextValue[0] : nextValue) || 'any' })}
+                                                            options={targetOptionsFor(update.targetType)}
                                                             defaultOptionKeys={['any']}
                                                             allowClear={false}
-                                                            title="Choose actor target"
-                                                            placeholder="Search actors"
+                                                            title={`Choose ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()} target`}
+                                                            placeholder={`Search ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()}s`}
                                                         />
                                                     </div>
                                                 ) : null}
@@ -292,7 +305,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                 })}
                                 <Button
                                     variant="secondary"
-                                    disabled={globalStats.length === 0 && updatableActorStats.length === 0}
+                                    disabled={globalStats.length === 0 && updatableActorStats.length === 0 && locationStats.length === 0 && itemStats.length === 0}
                                     onClick={() => updateRule(rule.id, { updates: [...rule.updates, createUpdate()] })}
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifySelf: 'start' }}
                                 >

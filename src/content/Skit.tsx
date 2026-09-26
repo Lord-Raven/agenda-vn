@@ -13,7 +13,7 @@ import {
     parseStructuredListValue,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-import { ConditionContext, evaluateConditionCollections, hasVariableActorTarget } from './Condition';
+import { ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
 import { findStatOptionByValue, isStatLlmMaintained, isStatLlmSeen, mapReferenceStatValue, normalizeStatValue, StatType, StatValue } from './Stat';
 import { build } from "vite";
 
@@ -229,13 +229,13 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     currentActors.forEach(() => {});
     const lorebook = save.lorebook || [];
     const agendaConfig = stage.getConfiguration();
-    const conditionContext: ConditionContext = { ...save, globalStats: agendaConfig.globalStats, actorStats: agendaConfig.actorStats };
+    const conditionContext: ConditionContext = stage.getScheduleContext(save);
     const passedProbabilityLoreIds = new Set(
         lorebook.filter((lore) => isLoreProbabilityActive(lore)).map((lore) => lore.id),
     );
     const activeConstantLore = lorebook
         .filter((lore) => lore.enabled && lore.constant && passedProbabilityLoreIds.has(lore.id))
-        .filter((lore) => !hasVariableActorTarget(lore.conditionCollections))
+        .filter((lore) => !hasVariableContentTarget(lore.conditionCollections))
         .filter((lore) => evaluateConditionCollections(lore.conditionCollections, conditionContext))
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
     const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
@@ -298,7 +298,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
     // For lorebook context, we go through lorebook entries and add them 
     let triggeredLore = lorebook.filter(lore => {
-            if (!lore.enabled || hasVariableActorTarget(lore.conditionCollections) || (!['character', 'location', 'other'].includes(lore.type) && !currentActors.some(actor => actor.name.toLowerCase() === lore.type.toLowerCase()))) {
+            if (!lore.enabled || hasVariableContentTarget(lore.conditionCollections) || (!['character', 'location', 'other'].includes(lore.type) && !currentActors.some(actor => actor.name.toLowerCase() === lore.type.toLowerCase()))) {
                 return false;
             }
 
@@ -622,7 +622,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         return undefined;
                     }
 
-                    const globalStatContext: ConditionContext = { ...save, globalStats: stage.getConfiguration().globalStats, actorStats: stage.getConfiguration().actorStats };
+                    const globalStatContext: ConditionContext = stage.getScheduleContext(save);
                     if (!isStatLlmMaintained(matchedGlobalStat, globalStatContext)) {
                         return undefined;
                     }

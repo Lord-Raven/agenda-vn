@@ -11,7 +11,7 @@ import {
     parseStructuredResponse,
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
-import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableActorTarget, pickSeededItem } from './Condition';
+import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget, pickSeededItem } from './Condition';
 import { formatCurrentDate } from './Skit';
 import { ACTOR_VOICES, DEFAULT_VOICE_MODULATION, formatActorVoiceLabel, normalizeVoiceModulation, VoiceModulation } from './ActorVoice';
 
@@ -468,7 +468,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
-    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats })) || 'None provided.';
+    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats })) || 'None provided.';
     const otherActorsContext = Object.values(stage.getSave().actors || {})
         .filter(otherActor => otherActor?.id && otherActor.id !== actor.id && otherActor.active !== false && otherActor !== stage.getPlayerActor())
         .map(otherActor => {
@@ -898,14 +898,12 @@ export function getActorLore(actorId: string, stage: Stage) {
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
     const variableLoreText = (stage.getSave().lorebook || [])
-        .filter((entry) => entry?.enabled && entry?.title && hasVariableActorTarget(entry.conditionCollections))
+        .filter((entry) => entry?.enabled && entry?.title && hasVariableContentTarget(entry.conditionCollections, 'actor'))
         .filter((entry) => evaluateConditionCollections(entry.conditionCollections, {
+            ...stage.getScheduleContext(save),
             actors: [actor],
             currentActor: actor,
             actorStatValues: { [actor.id]: actor.statMap || {} },
-            globalStatValues: save.globalStatValues,
-            globalStats: configuration.globalStats,
-            actorStats: configuration.actorStats,
         }))
         .map((entry) => `Additional Instruction: ${entry.title}\n${entry.content}`)
         .join('\n\n');

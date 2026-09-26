@@ -312,7 +312,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
                                     const configuration = stage().getConfiguration();
-                                    const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats });
+                                    const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats });
                                     const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
                                     const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize);
                                     const handleMarkerClick = () => {

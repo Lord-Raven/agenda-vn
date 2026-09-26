@@ -2568,7 +2568,7 @@ ${indent}}`;
                                                                             actors={Object.values(stage().getSave().actors || {})}
                                                                             items={itemOptions}
                                                                             locations={locationOptions}
-                                                                            allowVariableActorTarget
+                                                                            variableContentType="actor"
                                                                             onChange={(conditions) => updatePerActorValueRule(stat, rule.id, { conditions })}
                                                                         />
                                                                         {rule.conditions.length === 0 && (

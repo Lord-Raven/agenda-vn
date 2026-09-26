@@ -3,10 +3,10 @@ import { Add, Delete } from '@mui/icons-material';
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { Control, ControlPlacement, ControlType } from '../content/Control';
-import { ConditionCollection } from '../content/Condition';
+import { ConditionCollection, CONTENT_TYPES, ContentType } from '../content/Condition';
 import { isFunctionStatType, isNumericDisplayType, Stat, StatUpdate, StatValue } from '../content/Stat';
 import { Button, GlassPanel, TextInput, Title } from '../components/UiComponents';
-import { ConditionEditor, buildActorTargetOptions } from '../components/ConditionEditor';
+import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { StatValueInput } from '../components/StatValueInput';
 import { resolveIcon } from '../components/StatRating';
@@ -82,10 +82,16 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const actorStats = useMemo(() => stageInstance.getConfiguration().actorStats || [], [stageInstance]);
     const updatableGlobalStats = useMemo(() => globalStats.filter((stat) => !isFunctionStatType(stat.type)), [globalStats]);
     const updatableActorStats = useMemo(() => actorStats.filter((stat) => !isFunctionStatType(stat.type) && !stat.perActor), [actorStats]);
+    const updatableLocationStats = useMemo(() => (stageInstance.getConfiguration().locationStats || []).filter((stat) => !isFunctionStatType(stat.type)), [stageInstance]);
+    const updatableItemStats = useMemo(() => (stageInstance.getConfiguration().itemStats || []).filter((stat) => !isFunctionStatType(stat.type)), [stageInstance]);
     const actors = useMemo(() => stageInstance.getConfiguration().actors || [], [stageInstance]);
     const items = useMemo(() => stageInstance.getConfiguration().items || [], [stageInstance]);
     const locations = useMemo(() => stageInstance.getConfiguration().locations || [], [stageInstance]);
-    const actorTargetOptions = useMemo(() => buildActorTargetOptions(actors, false).filter((option) => option.key !== 'none'), [actors]);
+    const targetOptionsByContentType = useMemo<Record<ContentType, ReturnType<typeof buildContentTargetOptions>>>(() => ({
+        actor: buildContentTargetOptions('actor', actors.filter((actor) => actor.active !== false), { allowNone: false }),
+        location: buildContentTargetOptions('location', locations.filter((location) => location.active !== false), { allowNone: false }),
+        item: buildContentTargetOptions('item', items.filter((item) => item.active !== false), { allowNone: false }),
+    }), [actors, locations, items]);
 
     const [draft, setDraft] = useState<ControlDraft>(() => createDraft(control));
     const draftRef = useRef(draft);
@@ -156,14 +162,22 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         onDeactivate?.(control.id);
     };
 
-    const statsForUpdate = (update: StatUpdate): Stat[] => update.targetType === 'global' ? updatableGlobalStats : updatableActorStats;
+    const statsForTargetType = (targetType: StatUpdate['targetType']): Stat[] => {
+        switch (targetType) {
+            case 'global': return updatableGlobalStats;
+            case 'location': return updatableLocationStats;
+            case 'item': return updatableItemStats;
+            default: return updatableActorStats;
+        }
+    };
+    const statsForUpdate = (update: StatUpdate): Stat[] => statsForTargetType(update.targetType);
     const resolveUpdateStat = (update: StatUpdate): Stat | undefined => statsForUpdate(update).find((stat) => stat.id === update.statId);
 
     const addAction = () => {
         const newUpdate: StatUpdate = {
             id: generateUuid(),
             targetType: 'global',
-            actorId: 'any',
+            targetId: 'any',
             statId: updatableGlobalStats[0]?.id || '',
             operation: 'adjust',
             value: 0,
@@ -240,6 +254,8 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         conditionCollections={draft.availabilityConditions}
                         globalStats={globalStats}
                         actorStats={actorStats}
+                        locationStats={stageInstance.getConfiguration().locationStats || []}
+                        itemStats={stageInstance.getConfiguration().itemStats || []}
                         actors={actors}
                         items={items}
                         locations={locations}
@@ -301,22 +317,22 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                                 value={update.targetType}
                                                 onChange={(e) => {
                                                     const targetType = e.target.value as StatUpdate['targetType'];
-                                                    const nextStats = targetType === 'global' ? updatableGlobalStats : updatableActorStats;
-                                                    updateAction(update.id, { targetType, statId: nextStats[0]?.id || '', value: 0 });
+                                                    const nextStats = statsForTargetType(targetType);
+                                                    updateAction(update.id, { targetType, targetId: 'any', statId: nextStats[0]?.id || '', value: 0 });
                                                 }}
                                             >
                                                 <option value="global">Global</option>
-                                                <option value="actor">Actor</option>
+                                                {CONTENT_TYPES.map((contentType) => <option key={contentType} value={contentType}>{CONTENT_TYPE_LABELS[contentType]}</option>)}
                                             </select>
-                                            {update.targetType === 'actor' ? (
+                                            {update.targetType !== 'global' ? (
                                                 <SearchableOptionPicker
-                                                    value={update.actorId}
-                                                    onChange={(nextValue) => updateAction(update.id, { actorId: (Array.isArray(nextValue) ? nextValue[0] : nextValue) || 'any' })}
-                                                    options={actorTargetOptions}
+                                                    value={update.targetId}
+                                                    onChange={(nextValue) => updateAction(update.id, { targetId: (Array.isArray(nextValue) ? nextValue[0] : nextValue) || 'any' })}
+                                                    options={targetOptionsByContentType[update.targetType]}
                                                     defaultOptionKeys={['any']}
                                                     allowClear={false}
-                                                    title="Choose actor target"
-                                                    placeholder="Search actors"
+                                                    title={`Choose ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()} target`}
+                                                    placeholder={`Search ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()}s`}
                                                 />
                                             ) : <div />}
                                             <select

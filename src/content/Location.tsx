@@ -433,7 +433,7 @@ export async function distillLocation(location: Location, definition: any, stage
 
 	const save = stage.getSave();
 	const configuration = stage.getConfiguration();
-	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats })) || 'None provided.';
+	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats })) || 'None provided.';
 
 	const locationDetails = [
 		`Name: ${String(definition?.name || location.name || '').trim()}`,

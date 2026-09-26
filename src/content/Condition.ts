@@ -2,9 +2,12 @@ import { CalendarTimeOfDay } from './CalendarEvent';
 import { normalizeStatValue, type Stat, type StatValue } from './Stat';
 
 export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual';
-// 'any'/'none'/'variable' are meta-targets (see resolveConditionActorSubjects); anything else is a specific
-// actor id.
-export type ActorConditionTarget = 'any' | 'none' | 'variable' | string;
+// The kinds of stat-bearing content that conditions, stat updates, reference stats, and scripts can target.
+export type ContentType = 'actor' | 'location' | 'item';
+export const CONTENT_TYPES: ContentType[] = ['actor', 'location', 'item'];
+// 'any'/'none'/'variable' are meta-targets (see resolveConditionContentSubjects); anything else is a specific
+// content (actor/location/item) id.
+export type ContentTarget = 'any' | 'none' | 'variable' | string;
 
 export type CalendarCondition = {
     type: 'calendar';
@@ -20,37 +23,72 @@ export type GlobalStatCondition = {
     value: string | number | boolean;
 };
 
-export type ActorStatCondition = {
-    type: 'actorStat';
-    actorId: ActorConditionTarget;
+export type ContentStatCondition = {
+    type: 'contentStat';
+    contentType: ContentType;
+    targetId: ContentTarget;
     statId: string;
     comparison: ConditionComparison;
     value: string | number | boolean;
 };
 
-// Checks the identity of the context-specific ('variable') actor against a specific actor chosen via an
-// actor picker in the UI. Only meaningful where a variable actor exists (e.g. perActor stat rules), so it
-// always evaluates against context.currentActor rather than tracking its own actor target.
-export type ActorIdentityCondition = {
-    type: 'actorIdentity';
+// Checks the identity of the context-specific ('variable') entity of `contentType` against a specific entity
+// chosen in the UI. Only meaningful where such a variable entity is bound (e.g. context.currentActor during
+// perActor stat rules), so it has no target of its own.
+export type ContentIdentityCondition = {
+    type: 'contentIdentity';
+    contentType: ContentType;
     comparison: 'equals' | 'notEquals';
     value: string;
 };
 
-export type Condition = CalendarCondition | GlobalStatCondition | ActorStatCondition | ActorIdentityCondition;
+export type Condition = CalendarCondition | GlobalStatCondition | ContentStatCondition | ContentIdentityCondition;
 
 // A ConditionCollection is an array of Condition objects, where all conditions must be satisfied for the collection to be considered true.
 export type ConditionCollection = Condition[];
 
+export type ConditionEntity = { id?: string; name?: string; statMap?: Record<string, StatValue>; active?: boolean; generic?: boolean; status?: string };
+export type ConditionEntityCollection = ConditionEntity[] | Record<string, ConditionEntity>;
+
+// Field names mirror SaveType (actors/atlas/inventory) so a spread save works as a context directly.
 export type ConditionContext = {
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
     globalStatValues?: Record<string, StatValue>;
     globalStats?: Stat[];
     actorStats?: Stat[];
-    actors?: Array<{ id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string }> | Record<string, { id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string }>;
-    currentActor?: { id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string };
+    locationStats?: Stat[];
+    itemStats?: Stat[];
+    actors?: ConditionEntityCollection;
+    atlas?: ConditionEntityCollection;
+    inventory?: ConditionEntityCollection;
+    currentActor?: ConditionEntity;
+    currentLocation?: ConditionEntity;
+    currentItem?: ConditionEntity;
     actorStatValues?: Record<string, Record<string, StatValue>>;
+};
+
+const CONTENT_CONTEXT_KEYS = {
+    actor: { entities: 'actors', stats: 'actorStats', current: 'currentActor' },
+    location: { entities: 'atlas', stats: 'locationStats', current: 'currentLocation' },
+    item: { entities: 'inventory', stats: 'itemStats', current: 'currentItem' },
+} as const;
+
+export const getContextContentStats = (context: ConditionContext, contentType: ContentType): Stat[] => (
+    context[CONTENT_CONTEXT_KEYS[contentType].stats] || []
+);
+
+export const getContextContentEntities = (context: ConditionContext, contentType: ContentType): ConditionEntity[] => {
+    const collection = context[CONTENT_CONTEXT_KEYS[contentType].entities];
+    const entities = Array.isArray(collection) ? collection : collection ? Object.values(collection) : [];
+    return entities.filter((entity) => entity && entity.active !== false);
+};
+
+// The 'variable' entity of a content type; a keyed (single-entry) collection doubles as the bound entity.
+export const getContextCurrentContent = (context: ConditionContext, contentType: ContentType): ConditionEntity | undefined => {
+    const keys = CONTENT_CONTEXT_KEYS[contentType];
+    const collection = context[keys.entities];
+    return context[keys.current] || (collection && !Array.isArray(collection) ? Object.values(collection)[0] : undefined);
 };
 
 const TIME_OF_DAY_VALUES: Record<CalendarTimeOfDay, number> = {
@@ -121,13 +159,13 @@ const rollDiceNotation = (notation: string, seed: string): number => {
 // Builds a seed identifying "this condition, at this point in the game" - the condition's own definition
 // (which includes its dice notation value) plus the parts of context that could vary its meaning.
 const buildDiceSeed = (condition: Condition, context: ConditionContext): string => {
-    const variableActorId = condition.type === 'actorStat' && condition.actorId === 'variable' ? (context.currentActor?.id || '') : '';
-    return `${JSON.stringify(condition)}|${context.currentDate || ''}|${context.currentTimeOfDay || ''}|${variableActorId}`;
+    const variableTargetId = condition.type === 'contentStat' && condition.targetId === 'variable' ? (getContextCurrentContent(context, condition.contentType)?.id || '') : '';
+    return `${JSON.stringify(condition)}|${context.currentDate || ''}|${context.currentTimeOfDay || ''}|${variableTargetId}`;
 };
 
 // Resolves a condition's target value, rolling dice notation deterministically if present.
 const resolveConditionValue = (condition: Condition, context: ConditionContext): string | number | boolean => {
-    const value = (condition as GlobalStatCondition | ActorStatCondition | CalendarCondition).value;
+    const value = (condition as GlobalStatCondition | ContentStatCondition | CalendarCondition).value;
     return isDiceNotation(value) ? rollDiceNotation(value, buildDiceSeed(condition, context)) : value;
 };
 
@@ -187,60 +225,36 @@ const getCalendarValue = (condition: CalendarCondition, context: ConditionContex
     }
 };
 
-const getActorStatValue = (actor: { statMap?: Record<string, StatValue> } | undefined, statId: string): StatValue | undefined => {
-    if (!actor) {
-        return undefined;
+// Resolves which entities a content condition's target refers to: 'any'/'none' check every active entity of
+// the content type, 'variable' refers to the one currently under consideration (see getContextCurrentContent),
+// and any other value is a specific entity id.
+const resolveConditionContentSubjects = (contentType: ContentType, targetId: ContentTarget, context: ConditionContext): { mode: 'any' | 'none' | 'single'; entities: ConditionEntity[] } => {
+    if (targetId === 'variable') {
+        const current = getContextCurrentContent(context, contentType);
+        return { mode: 'single', entities: current ? [current] : [] };
     }
-    return actor.statMap?.[statId];
+
+    const entities = getContextContentEntities(context, contentType);
+    if (targetId === 'any' || targetId === 'none') {
+        return { mode: targetId, entities };
+    }
+    return { mode: 'single', entities: entities.filter((entity) => entity.id === targetId).slice(0, 1) };
 };
 
-type ConditionActor = { id?: string; name?: string; statMap?: Record<string, StatValue>; generic?: boolean; status?: string };
-
-// Resolves which actor(s) an actorStat condition's `actorId` target refers to: 'any'/'none' check every actor
-// in context, 'variable' refers to the actor currently under consideration (context.currentActor, e.g. the
-// target of a perActor stat), and any other value is a specific actor id.
-const resolveConditionActorSubjects = (actorId: ActorConditionTarget, context: ConditionContext): { mode: 'any' | 'none' | 'single'; actors: ConditionActor[] } => {
-    const actorList = Array.isArray(context.actors)
-        ? context.actors
-        : context.actors
-            ? Object.values(context.actors)
-            : [];
-
-    if (actorId === 'any') {
-        return { mode: 'any', actors: actorList };
-    }
-
-    if (actorId === 'none') {
-        return { mode: 'none', actors: actorList };
-    }
-
-    if (actorId === 'variable') {
-        const resolvedCurrentActor = context.currentActor || (context.actors && !Array.isArray(context.actors)
-            ? Object.values(context.actors)[0]
-            : undefined);
-        return { mode: 'single', actors: resolvedCurrentActor ? [resolvedCurrentActor] : [] };
-    }
-
-    const targetActor = actorList.find((actor) => actor?.id === actorId);
-    return { mode: 'single', actors: targetActor ? [targetActor] : [] };
-};
-
-export const evaluateActorStatCondition = (condition: ActorStatCondition, context: ConditionContext): boolean => {
-    const { mode, actors } = resolveConditionActorSubjects(condition.actorId, context);
-    const stat = context.actorStats?.find(candidate => candidate.id === condition.statId);
+export const evaluateContentStatCondition = (condition: ContentStatCondition, context: ConditionContext): boolean => {
+    const { mode, entities } = resolveConditionContentSubjects(condition.contentType, condition.targetId, context);
+    const stat = getContextContentStats(context, condition.contentType).find(candidate => candidate.id === condition.statId);
     const resolvedValue = normalizeStatConditionValue(resolveConditionValue(condition, context), stat);
-    const matches = (actor: ConditionActor) => compareValues(stat ? normalizeStatValue(getActorStatValue(actor, stat.id), stat) : undefined, resolvedValue, condition.comparison);
+    const matches = (entity: ConditionEntity) => compareValues(stat ? normalizeStatValue(entity.statMap?.[stat.id], stat) : undefined, resolvedValue, condition.comparison);
 
-    if (mode === 'any') return actors.some(matches);
-    if (mode === 'none') return !actors.some(matches);
-    return actors.length > 0 && matches(actors[0]);
+    if (mode === 'any') return entities.some(matches);
+    if (mode === 'none') return !entities.some(matches);
+    return entities.length > 0 && matches(entities[0]);
 };
 
-export const evaluateActorIdentityCondition = (condition: ActorIdentityCondition, context: ConditionContext): boolean => {
-    const resolvedCurrentActor = context.currentActor || (context.actors && !Array.isArray(context.actors)
-        ? Object.values(context.actors)[0]
-        : undefined);
-    return !!resolvedCurrentActor && compareValues(resolvedCurrentActor.id, condition.value, condition.comparison);
+export const evaluateContentIdentityCondition = (condition: ContentIdentityCondition, context: ConditionContext): boolean => {
+    const current = getContextCurrentContent(context, condition.contentType);
+    return !!current && compareValues(current.id, condition.value, condition.comparison);
 };
 
 export const evaluateCondition = (condition: Condition, context: ConditionContext): boolean => {
@@ -255,11 +269,11 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
         return compareValues(actual, normalizeStatConditionValue(resolveConditionValue(condition, context), stat), condition.comparison);
     }
 
-    if (condition.type === 'actorIdentity') {
-        return evaluateActorIdentityCondition(condition, context);
+    if (condition.type === 'contentIdentity') {
+        return evaluateContentIdentityCondition(condition, context);
     }
 
-    return evaluateActorStatCondition(condition, context);
+    return evaluateContentStatCondition(condition, context);
 };
 
 export const evaluateConditionCollection = (conditionCollection: ConditionCollection, context: ConditionContext): boolean => {
@@ -273,6 +287,10 @@ export const evaluateConditionCollections = (conditionCollections: ConditionColl
     return returnDefault;
 };
 
-export const hasVariableActorTarget = (conditionCollections: ConditionCollection[] | undefined): boolean => {
-    return !!conditionCollections?.some((collection) => collection.some((condition) => condition.type === 'actorIdentity' || (condition.type === 'actorStat' && condition.actorId === 'variable')));
+// Whether any condition depends on a bound 'variable' entity (of `contentType`, or of any type if omitted).
+export const hasVariableContentTarget = (conditionCollections: ConditionCollection[] | undefined, contentType?: ContentType): boolean => {
+    return !!conditionCollections?.some((collection) => collection.some((condition) => {
+        const isVariable = condition.type === 'contentIdentity' || (condition.type === 'contentStat' && condition.targetId === 'variable');
+        return isVariable && (!contentType || condition.contentType === contentType);
+    }));
 };

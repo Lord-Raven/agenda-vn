@@ -2,6 +2,7 @@ import { FC } from 'react';
 import { AddCircleOutline } from '@mui/icons-material';
 import { Stat } from '../content/Stat';
 import { ConditionalFlag } from '../content/Stat';
+import { ContentType } from '../content/Condition';
 import { ConditionEditor } from './ConditionEditor';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
@@ -16,10 +17,12 @@ interface ConditionalFlagEditorProps {
     disabledLabel?: string;
     globalStats: Stat[];
     actorStats?: Stat[];
+    locationStats?: Stat[];
+    itemStats?: Stat[];
     actors?: Array<{ id: string; name: string; category?: string }>;
     items?: ItemLike[];
     locations?: LocationLike[];
-    allowVariableActorTarget?: boolean;
+    variableContentType?: ContentType;
     fieldLabelStyle?: React.CSSProperties;
     inlineFieldStyle?: React.CSSProperties;
 }
@@ -34,10 +37,12 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
     disabledLabel = 'Disabled',
     globalStats,
     actorStats = [],
+    locationStats = [],
+    itemStats = [],
     actors = [],
     items = [],
     locations = [],
-    allowVariableActorTarget = false,
+    variableContentType,
     fieldLabelStyle,
     inlineFieldStyle,
 }) => {
@@ -75,10 +80,12 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
                     conditionCollections={flag.conditions}
                     globalStats={globalStats}
                     actorStats={actorStats}
+                    locationStats={locationStats}
+                    itemStats={itemStats}
                     actors={actors}
                     items={items}
                     locations={locations}
-                    allowVariableActorTarget={allowVariableActorTarget}
+                    variableContentType={variableContentType}
                     onChange={(conditions) => onChange({ ...flag, conditions })}
                     showAddConditionButton={false}
                 />

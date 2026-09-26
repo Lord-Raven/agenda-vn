@@ -1,5 +1,5 @@
 import { v4 as generateUuid } from 'uuid';
-import { ActorConditionTarget, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
+import { ContentTarget, ContentType, CONTENT_TYPES, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 
 // A boolean field whose effective value can be gated by conditions instead of always being fixed. With no
 // conditions, `value` always applies. With conditions, `value` applies only while at least one collection is
@@ -66,7 +66,7 @@ export const normalizeReferenceListValue = (value: unknown): string[] => (
 // The kind of content a reference stat (scalar or list) points to; shared by every place that needs to pick
 // per-kind behavior (which entity collection, which UI select component, which portrait, etc.) instead of
 // re-deriving it from a 6-way StatType comparison.
-export type ReferenceKind = 'actor' | 'item' | 'location';
+export type ReferenceKind = ContentType;
 
 export const resolveReferenceKind = (type: StatType): ReferenceKind | undefined => {
     if (type === 'actor' || type === 'actorList') {
@@ -246,7 +246,7 @@ export type StatValueRule = {
 // directly, bypassing the Stat system.
 export type FunctionScriptEntity = {
     name: string;
-    kind: 'actor' | 'location' | 'item';
+    kind: ContentType;
     get: (statName: string) => StatValue | undefined;
     set: (statName: string, value: StatValue) => void;
     getField?: (fieldName: string) => string | undefined;
@@ -489,7 +489,7 @@ export const resolvePerActorValueRule = (
 // resolved but there is no per-actor target involved (e.g. a global stat's defaultValueRules at game start).
 export const resolveStatValueRule = resolvePerActorValueRule;
 
-export type StatUpdateTargetType = 'global' | 'actor';
+export type StatUpdateTargetType = 'global' | ContentType;
 export type StatUpdateOperation = 'set' | 'adjust';
 
 // Whether a StatUpdateRule action writes a stat directly ('stat', the original/default behavior) or invokes
@@ -505,8 +505,9 @@ export type StatUpdate = {
     kind?: StatUpdateActionKind;
     targetType: StatUpdateTargetType;
     // Which entity owns the target stat ('stat' kind) or the function stat being invoked ('function' kind).
-    // Only meaningful for 'actor' updates: 'any' targets every active actor, otherwise a specific actor id.
-    actorId: ActorConditionTarget;
+    // Meaningful for 'actor'/'location'/'item' updates: 'any' targets every active entity of that type,
+    // otherwise a specific actor/location/item id. Ignored for 'global' updates.
+    targetId: ContentTarget;
     // Only meaningful when kind is 'stat': the stat being written. When kind is 'function': the function-typed
     // stat being invoked (its script is bound the resolved actor, or no target for a 'player' invocation).
     statId: string;
@@ -527,8 +528,8 @@ export type StatUpdateRule = {
 export const cloneStatUpdate = (update: any): StatUpdate => ({
     id: update?.id || generateUuid(),
     kind: update?.kind === 'function' ? 'function' : 'stat',
-    targetType: update?.targetType === 'global' ? 'global' : 'actor',
-    actorId: `${update?.actorId || 'any'}`,
+    targetType: update?.targetType === 'global' ? 'global' : (CONTENT_TYPES.find(type => type === update?.targetType) || 'actor'),
+    targetId: `${update?.targetId || 'any'}`,
     statId: `${update?.statId || ''}`,
     operation: update?.operation === 'set' ? 'set' : 'adjust',
     value: Array.isArray(update?.value)

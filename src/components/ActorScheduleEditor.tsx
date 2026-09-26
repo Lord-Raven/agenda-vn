@@ -105,7 +105,7 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
                             actorStats={actorStats}
                             actors={actors}
                             locations={locations}
-                            allowVariableActorTarget
+                            variableContentType="actor"
                             onChange={collections => updateEntry(index, destination, collections)}
                         />
                         {conditionCollections.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Always applies when reached.</span>}

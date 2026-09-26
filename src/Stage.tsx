@@ -4,7 +4,7 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { findStatOptionByValue, formatReferenceStatText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, normalizeStatValue, resolveStatValueRule, resolveStatText } from './content/Stat';
+import { findStatOptionByValue, formatReferenceStatText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, normalizeStatValue, resolveFunctionScript, resolveStatValueRule, resolveStatText } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { Control, ControlPlacement, isControlAvailable } from "./content/Control";
@@ -490,7 +490,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // that point at a location-type ActorStat rather than a fixed location id.
     getScheduleContext(save: SaveType): ScheduleContext {
         const configuration = this.getConfiguration();
-        return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats };
+        return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats };
     }
 
     // Resolves the active (available) controls for the given placement, in configured order, for rendering
@@ -749,8 +749,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const globalStatValues: { [key: string]: StatValue } = {};
         const globalStatContext: ConditionContext = {
             actors: Object.values(actors),
+            atlas,
+            inventory,
             globalStats: configuration.globalStats,
             actorStats: configuration.actorStats,
+            locationStats: configuration.locationStats,
+            itemStats: configuration.itemStats,
             globalStatValues,
         };
         configuredGlobalStats.forEach((stat) => {
@@ -1517,7 +1521,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.applyStatUpdate(save, update, context);
     }
 
-    // Resolves the actor(s) an update/invocation targets for a given ActorConditionTarget: the 'any'/'none'
+    // Resolves the actor(s) an update/invocation targets for a given ContentTarget: the 'any'/'none'
     // meta-targets, 'variable' (context.currentActor, e.g. while invoking a function on a specific actor), or
     // a literal actor id.
     private resolveUpdateTargetActors(save: SaveType, actorId: string, context: ConditionContext): Actor[] {
@@ -1532,6 +1536,44 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return context.currentActor ? activeActors.filter(actor => actor.id === context.currentActor?.id) : [];
         }
         return activeActors.filter(actor => actor.id === actorId);
+    }
+
+    // Location/item counterparts of resolveUpdateTargetActors; there's no context-bound location/item, so
+    // 'variable' resolves to nothing.
+    private resolveUpdateTargetLocations(save: SaveType, locationId: string): Location[] {
+        const activeLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
+        if (locationId === 'any') {
+            return activeLocations;
+        }
+        return activeLocations.filter(location => location.id === locationId);
+    }
+
+    private resolveUpdateTargetItems(save: SaveType, itemId: string): Item[] {
+        const activeItems = (save.inventory || []).filter(item => item.active !== false);
+        if (itemId === 'any') {
+            return activeItems;
+        }
+        return activeItems.filter(item => item.id === itemId);
+    }
+
+    private getStatsForUpdateTarget(targetType: StatUpdate['targetType']): Stat[] {
+        const configuration = this.getConfiguration();
+        switch (targetType) {
+            case 'global': return configuration.globalStats || [];
+            case 'location': return configuration.locationStats || [];
+            case 'item': return configuration.itemStats || [];
+            default: return configuration.actorStats || [];
+        }
+    }
+
+    // The entity instances (with statMaps) a non-global update targets, per its targetType.
+    private resolveUpdateTargetEntities(save: SaveType, update: StatUpdate, context: ConditionContext): Array<Actor | Location | Item> {
+        switch (update.targetType) {
+            case 'location': return this.resolveUpdateTargetLocations(save, update.targetId);
+            case 'item': return this.resolveUpdateTargetItems(save, update.targetId);
+            case 'actor': return this.resolveUpdateTargetActors(save, update.targetId, context);
+            default: return [];
+        }
     }
 
     // Builds the get/set accessors a function script uses to read/write a global stat by name.
@@ -1681,54 +1723,67 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // Invokes the function-typed stat targeted by a 'function' kind StatUpdate: runs its script once for the
-    // player (targetType 'player', no target bound) or once per resolved actor (targetType 'actor', target
-    // bound to that actor). depth guards against runaway recursion (a script's `call()` invoking further
-    // functions).
+    // global (targetType 'global', no target bound) or once per resolved actor/location/item (target bound to
+    // that entity; items use their own functionScriptOverrides when set). depth guards against runaway
+    // recursion (a script's `call()` invoking further functions).
     private invokeFunctionUpdate(save: SaveType, update: StatUpdate, context: ConditionContext, depth: number) {
         if (depth >= MAX_FUNCTION_INVOCATION_DEPTH) {
             return;
         }
-        const configuration = this.getConfiguration();
-        const stat = (update.targetType === 'player' ? (configuration.globalStats || []) : (configuration.actorStats || []))
-            .find(candidate => candidate.id === update.statId);
+        const stats = this.getStatsForUpdateTarget(update.targetType);
+        const stat = stats.find(candidate => candidate.id === update.statId);
         if (!stat || !isFunctionStatType(stat.type)) {
             return;
         }
 
-        if (update.targetType === 'player') {
+        if (update.targetType === 'global') {
             this.runFunctionStatScript(save, stat, undefined, undefined, depth);
             return;
         }
 
-        this.resolveUpdateTargetActors(save, update.actorId, context).forEach(actor => {
-            const target = this.buildEntityScriptAccessor(actor, 'actor', configuration.actorStats || [], ACTOR_SCRIPT_FIELDS);
+        if (update.targetType === 'location') {
+            this.resolveUpdateTargetLocations(save, update.targetId).forEach(location => {
+                const target = this.buildEntityScriptAccessor(location, 'location', stats, LOCATION_SCRIPT_FIELDS);
+                this.runFunctionStatScript(save, stat, target, undefined, depth);
+            });
+            return;
+        }
+
+        if (update.targetType === 'item') {
+            this.resolveUpdateTargetItems(save, update.targetId).forEach(item => {
+                const target = this.buildEntityScriptAccessor(item, 'item', stats, ITEM_SCRIPT_FIELDS);
+                this.runFunctionStatScript(save, stat, target, resolveFunctionScript(stat, item.functionScriptOverrides), depth);
+            });
+            return;
+        }
+
+        this.resolveUpdateTargetActors(save, update.targetId, context).forEach(actor => {
+            const target = this.buildEntityScriptAccessor(actor, 'actor', stats, ACTOR_SCRIPT_FIELDS);
             this.runFunctionStatScript(save, stat, target, undefined, depth);
         });
     }
 
 
     private applyStatUpdate(save: SaveType, update: StatUpdate, context: ConditionContext = {}) {
-        const configuration = this.getConfiguration();
+        const stat = this.getStatsForUpdateTarget(update.targetType).find(candidate => candidate.id === update.statId);
+        if (!stat) {
+            return;
+        }
 
-        if (update.targetType === 'player') {
-            const stat = (configuration.globalStats || []).find(candidate => candidate.id === update.statId);
-            if (!stat) {
-                return;
-            }
+        if (update.targetType === 'global') {
             save.globalStatValues = save.globalStatValues || {};
             save.globalStatValues[stat.id] = applyStatUpdateValue(save.globalStatValues[stat.id], update, stat);
             return;
         }
 
-        const stat = (configuration.actorStats || []).find(candidate => candidate.id === update.statId);
         // perActor stats have no single target value, so they cannot be written by a rule.
-        if (!stat || stat.perActor) {
+        if (update.targetType === 'actor' && stat.perActor) {
             return;
         }
 
-        this.resolveUpdateTargetActors(save, update.actorId, context).forEach(actor => {
-            actor.statMap = actor.statMap || {};
-            actor.statMap[stat.id] = applyStatUpdateValue(actor.statMap[stat.id], update, stat);
+        this.resolveUpdateTargetEntities(save, update, context).forEach(entity => {
+            entity.statMap = entity.statMap || {};
+            entity.statMap[stat.id] = applyStatUpdateValue(entity.statMap[stat.id], update, stat);
         });
     }
 

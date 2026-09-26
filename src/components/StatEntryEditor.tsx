@@ -187,7 +187,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 }) => {
     const normalizedStat = normalizeStatShape(stat);
     const optionEntries = normalizedStat.options || [];
-    const allowVariableActorTarget = category === 'actor';
+    const variableContentType = category === 'actor' ? 'actor' : undefined;
     const isFunctionType = normalizedStat.type === 'function';
     const conditionStats = category === 'global' ? [...selfStats, ...actorStats] : [...selfStats, ...globalStats];
 
@@ -328,7 +328,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             actors={conditionActors}
                             items={items}
                             locations={locations}
-                            allowVariableActorTarget={allowVariableActorTarget}
+                            variableContentType={variableContentType}
                             fieldLabelStyle={fieldLabelStyle}
                             inlineFieldStyle={inlineFieldStyle}
                         />
@@ -373,7 +373,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             actors={conditionActors}
                             items={items}
                             locations={locations}
-                            allowVariableActorTarget={allowVariableActorTarget}
+                            variableContentType={variableContentType}
                             fieldLabelStyle={fieldLabelStyle}
                             inlineFieldStyle={inlineFieldStyle}
                         />
@@ -390,7 +390,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 actors={conditionActors}
                                 items={items}
                                 locations={locations}
-                                allowVariableActorTarget={allowVariableActorTarget}
+                                variableContentType={variableContentType}
                                 fieldLabelStyle={fieldLabelStyle}
                                 inlineFieldStyle={inlineFieldStyle}
                             />
@@ -643,7 +643,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                         actors={conditionActors}
                                         items={items}
                                         locations={locations}
-                                        allowVariableActorTarget={allowVariableActorTarget}
+                                        variableContentType={variableContentType}
                                         onChange={(conditions) => updateValueRule(rule.id, { conditions })}
                                     />
                                     {rule.conditions.length === 0 && (

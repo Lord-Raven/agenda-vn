@@ -1,8 +1,8 @@
 import { FC } from 'react';
-import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, LinkOffRounded, LinkRounded, PersonOffOutlined, SwapHoriz } from '@mui/icons-material';
+import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
 import { findStatOptionByValue, getStatOptionValue, isReferenceDisplayType, resolveReferenceKind, Stat } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
-import { ActorConditionTarget, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
+import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
 import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationLike } from './LocationPortrait';
@@ -12,10 +12,14 @@ interface ConditionEditorProps {
     conditionCollections: ConditionCollection[];
     globalStats: Stat[];
     actorStats?: Stat[];
+    locationStats?: Stat[];
+    itemStats?: Stat[];
     actors?: ActorLike[];
     items?: ItemLike[];
     locations?: LocationLike[];
-    allowVariableActorTarget?: boolean;
+    // The content type whose context-bound entity can be targeted as 'Variable' (e.g. the actor a perActor
+    // stat rule is being resolved for); omitted where no such entity is bound.
+    variableContentType?: ContentType;
     onChange: (conditionCollections: ConditionCollection[]) => void;
     // When provided, renders a dropdown per condition collection (on its first row) letting the caller
     // tag each collection with an arbitrary category (e.g. which availability state it applies to).
@@ -38,6 +42,12 @@ const IDENTITY_COMPARISONS: Array<{ value: ConditionComparison; label: string }>
     { value: 'equals', label: 'is' },
     { value: 'notEquals', label: 'is not' },
 ];
+
+export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
+    actor: 'Actor',
+    location: 'Location',
+    item: 'Item',
+};
 
 const CALENDAR_FIELDS = [
     { value: 'timeOfDay', label: 'Time of day' },
@@ -67,7 +77,7 @@ const iconButtonStyle = {
 };
 
 const getConditionRowTemplate = (condition: Condition, hasCollectionCategories: boolean) => {
-    const parameterColumns = condition.type === 'actorStat'
+    const parameterColumns = condition.type === 'contentStat'
         ? ['minmax(120px, 1fr)', 'minmax(120px, 1fr)']
         : condition.type === 'calendar' || condition.type === 'globalStat'
             ? ['minmax(120px, 1fr)']
@@ -101,27 +111,47 @@ const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
     return typeof stat.default === 'number' ? stat.default : 0;
 };
 
-export const buildActorTargetOptions = (actors: Array<{ id: string; name: string; category?: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] }>, allowVariableActorTarget: boolean) => {
+type ContentTargetEntity = { id: string; name: string; category?: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] };
+
+const resolveContentTargetImage = (contentType: ContentType, entity: ContentTargetEntity): string => {
+    if (entity.imageUrl || contentType !== 'actor' || !entity.outfits?.length) {
+        return entity.imageUrl || '';
+    }
+    return getEmotionImage(entity as Actor, 'neutral', undefined, entity.outfitId || '') || getEmotionImage(entity as Actor, 'base', undefined, entity.outfitId || '') || '';
+};
+
+// Target picker options for any content type: the meta-targets ('variable' when allowed, 'any', and 'none'
+// unless disabled) followed by each concrete entity.
+export const buildContentTargetOptions = (
+    contentType: ContentType,
+    entities: ContentTargetEntity[],
+    { allowVariable = false, allowNone = true }: { allowVariable?: boolean; allowNone?: boolean } = {},
+) => {
     const options: Array<{ key: string; label: string; category?: string; icon?: typeof AllInclusive; imageUrl?: string }> = [];
-    if (allowVariableActorTarget) {
+    if (allowVariable) {
         options.push({ key: 'variable', label: 'Variable', icon: SwapHoriz });
     }
-    options.push({ key: 'any', label: 'Any', icon: AllInclusive }, { key: 'none', label: 'None', icon: PersonOffOutlined });
-    options.push(...actors.map((actor) => {
-        const portraitUrl = actor.imageUrl || (
-            actor.outfits && actor.outfits.length > 0
-                ? getEmotionImage(actor as Actor, 'neutral', undefined, actor.outfitId || '') || getEmotionImage(actor as Actor, 'base', undefined, actor.outfitId || '')
-                : ''
-        );
-        return { key: actor.id, label: actor.name, category: actor.category?.trim() || 'Uncategorized', imageUrl: portraitUrl || '' };
-    }));
+    options.push({ key: 'any', label: 'Any', icon: AllInclusive });
+    if (allowNone) {
+        options.push({ key: 'none', label: 'None', icon: DoNotDisturb });
+    }
+    options.push(...entities.map((entity) => ({
+        key: entity.id,
+        label: entity.name,
+        category: entity.category?.trim() || 'Uncategorized',
+        imageUrl: resolveContentTargetImage(contentType, entity),
+    })));
     return options;
 };
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], actors = [], items = [], locations = [], allowVariableActorTarget = false, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true }) => {
+const META_TARGET_KEYS = ['variable', 'any', 'none'];
+
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], locationStats = [], itemStats = [], actors = [], items = [], locations = [], variableContentType, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true }) => {
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
-    const actorTargetOptions = buildActorTargetOptions(actors, allowVariableActorTarget);
-    const concreteActorOptions = actorTargetOptions.filter((option) => !['variable', 'any', 'none'].includes(option.key));
+    const statsByContentType: Record<ContentType, Stat[]> = { actor: actorStats, location: locationStats, item: itemStats };
+    const entitiesByContentType: Record<ContentType, ContentTargetEntity[]> = { actor: actors, location: locations, item: items };
+    const targetOptionsFor = (contentType: ContentType) => buildContentTargetOptions(contentType, entitiesByContentType[contentType], { allowVariable: variableContentType === contentType });
+    const concreteTargetOptionsFor = (contentType: ContentType) => targetOptionsFor(contentType).filter((option) => !META_TARGET_KEYS.includes(option.key));
 
     const updateCondition = (collectionIndex: number, conditionIndex: number, condition: Condition) => {
         onChange(conditionCollections.map((collection, currentCollectionIndex) => currentCollectionIndex === collectionIndex
@@ -180,18 +210,46 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         }
     };
 
+    const statsForCondition = (condition: Condition): Stat[] => (
+        condition.type === 'globalStat' ? globalStats : condition.type === 'contentStat' ? statsByContentType[condition.contentType] : []
+    );
+
+    // Encodes condition type + content type into one select value (e.g. 'contentStat:location').
+    const conditionKindValue = (condition: Condition): string => (
+        condition.type === 'contentStat' || condition.type === 'contentIdentity' ? `${condition.type}:${condition.contentType}` : condition.type
+    );
+
+    const createConditionOfKind = (kind: string): Condition => {
+        const [type, rawContentType] = kind.split(':');
+        const contentType = (CONTENT_TYPES.includes(rawContentType as ContentType) ? rawContentType : 'actor') as ContentType;
+        if (type === 'globalStat') {
+            const stat = globalStats[0];
+            return { type: 'globalStat', statId: stat?.id || '', comparison: 'equals', value: getDefaultConditionValue(stat) };
+        }
+        if (type === 'contentIdentity') {
+            return { type: 'contentIdentity', contentType, comparison: 'equals', value: concreteTargetOptionsFor(contentType)[0]?.key || '' };
+        }
+        if (type === 'contentStat') {
+            const stat = statsByContentType[contentType][0];
+            return { type: 'contentStat', contentType, targetId: targetOptionsFor(contentType)[0]?.key || 'any', statId: stat?.id || '', comparison: 'equals', value: getDefaultConditionValue(stat) };
+        }
+        return { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' };
+    };
+
     const renderValueInput = (condition: Condition, collectionIndex: number, conditionIndex: number) => {
         const updateValue = (value: string | number | boolean) => updateCondition(collectionIndex, conditionIndex, { ...condition, value } as Condition);
-        if (condition.type === 'actorIdentity') {
+        if (condition.type === 'contentIdentity') {
+            const concreteOptions = concreteTargetOptionsFor(condition.contentType);
+            const label = CONTENT_TYPE_LABELS[condition.contentType].toLowerCase();
             return (
                 <SearchableOptionPicker
                     value={condition.value}
-                    onChange={(nextValue) => updateValue((Array.isArray(nextValue) ? nextValue[0] : nextValue) || concreteActorOptions[0]?.key || '')}
-                    options={concreteActorOptions.map((option) => ({ key: option.key, label: option.label, category: option.category, icon: option.icon, imageUrl: option.imageUrl }))}
+                    onChange={(nextValue) => updateValue((Array.isArray(nextValue) ? nextValue[0] : nextValue) || concreteOptions[0]?.key || '')}
+                    options={concreteOptions}
                     allowClear={false}
                     emptyLabel="None"
-                    title="Choose actor"
-                    placeholder="Search actors"
+                    title={`Choose ${label}`}
+                    placeholder={`Search ${label}s`}
                 />
             );
         }
@@ -201,7 +259,9 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (condition.type === 'calendar' && condition.field === 'dayOfWeek') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
         }
-        const stat = condition.type === 'globalStat' ? globalStats.find(candidate => candidate.id === condition.statId) : (condition.type === 'actorStat' ? actorStats.find(candidate => candidate.id === condition.statId) : undefined);
+        const stat = condition.type === 'globalStat' || condition.type === 'contentStat'
+            ? statsForCondition(condition).find(candidate => candidate.id === condition.statId)
+            : undefined;
         if (stat?.type === 'option') {
             const selectedOption = findStatOptionByValue(stat, condition.value);
             return <select style={selectStyle} value={selectedOption?.value || ''} onChange={(event) => updateValue(event.target.value)}>{(stat.options || []).map((option, optionIndex) => {
@@ -262,56 +322,40 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         )}
                         <select
                             style={selectStyle}
-                            value={condition.type}
-                            onChange={(event) => {
-                                const nextType = event.target.value as 'calendar' | 'globalStat' | 'actorStat' | 'actorIdentity';
-                                if (nextType === 'calendar') {
-                                    updateCondition(collectionIndex, conditionIndex, { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' });
-                                    return;
-                                }
-                                if (nextType === 'globalStat') {
-                                    const stat = globalStats[0];
-                                    updateCondition(collectionIndex, conditionIndex, { type: 'globalStat', statId: stat?.id || '', comparison: 'equals', value: getDefaultConditionValue(stat) });
-                                    return;
-                                }
-                                const target = actorTargetOptions[0]?.key || 'any';
-                                if (nextType === 'actorIdentity') {
-                                    updateCondition(collectionIndex, conditionIndex, { type: 'actorIdentity', comparison: 'equals', value: concreteActorOptions[0]?.key || '' });
-                                    return;
-                                }
-                                const actorStat = actorStats[0];
-                                updateCondition(collectionIndex, conditionIndex, { type: 'actorStat', actorId: target, statId: actorStat?.id || '', comparison: 'equals', value: getDefaultConditionValue(actorStat) });
-                            }}
+                            value={conditionKindValue(condition)}
+                            onChange={(event) => updateCondition(collectionIndex, conditionIndex, createConditionOfKind(event.target.value))}
                         >
                             <option value="calendar">Calendar</option>
                             <option value="globalStat">Global Stat</option>
-                            <option value="actorStat">Actor Stat</option>
-                            {allowVariableActorTarget && <option value="actorIdentity">Actor Identity</option>}
+                            {CONTENT_TYPES
+                                .filter((contentType) => statsByContentType[contentType].length > 0 || conditionKindValue(condition) === `contentStat:${contentType}`)
+                                .map((contentType) => <option key={contentType} value={`contentStat:${contentType}`}>{CONTENT_TYPE_LABELS[contentType]} Stat</option>)}
+                            {variableContentType && <option value={`contentIdentity:${variableContentType}`}>{CONTENT_TYPE_LABELS[variableContentType]} Identity</option>}
                         </select>
                         {condition.type === 'calendar' ? (
                             <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 })}>
                                 {CALENDAR_FIELDS.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
                             </select>
-                        ) : condition.type === 'actorStat' ? (
+                        ) : condition.type === 'contentStat' ? (
                             <div style={{ display: 'grid', gap: 6 }}>
                                 <SearchableOptionPicker
-                                    value={condition.actorId}
-                                    onChange={(nextValue) => updateCondition(collectionIndex, conditionIndex, { ...condition, actorId: nextValue || (allowVariableActorTarget ? 'variable' : 'any') } as Condition)}
-                                    options={actorTargetOptions.map((option) => ({ key: option.key, label: option.label, category: option.category, icon: option.icon, imageUrl: option.imageUrl }))}
-                                    defaultOptionKeys={allowVariableActorTarget ? ['variable', 'any', 'none'] : ['any', 'none']}
+                                    value={condition.targetId}
+                                    onChange={(nextValue) => updateCondition(collectionIndex, conditionIndex, { ...condition, targetId: (Array.isArray(nextValue) ? nextValue[0] : nextValue) || (variableContentType === condition.contentType ? 'variable' : 'any') })}
+                                    options={targetOptionsFor(condition.contentType)}
+                                    defaultOptionKeys={variableContentType === condition.contentType ? META_TARGET_KEYS : ['any', 'none']}
                                     allowClear={false}
                                     emptyLabel="None"
-                                    title="Choose actor target"
-                                    placeholder="Search actors"
+                                    title={`Choose ${CONTENT_TYPE_LABELS[condition.contentType].toLowerCase()} target`}
+                                    placeholder={`Search ${CONTENT_TYPE_LABELS[condition.contentType].toLowerCase()}s`}
                                 />
                             </div>
                         ) : null}
-                        {(condition.type === 'globalStat' || condition.type === 'actorStat') && (
+                        {(condition.type === 'globalStat' || condition.type === 'contentStat') && (
                             <select style={selectStyle} value={condition.statId} onChange={(event) => {
-                                const stat = (condition.type === 'globalStat' ? globalStats : actorStats).find(candidate => candidate.id === event.target.value);
-                                updateCondition(collectionIndex, conditionIndex, { ...condition, statId: event.target.value, value: getDefaultConditionValue(stat) } as Condition);
+                                const stat = statsForCondition(condition).find(candidate => candidate.id === event.target.value);
+                                updateCondition(collectionIndex, conditionIndex, { ...condition, statId: event.target.value, value: getDefaultConditionValue(stat) });
                             }}>
-                                {(condition.type === 'globalStat' ? globalStats : actorStats).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
+                                {statsForCondition(condition).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
                             </select>
                         )}
                         {condition.type === 'calendar' && (
@@ -321,7 +365,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         )}
                         {condition.type !== 'calendar' && (
                             <select style={selectStyle} value={condition.comparison} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, comparison: event.target.value as ConditionComparison } as Condition)}>
-                                {(condition.type === 'actorIdentity' ? IDENTITY_COMPARISONS : COMPARISONS).map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
+                                {(condition.type === 'contentIdentity' ? IDENTITY_COMPARISONS : COMPARISONS).map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
                             </select>
                         )}
                         {renderValueInput(condition, collectionIndex, conditionIndex)}

@@ -696,6 +696,8 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                     rules={statUpdateRules}
                     globalStats={globalStats}
                     actorStats={actorStats}
+                    locationStats={locationStats}
+                    itemStats={itemStats}
                     actors={Object.values(save.actors || {})}
                     items={itemOptions}
                     locations={locationOptions}
