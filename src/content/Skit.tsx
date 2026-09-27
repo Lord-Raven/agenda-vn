@@ -397,7 +397,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
         const actorsAtLocation = activeActors.filter(actor => resolveActorSchedule(actor, scheduleContext) === skit.initialLocationId);
         const generallyAvailableActors = activeActors.filter(actor => resolveActorSchedule(actor, scheduleContext) === ACTOR_SCHEDULE_AVAILABLE);
         const availableActors = Array.from(new Map([...actorsAtLocation, ...generallyAvailableActors].map(actor => [actor.id, actor])).values());
-        skit.initialActors = Array.from(new Set([
+        // Mutate in place: the visualizer holds shallow skit copies that share this array.
+        skit.initialActors.splice(0, skit.initialActors.length, ...new Set([
             ...actorsAtLocation.map(actor => actor.id),
             ...skit.initialActors.filter(actorId => availableActors.some(actor => actor.id === actorId)),
         ]));
@@ -449,7 +450,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         .map(name => findBestNameMatch(name, availableActors, ['name'])?.id)
                         .filter(id => id !== undefined) as string[];
                     console.log('Selected Actor IDs:', selectedActorIds);
-                    skit.initialActors = Array.from(new Set([...actorsAtLocation.map(actor => actor.id), ...selectedActorIds]));
+                    skit.initialActors.splice(0, skit.initialActors.length, ...new Set([...actorsAtLocation.map(actor => actor.id), ...selectedActorIds]));
                     break;
                 }
             }
