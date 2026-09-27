@@ -3,6 +3,7 @@ import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { Stat, StatValue, StatUpdate, StatUpdateRule, isFunctionStatType, isNumericDisplayType } from '../content/Stat';
 import { ContentType, CONTENT_TYPES, Condition, ConditionCollection } from '../content/Condition';
+import { formatTimeSlot } from '../content/CalendarEvent';
 import { Stage } from '../Stage';
 import { Button } from './UiComponents';
 import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from './ConditionEditor';
@@ -64,6 +65,7 @@ const describeCalendarCondition = (condition: Condition): string | undefined => 
     }
     switch (condition.field) {
         case 'timeOfDay':
+            return formatTimeSlot(`${condition.value}`);
         case 'dayOfWeek':
             return capitalize(`${condition.value}`);
         case 'day':

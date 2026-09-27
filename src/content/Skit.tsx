@@ -4,6 +4,7 @@ import { Outcome, OutcomeType } from "./Outcome";
 import { Stage } from "../Stage";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, buildActorContext, findBestNameMatch, getActorLore, resolveActorSchedule } from "./Actor";
 import { getLocationDescription, getLocationName } from "./Location";
+import { formatTimeSlot } from "./CalendarEvent";
 import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
 import {
@@ -77,9 +78,7 @@ export const formatDateLabel = (currentDate?: string): string => {
 };
 
 export const formatTimeOfDayLabel = (currentTimeOfDay?: string): string => {
-    return currentTimeOfDay
-        ? `${currentTimeOfDay[0].toUpperCase()}${currentTimeOfDay.slice(1)}`
-        : 'Unknown Time';
+    return formatTimeSlot(currentTimeOfDay);
 };
 
 export const formatCurrentDate = (currentDate?: string, currentTimeOfDay?: string): string => {
@@ -247,7 +246,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
+        const value = normalizeStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat);
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
         const valueText = selectedOption?.option.name || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
@@ -275,7 +274,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        const value = agendaConfig?.globalStatValues?.[stat.id] ?? stat.default;
+        const value = normalizeStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat);
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
         const valueText = selectedOption?.option.name || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
@@ -347,9 +346,9 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     // Finally, order the triggeredLore list by insertion order, so that earlier lore entries appear first in the context.
     triggeredLore = triggeredLore.sort((a, b) => a.insertionOrder - b.insertionOrder);
 
-    return (builder: PromptBuilder) => builder.addBlock(`World Context`, agendaContext || 'None.')
-        .addBlock(`Selected Player Settings`, playerSettingContext || 'None.')
-        .addBlock(`Player Stats`, globalStatContext || 'None.')
+    return (builder: PromptBuilder) => builder.addBlock(`World Context`, agendaContext || '')
+        .addBlock(`Selected Player Settings`, playerSettingContext || '')
+        .addBlock(`Global Stats`, globalStatContext || '')
         .addBlock(`Lore Entries`, (builder) => {
             // Add each lore entry as a separate block, with the title and content.
             triggeredLore.forEach(lore => {

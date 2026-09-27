@@ -1,5 +1,6 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import type { CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from "../content/CalendarEvent";
+import { formatTimeSlot } from "../content/CalendarEvent";
 import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { Box, Typography } from "@mui/material";
@@ -79,7 +80,7 @@ const formatRecurrenceSummary = (recurrence: CalendarEventRecurrence | null | un
     return `Repeats every ${interval} ${unit} until ${formatDateLabel(recurrence.untilDate)}`;
 };
 
-const formatTimeOfDay = (timeOfDay: CalendarTimeOfDay) => `${timeOfDay[0].toUpperCase()}${timeOfDay.slice(1)}`;
+const formatTimeOfDay = (timeOfDay: CalendarTimeOfDay) => formatTimeSlot(timeOfDay);
 
 const getDurationSlots = (event: CalendarEvent) => {
     const unique = Array.from(new Set((event.duration || []).filter((slot): slot is CalendarTimeOfDay => TIME_OF_DAY_ORDER.includes(slot as CalendarTimeOfDay))));

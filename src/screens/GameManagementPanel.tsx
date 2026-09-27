@@ -1,6 +1,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { DateMode, Stage, buildPortableGameConfiguration } from '../Stage';
+import { TimeMode } from '../content/CalendarEvent';
 import { v4 as generateUuid } from 'uuid';
 import { findStatOptionByValue, getStatOptionValue, Stat, StatType, StatValue, cloneStat, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
@@ -105,6 +106,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [slideshowLocationIds, setSlideshowLocationIds] = useState<string[]>(() => [...(configuration.slideshowLocationIds || [])]);
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
     const [dateMode, setDateMode] = useState<DateMode>(() => configuration.dateMode === 'turnBased' ? 'turnBased' : 'calendar');
+    const [timeMode, setTimeMode] = useState<TimeMode>(() => configuration.timeMode === 'phase' ? 'phase' : 'timeOfDay');
     const [artStyle, setArtStyle] = useState<string>(() => configuration.artStyle || '');
     const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
         (configuration.globalStats || []).map(cloneStat),
@@ -211,6 +213,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             castActorIds,
             slideshowLocationIds,
             dateMode,
+            timeMode,
             controls: configuration.controls || [],
         });
     }, [
@@ -224,6 +227,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         castActorIds,
         creatorNotes,
         dateMode,
+        timeMode,
         managedCalendarEvents,
         globalStats,
         itemStats,
@@ -319,9 +323,10 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             castActorIds,
             slideshowLocationIds,
             dateMode,
+            timeMode,
         });
 
-    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
+    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, timeMode, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;
@@ -485,6 +490,30 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             {dateMode === 'calendar'
                                 ? 'The calendar screen shows real dates, and events are scheduled by date.'
                                 : 'The calendar screen becomes a timeline of numbered days starting at Day 1; real dates are tracked internally but never shown to the player.'}
+                        </div>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Time Presentation</label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <Button
+                                variant={timeMode === 'timeOfDay' ? 'primary' : 'secondary'}
+                                onClick={() => setTimeMode('timeOfDay')}
+                                style={{ flex: 1 }}
+                            >
+                                Times of Day
+                            </Button>
+                            <Button
+                                variant={timeMode === 'phase' ? 'primary' : 'secondary'}
+                                onClick={() => setTimeMode('phase')}
+                                style={{ flex: 1 }}
+                            >
+                                Phases
+                            </Button>
+                        </div>
+                        <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 6 }}>
+                            {timeMode === 'timeOfDay'
+                                ? 'Each day is split into Morning, Afternoon, Evening, and Night.'
+                                : 'Each day is split into four unnamed phases, shown as hourglass pips instead of a time-of-day icon.'}
                         </div>
                     </div>
                     <div>

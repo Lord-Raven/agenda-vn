@@ -1,7 +1,7 @@
 import React, { FC, useMemo, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { Stage } from '../Stage';
-import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay } from '../content/CalendarEvent';
+import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarTimeOfDay, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
 import { getEmotionImage } from '../content/Actor';
 import { Button, GlassPanel, LocationSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -25,7 +25,7 @@ const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
 });
 
-const formatTimeOfDay = (timeOfDay: CalendarTimeOfDay) => `${timeOfDay[0].toUpperCase()}${timeOfDay.slice(1)}`;
+const formatTimeOfDay = (timeOfDay: CalendarTimeOfDay) => formatTimeSlot(timeOfDay);
 
 const normalizeDuration = (duration: CalendarEvent['duration']): CalendarTimeOfDay[] => {
     const unique = Array.from(new Set((duration || []).filter((slot): slot is CalendarTimeOfDay => TIME_OF_DAY_ORDER.includes(slot as CalendarTimeOfDay))));
@@ -400,7 +400,7 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
 
                     <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>
-                            Duration Slots ({durationSummary(draft.duration)})
+                            Duration {timeSlotTerm(true)} ({durationSummary(draft.duration)})
                         </label>
                         <div style={{
                             border: '1px solid var(--agenda-line-subtle)',

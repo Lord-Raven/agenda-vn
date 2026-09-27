@@ -1,8 +1,9 @@
 import { FC, ReactNode, useState } from "react";
 import { Box, Typography } from "@mui/material";
-import { Bed, Bedtime, EventAvailable, WbSunny, WbTwilight } from "@mui/icons-material";
+import { Bed, Bedtime, EventAvailable, HourglassBottom, HourglassTop, WbSunny, WbTwilight } from "@mui/icons-material";
 import { Stage } from "../Stage";
 import { formatCurrentDate, formatDateLabel } from "../content/Skit";
+import { CALENDAR_TIME_OF_DAY_ORDER, CalendarTimeOfDay } from "../content/CalendarEvent";
 import { ControlRenderer } from "./ControlRenderer";
 
 interface GlobalStatBarProps {
@@ -35,6 +36,8 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
     const currentDate = save?.currentDate || stageInstance.getConfiguration()?.startingDate || new Date().toISOString().slice(0, 10);
     const currentTimeOfDay = save?.currentTimeOfDay || "morning";
     const DateTimeIcon = getDateTimeIcon(currentTimeOfDay);
+    const isPhaseMode = stageInstance.getTimeMode() === "phase";
+    const currentPhaseIndex = Math.max(CALENDAR_TIME_OF_DAY_ORDER.indexOf(currentTimeOfDay as CalendarTimeOfDay), 0);
     const dateLabel = stageInstance.getDateMode() === "turnBased"
         ? `Day ${stageInstance.getDayNumberForDate(currentDate)}`
         : formatDateLabel(currentDate);
@@ -85,7 +88,27 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
                     >
                         {dateLabel}
                     </Typography>
-                    <DateTimeIcon sx={{ fontSize: "1.1rem", color: "var(--agenda-highlight)" }} />
+                    {isPhaseMode ? (
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.1 }}>
+                            {CALENDAR_TIME_OF_DAY_ORDER.map((slot, index) => {
+                                // HourglassTop reads as sand already fallen, so it marks elapsed phases.
+                                const elapsed = index <= currentPhaseIndex;
+                                const PhaseIcon = elapsed ? HourglassTop : HourglassBottom;
+                                return (
+                                    <PhaseIcon
+                                        key={slot}
+                                        sx={{
+                                            fontSize: "1.1rem",
+                                            color: elapsed ? "var(--agenda-highlight)" : "var(--agenda-text-muted)",
+                                            opacity: elapsed ? 1 : 0.45,
+                                        }}
+                                    />
+                                );
+                            })}
+                        </Box>
+                    ) : (
+                        <DateTimeIcon sx={{ fontSize: "1.1rem", color: "var(--agenda-highlight)" }} />
+                    )}
                 </Box>
                 {topControls.map((control) => (
                     <ControlRenderer

@@ -5,7 +5,7 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
 import { findStatOptionByValue, formatReferenceStatText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, normalizeStatValue, resolveFunctionScript, resolveStatValueRule, resolveStatText } from './content/Stat';
-import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay } from "./content/CalendarEvent";
+import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { Control, ControlPlacement, isControlAvailable } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, Skit } from "./content/Skit";
@@ -167,6 +167,7 @@ export type GameConfiguration = {
     castActorIds: string[]; // Optional allowlist of actor ids for the Creator Notes HTML cast section; if empty, all active actors are included.
     slideshowLocationIds: string[]; // Optional allowlist of location ids for the Creator Notes HTML slideshow; if empty, active locations are used in their existing order.
     dateMode: DateMode; // Whether the game tracks real calendar dates or an abstract turn/day counter
+    timeMode: TimeMode; // Whether the four daily slots are presented as times of day or as abstract phases
 
 }
 
@@ -276,6 +277,7 @@ export type PortableGameConfiguration = {
     castActorIds: string[];
     slideshowLocationIds: string[];
     dateMode: DateMode;
+    timeMode: TimeMode;
     controls: Control[];
 };
 
@@ -304,6 +306,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     castActorIds: [...(input.castActorIds || [])],
     slideshowLocationIds: [...(input.slideshowLocationIds || [])],
     dateMode: input.dateMode === 'turnBased' ? 'turnBased' : 'calendar',
+    timeMode: input.timeMode === 'phase' ? 'phase' : 'timeOfDay',
     controls: (input.controls || []).map((control) => new Control(control)),
 });
 
@@ -393,6 +396,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             castActorIds: [],
             slideshowLocationIds: [],
             dateMode: 'calendar',
+            timeMode: 'timeOfDay',
         };
     }
 
@@ -468,6 +472,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         configuration.castActorIds = configuration.castActorIds || defaultConfiguration.castActorIds;
         configuration.slideshowLocationIds = configuration.slideshowLocationIds || defaultConfiguration.slideshowLocationIds;
         configuration.dateMode = configuration.dateMode === 'turnBased' ? 'turnBased' : 'calendar';
+        configuration.timeMode = configuration.timeMode === 'phase' ? 'phase' : 'timeOfDay';
+        setActiveTimeMode(configuration.timeMode);
 
         this.syncUniversalSchedule();
     }
@@ -545,6 +551,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             this.syncItemStats(currentSave);
             this.syncGlobalStats(currentSave);
         }
+        setActiveTimeMode(this.saveData.configuration.timeMode);
         this.syncUniversalSchedule();
     }
 
@@ -1347,6 +1354,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // Whether the active configuration hides real calendar dates behind an abstract Day N counter.
     getDateMode(): DateMode {
         return this.getConfiguration().dateMode === 'turnBased' ? 'turnBased' : 'calendar';
+    }
+
+    // Whether the four daily slots are presented as named times of day or as abstract numbered phases.
+    getTimeMode(): TimeMode {
+        return this.getConfiguration().timeMode === 'phase' ? 'phase' : 'timeOfDay';
     }
 
     // Converts a YYYY-MM-DD date into the 1-based day number relative to the configured starting date.
@@ -3017,6 +3029,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             controls: (configuration.controls || []).filter((control) => control.active !== false),
             slideshowLocationIds: configuration.slideshowLocationIds || [],
             dateMode: configuration.dateMode,
+            timeMode: configuration.timeMode,
         });
     }
 

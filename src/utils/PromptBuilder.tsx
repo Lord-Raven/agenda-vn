@@ -85,8 +85,11 @@ export class PromptBuilder {
       return this;
     }
 
-    const c = this.stringifyContent(content);
-    this.blocks.push({ title: t, content: c });
+    // skip adding block if content is empty string after stringification
+    const c = this.stringifyContent(content).trim();
+    if (c) {
+      this.blocks.push({ title: t, content: c });
+    }
     return this;
   }
 

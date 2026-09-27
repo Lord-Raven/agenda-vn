@@ -3,6 +3,7 @@ import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, Li
 import { findStatOptionByValue, getStatOptionValue, isReferenceDisplayType, resolveReferenceKind, Stat } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
+import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
 import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationLike } from './LocationPortrait';
@@ -49,13 +50,14 @@ export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
     item: 'Item',
 };
 
-const CALENDAR_FIELDS = [
-    { value: 'timeOfDay', label: 'Time of day' },
+// Built per render rather than hoisted, since the time-of-day label depends on the active time mode.
+const buildCalendarFields = () => [
+    { value: 'timeOfDay', label: timeSlotTerm() },
     { value: 'dayOfWeek', label: 'Day of week' },
     { value: 'day', label: 'Day of month' },
     { value: 'month', label: 'Month' },
     { value: 'year', label: 'Year' },
-] as const;
+];
 
 const selectStyle = {
     minHeight: 38,
@@ -254,7 +256,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             );
         }
         if (condition.type === 'calendar' && condition.field === 'timeOfDay') {
-            return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['morning', 'afternoon', 'evening', 'night'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
+            return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{CALENDAR_TIME_OF_DAY_ORDER.map(value => <option key={value} value={value}>{formatTimeSlot(value)}</option>)}</select>;
         }
         if (condition.type === 'calendar' && condition.field === 'dayOfWeek') {
             return <select style={selectStyle} value={String(condition.value ?? '')} onChange={(event) => updateValue(event.target.value)}>{['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(value => <option key={value} value={value}>{value}</option>)}</select>;
@@ -334,7 +336,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         </select>
                         {condition.type === 'calendar' ? (
                             <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 })}>
-                                {CALENDAR_FIELDS.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
+                                {buildCalendarFields().map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
                             </select>
                         ) : condition.type === 'contentStat' ? (
                             <div style={{ display: 'grid', gap: 6 }}>
