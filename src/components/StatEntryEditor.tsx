@@ -203,6 +203,8 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 }) => {
     const normalizedStat = normalizeStatShape(stat);
     const optionEntries = normalizedStat.options || [];
+    // Raw (unfiltered) options, so blank-named rows stay visible and indices match updateOption/removeOption.
+    const editableOptionEntries = stat.options || [];
     const isSourcedOption = isSourcedOptionStat(normalizedStat);
     // Global lists, plus (for entity stats) lists on the same entity, whose active options are that entity's own.
     const optionListSources = [...globalStats, ...(category === 'global' ? [] : selfStats)]
@@ -550,8 +552,8 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 </div>
                                 )}
 
-                                {optionEntries.map((option, optionIndex) => (
-                                    <div key={`option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
+                                {editableOptionEntries.map((option, optionIndex) => (
+                                    <div key={option.id || `option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
                                         <div style={inlineFieldStyle}>
                                             <label style={fieldLabelStyle}>Option Name</label>
                                             <TextInput
