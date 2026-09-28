@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
-import { findStatOptionByValue, getStatOptionValue, isReferenceDisplayType, resolveReferenceKind, Stat } from '../content/Stat';
+import { findStatOptionByValue, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
@@ -43,6 +43,30 @@ const IDENTITY_COMPARISONS: Array<{ value: ConditionComparison; label: string }>
     { value: 'equals', label: 'is' },
     { value: 'notEquals', label: 'is not' },
 ];
+
+const LIST_COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
+    { value: 'contains', label: 'contains' },
+    { value: 'notContains', label: 'does not contain' },
+];
+
+const TEXT_COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
+    ...IDENTITY_COMPARISONS,
+    ...LIST_COMPARISONS,
+];
+
+const isListStat = (stat?: Stat): boolean => !!stat && (isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type));
+
+const comparisonsForStat = (stat?: Stat): Array<{ value: ConditionComparison; label: string }> => {
+    if (isListStat(stat)) {
+        return LIST_COMPARISONS;
+    }
+    return stat?.type === 'text' ? TEXT_COMPARISONS : COMPARISONS;
+};
+
+const getDefaultComparison = (stat: Stat | undefined, current?: ConditionComparison): ConditionComparison => {
+    const allowed = comparisonsForStat(stat);
+    return current && allowed.some(comparison => comparison.value === current) ? current : allowed[0].value;
+};
 
 export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
     actor: 'Actor',
@@ -103,11 +127,11 @@ const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
     if (stat.type === 'checkbox') {
         return typeof stat.default === 'boolean' ? stat.default : false;
     }
-    if (stat.type === 'option') {
-        const defaultOption = findStatOptionByValue(stat, stat.default);
-        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
+    if (stat.type === 'option' || stat.type === 'optionList') {
+        const defaultOption = stat.type === 'option' ? findStatOptionByValue(stat, stat.default) : undefined;
+        return defaultOption?.value || resolveStatOptionPool(stat)[0]?.id || '';
     }
-    if (isReferenceDisplayType(stat.type)) {
+    if (isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || stat.type === 'text') {
         return typeof stat.default === 'string' ? stat.default : '';
     }
     return typeof stat.default === 'number' ? stat.default : 0;
@@ -226,14 +250,14 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         const contentType = (CONTENT_TYPES.includes(rawContentType as ContentType) ? rawContentType : 'actor') as ContentType;
         if (type === 'globalStat') {
             const stat = globalStats[0];
-            return { type: 'globalStat', statId: stat?.id || '', comparison: 'equals', value: getDefaultConditionValue(stat) };
+            return { type: 'globalStat', statId: stat?.id || '', comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) };
         }
         if (type === 'contentIdentity') {
             return { type: 'contentIdentity', contentType, comparison: 'equals', value: concreteTargetOptionsFor(contentType)[0]?.key || '' };
         }
         if (type === 'contentStat') {
             const stat = statsByContentType[contentType][0];
-            return { type: 'contentStat', contentType, targetId: targetOptionsFor(contentType)[0]?.key || 'any', statId: stat?.id || '', comparison: 'equals', value: getDefaultConditionValue(stat) };
+            return { type: 'contentStat', contentType, targetId: targetOptionsFor(contentType)[0]?.key || 'any', statId: stat?.id || '', comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) };
         }
         return { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' };
     };
@@ -264,12 +288,11 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         const stat = condition.type === 'globalStat' || condition.type === 'contentStat'
             ? statsForCondition(condition).find(candidate => candidate.id === condition.statId)
             : undefined;
-        if (stat?.type === 'option') {
+        if (stat?.type === 'option' || stat?.type === 'optionList') {
             const selectedOption = findStatOptionByValue(stat, condition.value);
-            return <select style={selectStyle} value={selectedOption?.value || ''} onChange={(event) => updateValue(event.target.value)}>{(stat.options || []).map((option, optionIndex) => {
-                const optionValue = getStatOptionValue(option, optionIndex);
-                return <option key={optionValue} value={optionValue}>{option.name}</option>;
-            })}</select>;
+            return <select style={selectStyle} value={selectedOption?.value || ''} onChange={(event) => updateValue(event.target.value)}>{resolveStatOptionPool(stat).map((option) => (
+                <option key={option.id} value={option.id}>{option.name}</option>
+            ))}</select>;
         }
         if (stat?.type === 'checkbox') {
             return <input type="checkbox" checked={Boolean(condition.value === true || condition.value === 'true')} onChange={(event) => updateValue(event.target.checked)} />;
@@ -355,7 +378,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         {(condition.type === 'globalStat' || condition.type === 'contentStat') && (
                             <select style={selectStyle} value={condition.statId} onChange={(event) => {
                                 const stat = statsForCondition(condition).find(candidate => candidate.id === event.target.value);
-                                updateCondition(collectionIndex, conditionIndex, { ...condition, statId: event.target.value, value: getDefaultConditionValue(stat) });
+                                updateCondition(collectionIndex, conditionIndex, { ...condition, statId: event.target.value, comparison: getDefaultComparison(stat, condition.comparison), value: getDefaultConditionValue(stat) });
                             }}>
                                 {statsForCondition(condition).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
                             </select>
@@ -367,7 +390,10 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         )}
                         {condition.type !== 'calendar' && (
                             <select style={selectStyle} value={condition.comparison} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, comparison: event.target.value as ConditionComparison } as Condition)}>
-                                {(condition.type === 'contentIdentity' ? IDENTITY_COMPARISONS : COMPARISONS).map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
+                                {(condition.type === 'contentIdentity'
+                                    ? IDENTITY_COMPARISONS
+                                    : comparisonsForStat(statsForCondition(condition).find(candidate => candidate.id === condition.statId))
+                                ).map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
                             </select>
                         )}
                         {renderValueInput(condition, collectionIndex, conditionIndex)}

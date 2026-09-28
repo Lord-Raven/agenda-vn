@@ -1,14 +1,14 @@
 import { FC, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
-import { Stat, StatValue, StatUpdate, StatUpdateRule, isFunctionStatType, isNumericDisplayType } from '../content/Stat';
+import { Stat, StatValue, StatUpdate, StatUpdateRule, formatStatOptionValueText, isFunctionStatType, isNumericDisplayType, isOptionListStatType } from '../content/Stat';
 import { ContentType, CONTENT_TYPES, Condition, ConditionCollection } from '../content/Condition';
 import { formatTimeSlot } from '../content/CalendarEvent';
 import { Stage } from '../Stage';
 import { Button } from './UiComponents';
 import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from './ConditionEditor';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
-import { StatValueInput } from './StatValueInput';
+import { StatUpdateOperationSelect, StatValueInput } from './StatValueInput';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 
@@ -91,6 +91,10 @@ const describeUpdate = (update: StatUpdate, stat: Stat | undefined): string => {
     }
     if (update.kind === 'function') {
         return `Invoke ${stat.name}`;
+    }
+    if (isOptionListStatType(stat.type)) {
+        const verb = update.operation === 'set' ? 'set to' : (update.operation === 'remove' ? 'remove' : 'add');
+        return `${stat.name} ${verb} ${formatStatOptionValueText(stat, update.value)}`;
     }
     const verb = update.operation === 'set' || !isNumericDisplayType(stat.type) ? 'set to' : 'adjust by';
     return `${stat.name} ${verb} ${update.value}`;
@@ -267,16 +271,12 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                                     >
                                                         {availableStats.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
                                                     </select>
-                                                    {stat && isNumericDisplayType(stat.type) ? (
-                                                        <select
-                                                            style={selectStyle}
-                                                            value={update.operation}
-                                                            onChange={(event) => updateStatUpdate(rule.id, update.id, { operation: event.target.value as StatUpdate['operation'] })}
-                                                        >
-                                                            <option value="adjust">Adjust by</option>
-                                                            <option value="set">Set to</option>
-                                                        </select>
-                                                    ) : <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Set to</span>}
+                                                    <StatUpdateOperationSelect
+                                                        stat={stat}
+                                                        style={selectStyle}
+                                                        operation={update.operation}
+                                                        onChange={(operation) => updateStatUpdate(rule.id, update.id, { operation })}
+                                                    />
                                                     <StatValueInput
                                                         stat={stat}
                                                         value={update.value}

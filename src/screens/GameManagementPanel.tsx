@@ -3,7 +3,7 @@ import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { DateMode, Stage, buildPortableGameConfiguration } from '../Stage';
 import { TimeMode } from '../content/CalendarEvent';
 import { v4 as generateUuid } from 'uuid';
-import { findStatOptionByValue, getStatOptionValue, Stat, StatType, StatValue, cloneStat, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue } from '../content/Stat';
+import { Stat, StatType, StatValue, cloneStat, normalizeStatValue } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -14,67 +14,6 @@ import { getLocationImageUrl } from '../content/Location';
 interface GameManagementPanelProps {
     stage: () => Stage;
 }
-
-const resolveStatDefaultValue = (stat: Stat): StatValue => {
-    if (stat.type === 'option') {
-        const defaultOption = findStatOptionByValue(stat, stat.default);
-        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
-    }
-
-    if (isReferenceListDisplayType(stat.type)) {
-        return normalizeReferenceListValue(stat.default);
-    }
-
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
-        return typeof stat.default === 'string' ? stat.default : '';
-    }
-
-    if (stat.type === 'checkbox') {
-        return typeof stat.default === 'boolean' ? stat.default : false;
-    }
-
-    return Number.isFinite(stat.default) ? Number(stat.default) : 0;
-};
-
-const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
-    if (stat.type === 'option') {
-        const selectedOption = findStatOptionByValue(stat, value);
-        if (selectedOption) {
-            return selectedOption.value;
-        }
-        return resolveStatDefaultValue(stat);
-    }
-
-    if (isReferenceListDisplayType(stat.type)) {
-        return Array.isArray(value) ? normalizeReferenceListValue(value) : resolveStatDefaultValue(stat);
-    }
-
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
-        if (typeof value === 'string') {
-            return value;
-        }
-        return resolveStatDefaultValue(stat);
-    }
-
-    if (stat.type === 'checkbox') {
-        if (typeof value === 'boolean') return value;
-        if (typeof value === 'string') {
-            const lowered = value.trim().toLowerCase();
-            if (lowered === 'true') return true;
-            if (lowered === 'false') return false;
-        }
-        return (resolveStatDefaultValue(stat) as boolean);
-    }
-
-    let resolved = Number.isFinite(value) ? Number(value) : Number(resolveStatDefaultValue(stat)) || 0;
-    if (typeof stat.min === 'number') {
-        resolved = Math.max(stat.min, resolved);
-    }
-    if (typeof stat.max === 'number') {
-        resolved = Math.min(stat.max, resolved);
-    }
-    return resolved;
-};
 
 const clampStatValue = (value: number, stat: Stat): number => {
     let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;

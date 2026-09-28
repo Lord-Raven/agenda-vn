@@ -35,13 +35,17 @@ export const resolveConditionalFlag = (flag: ConditionalFlag | undefined, contex
 // Reference stats hold content IDs rather than display values. List variants hold a set of IDs. 'function'
 // stats hold no value at all - they are a JavaScript snippet (Stat.script) invoked on demand, rather than
 // something read/written as a scalar. See runFunctionScript.
-export type StatType = 'number' | 'option' | 'text' | 'checkbox' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'function';
+// 'optionList' holds a pool of options (Stat.options) whose value is the list of currently active option ids;
+// 'option' stats may pull their choices from one via Stat.optionSourceStatId.
+export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'checkbox' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'function';
 export type StatDisplayType = 'straight' | 'percentage' | 'bar' | 'rating' | 'letter grade';
 export type StatValue = number | string | boolean | string[];
 
 export const isNumericDisplayType = (type: StatType): boolean => type === 'number';
 
 export const isFunctionStatType = (type: StatType): boolean => type === 'function';
+
+export const isOptionListStatType = (type: StatType): boolean => type === 'optionList';
 
 export const isLocationDisplayType = (type: StatType): boolean => type === 'location';
 
@@ -58,6 +62,9 @@ export const isItemListDisplayType = (type: StatType): boolean => type === 'item
 export const isReferenceDisplayType = (type: StatType): boolean => type === 'actor' || type === 'item' || type === 'location';
 
 export const isReferenceListDisplayType = (type: StatType): boolean => type === 'actorList' || type === 'itemList' || type === 'locationList';
+
+// Any stat whose value is a string[] (reference lists and optionLists).
+export const isListStatType = (type: StatType): boolean => isReferenceListDisplayType(type) || isOptionListStatType(type);
 
 export const normalizeReferenceListValue = (value: unknown): string[] => (
     Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
@@ -167,11 +174,74 @@ export const resolveStatOptionId = (option: StatOption | undefined, index: numbe
 
 export const getStatOptionValue = resolveStatOptionId;
 
-export const findStatOptionByValue = (stat: Stat | undefined, value: unknown): { option: StatOption; index: number; value: string } | undefined => {
-    if (!stat || stat.type !== 'option' || typeof value !== 'string') {
+// Supplies optionList stat definitions (from any stat category, looked up by id) to option stats that source
+// their choices from one; `value` is only known for global lists. Registered by the Stage.
+export type OptionListSourceResolver = (statId: string) => { stat: Stat; value?: StatValue } | undefined;
+let optionListSourceResolver: OptionListSourceResolver | undefined;
+
+export const setOptionListSourceResolver = (resolver: OptionListSourceResolver | undefined) => {
+    optionListSourceResolver = resolver;
+};
+
+// Explicit source data: `sourceStats` for editors holding unsaved definitions, and the owning entity's
+// statMap so an option stat sourced from a list on the same actor/location/item sees that entity's active list.
+export type OptionListSourceContext = {
+    sourceStats?: Stat[];
+    globalStatValues?: { [statId: string]: StatValue };
+    entityStatValues?: { [statId: string]: StatValue };
+};
+
+const resolveOptionListSource = (statId: string, context?: OptionListSourceContext): { stat: Stat; value?: StatValue } | undefined => {
+    const resolved = optionListSourceResolver?.(statId);
+    const stat = context?.sourceStats?.find((candidate) => candidate.id === statId) || resolved?.stat;
+    if (stat?.type !== 'optionList') {
         return undefined;
     }
-    const options = stat.options || [];
+    return { stat, value: context?.entityStatValues?.[statId] ?? context?.globalStatValues?.[statId] ?? resolved?.value };
+};
+
+export const isSourcedOptionStat = (stat: Stat | undefined): boolean => (
+    stat?.type === 'option' && !!stat.optionSourceStatId?.trim()
+);
+
+// Ids are materialized so filtering the list later doesn't change index-derived fallback ids.
+const materializeOptions = (options: StatOption[] | undefined): StatOption[] => (
+    (options || []).map((option, index) => ({ ...option, id: resolveStatOptionId(option, index) }))
+);
+
+// Every option a stat's value may refer to: its own options, or (for a sourced option stat) the source
+// optionList's full pool, including options not currently active.
+export const resolveStatOptionPool = (stat: Stat | undefined, context?: OptionListSourceContext): StatOption[] => {
+    if (!stat) {
+        return [];
+    }
+    if (isSourcedOptionStat(stat)) {
+        return materializeOptions(resolveOptionListSource(stat.optionSourceStatId!, context)?.stat.options);
+    }
+    return materializeOptions(stat.options);
+};
+
+// The options currently offered for selection. For a sourced option stat, only those active in the source
+// optionList's value; `currentValue`'s option is always kept so an existing selection still renders.
+export const resolveAvailableStatOptions = (stat: Stat | undefined, currentValue?: unknown, context?: OptionListSourceContext): StatOption[] => {
+    const pool = resolveStatOptionPool(stat, context);
+    if (!stat || !isSourcedOptionStat(stat)) {
+        return pool;
+    }
+    const source = resolveOptionListSource(stat.optionSourceStatId!, context);
+    if (!source) {
+        return pool;
+    }
+    const activeIds = new Set(normalizeStatValue(source.value, source.stat) as string[]);
+    const currentId = findStatOptionByValue(stat, currentValue, context)?.value;
+    return pool.filter((option) => activeIds.has(option.id!) || option.id === currentId);
+};
+
+export const findStatOptionByValue = (stat: Stat | undefined, value: unknown, context?: OptionListSourceContext): { option: StatOption; index: number; value: string } | undefined => {
+    if (!stat || (stat.type !== 'option' && stat.type !== 'optionList') || typeof value !== 'string') {
+        return undefined;
+    }
+    const options = resolveStatOptionPool(stat, context);
     const exactMatch = options
         .map((option, index) => ({ option, index, value: resolveStatOptionId(option, index) }))
         .find((entry) => entry.value === value || entry.option.name === value);
@@ -319,6 +389,8 @@ export type Stat = {
     // Only meaningful when type is 'number'; controls how the numeric value is rendered (straight number, bar, etc).
     displayType?: StatDisplayType;
     options?: StatOption[];
+    // Only meaningful when type is 'option': id of a global 'optionList' stat to take options from instead of `options`.
+    optionSourceStatId?: string;
     min?: number;
     max?: number;
     setByPlayer: boolean;
@@ -363,7 +435,7 @@ export const cloneStat = (stat: Stat): Stat => ({
     llmSees: cloneConditionalFlag(stat.llmSees, true),
     llmMaintained: cloneConditionalFlag(stat.llmMaintained, true),
     guidance: stat.guidance,
-    default: isReferenceListDisplayType(stat.type)
+    default: isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type)
         ? normalizeReferenceListValue(stat.default)
         : (typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0))),
     type: stat.type,
@@ -373,6 +445,7 @@ export const cloneStat = (stat: Stat): Stat => ({
         name: option.name,
         description: option.description,
     })),
+    optionSourceStatId: stat.type === 'option' && stat.optionSourceStatId ? stat.optionSourceStatId : undefined,
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true,
@@ -398,7 +471,15 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
         if (defaultOption) {
             return defaultOption.value;
         }
-        return stat.options?.[0] ? resolveStatOptionId(stat.options[0], 0) : '';
+        const firstOption = resolveAvailableStatOptions(stat)[0] || resolveStatOptionPool(stat)[0];
+        return firstOption?.id || '';
+    }
+
+    if (isOptionListStatType(stat.type)) {
+        // No explicit default list means every option starts active.
+        return Array.isArray(stat.default)
+            ? normalizeOptionListIds(stat.default, stat)
+            : resolveStatOptionPool(stat).map((option) => option.id!);
     }
 
     if (isReferenceListDisplayType(stat.type)) {
@@ -430,8 +511,20 @@ export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValu
         if (selectedOption) {
             return selectedOption.value;
         }
+        // Keep the stored id if the source list can't be resolved yet rather than wiping it.
+        if (isSourcedOptionStat(stat) && typeof value === 'string' && value && resolveStatOptionPool(stat).length === 0) {
+            return value;
+        }
         const fallback = resolveStatDefault(stat, options);
         return typeof fallback === 'string' ? fallback : '';
+    }
+
+    if (isOptionListStatType(stat.type)) {
+        if (typeof value === 'string') {
+            // e.g. an LLM outcome value like "Wealth, Fame"
+            return normalizeOptionListIds(value.split(',').map((entry) => entry.trim()).filter(Boolean), stat);
+        }
+        return Array.isArray(value) ? normalizeOptionListIds(value, stat) : resolveStatDefault(stat, options);
     }
 
     if (isReferenceListDisplayType(stat.type)) {
@@ -473,6 +566,28 @@ export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValu
     return resolved;
 };
 
+// Maps option ids/names to canonical ids of an optionList's pool, dropping unknown entries and duplicates.
+const normalizeOptionListIds = (values: unknown[], stat: Stat): string[] => {
+    const ids = values
+        .map((entry) => findStatOptionByValue(stat, entry)?.value)
+        .filter((id): id is string => !!id);
+    return Array.from(new Set(ids));
+};
+
+// Display label(s) for an option/optionList stat's value (never raw ids); undefined for other stat types.
+export const formatStatOptionValueText = (stat: Stat, value: StatValue | undefined): string | undefined => {
+    if (stat.type === 'option') {
+        return findStatOptionByValue(stat, value)?.option.name;
+    }
+    if (isOptionListStatType(stat.type)) {
+        return (normalizeStatValue(value, stat) as string[])
+            .map((id) => findStatOptionByValue(stat, id)?.option.name)
+            .filter(Boolean)
+            .join(', ') || 'None';
+    }
+    return undefined;
+};
+
 // Finds the first rule in an ordered list whose conditions are satisfied by the given context (e.g. with
 // context.currentActor set to the target actor so 'variable' actor-stat conditions inspect the target).
 // Returns undefined if no rule matches, so callers can continue to the next fallback tier.
@@ -490,7 +605,8 @@ export const resolvePerActorValueRule = (
 export const resolveStatValueRule = resolvePerActorValueRule;
 
 export type StatUpdateTargetType = 'global' | ContentType;
-export type StatUpdateOperation = 'set' | 'adjust';
+// For optionList stats, 'adjust' adds the given options to the active list and 'remove' removes them.
+export type StatUpdateOperation = 'set' | 'adjust' | 'remove';
 
 // Whether a StatUpdateRule action writes a stat directly ('stat', the original/default behavior) or invokes
 // a 'function' typed stat instead (running that stat's script, see runFunctionScript).
@@ -531,7 +647,7 @@ export const cloneStatUpdate = (update: any): StatUpdate => ({
     targetType: update?.targetType === 'global' ? 'global' : (CONTENT_TYPES.find(type => type === update?.targetType) || 'actor'),
     targetId: `${update?.targetId || 'any'}`,
     statId: `${update?.statId || ''}`,
-    operation: update?.operation === 'set' ? 'set' : 'adjust',
+    operation: update?.operation === 'set' || update?.operation === 'remove' ? update.operation : 'adjust',
     value: Array.isArray(update?.value)
         ? normalizeReferenceListValue(update.value)
         : (typeof update?.value === 'boolean' || typeof update?.value === 'number' || typeof update?.value === 'string' ? update.value : 0),
@@ -574,6 +690,17 @@ export const resolveFunctionScript = (stat: Stat, overrides: FunctionScriptOverr
 // update's value as a dice/relative expression, so 'adjust' adds the rolled amount while 'set' replaces with
 // it; non-numeric stats always write a literal value.
 export const applyStatUpdateValue = (currentValue: StatValue | undefined, update: StatUpdate, stat: Stat): StatValue => {
+    if (isOptionListStatType(stat.type)) {
+        const changed = normalizeStatValue(Array.isArray(update.value) ? update.value : [update.value], stat) as string[];
+        if (update.operation === 'set') {
+            return changed;
+        }
+        const current = normalizeStatValue(currentValue, stat) as string[];
+        return update.operation === 'remove'
+            ? current.filter((id) => !changed.includes(id))
+            : Array.from(new Set([...current, ...changed]));
+    }
+
     if (!isNumericDisplayType(stat.type)) {
         return normalizeStatValue(update.value, stat);
     }

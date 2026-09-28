@@ -2,7 +2,7 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { findStatOptionByValue, getStatOptionValue, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, Stat, StatValue, StatValueRule, normalizeReferenceListValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
+import { findStatOptionByValue, isListStatType, isNumericDisplayType, isReferenceDisplayType, Stat, StatValue, StatValueRule, normalizeReferenceListValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ACTOR_VOICES, ACTOR_VOICE_GENDER_LABELS, ActorVoice, formatActorVoiceLabel, getActorVoice, getActorVoiceVolume, normalizeVoiceModulation, VoiceModulation } from '../content/ActorVoice';
@@ -174,7 +174,7 @@ const normalizeActorStatModifierAmount = (stat: Stat, amount: unknown): StatValu
     if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
         return typeof amount === 'string' ? amount : String(resolveStatDefault(stat));
     }
-    if (isReferenceListDisplayType(stat.type)) {
+    if (isListStatType(stat.type)) {
         return Array.isArray(amount) ? normalizeReferenceListValue(amount) : normalizeReferenceListValue(resolveStatDefault(stat));
     }
     if (stat.type === 'checkbox') {
@@ -922,7 +922,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }));
             return;
         }
-        if (isReferenceListDisplayType(stat.type)) {
+        if (isListStatType(stat.type)) {
             setEditedStatMap((prev) => ({
                 ...prev,
                 [stat.id]: Array.isArray(value) ? normalizeReferenceListValue(value) : [],
@@ -951,7 +951,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }));
             return;
         }
-        if (isReferenceListDisplayType(stat.type)) {
+        if (isListStatType(stat.type)) {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
                 [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: Array.isArray(value) ? normalizeReferenceListValue(value) : [] },
@@ -1090,6 +1090,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         }));
     };
 
+    const entityOptionValues: { [statId: string]: StatValue } = isCreatorMode
+        ? Object.fromEntries(Object.entries(editedStatInitialMap).map(([statId, initial]) => [statId, initial?.value]))
+        : editedStatMap;
+
     const renderPerActorValueInput = (stat: Stat, value: StatValue, onChange: (value: StatValue) => void) => {
         if (stat.type === 'checkbox') {
             return <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
@@ -1098,17 +1102,16 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             const selectedOption = findStatOptionByValue(stat, value);
             return (
                 <select className="input-base" value={selectedOption?.value || ''} onChange={(e) => onChange(e.target.value)}>
-                    {(stat.options || []).map((option, optionIndex) => {
-                        const optionValue = getStatOptionValue(option, optionIndex);
-                        return <option key={optionValue} value={optionValue}>{option.name}</option>;
-                    })}
+                    {resolveAvailableStatOptions(stat, value).map((option) => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                    ))}
                 </select>
             );
         }
         if (stat.type === 'text') {
             return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
         }
-        if (isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) {
+        if (isReferenceDisplayType(stat.type) || isListStatType(stat.type)) {
             return (
                 <StatValueInput
                     stat={stat}
@@ -2282,7 +2285,7 @@ ${indent}}`;
                                                                 />
                                                             )}
 
-                                                            {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) && (
+                                                            {(isReferenceDisplayType(stat.type) || isListStatType(stat.type)) && (
                                                                 <div style={{ maxWidth: '220px', width: '100%' }}>
                                                                     <StatValueInput
                                                                         stat={stat}
@@ -2364,8 +2367,8 @@ ${indent}}`;
                                                                         cursor: 'pointer',
                                                                     }}
                                                                 >
-                                                                    {(stat.options || []).map((option, optionIndex) => (
-                                                                        <option key={getStatOptionValue(option, optionIndex)} value={getStatOptionValue(option, optionIndex)}>
+                                                                    {resolveAvailableStatOptions(stat, editorValue, { entityStatValues: entityOptionValues }).map((option) => (
+                                                                        <option key={option.id} value={option.id}>
                                                                             {option.name}
                                                                         </option>
                                                                     ))}
@@ -2381,7 +2384,7 @@ ${indent}}`;
                                                                     </div>
                                                                 )}
 
-                                                                {isCreatorMode && (isNumericDisplayType(stat.type) || stat.type === 'text' || isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) && (
+                                                                {isCreatorMode && (isNumericDisplayType(stat.type) || stat.type === 'text' || isReferenceDisplayType(stat.type) || isListStatType(stat.type)) && (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                                     <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
                                                                         Default Modifiers

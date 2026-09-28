@@ -2,56 +2,16 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatValue, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, findStatOptionByValue, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue, cloneStat } from '../content/Stat';
+import { Stat, StatValue, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue, normalizeStatValue, cloneStat } from '../content/Stat';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
-import { resolveStatDefaultValue, StatEntryEditor } from '../components/StatEntryEditor';
+import { StatEntryEditor } from '../components/StatEntryEditor';
 import { Add } from '@mui/icons-material';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
 }
-
-const normalizeStatValue = (value: unknown, stat: Stat): StatValue => {
-    if (stat.type === 'option') {
-        const selectedOption = findStatOptionByValue(stat, value);
-        if (selectedOption) {
-            return selectedOption.value;
-        }
-        return resolveStatDefaultValue(stat);
-    }
-
-    if (isReferenceListDisplayType(stat.type)) {
-        return Array.isArray(value) ? normalizeReferenceListValue(value) : resolveStatDefaultValue(stat);
-    }
-
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
-        if (typeof value === 'string') {
-            return value;
-        }
-        return resolveStatDefaultValue(stat);
-    }
-
-    if (stat.type === 'checkbox') {
-        if (typeof value === 'boolean') return value;
-        if (typeof value === 'string') {
-            const lowered = value.trim().toLowerCase();
-            if (lowered === 'true') return true;
-            if (lowered === 'false') return false;
-        }
-        return resolveStatDefaultValue(stat) as boolean;
-    }
-
-    let resolved = Number.isFinite(value) ? Number(value) : Number(resolveStatDefaultValue(stat)) || 0;
-    if (typeof stat.min === 'number') {
-        resolved = Math.max(stat.min, resolved);
-    }
-    if (typeof stat.max === 'number') {
-        resolved = Math.min(stat.max, resolved);
-    }
-    return resolved;
-};
 
 const defaultGlobalStat = (): Stat => ({
     id: generateUuid(),

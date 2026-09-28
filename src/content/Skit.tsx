@@ -15,7 +15,7 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
-import { findStatOptionByValue, isStatLlmMaintained, isStatLlmSeen, mapReferenceStatValue, normalizeStatValue, StatType, StatValue } from './Stat';
+import { findStatOptionByValue, formatStatOptionValueText, isStatLlmMaintained, isStatLlmSeen, mapReferenceStatValue, normalizeStatValue, StatType, StatValue } from './Stat';
 import { build } from "vite";
 
 const getDayDifference = (startDate: string, endDate: string): number => {
@@ -248,7 +248,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
         const value = normalizeStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat);
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
-        const valueText = selectedOption?.option.name || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
+        const valueText = formatStatOptionValueText(stat, value) || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
             return '';
         }
@@ -276,7 +276,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
         const value = normalizeStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat);
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
-        const valueText = selectedOption?.option.name || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
+        const valueText = formatStatOptionValueText(stat, value) || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
             return '';
         }

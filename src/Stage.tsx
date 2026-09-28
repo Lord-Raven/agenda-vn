@@ -4,7 +4,7 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { findStatOptionByValue, formatReferenceStatText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, normalizeStatValue, resolveFunctionScript, resolveStatValueRule, resolveStatText } from './content/Stat';
+import { findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, normalizeStatValue, resolveFunctionScript, resolveStatValueRule, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { Control, ControlPlacement, isControlAvailable } from "./content/Control";
@@ -335,6 +335,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     constructor(data: InitialData<InitStateType, ChatStateType, MessageStateType, ConfigType>) {
         super(data);
+        // Registered before any save/config normalization so sourced option stats can see their optionList.
+        setOptionListSourceResolver((statId) => {
+            const configuration = this.saveData?.configuration;
+            const globalStat = configuration?.globalStats?.find((candidate) => candidate.id === statId);
+            if (!globalStat) {
+                const stat = [...(configuration?.actorStats || []), ...(configuration?.locationStats || []), ...(configuration?.itemStats || [])]
+                    .find((candidate) => candidate.id === statId);
+                return stat ? { stat } : undefined;
+            }
+            const save = this.saveData?.saves?.[this.saveData.lastSaveSlot];
+            return { stat: globalStat, value: save?.globalStatValues?.[statId] ?? configuration?.globalStatValues?.[statId] };
+        });
         const {
             characters,
             users,
@@ -2600,7 +2612,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             const value = normalizeStatValue(save.globalStatValues?.[stat.id], stat);
             const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
-            const valueText = selectedOption?.option.name || (resolveReferenceKind(stat.type)
+            const valueText = formatStatOptionValueText(stat, value) || (resolveReferenceKind(stat.type)
                 ? formatReferenceStatText(stat, value, { actors: save.actors, items: save.inventory, locations: save.atlas })
                 : (typeof value === 'string' ? value : (typeof value === 'number' ? String(value) : value)));
 

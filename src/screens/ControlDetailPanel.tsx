@@ -4,11 +4,11 @@ import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { Control, ControlPlacement, ControlType } from '../content/Control';
 import { ConditionCollection, CONTENT_TYPES, ContentType } from '../content/Condition';
-import { isFunctionStatType, isNumericDisplayType, Stat, StatUpdate, StatValue } from '../content/Stat';
+import { isFunctionStatType, Stat, StatUpdate, StatValue } from '../content/Stat';
 import { Button, GlassPanel, TextInput, Title } from '../components/UiComponents';
 import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
-import { StatValueInput } from '../components/StatValueInput';
+import { StatUpdateOperationSelect, StatValueInput } from '../components/StatValueInput';
 import { resolveIcon } from '../components/StatRating';
 
 interface ControlDetailPanelProps {
@@ -342,16 +342,12 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             >
                                                 {availableStats.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
                                             </select>
-                                            {stat && isNumericDisplayType(stat.type) ? (
-                                                <select
-                                                    style={selectStyle}
-                                                    value={update.operation}
-                                                    onChange={(e) => updateAction(update.id, { operation: e.target.value as StatUpdate['operation'] })}
-                                                >
-                                                    <option value="adjust">Adjust by</option>
-                                                    <option value="set">Set to</option>
-                                                </select>
-                                            ) : <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Set to</span>}
+                                            <StatUpdateOperationSelect
+                                                stat={stat}
+                                                style={selectStyle}
+                                                operation={update.operation}
+                                                onChange={(operation) => updateAction(update.id, { operation })}
+                                            />
                                             <StatValueInput
                                                 stat={stat}
                                                 value={update.value as StatValue}

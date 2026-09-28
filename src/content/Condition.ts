@@ -1,7 +1,8 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
-import { normalizeStatValue, type Stat, type StatValue } from './Stat';
+import { findStatOptionByValue, normalizeStatValue, type Stat, type StatValue } from './Stat';
 
-export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual';
+// 'contains'/'notContains' test list membership for list stats, or substring match for text.
+export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual' | 'contains' | 'notContains';
 // The kinds of stat-bearing content that conditions, stat updates, reference stats, and scripts can target.
 export type ContentType = 'actor' | 'location' | 'item';
 export const CONTENT_TYPES: ContentType[] = ['actor', 'location', 'item'];
@@ -170,6 +171,9 @@ const resolveConditionValue = (condition: Condition, context: ConditionContext):
 };
 
 const normalizeStatConditionValue = (value: string | number | boolean, stat: Stat | undefined): string | number | boolean => {
+    if (stat?.type === 'optionList') {
+        return findStatOptionByValue(stat, value)?.value ?? value;
+    }
     if (!stat || stat.type !== 'option') {
         return value;
     }
@@ -178,6 +182,14 @@ const normalizeStatConditionValue = (value: string | number | boolean, stat: Sta
 };
 
 const compareValues = (actual: StatValue | undefined, expected: string | number | boolean, comparison: ConditionComparison): boolean => {
+    if (comparison === 'contains' || comparison === 'notContains') {
+        const needle = String(expected).toLowerCase();
+        const found = Array.isArray(actual)
+            ? actual.some((entry) => String(entry).toLowerCase() === needle)
+            : actual !== undefined && String(actual).toLowerCase().includes(needle);
+        return comparison === 'contains' ? found : !found;
+    }
+
     if (actual === undefined || Array.isArray(actual)) {
         return false;
     }

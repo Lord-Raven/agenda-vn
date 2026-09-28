@@ -4,8 +4,9 @@ import { Add, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import {
     Stat, StatDisplayType, StatValue, StatValueRule,
-    findStatOptionByValue, getStatOptionValue, isFunctionStatType, isNumericDisplayType,
-    isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue,
+    findStatOptionByValue, getStatOptionValue, isFunctionStatType, isNumericDisplayType, isOptionListStatType,
+    isReferenceDisplayType, isReferenceListDisplayType, isSourcedOptionStat, normalizeReferenceListValue,
+    resolveStatDefault, resolveStatOptionPool,
 } from '../content/Stat';
 import { Button, ColorPickerInput, TextArea, TextInput } from './UiComponents';
 import { IconPicker } from './StatRating';
@@ -19,30 +20,16 @@ import { LocationLike } from './LocationPortrait';
 
 export type StatEntryCategory = 'global' | 'actor' | 'location' | 'item';
 
-export const resolveStatDefaultValue = (stat: Stat): StatValue => {
-    if (stat.type === 'option') {
-        const defaultOption = findStatOptionByValue(stat, stat.default);
-        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
-    }
-
-    if (isReferenceListDisplayType(stat.type)) {
-        return normalizeReferenceListValue(stat.default);
-    }
-
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
-        return typeof stat.default === 'string' ? stat.default : '';
-    }
-
-    if (stat.type === 'checkbox') {
-        return typeof stat.default === 'boolean' ? stat.default : false;
-    }
-
-    return Number.isFinite(stat.default) ? Number(stat.default) : 0;
-};
+export const resolveStatDefaultValue = (stat: Stat): StatValue => resolveStatDefault(stat);
 
 // Shape-normalizes a stat after a type change (or on render) so fields irrelevant to the current type are
 // cleared/defaulted consistently, regardless of whether the stat is a global/actor/location/item stat.
 export const normalizeStatShape = (stat: Stat): Stat => {
+    const normalized = normalizeStatShapeForType(stat);
+    return normalized.type === 'option' ? normalized : { ...normalized, optionSourceStatId: undefined };
+};
+
+const normalizeStatShapeForType = (stat: Stat): Stat => {
     if (isFunctionStatType(stat.type)) {
         return {
             ...stat,
@@ -62,10 +49,38 @@ export const normalizeStatShape = (stat: Stat): Stat => {
         };
     }
 
-    if (stat.type === 'option') {
+    if (stat.type === 'option' && isSourcedOptionStat(stat)) {
+        // Options come from the source list; the stat's own options are kept in case the source is cleared.
+        return {
+            ...stat,
+            default: typeof stat.default === 'string' ? stat.default : '',
+            min: undefined,
+            max: undefined,
+            displayType: undefined,
+            iconName: stat.iconName || 'star',
+        };
+    }
+
+    if (stat.type === 'option' || isOptionListStatType(stat.type)) {
         const options = (stat.options || [])
             .filter(option => option.name.trim())
             .map((option, optionIndex) => ({ ...option, id: getStatOptionValue(option, optionIndex) }));
+        if (isOptionListStatType(stat.type)) {
+            const optionIds = new Set(options.map(option => option.id));
+            return {
+                ...stat,
+                options,
+                default: Array.isArray(stat.default)
+                    ? normalizeReferenceListValue(stat.default).filter(id => optionIds.has(id))
+                    : options.map(option => option.id),
+                min: undefined,
+                max: undefined,
+                displayType: undefined,
+                perActor: false,
+                perActorDefaultRules: [],
+                iconName: stat.iconName || 'star',
+            };
+        }
         const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
         return {
             ...stat,
@@ -137,6 +152,7 @@ export const renderStatTypeOptions = () => (
         <option value="locationList">Location List</option>
         <option value="number">Number</option>
         <option value="option">Option</option>
+        <option value="optionList">Option List</option>
         <option value="text">Text</option>
     </>
 );
@@ -187,6 +203,11 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 }) => {
     const normalizedStat = normalizeStatShape(stat);
     const optionEntries = normalizedStat.options || [];
+    const isSourcedOption = isSourcedOptionStat(normalizedStat);
+    // Global lists, plus (for entity stats) lists on the same entity, whose active options are that entity's own.
+    const optionListSources = [...globalStats, ...(category === 'global' ? [] : selfStats)]
+        .filter(candidate => isOptionListStatType(candidate.type) && candidate.id !== stat.id);
+    const sourcedOptionEntries = isSourcedOption ? resolveStatOptionPool(normalizedStat, { sourceStats: optionListSources }) : [];
     const variableContentType = category === 'actor' ? 'actor' : undefined;
     const isFunctionType = normalizedStat.type === 'function';
     const conditionStats = category === 'global' ? [...selfStats, ...actorStats] : [...selfStats, ...globalStats];
@@ -224,6 +245,10 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
     const removeOption = (optionIndex: number) => {
         const options = (stat.options || []).filter((_, idx) => idx !== optionIndex);
+        if (isOptionListStatType(stat.type)) {
+            onPatch({ options });
+            return;
+        }
         const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
         onPatch({ options, default: defaultValue });
     };
@@ -232,6 +257,11 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
         const options = [...(stat.options || [])];
         const nextLabel = `Option ${options.length + 1}`;
         options.push({ id: generateUuid(), name: nextLabel, description: '' });
+        if (isOptionListStatType(stat.type)) {
+            const activeIds = Array.isArray(stat.default) ? normalizeReferenceListValue(stat.default) : [];
+            onPatch({ options, default: [...activeIds, options[options.length - 1].id!] });
+            return;
+        }
         onPatch({
             options,
             default: typeof stat.default === 'string' && stat.default.trim() ? stat.default : getStatOptionValue(options[options.length - 1], options.length - 1),
@@ -459,8 +489,51 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </div>
                         )}
 
-                        {normalizedStat.type === 'option' && (
+                        {normalizedStat.type === 'option' && (optionListSources.length > 0 || isSourcedOption) && (
+                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                <label style={fieldLabelStyle}>Option Source</label>
+                                <select
+                                    className="input-base"
+                                    value={normalizedStat.optionSourceStatId || ''}
+                                    onChange={(e) => onPatch({ optionSourceStatId: e.target.value || undefined, default: '' })}
+                                >
+                                    <option value="">Own options</option>
+                                    {optionListSources.map(source => (
+                                        <option key={source.id} value={source.id}>
+                                            {source.name?.trim() || 'Unnamed option list'}{category !== 'global' && !globalStats.includes(source) ? ` (same ${category})` : ' (global)'}
+                                        </option>
+                                    ))}
+                                    {isSourcedOption && !optionListSources.some(source => source.id === normalizedStat.optionSourceStatId) && (
+                                        <option value={normalizedStat.optionSourceStatId}>Missing option list</option>
+                                    )}
+                                </select>
+                            </div>
+                        )}
+
+                        {isSourcedOption && (
+                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                <label style={fieldLabelStyle}>Default Option</label>
+                                <select
+                                    className="input-base"
+                                    value={findStatOptionByValue(normalizedStat, normalizedStat.default, { sourceStats: optionListSources })?.value || ''}
+                                    onChange={(e) => onPatch({ default: e.target.value })}
+                                >
+                                    <option value="">First available option</option>
+                                    {sourcedOptionEntries.map(option => (
+                                        <option key={option.id} value={option.id}>{option.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {((normalizedStat.type === 'option' && !isSourcedOption) || isOptionListStatType(normalizedStat.type)) && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
+                                {isOptionListStatType(normalizedStat.type) ? (
+                                    <div style={{ ...inlineFieldTopStyle, marginBottom: 4 }}>
+                                        <label style={fieldLabelStyle}>Initially Active</label>
+                                        <StatValueInput stat={normalizedStat} value={normalizedStat.default} onChange={(defaultValue) => onPatch({ default: defaultValue })} />
+                                    </div>
+                                ) : (
                                 <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
                                     <label style={fieldLabelStyle}>Default Option</label>
                                     <select
@@ -475,6 +548,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                         ))}
                                     </select>
                                 </div>
+                                )}
 
                                 {optionEntries.map((option, optionIndex) => (
                                     <div key={`option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>

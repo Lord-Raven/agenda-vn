@@ -1,7 +1,7 @@
 import { FC, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SaveType, Stage } from '../Stage';
-import { findStatOptionByValue, getStatOptionValue, Stat, StatValue, applyUserPlaceholder, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue } from '../content/Stat';
+import { findStatOptionByValue, Stat, StatValue, applyUserPlaceholder, isNumericDisplayType, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, resolveAvailableStatOptions } from '../content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../content/Style';
 import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
@@ -45,66 +45,7 @@ const resolveActiveGlobalStats = (stageInstance: Stage): Stat[] => {
     return stageInstance.getConfiguration()?.globalStats || [];
 };
 
-const resolveStatDefaultValue = (stat: Stat): StatValue => {
-    if (stat.type === 'option') {
-        const defaultOption = findStatOptionByValue(stat, stat.default);
-        return defaultOption?.value || (stat.options?.[0] ? getStatOptionValue(stat.options[0], 0) : '');
-    }
-
-    if (isReferenceListDisplayType(stat.type)) {
-        return normalizeReferenceListValue(stat.default);
-    }
-
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
-        return typeof stat.default === 'string' ? stat.default : '';
-    }
-
-    if (stat.type === 'checkbox') {
-        return typeof stat.default === 'boolean' ? stat.default : false;
-    }
-
-    return Number.isFinite(stat.default) ? Number(stat.default) : 0;
-};
-
-const normalizeGlobalStatValue = (value: unknown, stat: Stat): StatValue => {
-    if (stat.type === 'option') {
-        const selectedOption = findStatOptionByValue(stat, value);
-        if (selectedOption) {
-            return selectedOption.value;
-        }
-        return resolveStatDefaultValue(stat);
-    }
-
-    if (isReferenceListDisplayType(stat.type)) {
-        return Array.isArray(value) ? normalizeReferenceListValue(value) : resolveStatDefaultValue(stat);
-    }
-
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
-        if (typeof value === 'string') {
-            return value;
-        }
-        return resolveStatDefaultValue(stat);
-    }
-
-    if (stat.type === 'checkbox') {
-        if (typeof value === 'boolean') return value;
-        if (typeof value === 'string') {
-            const lowered = value.trim().toLowerCase();
-            if (lowered === 'true') return true;
-            if (lowered === 'false') return false;
-        }
-        return resolveStatDefaultValue(stat) as boolean;
-    }
-
-    let resolved = Number.isFinite(value) ? Number(value) : Number(resolveStatDefaultValue(stat)) || 0;
-    if (typeof stat.min === 'number') {
-        resolved = Math.max(stat.min, resolved);
-    }
-    if (typeof stat.max === 'number') {
-        resolved = Math.min(stat.max, resolved);
-    }
-    return resolved;
-};
+const normalizeGlobalStatValue = (value: unknown, stat: Stat): StatValue => normalizeStatValue(value, stat);
 
 const buildGlobalStatValues = (
     stats: Stat[],
@@ -525,7 +466,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         .map((stat) => {
                                         const statName = (stat.name || '').trim();
                                         const selectedValue = normalizeGlobalStatValue(globalStatValues[stat.id], stat);
-                                        const optionEntries = stat.options || [];
+                                        const optionEntries = resolveAvailableStatOptions(stat, selectedValue, { sourceStats: globalStats, globalStatValues });
                                         const selectedOptionDescription = stat.type === 'option'
                                             ? resolveText(findStatOptionByValue(stat, selectedValue)?.option.description).trim()
                                             : '';
@@ -560,8 +501,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                         onChange={(e) => handleGlobalStatValueChange(stat, e.target.value)}
                                                         style={{ fontSize: '13px' }}
                                                     >
-                                                        {optionEntries.map((option, optionIndex) => (
-                                                            <option key={getStatOptionValue(option, optionIndex)} value={getStatOptionValue(option, optionIndex)}>
+                                                        {optionEntries.map((option) => (
+                                                            <option key={option.id} value={option.id}>
                                                                 {option.name}
                                                             </option>
                                                         ))}
@@ -580,7 +521,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     </div>
                                                 )}
 
-                                                {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) && (
+                                                {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type)) && (
                                                     <StatValueInput
                                                         stat={stat}
                                                         value={selectedValue}

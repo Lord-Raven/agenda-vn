@@ -1,5 +1,5 @@
-import { FC } from 'react';
-import { findStatOptionByValue, getStatOptionValue, isReferenceListDisplayType, resolveReferenceKind, Stat, StatValue, isNumericDisplayType } from '../content/Stat';
+import { CSSProperties, FC } from 'react';
+import { findStatOptionByValue, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, Stat, StatUpdate, StatValue, isNumericDisplayType } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
@@ -15,9 +15,11 @@ interface StatValueInputProps {
     stage?: Stage | (() => Stage);
     // When true, numeric stats accept dice/relative expressions (e.g. "1d6+1", "-2") instead of a plain number.
     allowExpression?: boolean;
+    // The owning entity's statMap etc., so a sourced option stat only offers that entity's active options.
+    optionContext?: OptionListSourceContext;
 }
 
-export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false }) => {
+export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, optionContext }) => {
     if (!stat) {
         return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
     }
@@ -35,11 +37,35 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
         const selectedOption = findStatOptionByValue(stat, value);
         return (
             <select className="input-base" value={selectedOption?.value || ''} onChange={(e) => onChange(e.target.value)}>
-                {(stat.options || []).map((option, optionIndex) => {
-                    const optionValue = getStatOptionValue(option, optionIndex);
-                    return <option key={optionValue} value={optionValue}>{option.name}</option>;
-                })}
+                {!selectedOption && <option value="" disabled>Select an option...</option>}
+                {resolveAvailableStatOptions(stat, value, optionContext).map((option) => (
+                    <option key={option.id} value={option.id}>{option.name}</option>
+                ))}
             </select>
+        );
+    }
+
+    if (isOptionListStatType(stat.type)) {
+        const selectedIds = Array.isArray(value) ? (normalizeStatValue(value, stat) as string[]) : [];
+        const pool = resolveStatOptionPool(stat);
+        if (pool.length === 0) {
+            return <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>No options defined.</span>;
+        }
+        return (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
+                {pool.map((option) => (
+                    <label key={option.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--agenda-text-primary)' }}>
+                        <input
+                            type="checkbox"
+                            checked={selectedIds.includes(option.id!)}
+                            onChange={(e) => onChange(e.target.checked
+                                ? [...selectedIds, option.id!]
+                                : selectedIds.filter((id) => id !== option.id))}
+                        />
+                        {option.name}
+                    </label>
+                ))}
+            </div>
         );
     }
 
@@ -98,4 +124,26 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
             onChange={(e) => onChange(Number(e.target.value) || 0)}
         />
     );
+};
+
+// Operation picker for a stat update action; only numeric and optionList stats have more than "Set to".
+export const StatUpdateOperationSelect: FC<{ stat?: Stat; operation: StatUpdate['operation']; onChange: (operation: StatUpdate['operation']) => void; style?: CSSProperties }> = ({ stat, operation, onChange, style }) => {
+    if (stat && isNumericDisplayType(stat.type)) {
+        return (
+            <select style={style} value={operation === 'remove' ? 'adjust' : operation} onChange={(e) => onChange(e.target.value as StatUpdate['operation'])}>
+                <option value="adjust">Adjust by</option>
+                <option value="set">Set to</option>
+            </select>
+        );
+    }
+    if (stat && isOptionListStatType(stat.type)) {
+        return (
+            <select style={style} value={operation} onChange={(e) => onChange(e.target.value as StatUpdate['operation'])}>
+                <option value="adjust">Add</option>
+                <option value="remove">Remove</option>
+                <option value="set">Set to</option>
+            </select>
+        );
+    }
+    return <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Set to</span>;
 };

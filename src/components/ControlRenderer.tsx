@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Stage } from '../Stage';
 import { Control } from '../content/Control';
-import { findStatOptionByValue, normalizeStatValue, resolveStatText, Stat } from '../content/Stat';
+import { findStatOptionByValue, formatStatOptionValueText, normalizeStatValue, resolveStatText, Stat } from '../content/Stat';
 import { resolveIcon } from './StatRating';
 import { StatValueDisplay } from './StatDisplay';
 import { StatValueInput } from './StatValueInput';
@@ -34,8 +34,8 @@ const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]
     if (stat.type === 'location') {
         return atlas?.[String(normalized)]?.name || '';
     }
-    if (stat.type === 'option') {
-        return findStatOptionByValue(stat, normalized)?.option.name || '';
+    if (stat.type === 'option' || stat.type === 'optionList') {
+        return formatStatOptionValueText(stat, normalized) || '';
     }
     if (stat.type === 'checkbox') {
         return normalized === true ? 'True' : 'False';

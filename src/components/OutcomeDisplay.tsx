@@ -2,7 +2,7 @@ import { FC, ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Actor } from '../content/Actor';
 import { Outcome, OutcomeType } from '../content/Outcome';
-import { findStatOptionByValue, Stat, StatValue } from '../content/Stat';
+import { formatStatOptionValueText, Stat, StatValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorPortrait } from './ActorPortrait';
 import { resolveStatValueText } from './StatDisplay';
@@ -18,8 +18,8 @@ const formatStatValue = (stat: Stat, value: StatValue): string => {
     if (stat.type === 'number') {
         return resolveStatValueText(stat, Number(value));
     }
-    if (stat.type === 'option') {
-        return findStatOptionByValue(stat, value)?.option.name || `${value ?? ''}`;
+    if (stat.type === 'option' || stat.type === 'optionList') {
+        return formatStatOptionValueText(stat, value) || `${value ?? ''}`;
     }
     if (stat.type === 'checkbox') {
         return value ? 'Yes' : 'No';
