@@ -413,7 +413,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         `  ${skit.initialLocationId ? getLocationName(skit.initialLocationId, stage) : 'Unknown Location'}\n` +
                         `    ${getLocationDescription(skit.initialLocationId, stage) || 'No description available.'}`)
                     .addBlock('Available Characters',
-                        availableActors.map(actor => buildActorContext(actor, '', stage, [], ['summary', 'profile']).format()))
+                        availableActors.map(actor => buildActorContext(actor, '', stage, [], ['summary', 'profile']).format()).join('\n'))
                     .addBlock('Response Format',
                         buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
                     .addBlock('Additional Context',
@@ -474,7 +474,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         `Entries from the player, ${playerName}, are written in first-person, while other entries consistently refer to ${playerName} in second-person; all other characters are referred to in third-person, even in their own entries.` :
                         `New entries refer to the player, ${playerName}, in second-person; all other characters are referred to in third-person, even in their own entries.`) +
                     `This scene is a brief visual novel skit within a video game; as such, the scene avoids major developments or concrete details which would fundamentally alter or subvert the mechanics of the game. ` +
-                    (skit.script.length == 0 ? 'As this is the initial, establishing moment of a new scene, evaluate the current outfit and alternative outfits of each character and use Outfit ("wears") tags to update the characters to the most appropriate outfit for the moment. Begin the scene with appropriate tags at the "System:" prompt.' : 'Continue the scene at the "System:" prompt.') +
+                    (skit.script.length == 0 ? 'As this is the initial, establishing moment of a new scene, evaluate the current outfit and alternative outfits of each character and use Outfit tags to update the characters to the most appropriate outfit for the moment. Begin the scene with appropriate tags at the "System:" prompt.' : 'Continue the scene at the "System:" prompt.') +
                     `Generally, focus upon interpersonal dynamics, character growth, and discovery or trials within this strange world.` +
                     ((save.language || 'English').toLowerCase() !== 'english' ? `\n\nNote: The game is now being played in ${save.language}. Regardless of historic language use, generate this skit content in ${save.language} accordingly. Special tags (emotion, outfit, movement, etc.) continue to use English (these are invisible to the user).` : '')
                 )
@@ -482,7 +482,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     `<Entry><Speaker>[Speaker Name]</Speaker>[Appropriate Tags]<Message>Prose with "embedded dialogue" and actions.</Message></Entry>`)
                 .addBlock('Tags', (builder) =>
                     builder.addBlock('Tag Instruction',
-                        `Embedded within this script, you may employ special tags to trigger various game mechanics. These tags are not presented to users, so the narrative content of the script should also organically mention characters entering, exiting, or relocating. Character names in tags or in the script are ALL CAPS.`)
+                        `Embedded within this script, you may employ special tags to trigger various game mechanics. These tags are not presented to users, so the narrative content of the script should also organically mention characters entering, exiting, or relocating.`)
                         .addBlock('Emotion Tags',
                         `Emotion tags ("<Expression><Actor>[Character Name]</Actor><Mood>[Emotion]</Mood></Expression>") should be used to indicate visible emotional shifts in a character's appearance using a single-word emotion name.`)
                         .addBlock('Outfit Tags',

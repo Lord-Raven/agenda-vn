@@ -104,7 +104,11 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                     stage={stage}
                 />
             ) : stat.type === 'number' ? (
-                <StatValueDisplay stat={stat} value={Number(normalizedValue)} style={{ minHeight: 20 }} />
+                <StatValueDisplay
+                    stat={stat}
+                    value={Number(normalizedValue)}
+                    style={{ minHeight: 20, ...(stat.displayType === 'rating' ? { justifyContent: 'flex-start' } : {}) }}
+                />
             ) : (
                 <Typography sx={{ color: 'var(--agenda-text-primary)', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2, wordBreak: 'break-word' }}>
                     {resolveDisplayValue(stat, normalizedValue, stageInstance.getSave()?.atlas)}

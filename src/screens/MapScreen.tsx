@@ -233,6 +233,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                             flexDirection: "column",
                             gap: 1.25,
                             minHeight: 0,
+                            overflowX: "hidden",
                             overflowY: "auto",
                             pr: 0.5,
                         }}
