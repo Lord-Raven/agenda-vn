@@ -4,7 +4,7 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, normalizeStatValue, resolveFunctionScript, resolveStatValueRule, resolveStatText, setOptionListSourceResolver } from './content/Stat';
+import { findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveFunctionScript, resolveStatValueRule, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { Control, ControlPlacement, isControlAvailable } from "./content/Control";
@@ -551,6 +551,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
 
         const currentSave = this.saveData.saves[this.saveData.lastSaveSlot];
+        if (updates.globalStats) {
+            const configuration = this.saveData.configuration;
+            configuration.globalStatValues = { ...(configuration.globalStatValues || {}) };
+            configuration.globalStats.forEach((stat) => {
+                const previousStat = current.globalStats?.find((candidate) => candidate.id === stat.id);
+                [configuration.globalStatValues, currentSave?.globalStatValues].forEach((values) => {
+                    if (values && values[stat.id] !== undefined) {
+                        values[stat.id] = includeNewOptionListOptions(values[stat.id], previousStat, stat)!;
+                    }
+                });
+            });
+        }
         if (currentSave) {
             // Preserve the save's own values (e.g. changed in-game via stat update rules); only fill gaps
             // from configuration so this doesn't clobber player progress with the configured tester defaults.

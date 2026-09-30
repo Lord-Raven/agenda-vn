@@ -588,6 +588,20 @@ export const formatStatOptionValueText = (stat: Stat, value: StatValue | undefin
     return undefined;
 };
 
+// A stored optionList value only lists options that existed when it was written; options added to the pool since
+// `previousStat` join it if they're active in `nextStat`'s default. Other values are returned unchanged.
+export const includeNewOptionListOptions = (value: StatValue | undefined, previousStat: Stat | undefined, nextStat: Stat): StatValue | undefined => {
+    if (!isOptionListStatType(nextStat.type) || !previousStat || !isOptionListStatType(previousStat.type) || !Array.isArray(value)) {
+        return value;
+    }
+    const previousIds = new Set(resolveStatOptionPool(previousStat).map((option) => option.id!));
+    const defaultIds = new Set(resolveStatDefault(nextStat) as string[]);
+    const addedIds = resolveStatOptionPool(nextStat)
+        .map((option) => option.id!)
+        .filter((id) => !previousIds.has(id) && defaultIds.has(id) && !value.includes(id));
+    return addedIds.length ? [...value, ...addedIds] : value;
+};
+
 // Finds the first rule in an ordered list whose conditions are satisfied by the given context (e.g. with
 // context.currentActor set to the target actor so 'variable' actor-stat conditions inspect the target).
 // Returns undefined if no rule matches, so callers can continue to the next fallback tier.

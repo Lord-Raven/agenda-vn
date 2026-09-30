@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatValue, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue, normalizeStatValue, cloneStat } from '../content/Stat';
+import { Stat, StatValue, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, includeNewOptionListOptions, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue, normalizeStatValue, cloneStat } from '../content/Stat';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
@@ -74,6 +74,7 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
     const save = stageInstance.getSave();
     const configuration = stageInstance.getConfiguration();
 
+    const [loadedGlobalStats] = useState<Stat[]>(() => configuration.globalStats || []);
     const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
         (configuration.globalStats || []).map(cloneStat),
     );
@@ -161,11 +162,13 @@ export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => 
                 return;
             }
 
-            nextValues[stat.id] = normalizeStatValue(globalStatValues[stat.id], stat);
+            // Baseline is the stat as loaded, so options added during this session stay included across autosaves.
+            const loadedStat = loadedGlobalStats.find((candidate) => candidate.id === stat.id);
+            nextValues[stat.id] = normalizeStatValue(includeNewOptionListOptions(globalStatValues[stat.id], loadedStat, stat), stat);
         });
 
         return nextValues;
-    }, [globalStatValues, globalStats]);
+    }, [globalStatValues, globalStats, loadedGlobalStats]);
 
     const saveGameConfiguration = useCallback(() => {
         stageInstance.updateConfiguration({
