@@ -905,7 +905,7 @@ export function getActorLore(actorId: string, stage: Stage) {
             currentActor: actor,
             actorStatValues: { [actor.id]: actor.statMap || {} },
         }))
-        .map((entry) => `Additional Instruction: ${entry.title}\n${entry.content}`)
+        .map((entry) => `Additional Instruction: ${entry.title}\n${entry.content}`.replace(/\{\{char\}\}/gi, actor.displayName || actor.name))
         .join('\n\n');
 	return [lore?.content ?? '', variableLoreText].filter(Boolean).join('\n\n');
 }

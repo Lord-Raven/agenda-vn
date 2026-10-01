@@ -45,6 +45,20 @@ export type ContentIdentityCondition = {
 
 export type Condition = CalendarCondition | GlobalStatCondition | ContentStatCondition | ContentIdentityCondition;
 
+// A stat condition value that stands in for the id of the bound 'variable' entity of a content type (e.g. a
+// reference-list stat "contains" the actor whose schedule is being evaluated).
+const VARIABLE_CONTENT_VALUE_PREFIX = 'variable:';
+
+export const variableContentValue = (contentType: ContentType): string => `${VARIABLE_CONTENT_VALUE_PREFIX}${contentType}`;
+
+export const parseVariableContentValue = (value: unknown): ContentType | undefined => {
+    if (typeof value !== 'string' || !value.startsWith(VARIABLE_CONTENT_VALUE_PREFIX)) {
+        return undefined;
+    }
+    const contentType = value.slice(VARIABLE_CONTENT_VALUE_PREFIX.length) as ContentType;
+    return CONTENT_TYPES.includes(contentType) ? contentType : undefined;
+};
+
 // A ConditionCollection is an array of Condition objects, where all conditions must be satisfied for the collection to be considered true.
 export type ConditionCollection = Condition[];
 
@@ -167,6 +181,10 @@ const buildDiceSeed = (condition: Condition, context: ConditionContext): string 
 // Resolves a condition's target value, rolling dice notation deterministically if present.
 const resolveConditionValue = (condition: Condition, context: ConditionContext): string | number | boolean => {
     const value = (condition as GlobalStatCondition | ContentStatCondition | CalendarCondition).value;
+    const variableContentType = parseVariableContentValue(value);
+    if (variableContentType) {
+        return getContextCurrentContent(context, variableContentType)?.id || '';
+    }
     return isDiceNotation(value) ? rollDiceNotation(value, buildDiceSeed(condition, context)) : value;
 };
 
@@ -302,6 +320,10 @@ export const evaluateConditionCollections = (conditionCollections: ConditionColl
 // Whether any condition depends on a bound 'variable' entity (of `contentType`, or of any type if omitted).
 export const hasVariableContentTarget = (conditionCollections: ConditionCollection[] | undefined, contentType?: ContentType): boolean => {
     return !!conditionCollections?.some((collection) => collection.some((condition) => {
+        const valueContentType = condition.type !== 'contentIdentity' ? parseVariableContentValue(condition.value) : undefined;
+        if (valueContentType && (!contentType || valueContentType === contentType)) {
+            return true;
+        }
         const isVariable = condition.type === 'contentIdentity' || (condition.type === 'contentStat' && condition.targetId === 'variable');
         return isVariable && (!contentType || condition.contentType === contentType);
     }));

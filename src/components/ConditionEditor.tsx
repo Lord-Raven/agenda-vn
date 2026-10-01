@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
 import { findStatOptionByValue, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
-import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison } from '../content/Condition';
+import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, variableContentValue } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
 import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
@@ -298,6 +298,24 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             return <input type="checkbox" checked={Boolean(condition.value === true || condition.value === 'true')} onChange={(event) => updateValue(event.target.checked)} />;
         }
         const referenceKind = stat ? resolveReferenceKind(stat.type) : undefined;
+        if (referenceKind && referenceKind === variableContentType) {
+            const label = CONTENT_TYPE_LABELS[referenceKind].toLowerCase();
+            const options = [
+                { key: variableContentValue(referenceKind), label: 'Variable', icon: SwapHoriz },
+                ...concreteTargetOptionsFor(referenceKind),
+            ];
+            return (
+                <SearchableOptionPicker
+                    value={String(condition.value ?? '')}
+                    onChange={(nextValue) => updateValue((Array.isArray(nextValue) ? nextValue[0] : nextValue) || '')}
+                    options={options}
+                    defaultOptionKeys={[variableContentValue(referenceKind)]}
+                    emptyLabel="None"
+                    title={`Choose ${label}`}
+                    placeholder={`Search ${label}s`}
+                />
+            );
+        }
         if (referenceKind) {
             return <ReferenceSelect kind={referenceKind} value={String(condition.value ?? '')} onChange={(id) => updateValue(id)} actors={actors} items={items} locations={locations} style={{ width: '100%', minWidth: 0 }} />;
         }
