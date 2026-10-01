@@ -168,6 +168,7 @@ export type GameConfiguration = {
     slideshowLocationIds: string[]; // Optional allowlist of location ids for the Creator Notes HTML slideshow; if empty, active locations are used in their existing order.
     dateMode: DateMode; // Whether the game tracks real calendar dates or an abstract turn/day counter
     timeMode: TimeMode; // Whether the four daily slots are presented as times of day or as abstract phases
+    useEvents: boolean; // Whether the calendar event system (event panel, calendar screen, generated/mandatory events) is enabled
 
 }
 
@@ -278,6 +279,7 @@ export type PortableGameConfiguration = {
     slideshowLocationIds: string[];
     dateMode: DateMode;
     timeMode: TimeMode;
+    useEvents: boolean;
     controls: Control[];
 };
 
@@ -307,6 +309,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     slideshowLocationIds: [...(input.slideshowLocationIds || [])],
     dateMode: input.dateMode === 'turnBased' ? 'turnBased' : 'calendar',
     timeMode: input.timeMode === 'phase' ? 'phase' : 'timeOfDay',
+    useEvents: input.useEvents !== false,
     controls: (input.controls || []).map((control) => new Control(control)),
 });
 
@@ -409,6 +412,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             slideshowLocationIds: [],
             dateMode: 'calendar',
             timeMode: 'timeOfDay',
+            useEvents: true,
         };
     }
 
@@ -485,6 +489,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         configuration.slideshowLocationIds = configuration.slideshowLocationIds || defaultConfiguration.slideshowLocationIds;
         configuration.dateMode = configuration.dateMode === 'turnBased' ? 'turnBased' : 'calendar';
         configuration.timeMode = configuration.timeMode === 'phase' ? 'phase' : 'timeOfDay';
+        configuration.useEvents = configuration.useEvents !== false;
         setActiveTimeMode(configuration.timeMode);
 
         this.syncUniversalSchedule();
@@ -1201,6 +1206,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     getCurrentLocationEvent(locationId: string): CalendarEvent | null {
+        if (!this.areEventsEnabled()) {
+            return null;
+        }
         const save = this.getSave();
         this.ensureCalendarState(save);
         const currentDate = save.currentDate || this.getStartingDate(save);
@@ -1214,6 +1222,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private getCurrentMandatoryEvent(save: SaveType): CalendarEvent | null {
+        if (!this.areEventsEnabled()) {
+            return null;
+        }
         const currentDate = save.currentDate || this.getStartingDate(save);
         const currentTimeOfDay = save.currentTimeOfDay || 'morning';
 
@@ -1383,6 +1394,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // Whether the four daily slots are presented as named times of day or as abstract numbered phases.
     getTimeMode(): TimeMode {
         return this.getConfiguration().timeMode === 'phase' ? 'phase' : 'timeOfDay';
+    }
+
+    areEventsEnabled(): boolean {
+        return this.getConfiguration().useEvents !== false;
     }
 
     // Converts a YYYY-MM-DD date into the 1-based day number relative to the configured starting date.
@@ -2287,7 +2302,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .filter(event => this.isFutureEvent(event))
             .sort((a, b) => this.compareCalendarEvents(a, b));
 
-        const neededEventCount = Math.max(targetEventCount - existingUpcomingEvents.length, 0);
+        const neededEventCount = this.areEventsEnabled() ? Math.max(targetEventCount - existingUpcomingEvents.length, 0) : 0;
         const newEvents = neededEventCount > 0 ? this.createCalendarEvents(save, neededEventCount) : [];
 
         save.upcomingEvents = [...existingUpcomingEvents, ...newEvents]
@@ -2499,7 +2514,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     break;
                 case 'NEW_EVENT':
                     // For new events, we expect details to include the event data.
-                    const newEvent = this.buildCalendarEventFromOutcome(outcome.details, save);
+                    const newEvent = this.areEventsEnabled() ? this.buildCalendarEventFromOutcome(outcome.details, save) : null;
                     if (newEvent) {
                         save.upcomingEvents = save.upcomingEvents || [];
                         save.upcomingEvents.push(...this.expandRecurringEvent(newEvent));
@@ -2527,7 +2542,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         this.rebuildUpcomingEvents(save)
-        this.showPriorityMessage('Calendar updated with new upcoming events.');
+        if (this.areEventsEnabled()) {
+            this.showPriorityMessage('Calendar updated with new upcoming events.');
+        }
 
         this.saveGame();
 
@@ -3054,6 +3071,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             slideshowLocationIds: configuration.slideshowLocationIds || [],
             dateMode: configuration.dateMode,
             timeMode: configuration.timeMode,
+            useEvents: configuration.useEvents,
         });
     }
 

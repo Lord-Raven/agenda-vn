@@ -32,7 +32,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
             onClose();
             // Navigate to main game screen
             if (setScreenType) {
-                setScreenType(ScreenType.CALENDAR);
+                setScreenType(stage().areEventsEnabled() ? ScreenType.CALENDAR : ScreenType.MAP);
             }
         }
     };

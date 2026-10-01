@@ -87,10 +87,10 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
                     {screenType === ScreenType.MENU && (
                         <MenuScreen stage={stage} setScreenType={setScreenType} />
                     )}
-                    {screenType === ScreenType.CALENDAR && (
+                    {screenType === ScreenType.CALENDAR && stage().areEventsEnabled() && (
                         <CalendarScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
                     )}
-                    {screenType === ScreenType.MAP && (
+                    {(screenType === ScreenType.MAP || (screenType === ScreenType.CALENDAR && !stage().areEventsEnabled())) && (
                         <MapScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
                     )}
                     {screenType === ScreenType.SKIT && (

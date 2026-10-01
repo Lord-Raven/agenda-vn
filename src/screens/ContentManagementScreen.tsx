@@ -20,15 +20,28 @@ interface ContentManagementScreenProps {
 }
 
 type TabType = 'game' | 'style' | 'stats' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
+const tabStorageKey = 'contentManagement.activeTab';
+const tabs: TabType[] = ['game', 'style', 'stats', 'controls', 'lorebook', 'actors', 'locations', 'items', 'maps', 'calendarEvents'];
+const creatorTabs: TabType[] = ['game', 'style', 'stats', 'controls'];
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
     const isCreatorMode = stage().isOwner && isCreateMode;
-    const [activeTab, setActiveTab] = useState<TabType>('actors');
+    const eventsEnabled = stage().areEventsEnabled();
+    const [activeTab, setActiveTab] = useState<TabType>(() => {
+        const savedTab = sessionStorage.getItem(tabStorageKey) as TabType | null;
+        return savedTab && tabs.includes(savedTab) && (isCreatorMode || !creatorTabs.includes(savedTab)) && (eventsEnabled || savedTab !== 'calendarEvents') ? savedTab : 'actors';
+    });
 
     useEffect(() => {
-        if (!isCreatorMode && (activeTab === 'game' || activeTab === 'style' || activeTab === 'stats' || activeTab === 'controls')) {
+        if ((!isCreatorMode && creatorTabs.includes(activeTab)) || (!eventsEnabled && activeTab === 'calendarEvents')) {
             setActiveTab('actors');
+        }
+    }, [activeTab, isCreatorMode, eventsEnabled]);
+
+    useEffect(() => {
+        if (isCreatorMode || !creatorTabs.includes(activeTab)) {
+            sessionStorage.setItem(tabStorageKey, activeTab);
         }
     }, [activeTab, isCreatorMode]);
 
@@ -275,6 +288,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     <Inventory2 />
                                     Items ({(isCreatorMode ? stage().getConfiguration().items : items).filter(item => item.active !== false).length})
                                 </Button>
+                                {eventsEnabled && (
                                 <Button
                                     onClick={() => setActiveTab('calendarEvents')}
                                     variant={activeTab === 'calendarEvents' ? 'primary' : 'secondary'}
@@ -290,6 +304,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     <CalendarMonth />
                                     Events ({stage().getManagedCalendarEvents(isCreatorMode).length})
                                 </Button>
+                                )}
                             </div>
 
                             {/* Content Area */}
@@ -317,7 +332,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 )}
 
                                 {/* Calendar Events Tab */}
-                                {activeTab === 'calendarEvents' && (
+                                {eventsEnabled && activeTab === 'calendarEvents' && (
                                     <CalendarEventManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 

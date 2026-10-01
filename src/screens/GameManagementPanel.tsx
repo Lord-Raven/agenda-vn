@@ -2,7 +2,6 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { DateMode, Stage, buildPortableGameConfiguration } from '../Stage';
 import { TimeMode } from '../content/CalendarEvent';
-import { v4 as generateUuid } from 'uuid';
 import { Stat, StatType, StatValue, cloneStat, normalizeStatValue } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
@@ -14,17 +13,6 @@ import { getLocationImageUrl } from '../content/Location';
 interface GameManagementPanelProps {
     stage: () => Stage;
 }
-
-const clampStatValue = (value: number, stat: Stat): number => {
-    let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
-    if (typeof stat.min === 'number') {
-        resolved = Math.max(stat.min, resolved);
-    }
-    if (typeof stat.max === 'number') {
-        resolved = Math.min(stat.max, resolved);
-    }
-    return resolved;
-};
 
 export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => {
     const stageInstance = stage();
@@ -46,6 +34,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [startingDate, setStartingDate] = useState<string>(() => configuration.startingDate || '');
     const [dateMode, setDateMode] = useState<DateMode>(() => configuration.dateMode === 'turnBased' ? 'turnBased' : 'calendar');
     const [timeMode, setTimeMode] = useState<TimeMode>(() => configuration.timeMode === 'phase' ? 'phase' : 'timeOfDay');
+    const [useEvents, setUseEvents] = useState<boolean>(() => configuration.useEvents !== false);
     const [artStyle, setArtStyle] = useState<string>(() => configuration.artStyle || '');
     const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
         (configuration.globalStats || []).map(cloneStat),
@@ -153,6 +142,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             slideshowLocationIds,
             dateMode,
             timeMode,
+            useEvents,
             controls: configuration.controls || [],
         });
     }, [
@@ -167,6 +157,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         creatorNotes,
         dateMode,
         timeMode,
+        useEvents,
         managedCalendarEvents,
         globalStats,
         itemStats,
@@ -263,9 +254,10 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             slideshowLocationIds,
             dateMode,
             timeMode,
+            useEvents,
         });
 
-    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, timeMode, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
+    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, timeMode, useEvents, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;
@@ -453,6 +445,30 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                             {timeMode === 'timeOfDay'
                                 ? 'Each day is split into Morning, Afternoon, Evening, and Night.'
                                 : 'Each day is split into four unnamed phases, shown as hourglass pips instead of a time-of-day icon.'}
+                        </div>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Events</label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <Button
+                                variant={useEvents ? 'primary' : 'secondary'}
+                                onClick={() => setUseEvents(true)}
+                                style={{ flex: 1 }}
+                            >
+                                Use Events
+                            </Button>
+                            <Button
+                                variant={!useEvents ? 'primary' : 'secondary'}
+                                onClick={() => setUseEvents(false)}
+                                style={{ flex: 1 }}
+                            >
+                                No Events
+                            </Button>
+                        </div>
+                        <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 6 }}>
+                            {useEvents
+                                ? 'Scheduled events occur at designated times and are managed from the Events tab and calendar screen.'
+                                : 'The event system is disabled: no Events tab, no calendar screen, and no generated or mandatory events. Play happens entirely from the map.'}
                         </div>
                     </div>
                     <div>

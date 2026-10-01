@@ -480,8 +480,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 )
                 .addBlock('Script Format',
                     `<Entry><Speaker>[Speaker Name]</Speaker>[Appropriate Tags]<Message>Prose with "embedded dialogue" and actions.</Message></Entry>`)
-                .addBlock('Tags', (builder) =>
-                    builder.addBlock('Tag Instruction',
+                .addBlock('Tags', (builder) => {
+                    const tagsBuilder = builder.addBlock('Tag Instruction',
                         `Embedded within this script, you may employ special tags to trigger various game mechanics. These tags are not presented to users, so the narrative content of the script should also organically mention characters entering, exiting, or relocating.`)
                         .addBlock('Emotion Tags',
                         `Emotion tags ("<Expression><Actor>[Character Name]</Actor><Mood>[Emotion]</Mood></Expression>") should be used to indicate visible emotional shifts in a character's appearance using a single-word emotion name.`)
@@ -506,14 +506,15 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         .addBlock('Lore Update Tags',
                             `Lore update tags flag existing lore entries that should be revised based on events in this entry. Include concise, specific guidance for the later lore revision. ` +
                             `Use the exact lore entry title in <Entry>: <LoreUpdate><Entry>Lore Entry Name</Entry><Guidance>Specific revision guidance based on this entry's events.</Guidance></LoreUpdate>`
-                        )
-                        .addBlock('New Event Tags',
+                        );
+                    if (stage.areEventsEnabled()) {
+                        tagsBuilder.addBlock('New Event Tags',
                             `Use a NewEvent tag when this entry specifies or implies a future calendar event. Include the event name, date, location (ID or name), required characters (IDs or names), user-facing description, secret guidance, whether it is mandatory, and optional finite recurrence. Mandatory events enforced at their start time by the game, so this flag should be used only for events that are essential to the plot or mechanics of the game. ` +
                             `<NewEvent><Name>Event Name</Name><Date>YYYY-MM-DD</Date><Location>Location ID or Name</Location><RequiredCharacters><Character>[Character ID or Name]</Character></RequiredCharacters><Description>Brief user-facing description</Description><Secret>Additional secret guidance</Secret><Mandatory>true|false</Mandatory><Recurrence><Frequency>DAILY|WEEKLY|MONTHLY</Frequency><Interval>1</Interval><UntilDate>YYYY-MM-DD</UntilDate></Recurrence></NewEvent>`
-                        )
-
-
-                ).addBlock('Scene Prompt',
+                        );
+                    }
+                    return tagsBuilder;
+                }).addBlock('Scene Prompt',
                     `Scene Prompt: ${skit.guidance}`)
                 .addBlock('Context',
                     generateContext(skit, stage, 7 - retry * 2))
@@ -795,7 +796,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             const parseEntryOutcomes = (input: string): Outcome[] => [
                 ...parseStatChangeTags(input),
                 ...parseLoreUpdateTags(input),
-                ...parseNewEventTags(input),
+                ...(stage.areEventsEnabled() ? parseNewEventTags(input) : []),
             ];
 
             const parseXmlScriptEntries = (input: string): ScriptEntry[] => {

@@ -93,20 +93,21 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
     }, [setScreenType]);
 
     const selectedCategoryIndex = categories.findIndex((category) => category === selectedCategory);
+    const currentCategoryIndex = selectedCategoryIndex >= 0 ? selectedCategoryIndex : 0;
+    const previousCategory = categories.length <= 1
+        ? undefined
+        : categories.length === 2
+            ? categories[currentCategoryIndex - 1]
+            : categories[(currentCategoryIndex - 1 + categories.length) % categories.length];
+    const nextCategory = categories.length <= 1
+        ? undefined
+        : categories.length === 2
+            ? categories[currentCategoryIndex + 1]
+            : categories[(currentCategoryIndex + 1) % categories.length];
     const visibleLocations = useMemo(
         () => activeLocations.filter((location) => normalizeCategory(location.category) === selectedCategory),
         [activeLocations, selectedCategory],
     );
-
-    const cycleCategory = (offset: number) => {
-        if (categories.length <= 1) {
-            return;
-        }
-
-        const currentIndex = selectedCategoryIndex >= 0 ? selectedCategoryIndex : 0;
-        const nextIndex = (currentIndex + offset + categories.length) % categories.length;
-        setSelectedCategory(categories[nextIndex]);
-    };
 
     if (activeMaps.length > 0) {
         return (
@@ -143,6 +144,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                         stage={stage}
                         buttons={
                             <>
+                                {stageInstance.areEventsEnabled() && (
                                 <Button
                                     variant="secondary"
                                     onClick={() => setScreenType(ScreenType.CALENDAR)}
@@ -152,6 +154,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                 >
                                     <EventAvailable fontSize="small" />
                                 </Button>
+                                )}
                                 <Button
                                     variant="secondary"
                                     onClick={() => setShowContentManagement(true)}
@@ -178,27 +181,46 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                     <Box
                         sx={{
-                            display: "flex",
+                            display: "grid",
+                            gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
                             alignItems: "center",
-                            justifyContent: "center",
                             gap: 1,
                             mt: 1,
                             mb: 1.5,
+                            width: "100%",
                         }}
                     >
-                        {categories.length > 1 && (
-                            <Button
-                                variant="secondary"
-                                onClick={() => cycleCategory(-1)}
-                                onMouseEnter={() => setTooltip("Previous category", ArrowBackRounded)}
-                                onMouseLeave={clearTooltip}
-                                style={{ padding: "8px 10px" }}
-                            >
-                                <ArrowBackRounded fontSize="small" />
-                            </Button>
-                        )}
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 1, minWidth: 0 }}>
+                            {previousCategory && (
+                                <>
+                                    <Typography
+                                        sx={{
+                                            color: "var(--agenda-text-muted)",
+                                            fontFamily: "var(--agenda-font-flavor)",
+                                            fontWeight: 600,
+                                            fontSize: { xs: "0.8rem", md: "1.15rem" },
+                                            opacity: 0.58,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        {previousCategory}
+                                    </Typography>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setSelectedCategory(previousCategory)}
+                                        onMouseEnter={() => setTooltip(`Previous category: ${previousCategory}`, ArrowBackRounded)}
+                                        onMouseLeave={clearTooltip}
+                                        style={{ padding: "8px 10px", flexShrink: 0 }}
+                                    >
+                                        <ArrowBackRounded fontSize="small" />
+                                    </Button>
+                                </>
+                            )}
+                        </Box>
 
-                        <Box sx={{ textAlign: "center", minWidth: 0 }}>
+                        <Box sx={{ textAlign: "center", minWidth: 0, maxWidth: { xs: "46vw", md: "min(42vw, 620px)" } }}>
                             <Typography
                                 sx={{
                                     color: "var(--agenda-text-primary)",
@@ -208,23 +230,44 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                     letterSpacing: "0.04em",
                                     lineHeight: 1,
                                     textShadow: "0 3px 14px color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
                                 }}
                             >
                                 {selectedCategory || "No Locations"}
                             </Typography>
                         </Box>
 
-                        {categories.length > 1 && (
-                            <Button
-                                variant="secondary"
-                                onClick={() => cycleCategory(1)}
-                                onMouseEnter={() => setTooltip("Next category", ArrowForwardRounded)}
-                                onMouseLeave={clearTooltip}
-                                style={{ padding: "8px 10px" }}
-                            >
-                                <ArrowForwardRounded fontSize="small" />
-                            </Button>
-                        )}
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+                            {nextCategory && (
+                                <>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setSelectedCategory(nextCategory)}
+                                        onMouseEnter={() => setTooltip(`Next category: ${nextCategory}`, ArrowForwardRounded)}
+                                        onMouseLeave={clearTooltip}
+                                        style={{ padding: "8px 10px", flexShrink: 0 }}
+                                    >
+                                        <ArrowForwardRounded fontSize="small" />
+                                    </Button>
+                                    <Typography
+                                        sx={{
+                                            color: "var(--agenda-text-muted)",
+                                            fontFamily: "var(--agenda-font-flavor)",
+                                            fontWeight: 600,
+                                            fontSize: { xs: "0.8rem", md: "1.15rem" },
+                                            opacity: 0.58,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        {nextCategory}
+                                    </Typography>
+                                </>
+                            )}
+                        </Box>
                     </Box>
 
                     <Box
@@ -235,7 +278,8 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                             minHeight: 0,
                             overflowX: "hidden",
                             overflowY: "auto",
-                            pr: 0.5,
+                            // Leaves room for the 10px hover shift on the location buttons.
+                            pr: "14px",
                         }}
                     >
                         {visibleLocations.length === 0 && (
