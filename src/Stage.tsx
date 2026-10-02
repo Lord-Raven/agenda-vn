@@ -1731,7 +1731,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // Builds the full binding set a function stat's script executes with; `call` looks up another function
     // stat by name (globals first, then - if a target/explicit entity is given - the stats matching its kind)
     // and recursively runs it, capped by MAX_FUNCTION_INVOCATION_DEPTH to guard against invocation cycles.
-    private buildFunctionScriptBindings(save: SaveType, target: FunctionScriptEntity | undefined, depth: number): FunctionScriptBindings {
+    private buildFunctionScriptBindings(save: SaveType, target: FunctionScriptEntity | undefined, depth: number, onError?: (message: string) => void): FunctionScriptBindings {
         const configuration = this.getConfiguration();
         const call = (name: string, explicitTarget?: FunctionScriptEntity): unknown => {
             if (depth >= MAX_FUNCTION_INVOCATION_DEPTH) {
@@ -1741,14 +1741,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             const normalizedName = `${name || ''}`.trim().toLowerCase();
             const globalMatch = (configuration.globalStats || []).find(candidate => isFunctionStatType(candidate.type) && candidate.name.trim().toLowerCase() === normalizedName);
             if (globalMatch) {
-                return this.runFunctionStatScript(save, globalMatch, undefined, undefined, depth + 1);
+                return this.runFunctionStatScript(save, globalMatch, undefined, undefined, depth + 1, onError);
             }
             if (!scopeTarget) {
                 return undefined;
             }
             const statsByKind = scopeTarget.kind === 'actor' ? configuration.actorStats : scopeTarget.kind === 'location' ? configuration.locationStats : configuration.itemStats;
             const scopedMatch = (statsByKind || []).find(candidate => isFunctionStatType(candidate.type) && candidate.name.trim().toLowerCase() === normalizedName);
-            return scopedMatch ? this.runFunctionStatScript(save, scopedMatch, scopeTarget, undefined, depth + 1) : undefined;
+            return scopedMatch ? this.runFunctionStatScript(save, scopedMatch, scopeTarget, undefined, depth + 1, onError) : undefined;
         };
         return {
             ...this.buildGlobalScriptAccessors(save),
@@ -1765,12 +1765,40 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Runs a function stat's script (or an explicit override, e.g. an Item's per-instance implementation)
     // bound to the given target entity (if any).
-    private runFunctionStatScript(save: SaveType, stat: Stat, target: FunctionScriptEntity | undefined, overrideScript: string | undefined, depth: number): unknown {
+    private runFunctionStatScript(save: SaveType, stat: Stat, target: FunctionScriptEntity | undefined, overrideScript: string | undefined, depth: number, onError?: (message: string) => void): unknown {
         const script = overrideScript !== undefined ? overrideScript : (stat.script || '');
         if (!script.trim()) {
             return undefined;
         }
-        return runFunctionScript(script, this.buildFunctionScriptBindings(save, target, depth));
+        return runFunctionScript(script, this.buildFunctionScriptBindings(save, target, depth, onError), onError);
+    }
+
+    testFunctionStat(stat: Stat, targetType: StatUpdate['targetType'] = 'global', targetId?: string): { value: unknown; errors: string[] } {
+        const errors: string[] = [];
+        try {
+            const save = structuredClone(this.getSave());
+            const configuration = structuredClone(this.getConfiguration());
+            const statsKey = targetType === 'global' ? 'globalStats' : targetType === 'actor' ? 'actorStats' : targetType === 'location' ? 'locationStats' : 'itemStats';
+            configuration[statsKey] = [...(configuration[statsKey] || []).filter(candidate => candidate.id !== stat.id), structuredClone(stat)];
+            const runtime: Stage = Object.create(this);
+            runtime.getConfiguration = () => configuration;
+            let target: FunctionScriptEntity | undefined;
+            if (targetType !== 'global') {
+                const entity = targetType === 'actor' ? save.actors?.[targetId || '']
+                    : targetType === 'location' ? save.atlas?.[targetId || '']
+                        : save.inventory?.find(item => item.id === targetId);
+                if (!entity || entity.active === false) {
+                    throw new Error('Select an active test target.');
+                }
+                const fields = targetType === 'actor' ? ACTOR_SCRIPT_FIELDS : targetType === 'location' ? LOCATION_SCRIPT_FIELDS : ITEM_SCRIPT_FIELDS;
+                target = runtime.buildEntityScriptAccessor(entity, targetType, configuration[statsKey], fields);
+            }
+            const value = runtime.runFunctionStatScript(save, stat, target, undefined, 0, message => errors.push(message));
+            return { value, errors };
+        } catch (error) {
+            errors.push((error as Error)?.message || String(error));
+            return { value: undefined, errors };
+        }
     }
 
     // Invokes the function-typed stat targeted by a 'function' kind StatUpdate: runs its script once for the

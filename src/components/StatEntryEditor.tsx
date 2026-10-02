@@ -344,6 +344,11 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 script={normalizedStat.script || ''}
                                 onScriptChange={(script) => onPatch({ script })}
                                 scriptLabel={scriptLabel}
+                                onTest={(targetId) => stage().testFunctionStat(normalizedStat, category, targetId)}
+                                testTargets={category === 'global' ? undefined
+                                    : (category === 'actor' ? Object.values(stage().getSave().actors || {})
+                                        : category === 'location' ? Object.values(stage().getSave().atlas || {})
+                                            : stage().getSave().inventory || []).filter(entity => entity.active !== false)}
                             />
                         )}
 

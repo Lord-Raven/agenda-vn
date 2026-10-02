@@ -345,7 +345,9 @@ export type FunctionScriptBindings = {
 // Compiles and runs a function stat's script body with the given bindings. Scripts are plain JavaScript
 // (may `return` a value) and can only touch game state through the bound accessors - never through direct
 // object references - so every mutation still goes through the normal normalize/clamp pipeline.
-export const runFunctionScript = (script: string | undefined, bindings: FunctionScriptBindings): unknown => {
+export type FunctionScriptTestResult = { value: unknown; errors: string[] };
+
+export const runFunctionScript = (script: string | undefined, bindings: FunctionScriptBindings, onError?: (message: string) => void): unknown => {
     const body = `${script || ''}`.trim();
     if (!body) {
         return undefined;
@@ -359,7 +361,12 @@ export const runFunctionScript = (script: string | undefined, bindings: Function
             bindings.actors, bindings.locations, bindings.items, bindings.call,
         );
     } catch (error) {
-        console.error(`Function stat script error: ${(error as Error)?.message || error}`);
+        const message = `Function stat script error: ${(error as Error)?.message || error}`;
+        if (onError) {
+            onError(message);
+        } else {
+            console.error(message);
+        }
         return undefined;
     }
 };
