@@ -7,7 +7,7 @@ import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
 import { findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveFunctionScript, resolveStatValueRule, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
-import { Control, ControlPlacement, isControlAvailable } from "./content/Control";
+import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
@@ -516,11 +516,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats };
     }
 
-    // Resolves the active (available) controls for the given placement, in configured order, for rendering
+    // Resolves the active (available) controls for the given placement, in priority order, for rendering
     // on the map screen (see MapScreen/DefinedMapView and ControlBar).
     getVisibleControls(placement: ControlPlacement): Control[] {
         const context = this.getScheduleContext(this.getSave());
-        return (this.getConfiguration().controls || []).filter((control) => control.placement === placement && isControlAvailable(control, context));
+        return (this.getConfiguration().controls || [])
+            .filter((control) => control.placement === placement && isControlAvailable(control, context))
+            .sort(compareControlPriority);
     }
 
     // Applies a 'button' control's defined stat updates (its "function") and saves.

@@ -20,6 +20,7 @@ interface ControlDetailPanelProps {
 
 type ControlDraft = {
     name: string;
+    priority: number;
     placement: ControlPlacement;
     type: ControlType;
     label: string;
@@ -32,6 +33,7 @@ type ControlDraft = {
 
 const createDraft = (control: Control): ControlDraft => ({
     name: control.name,
+    priority: control.priority,
     placement: control.placement,
     type: control.type,
     label: control.label,
@@ -105,6 +107,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         const persistedControl = new Control({
             ...control,
             name: nextDraft.name,
+            priority: nextDraft.priority,
             placement: nextDraft.placement,
             type: nextDraft.type,
             label: nextDraft.label,
@@ -222,6 +225,29 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 onChange={(e) => setDraft((current) => ({ ...current, name: e.target.value }))}
                                 placeholder="Internal/admin label"
                             />
+                        </div>
+                        <div>
+                            <label htmlFor={`control-priority-${control.id}`} style={labelStyle}>Priority</label>
+                            <TextInput
+                                id={`control-priority-${control.id}`}
+                                fullWidth
+                                type="number"
+                                step="any"
+                                value={draft.priority}
+                                onChange={(e) => {
+                                    const priority = Number(e.target.value);
+                                    if (!Number.isFinite(priority)) {
+                                        e.target.setCustomValidity('Enter a finite priority number.');
+                                        e.target.reportValidity();
+                                        return;
+                                    }
+                                    e.target.setCustomValidity('');
+                                    setDraft((current) => ({ ...current, priority }));
+                                }}
+                            />
+                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                Lower numbers display first. Equal priorities keep configuration order.
+                            </span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                             <div>

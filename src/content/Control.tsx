@@ -18,10 +18,14 @@ export const isControlAvailable = (control: Control, context: ConditionContext):
     control.active !== false && evaluateConditionCollections(control.availabilityConditions, context)
 );
 
+export const compareControlPriority = (left: Control, right: Control): number =>
+    (left.priority ?? 0) - (right.priority ?? 0);
+
 export class Control {
     id: string = ''; // UUID
     active: boolean = true;
     name: string = ''; // Internal/admin label shown in ControlManagementPanel; not necessarily displayed in-game.
+    priority: number = 0; // Lower numbers display first; ties keep configuration order.
     placement: ControlPlacement = 'bottom';
     type: ControlType = 'button';
     availabilityConditions: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
@@ -41,6 +45,7 @@ export class Control {
             this.id = generateUuid();
         }
         this.active = this.active !== false;
+        this.priority = Number.isFinite(this.priority) ? this.priority : 0;
         this.placement = this.placement === 'top' ? 'top' : 'bottom';
         this.type = CONTROL_TYPES.includes(this.type) ? this.type : 'button';
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map((collection) => [...collection]) : [];

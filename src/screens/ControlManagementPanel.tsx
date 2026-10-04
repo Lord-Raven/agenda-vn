@@ -1,7 +1,7 @@
 import { FC, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Stage } from '../Stage';
-import { Control } from '../content/Control';
+import { compareControlPriority, Control } from '../content/Control';
 import { ControlDetailPanel } from './ControlDetailPanel';
 import {
     CategorizedEntrySection,
@@ -52,13 +52,10 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
         maxHeight: '100%',
     };
 
-    const sortByName = <T extends { name?: string }>(a: T, b: T) =>
-        (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), undefined, { sensitivity: 'base' });
-
     const controls = useMemo(() => {
         return (stage().getConfiguration().controls || [])
             .filter((control) => control.active !== false)
-            .sort(sortByName);
+            .sort(compareControlPriority);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [stage, controlRevision]);
 
@@ -128,7 +125,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
                     {control.name || '(Unnamed Control)'}
                 </div>
                 <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px' }}>
-                    {TYPE_LABELS[control.type]}
+                    {TYPE_LABELS[control.type]} · Priority {control.priority}
                 </div>
             </motion.button>
         );

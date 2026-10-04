@@ -70,7 +70,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
     };
 
     return (
-        <Box ref={rootRef} role="group" aria-label={label} sx={{ display: 'flex', alignItems: 'center', width: '100%', minWidth: 0 }}>
+        <Box ref={rootRef} role="group" aria-label={label} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', textAlign: 'left', width: '100%', minWidth: 0 }}>
             {navigation.overflow && (
                 <IconButton size="small" aria-label={`Previous ${label}`} disabled={!navigation.previous} onClick={() => scroll(-1)} sx={{ padding: 0, color: 'var(--agenda-text-primary)' }}>
                     <ChevronLeft />
@@ -81,7 +81,8 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                 onScroll={updateNavigation}
                 sx={{ flex: 1, minWidth: 0, overflowX: 'auto', scrollbarWidth: 'none', scrollSnapType: 'x proximity', '&::-webkit-scrollbar': { display: 'none' } }}
             >
-                <Box ref={trackRef} role="list" sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px', width: 'max-content' }}>
+                <Box ref={trackRef} role="list" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', padding: '4px', width: 'max-content' }}>
+                    {values.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>None</span>}
                     {values.map((id, index) => {
                         const actor = kind === 'actor' ? save.actors?.[id] : undefined;
                         const item = kind === 'item' ? save.inventory?.find((candidate) => candidate.id === id) : undefined;
@@ -117,7 +118,6 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                     <ChevronRight />
                 </IconButton>
             )}
-            {values.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>None</span>}
         </Box>
     );
 };
