@@ -26,6 +26,7 @@ interface ContentListPortraitsProps {
 }
 
 const PORTRAIT_SIZE = 36;
+const PORTRAIT_OVERLAP = 6;
 
 export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label }) => {
     const rootRef = useRef<HTMLDivElement>(null);
@@ -42,7 +43,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
             return;
         }
         setNavigation({
-            overflow: track.scrollWidth > root.clientWidth,
+            overflow: track.offsetWidth > root.clientWidth,
             previous: viewport.scrollLeft > 1,
             next: viewport.scrollLeft + viewport.clientWidth < viewport.scrollWidth - 1,
         });
@@ -63,11 +64,15 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
         const viewport = viewportRef.current;
         if (viewport) {
             viewport.scrollBy({
-                left: direction * Math.max(PORTRAIT_SIZE + 8, viewport.clientWidth - PORTRAIT_SIZE),
+                left: direction * Math.max(PORTRAIT_SIZE - PORTRAIT_OVERLAP, viewport.clientWidth - PORTRAIT_SIZE),
                 behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
             });
         }
     };
+
+    const edgeMask = navigation.overflow
+        ? `linear-gradient(to right, ${navigation.previous ? 'transparent' : 'black'}, black 12px, black calc(100% - 12px), ${navigation.next ? 'transparent' : 'black'})`
+        : 'none';
 
     return (
         <Box ref={rootRef} role="group" aria-label={label} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', textAlign: 'left', width: '100%', minWidth: 0 }}>
@@ -79,9 +84,19 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
             <Box
                 ref={viewportRef}
                 onScroll={updateNavigation}
-                sx={{ flex: 1, minWidth: 0, overflowX: 'auto', scrollbarWidth: 'none', scrollSnapType: 'x proximity', '&::-webkit-scrollbar': { display: 'none' } }}
+                sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    overflowX: 'auto',
+                    scrollbarWidth: 'none',
+                    scrollSnapType: 'x proximity',
+                    maskImage: edgeMask,
+                    WebkitMaskImage: edgeMask,
+                    '&::-webkit-scrollbar': { display: 'none' },
+                }}
             >
-                <Box ref={trackRef} role="list" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', padding: '4px', width: 'max-content' }}>
+                {/* A horizontal scroll container also clips vertically, so reserve room for scaled portraits and shadows. */}
+                <Box ref={trackRef} role="list" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '16px 8px', width: 'max-content', overflow: 'visible' }}>
                     {values.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>None</span>}
                     {values.map((id, index) => {
                         const actor = kind === 'actor' ? save.actors?.[id] : undefined;
@@ -97,9 +112,12 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                                     aria-label={name}
                                     sx={{
                                         flexShrink: 0,
+                                        marginLeft: index > 0 ? `-${PORTRAIT_OVERLAP}px` : 0,
+                                        position: 'relative',
+                                        overflow: 'visible',
                                         scrollSnapAlign: 'start',
                                         borderRadius: '50%',
-                                        '&:hover, &:focus-visible': { transform: 'scale(1.1)', outline: '2px solid var(--agenda-highlight)', outlineOffset: 1 },
+                                        '&:hover, &:focus-visible': { zIndex: 1, transform: 'scale(1.1)', outline: '2px solid var(--agenda-highlight)', outlineOffset: 1 },
                                         '@media (prefers-reduced-motion: no-preference)': { transition: 'transform 0.15s ease-out' },
                                     }}
                                 >
