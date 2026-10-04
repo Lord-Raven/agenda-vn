@@ -2,9 +2,9 @@ import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Add, Delete } from '@mui/icons-material';
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
-import { Control, ControlPlacement, ControlType } from '../content/Control';
+import { ContentListDisplay, Control, ControlPlacement, ControlType } from '../content/Control';
 import { ConditionCollection, CONTENT_TYPES, ContentType } from '../content/Condition';
-import { isFunctionStatType, Stat, StatUpdate, StatValue } from '../content/Stat';
+import { isFunctionStatType, isReferenceListDisplayType, Stat, StatUpdate, StatValue } from '../content/Stat';
 import { Button, GlassPanel, TextInput, Title } from '../components/UiComponents';
 import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -25,6 +25,7 @@ type ControlDraft = {
     label: string;
     iconName: string;
     statId: string;
+    contentListDisplay: ContentListDisplay;
     availabilityConditions: ConditionCollection[];
     actions: StatUpdate[];
 };
@@ -36,6 +37,7 @@ const createDraft = (control: Control): ControlDraft => ({
     label: control.label,
     iconName: control.iconName,
     statId: control.statId,
+    contentListDisplay: control.contentListDisplay ?? 'carousel',
     availabilityConditions: (control.availabilityConditions || []).map((collection) => [...collection]),
     actions: (control.actions || []).map((update) => ({ ...update })),
 });
@@ -108,6 +110,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             label: nextDraft.label,
             iconName: nextDraft.iconName,
             statId: nextDraft.statId,
+            contentListDisplay: nextDraft.contentListDisplay,
             availabilityConditions: nextDraft.availabilityConditions.map((collection) => [...collection]),
             actions: nextDraft.actions.map((update) => ({ ...update })),
         });
@@ -384,6 +387,20 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 {updatableGlobalStats.map((stat) => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
                             </select>
                         </div>
+                        {isReferenceListDisplayType(globalStats.find((stat) => stat.id === draft.statId)?.type ?? 'text') && (
+                            <div style={{ marginTop: 15 }}>
+                                <label style={labelStyle} htmlFor={`content-list-display-${control.id}`}>Content List Display</label>
+                                <select
+                                    id={`content-list-display-${control.id}`}
+                                    style={selectStyle}
+                                    value={draft.contentListDisplay}
+                                    onChange={(e) => setDraft((current) => ({ ...current, contentListDisplay: e.target.value as ContentListDisplay }))}
+                                >
+                                    <option value="carousel">Portrait Carousel (default)</option>
+                                    <option value="abbreviated">Abbreviated</option>
+                                </select>
+                            </div>
+                        )}
                     </section>
                 )}
             </div>

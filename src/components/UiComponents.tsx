@@ -545,6 +545,8 @@ interface LocationMultiSelectProps {
 	title?: string;
 	style?: React.CSSProperties;
 	className?: string;
+	renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
+	disabled?: boolean;
 }
 
 export const LocationMultiSelect: FC<LocationMultiSelectProps> = ({
@@ -555,6 +557,8 @@ export const LocationMultiSelect: FC<LocationMultiSelectProps> = ({
 	emptyLabel = 'No locations',
 	title = 'Choose locations',
 	style,
+	renderButton,
+	disabled,
 }) => {
 	const sortedLocations = [...locations].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 	// Keep dangling ids (e.g. a deleted location) selectable so saving does not silently drop them.
@@ -586,6 +590,8 @@ export const LocationMultiSelect: FC<LocationMultiSelectProps> = ({
 				emptyLabel={emptyLabel}
 				title={title}
 				placeholder="Search locations"
+				renderButton={renderButton}
+				disabled={disabled}
 			/>
 		</div>
 	);
@@ -647,6 +653,8 @@ interface ActorMultiSelectProps {
 	emptyLabel?: string;
 	title?: string;
 	style?: React.CSSProperties;
+	renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
+	disabled?: boolean;
 }
 
 export const ActorMultiSelect: FC<ActorMultiSelectProps> = ({
@@ -657,6 +665,8 @@ export const ActorMultiSelect: FC<ActorMultiSelectProps> = ({
 	emptyLabel = 'No actors',
 	title = 'Choose actors',
 	style,
+	renderButton,
+	disabled,
 }) => {
 	const sortedActors = [...actors].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 	const missingIds = values.filter((id) => id && !sortedActors.some((actor) => actor.id === id));
@@ -678,6 +688,8 @@ export const ActorMultiSelect: FC<ActorMultiSelectProps> = ({
 				emptyLabel={emptyLabel}
 				title={title}
 				placeholder="Search actors"
+				renderButton={renderButton}
+				disabled={disabled}
 			/>
 		</div>
 	);
@@ -739,6 +751,8 @@ interface ItemMultiSelectProps {
 	emptyLabel?: string;
 	title?: string;
 	style?: React.CSSProperties;
+	renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
+	disabled?: boolean;
 }
 
 export const ItemMultiSelect: FC<ItemMultiSelectProps> = ({
@@ -749,6 +763,8 @@ export const ItemMultiSelect: FC<ItemMultiSelectProps> = ({
 	emptyLabel = 'No items',
 	title = 'Choose items',
 	style,
+	renderButton,
+	disabled,
 }) => {
 	const sortedItems = [...items].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 	const missingIds = values.filter((id) => id && !sortedItems.some((item) => item.id === id));
@@ -770,6 +786,8 @@ export const ItemMultiSelect: FC<ItemMultiSelectProps> = ({
 				emptyLabel={emptyLabel}
 				title={title}
 				placeholder="Search items"
+				renderButton={renderButton}
+				disabled={disabled}
 			/>
 		</div>
 	);
@@ -808,17 +826,19 @@ interface ReferenceMultiSelectProps {
 	locations?: LocationLike[];
 	stage?: Stage | (() => Stage);
 	style?: React.CSSProperties;
+	renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
+	disabled?: boolean;
 }
 
 // MultiSelect counterpart to ReferenceSelect (see resolveReferenceListDisplayType-style list stats).
-export const ReferenceMultiSelect: FC<ReferenceMultiSelectProps> = ({ kind, values, onChange, actors = [], items = [], locations = [], stage, style }) => {
+export const ReferenceMultiSelect: FC<ReferenceMultiSelectProps> = ({ kind, values, onChange, actors = [], items = [], locations = [], stage, style, renderButton, disabled }) => {
 	if (kind === 'actor') {
-		return <ActorMultiSelect values={values} onChange={onChange} actors={actors} stage={stage} style={style} />;
+		return <ActorMultiSelect values={values} onChange={onChange} actors={actors} stage={stage} style={style} renderButton={renderButton} disabled={disabled} />;
 	}
 	if (kind === 'item') {
-		return <ItemMultiSelect values={values} onChange={onChange} items={items} stage={stage} style={style} />;
+		return <ItemMultiSelect values={values} onChange={onChange} items={items} stage={stage} style={style} renderButton={renderButton} disabled={disabled} />;
 	}
-	return <LocationMultiSelect values={values} onChange={onChange} locations={locations} stage={stage} style={style} />;
+	return <LocationMultiSelect values={values} onChange={onChange} locations={locations} stage={stage} style={style} renderButton={renderButton} disabled={disabled} />;
 };
 
 interface ColorPickerInputProps {

@@ -27,6 +27,7 @@ export interface SearchableOptionPickerProps {
     emptyLabel?: string;
     title?: string;
     renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
+    disabled?: boolean;
 }
 
 export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
@@ -42,6 +43,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     emptyLabel = 'None',
     title = 'Choose option',
     renderButton,
+    disabled = false,
 }) => {
     const [search, setSearch] = useState(initialSearch);
     const [isOpen, setIsOpen] = useState(false);
@@ -293,6 +295,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         <>
             <button
                 type="button"
+                disabled={disabled}
                 onClick={() => {
                     setSearch(initialSearch);
                     setIsOpen(true);
@@ -309,7 +312,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                     borderRadius: '8px',
                     background: 'var(--agenda-surface-raised)',
                     color: 'var(--agenda-text-primary)',
-                    cursor: 'pointer',
+                    cursor: disabled ? 'default' : 'pointer',
                     padding: '6px 10px',
                     overflow: 'hidden',
                 }}

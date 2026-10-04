@@ -2,11 +2,12 @@ import { FC } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Stage } from '../Stage';
 import { Control } from '../content/Control';
-import { findStatOptionByValue, formatStatOptionValueText, normalizeStatValue, resolveStatText, Stat } from '../content/Stat';
+import { findStatOptionByValue, formatStatOptionValueText, isReferenceListDisplayType, normalizeReferenceListValue, normalizeStatValue, resolveReferenceKind, resolveStatText, Stat } from '../content/Stat';
 import { resolveIcon } from './StatRating';
 import { StatValueDisplay } from './StatDisplay';
 import { StatValueInput } from './StatValueInput';
 import { Button } from './UiComponents';
+import { ContentListControl } from './ContentListControl';
 
 interface ControlRendererProps {
     control: Control;
@@ -83,6 +84,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     const tooltipText = [resolveStatText(stat.description, stageInstance).trim(), selectedOptionDescription]
         .filter(Boolean)
         .join('\n\n');
+    const referenceKind = resolveReferenceKind(stat.type);
 
     return (
         <Box title={tooltipText || undefined} sx={boxStyle}>
@@ -93,7 +95,19 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                 </Typography>
             </Box>
 
-            {control.type === 'statEditor' ? (
+            {referenceKind && isReferenceListDisplayType(stat.type) ? (
+                <ContentListControl
+                    kind={referenceKind}
+                    values={normalizeReferenceListValue(normalizedValue)}
+                    stage={stageInstance}
+                    display={control.contentListDisplay}
+                    label={statName}
+                    onChange={control.type === 'statEditor' ? (nextValue) => {
+                        stageInstance.setGlobalStatValue(stat.id, nextValue);
+                        onActivate();
+                    } : undefined}
+                />
+            ) : control.type === 'statEditor' ? (
                 <StatValueInput
                     stat={stat}
                     value={normalizedValue}

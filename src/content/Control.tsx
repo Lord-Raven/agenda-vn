@@ -10,6 +10,7 @@ export type ControlPlacement = 'top' | 'bottom';
 // value (the same rendering the Global Stat Bar used to do directly from stat.exposed). 'statEditor' lets the
 // player change a global stat's value in place (e.g. picking an option from a dropdown).
 export type ControlType = 'button' | 'statDisplay' | 'statEditor';
+export type ContentListDisplay = 'carousel' | 'abbreviated';
 
 export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor'];
 
@@ -32,6 +33,7 @@ export class Control {
 
     // Only meaningful when type is 'statDisplay' or 'statEditor': the global stat this control shows/edits.
     statId: string = '';
+    contentListDisplay: ContentListDisplay = 'carousel';
 
     constructor(props: any) {
         Object.assign(this, props);
@@ -46,5 +48,6 @@ export class Control {
         this.iconName = `${this.iconName || ''}`;
         this.actions = Array.isArray(this.actions) ? this.actions.map(cloneStatUpdate) : [];
         this.statId = `${this.statId || ''}`;
+        this.contentListDisplay = this.contentListDisplay === 'abbreviated' ? 'abbreviated' : 'carousel';
     }
 }
