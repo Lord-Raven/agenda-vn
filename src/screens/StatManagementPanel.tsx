@@ -8,9 +8,11 @@ import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
 import { StatEntryEditor } from '../components/StatEntryEditor';
 import { Add } from '@mui/icons-material';
+import { GlobalStatManagementPanel } from './GlobalStatManagementPanel';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
+    isCreatorMode: boolean;
 }
 
 const defaultGlobalStat = (): Stat => ({
@@ -69,7 +71,13 @@ const clampStatValue = (value: number, stat: Stat): number => {
     return resolved;
 };
 
-export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage }) => {
+export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage, isCreatorMode }) => (
+    isCreatorMode
+        ? <CreatorStatManagementPanel stage={stage} />
+        : <GlobalStatManagementPanel stage={stage} />
+);
+
+const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const configuration = stageInstance.getConfiguration();

@@ -22,7 +22,7 @@ interface ContentManagementScreenProps {
 type TabType = 'game' | 'style' | 'stats' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
 const tabStorageKey = 'contentManagement.activeTab';
 const tabs: TabType[] = ['game', 'style', 'stats', 'controls', 'lorebook', 'actors', 'locations', 'items', 'maps', 'calendarEvents'];
-const creatorTabs: TabType[] = ['game', 'style', 'stats', 'controls'];
+const creatorTabs: TabType[] = ['game', 'style', 'controls'];
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
@@ -193,23 +193,21 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                         Style
                                     </Button>
                                 )}
-                                {isCreatorMode && (
-                                    <Button
-                                        onClick={() => setActiveTab('stats')}
-                                        variant={activeTab === 'stats' ? 'primary' : 'secondary'}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            flex: '0 0 auto',
-                                            gap: '8px',
-                                            opacity: activeTab === 'stats' ? 1 : 0.6,
-                                            whiteSpace: 'nowrap',
-                                        }}
-                                    >
-                                        <BarChart />
-                                        Stats
-                                    </Button>
-                                )}
+                                <Button
+                                    onClick={() => setActiveTab('stats')}
+                                    variant={activeTab === 'stats' ? 'primary' : 'secondary'}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        flex: '0 0 auto',
+                                        gap: '8px',
+                                        opacity: activeTab === 'stats' ? 1 : 0.6,
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    <BarChart />
+                                    Stats
+                                </Button>
                                 {isCreatorMode && (
                                     <Button
                                         onClick={() => setActiveTab('controls')}
@@ -358,7 +356,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
 
                                 {/* Stats Tab */}
                                 {activeTab === 'stats' && (
-                                    <StatManagementPanel stage={stage} />
+                                    <StatManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 
                                 {/* Controls Tab */}
