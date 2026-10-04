@@ -95,8 +95,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
     const [globalStats] = useState<Stat[]>(() => resolveActiveGlobalStats(stageInstance));
     const [globalStatValues, setGlobalStatValues] = useState<{ [key: string]: StatValue }>(() => {
-        const saveGlobalStatValues = stageInstance.getSave()?.globalStatValues || {};
-        return buildGlobalStatValues(resolveActiveGlobalStats(stageInstance), saveGlobalStatValues as { [key: string]: StatValue });
+        const preferredValues = isNewGame ? {} : stageInstance.getSave()?.globalStatValues || {};
+        return buildGlobalStatValues(globalStats, preferredValues);
     });
 
     const [languageSuggestions, setLanguageSuggestions] = useState<string[]>([]);
@@ -132,7 +132,10 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     const handleSave = async () => {
         console.log('Saving settings:', settings);
         const playerThemeColor = resolvePlayerThemeColor(settings.playerColor);
-        const resolvedGlobalStatValues = buildGlobalStatValues(globalStats, globalStatValues);
+        const resolvedGlobalStatValues = buildGlobalStatValues(
+            isNewGame ? globalStats.filter(stat => stat.setByPlayer) : globalStats,
+            globalStatValues,
+        );
         console.log("Resolved Global Stat Values:");
         console.log(resolvedGlobalStatValues);
         

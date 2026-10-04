@@ -1,3 +1,3 @@
 This is customizable VN stage for chub.ai.
 
-This file is fore essential stage details only.
+Do not update this file with feature note changes.

@@ -4,7 +4,7 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveFunctionScript, resolveStatValueRule, resolveStatText, setOptionListSourceResolver } from './content/Stat';
+import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveFunctionScript, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
@@ -781,28 +781,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             this.expandRecurringEvent(this.normalizeCalendarEventForSave(cloneCalendarEvent(event), draftSaveContext)),
         );
 
-        // Resolve each global stat's starting value from its defaultValueRules (first match wins), falling
-        // back to the configured value/default; used to seed a brand new save.
-        const configuredGlobalStats = (configuration.globalStats || []).filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
-        const globalStatValues: { [key: string]: StatValue } = {};
-        const globalStatContext: ConditionContext = {
+        const globalStatValues = buildInitialGlobalStatValues(configuration.globalStats || [], selectedGlobalStatValues, {
             actors: Object.values(actors),
             atlas,
             inventory,
-            globalStats: configuration.globalStats,
             actorStats: configuration.actorStats,
             locationStats: configuration.locationStats,
             itemStats: configuration.itemStats,
-            globalStatValues,
-        };
-        configuredGlobalStats.forEach((stat) => {
-            const ruleValue = resolveStatValueRule(stat.defaultValueRules, stat, globalStatContext);
-            const selectedValue = selectedGlobalStatValues[stat.id];
-            globalStatValues[stat.id] = selectedValue !== undefined
-                ? normalizeStatValue(selectedValue, stat)
-                : ruleValue !== undefined
-                ? ruleValue
-                : normalizeStatValue(configuration.globalStatValues?.[stat.id], stat);
         });
 
         return {playerId: this.primaryUser.anonymizedId,
@@ -832,8 +817,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         console.log(`Using slot ${saveSlotIndex}`);
 
         // Create new save data structure
-        const newSave: SaveType = this.generateFreshSave(playerData, playerData.data.globalStatValues);
-        Object.assign(newSave, playerData.data);
+        const { globalStatValues: selectedGlobalStatValues, ...saveSettings } = playerData.data;
+        const newSave: SaveType = this.generateFreshSave(playerData, selectedGlobalStatValues);
+        Object.assign(newSave, saveSettings);
 
         const persistedConfiguration = this.getConfiguration();
 

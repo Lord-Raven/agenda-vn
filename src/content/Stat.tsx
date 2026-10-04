@@ -383,7 +383,7 @@ export type Stat = {
     // host actor's own perActorValueRules nor an explicit override provide a value. Evaluated in order.
     perActorDefaultRules?: StatValueRule[];
     // For global stats: rules used to resolve this stat's initial value when a new game starts, evaluated in
-    // order (first matching wins); falls back to `default` if none match. See applyGlobalStatDefaults.
+    // order (first matching wins); falls back to `default` if none match. See buildInitialGlobalStatValues.
     defaultValueRules?: StatValueRule[];
     // Only meaningful when type is 'function': the JavaScript body run on invocation (see runFunctionScript).
     // Entities that own this stat (e.g. an Item) may override this default per-instance; see resolveFunctionScript.
@@ -624,6 +624,22 @@ export const resolvePerActorValueRule = (
 // Generic alias for resolvePerActorValueRule; used wherever an ordered StatValueRule list needs to be
 // resolved but there is no per-actor target involved (e.g. a global stat's defaultValueRules at game start).
 export const resolveStatValueRule = resolvePerActorValueRule;
+
+export const buildInitialGlobalStatValues = (
+    stats: Stat[],
+    selectedValues: Record<string, StatValue> = {},
+    context: ConditionContext = {},
+): Record<string, StatValue> => {
+    const values: Record<string, StatValue> = {};
+    const initialContext = { ...context, globalStats: stats, globalStatValues: values };
+    stats.filter(stat => stat?.id && stat.name?.trim() && !isFunctionStatType(stat.type)).forEach(stat => {
+        const selectedValue = selectedValues[stat.id];
+        values[stat.id] = selectedValue !== undefined
+            ? normalizeStatValue(selectedValue, stat)
+            : resolveStatValueRule(stat.defaultValueRules, stat, initialContext) ?? normalizeStatValue(undefined, stat);
+    });
+    return values;
+};
 
 export type StatUpdateTargetType = 'global' | ContentType;
 // For optionList stats, 'adjust' adds the given options to the active list and 'remove' removes them.
