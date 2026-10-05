@@ -5,6 +5,7 @@ import { Stage } from '../Stage';
 import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
+import { Stat, StatValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, normalizeStatValue, resolveReferenceKind } from './Stat';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -83,11 +84,67 @@ export const selectConstantLoreEntries = (lorebook: Lore[] = [], context: Condit
         .filter((entry) => isLoreProbabilityActive(entry));
 };
 
-export const formatLoreEntriesAsContext = (entries: Lore[] = []): string => {
+// Duck-typed so this module doesn't need to import the Actor class.
+export type LoreTextActor = { name: string; displayName?: string; statMap?: { [statId: string]: StatValue } };
+
+// {{user}}, {{char}}, {{global:Stat}}, {{user:Stat}}, {{char:Stat}}; stats match by id or (case-insensitive) name.
+const LORE_TAG_PATTERN = /\{\{\s*(user|char|global)\s*(?::\s*([^}]*?)\s*)?\}\}/gi;
+
+const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined => {
+    const lowerKey = key.toLowerCase();
+    return (stats || []).find((stat) => stat.id === key || (stat.name || '').trim().toLowerCase() === lowerKey);
+};
+
+// Resolves template tags in lore text for LLM/display use. Unresolvable tags (unknown stat, no target actor,
+// perActor/function stats) are left untouched. Don't use on text that will be written back to the lore entry.
+export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor): string {
+    const save = stage.getSave();
+    const configuration = stage.getConfiguration();
+    const player = stage.getPlayerActor();
+    const lookup = { actors: save.actors, items: save.inventory, locations: save.atlas };
+
+    const formatValue = (stat: Stat, rawValue: unknown): string => {
+        const value = normalizeStatValue(rawValue, stat);
+        if (stat.type === 'checkbox') {
+            return value === true ? 'yes' : 'no';
+        }
+        if (resolveReferenceKind(stat.type)) {
+            return formatReferenceStatText(stat, value, lookup, (kind) => `unknown ${kind}`);
+        }
+        return formatStatOptionValueText(stat, value) ?? String(value ?? '');
+    };
+
+    return String(text || '').replace(LORE_TAG_PATTERN, (match, tag: string, statKey: string | undefined) => {
+        const tagName = tag.toLowerCase();
+        if (tagName === 'global') {
+            const stat = statKey ? findStatByKey(configuration.globalStats, statKey) : undefined;
+            if (!stat || isFunctionStatType(stat.type)) {
+                return match;
+            }
+            return formatValue(stat, save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id]);
+        }
+
+        const actor: LoreTextActor | undefined = tagName === 'user' ? player : targetActor;
+        if (!statKey) {
+            if (tagName === 'user') {
+                return player?.name || 'the player';
+            }
+            return actor ? (actor.displayName || actor.name) : match;
+        }
+
+        const stat = findStatByKey(configuration.actorStats, statKey);
+        if (!actor || !stat || stat.perActor || isFunctionStatType(stat.type)) {
+            return match;
+        }
+        return formatValue(stat, actor.statMap?.[stat.id]);
+    });
+}
+
+export const formatLoreEntriesAsContext = (entries: Lore[], stage: Stage): string => {
     return entries
         .map((entry) => {
             const title = (entry.title || '').trim() || 'Lore';
-            const content = String(entry.content || '').trim();
+            const content = processLoreText(entry.content, stage).trim();
             if (!content) {
                 return '';
             }

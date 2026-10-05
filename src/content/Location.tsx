@@ -2,7 +2,7 @@ import { v4 as generateUuid } from 'uuid';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { Stage } from '../Stage';
 import { findBestNameMatch } from './Actor';
-import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
+import { createLoreEntry, formatLoreEntriesAsContext, processLoreText, selectConstantLoreEntries } from './Lore';
 import { buildPrompt } from '../utils/PromptBuilder.js';
 import {
 	buildStructuredExampleResponse,
@@ -433,7 +433,7 @@ export async function distillLocation(location: Location, definition: any, stage
 
 	const save = stage.getSave();
 	const configuration = stage.getConfiguration();
-	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats })) || 'None provided.';
+	const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats }), stage) || 'None provided.';
 
 	const locationDetails = [
 		`Name: ${String(definition?.name || location.name || '').trim()}`,
@@ -480,7 +480,7 @@ export async function distillLocation(location: Location, definition: any, stage
 		const oldName = location.name;
 		const nextName = (parsedData['name'] || location.name || '').trim() || location.name;
 		const nextCategory = (parsedData['category'] || location.category || '').trim();
-		const nextDescription = (parsedData['description'] || getLocationDescription(location.id, stage, isCreatorMode) || location.description || '').trim();
+		const nextDescription = (parsedData['description'] || getRawLocationDescription(location.id, stage, isCreatorMode) || location.description || '').trim();
 		const nextThemeColor = /^#([0-9A-F]{6}|[0-9A-F]{8})$/i.test(parsedData['theme_color'] || '')
 			? parsedData['theme_color']
 			: location.themeColor;
@@ -544,13 +544,22 @@ export function getLocationName(locationId: string, stage: Stage): string {
 	return location?.name.replace('{{user}}', stage.getPlayerActor().name) || 'Unknown Location';
 }
 
-export function getLocationDescription(locationId: string, stage: Stage, isCreatorMode: boolean = false): string {
+// Unprocessed description (tags intact), for editing or writing back.
+export function getRawLocationDescription(locationId: string, stage: Stage, isCreatorMode: boolean = false): string | undefined {
 	const locations = isCreatorMode ? stage.getConfiguration().locations || [] : Object.values(stage.getSave().atlas || {});
 	const location = locations.find((candidate) => candidate.id === locationId);
 	if (!location) {
+		return undefined;
+	}
+
+	return getLinkedLocationLore(location, stage, isCreatorMode)?.content ?? location.description;
+}
+
+export function getLocationDescription(locationId: string, stage: Stage, isCreatorMode: boolean = false): string {
+	const description = getRawLocationDescription(locationId, stage, isCreatorMode);
+	if (description === undefined) {
 		return 'Unknown Description';
 	}
 
-	const lore = getLinkedLocationLore(location, stage, isCreatorMode);
-	return (lore?.content ?? location.description).replace('{{user}}', stage.getPlayerActor().name) || 'Unknown Description';
+	return processLoreText(description, stage) || 'Unknown Description';
 }

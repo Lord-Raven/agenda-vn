@@ -3,7 +3,7 @@ import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emoti
 import { Stage } from '../Stage';
 import { Stat, StatValue, StatValueRule, cloneStatValueRules, formatReferenceStatText, isNumericDisplayType, isStatLlmSeen, normalizeLocationListValue, normalizeStatValue, resolveReferenceKind, resolveStatDefault, resolvePerActorValueRule, resolveStatText } from './Stat';
 import { AspectRatio } from '@chub-ai/stages-ts';
-import { createLoreEntry, formatLoreEntriesAsContext, selectConstantLoreEntries } from './Lore';
+import { createLoreEntry, formatLoreEntriesAsContext, processLoreText, selectConstantLoreEntries } from './Lore';
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
 import {
     buildStructuredExampleResponse,
@@ -468,7 +468,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
-    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats })) || 'None provided.';
+    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats }), stage) || 'None provided.';
     const otherActorsContext = Object.values(stage.getSave().actors || {})
         .filter(otherActor => otherActor?.id && otherActor.id !== actor.id && otherActor.active !== false && otherActor !== stage.getPlayerActor())
         .map(otherActor => {
@@ -905,9 +905,9 @@ export function getActorLore(actorId: string, stage: Stage) {
             currentActor: actor,
             actorStatValues: { [actor.id]: actor.statMap || {} },
         }))
-        .map((entry) => `Additional Instruction: ${entry.title}\n${entry.content}`.replace(/\{\{char\}\}/gi, actor.displayName || actor.name))
+        .map((entry) => processLoreText(`Additional Instruction: ${entry.title}\n${entry.content}`, stage, actor))
         .join('\n\n');
-	return [lore?.content ?? '', variableLoreText].filter(Boolean).join('\n\n');
+	return [processLoreText(lore?.content, stage, actor), variableLoreText].filter(Boolean).join('\n\n');
 }
 
 export function updateActorProfile(actorId: string, profile: string, stage: Stage) {

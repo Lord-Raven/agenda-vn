@@ -5,7 +5,7 @@ import { Stage } from "../Stage";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, buildActorContext, findBestNameMatch, getActorLore, resolveActorSchedule } from "./Actor";
 import { getLocationDescription, getLocationName } from "./Location";
 import { formatTimeSlot } from "./CalendarEvent";
-import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES } from "./Lore";
+import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES, processLoreText } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
 import {
     buildStructuredExampleResponse,
@@ -237,7 +237,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         .filter((lore) => !hasVariableContentTarget(lore.conditionCollections))
         .filter((lore) => evaluateConditionCollections(lore.conditionCollections, conditionContext))
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
-    const agendaContext = formatLoreEntriesAsContext(activeConstantLore);
+    const agendaContext = formatLoreEntriesAsContext(activeConstantLore, stage);
 
     // Exposed settings are conscious choices player's made; present them as settings.
     const playerSettingContext = (agendaConfig?.globalStats || []).map((stat) => {
@@ -352,7 +352,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         .addBlock(`Lore Entries`, (builder) => {
             // Add each lore entry as a separate block, with the title and content.
             triggeredLore.forEach(lore => {
-                builder.addBlock(`${lore.type}_${lore.title}`, lore.content);
+                builder.addBlock(`${lore.type}_${lore.title}`, processLoreText(lore.content, stage));
             });
         }).addBlock(`Recent Events`, (builder) => {
             pastEvents.forEach((event, index) => {
