@@ -599,6 +599,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
                 <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginBottom: '8px' }}>
                     Generates a creator-notes layout from active actors and location images, using hover tooltips for character backgrounds.
+                    {' '}Cast portraits grow for smaller casts, from 128px for 30 or more characters up to 256px for a single character.
+                    {' '}Tooltips wrap at 360px and reposition at display edges in browsers that support CSS anchor positioning.
                 </div>
 
                 <div style={{ marginBottom: '12px' }}>
