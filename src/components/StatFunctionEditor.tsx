@@ -1,4 +1,4 @@
-import { FC, useRef, useState } from 'react';
+import { FC, useState } from 'react';
 import { Box, IconButton, Popover, Tooltip, Typography } from '@mui/material';
 import { PlayArrow } from '@mui/icons-material';
 import { Button, TextArea } from './UiComponents';
@@ -37,31 +37,14 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
     scriptLabel = 'Script',
     onTest, testTargets,
 }) => {
-    const [helpOpen, setHelpOpen] = useState(false);
     const [helpAnchor, setHelpAnchor] = useState<HTMLElement | null>(null);
-    const containerRef = useRef<HTMLDivElement | null>(null);
     const [selectedTargetId, setSelectedTargetId] = useState('');
     const targetId = testTargets?.find(candidate => candidate.id === selectedTargetId)?.id || testTargets?.[0]?.id;
     const [testRun, setTestRun] = useState<{ script: string; targetId?: string; result: FunctionScriptTestResult } | null>(null);
     const testResult = testRun?.script === script && testRun.targetId === targetId ? testRun.result : undefined;
 
-    const closeHelpIfFocusLeft = (nextTarget: EventTarget | null) => {
-        if (!containerRef.current || !nextTarget) {
-            setHelpOpen(false);
-            return;
-        }
-        const nextNode = nextTarget instanceof Node ? nextTarget : null;
-        if (!nextNode || !containerRef.current.contains(nextNode)) {
-            setHelpOpen(false);
-        }
-    };
-
     return (
-        <div
-            ref={containerRef}
-            style={{ display: 'grid', gap: 8 }}
-            onBlur={(event) => closeHelpIfFocusLeft(event.relatedTarget)}
-        >
+        <div style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <label style={fieldLabelStyle}>{scriptLabel}</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%' }}>
@@ -95,15 +78,8 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
                 <IconButton
                     size="small"
                     aria-label="Function script reference"
-                    onClick={(event) => {
-                        if (helpOpen) {
-                            setHelpOpen(false);
-                            return;
-                        }
-                        setHelpAnchor(event.currentTarget);
-                        setHelpOpen(true);
-                    }}
-                    onBlur={(event) => closeHelpIfFocusLeft(event.relatedTarget)}
+                    aria-expanded={Boolean(helpAnchor)}
+                    onClick={(event) => setHelpAnchor(event.currentTarget)}
                     style={{
                         width: 20,
                         height: 20,
@@ -119,15 +95,12 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
                 </div>
             </div>
             <Popover
-                open={helpOpen}
+                open={Boolean(helpAnchor)}
                 anchorEl={helpAnchor}
-                onClose={() => setHelpOpen(false)}
+                onClose={() => setHelpAnchor(null)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                slotProps={{ paper: { style: { maxWidth: 420, padding: 12, backgroundColor: 'var(--agenda-panel-bg)', opacity: 1, color: 'var(--agenda-text-primary)', border: '1px solid color-mix(in srgb, var(--agenda-text-muted) 35%, transparent)' } } }}
-                disableAutoFocus
-                disableEnforceFocus
-                keepMounted
+                slotProps={{ paper: { style: { maxWidth: 420, padding: 12, backgroundColor: 'var(--agenda-surface-base)', color: 'var(--agenda-text-primary)', border: '1px solid color-mix(in srgb, var(--agenda-text-muted) 35%, transparent)' } } }}
             >
                 <Box style={{ display: 'grid', gap: 8 }}>
                     <Typography variant="subtitle2" style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>Function script reference</Typography>
@@ -165,7 +138,6 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
                 value={script}
                 onChange={(event) => onScriptChange(event.target.value)}
                 rows={16}
-                onBlur={(event) => closeHelpIfFocusLeft(event.relatedTarget)}
                 placeholder={[
                     'set(\'Gold\', get(\'Gold\') + 10);',
                     '// Read list objects without changing get()\'s ID values:',

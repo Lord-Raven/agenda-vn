@@ -313,7 +313,7 @@ export type StatValueRule = {
 // An entity a function script's `target` (or a `getActor`/`getLocation`/`getItem`/`actors`/`locations`/`items`
 // lookup) resolves to: its own stats can be read/written by name via `get`/`set`, scoped to whichever stat
 // definitions (`kind`) apply. `getField`/`setField` read/write a small allowlist of simple metadata fields
-// directly, bypassing the Stat system.
+// directly, bypassing the Stat system. `getObjects` resolves list IDs into these accessors or option copies.
 export type FunctionScriptEntity = {
     id: string;
     name: string;
@@ -332,7 +332,8 @@ export type FunctionScriptObject = FunctionScriptEntity | StatOption;
 // (e.g. the actor a StatUpdate targeted, or an Item's own stats); `getActor`/`getLocation`/`getItem` look up
 // any other named entity's stats; `actors`/`locations`/`items` list every active (non-deleted) entity of that
 // kind for looping; `call` invokes another function stat by name (global, or - if a target/explicit entity is
-// given - one scoped to that entity's kind), returning its return value.
+// given - one scoped to that entity's kind), returning its return value. `getObjects` resolves global list
+// stats into entity accessors or option copies without changing the IDs returned by `get`.
 export type FunctionScriptBindings = {
     get: (statName: string) => StatValue | undefined;
     getObjects: (statName: string) => FunctionScriptObject[];
