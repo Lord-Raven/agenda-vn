@@ -138,6 +138,16 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
                         <strong>getItem(name)</strong> to resolve another entity by name.
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
+                        <strong>get(name)</strong> still returns IDs for lists. Use <strong>getObjects(name)</strong> or
+                        <strong> target.getObjects(name)</strong> (also available on other entity accessors) to resolve
+                        an option list or actor/item/location list in its stored order. Content entries expose
+                        <strong> id</strong>, <strong>name</strong>, <strong>kind</strong>, and the same
+                        <strong> get/set/getField/setField</strong> methods as other entity accessors.
+                        Options expose <strong>id</strong>, <strong>name</strong>, and <strong>description</strong>
+                        {' '}as copies; editing them does not change the option definition.
+                        Missing or inactive content is omitted. Unknown or non-list stats raise a script error.
+                    </Typography>
+                    <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         You can also loop every active entity with <strong>actors()</strong>, <strong>locations()</strong>,
                         and <strong>items()</strong>. For simple metadata, use <strong>getField(name)</strong> and
                         <strong>setField(name, value)</strong> on actors/locations/items (for example: name, role,
@@ -158,6 +168,12 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
                 onBlur={(event) => closeHelpIfFocusLeft(event.relatedTarget)}
                 placeholder={[
                     'set(\'Gold\', get(\'Gold\') + 10);',
+                    '// Read list objects without changing get()\'s ID values:',
+                    'getObjects(\'Party\').forEach(actor => {',
+                    '    actor.set(\'Affinity\', actor.get(\'Affinity\') + 1);',
+                    '    const role = actor.getField(\'role\');',
+                    '});',
+                    'const descriptions = getObjects(\'Choices\').map(option => option.description);',
                     'if (target) {',
                     '    target.set(\'Affinity\', target.get(\'Affinity\') + 1);',
                     '}',

@@ -4,7 +4,7 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveFunctionScript, resolveStatText, setOptionListSourceResolver } from './content/Stat';
+import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, isListStatType, resolveStatOptionPool, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveFunctionScript, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
@@ -1616,13 +1616,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // Builds the get/set accessors a function script uses to read/write a global stat by name.
-    private buildGlobalScriptAccessors(save: SaveType): Pick<FunctionScriptBindings, 'get' | 'set'> {
+    private buildGlobalScriptAccessors(save: SaveType): Pick<FunctionScriptBindings, 'get' | 'getObjects' | 'set'> {
         const stats = this.getConfiguration().globalStats || [];
         const findStat = (name: string) => stats.find(candidate => candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
         return {
             get: (name: string) => {
                 const stat = findStat(name);
                 return stat ? normalizeStatValue(save.globalStatValues?.[stat.id], stat) : undefined;
+            },
+            getObjects: (name: string) => {
+                const stat = findStat(name);
+                return this.resolveScriptStatObjects(save, stat, stat ? save.globalStatValues?.[stat.id] : undefined, name);
             },
             set: (name: string, value: StatValue) => {
                 const stat = findStat(name);
@@ -1635,10 +1639,37 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
     }
 
+    private resolveScriptStatObjects(save: SaveType, stat: Stat | undefined, value: StatValue | undefined, name: string): FunctionScriptObject[] {
+        if (!stat || !isListStatType(stat.type)) {
+            throw new Error(`getObjects("${name}") requires an option list or content list stat.`);
+        }
+        const ids = normalizeStatValue(value, stat) as string[];
+        if (stat.type === 'optionList') {
+            const options = resolveStatOptionPool(stat);
+            return ids.flatMap(id => {
+                const option = options.find(candidate => candidate.id === id);
+                return option ? [{ ...option }] : [];
+            });
+        }
+        const kind = resolveReferenceKind(stat.type)!;
+        const configuration = this.getConfiguration();
+        const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
+        const fields = kind === 'actor' ? ACTOR_SCRIPT_FIELDS : kind === 'location' ? LOCATION_SCRIPT_FIELDS : ITEM_SCRIPT_FIELDS;
+        return ids.flatMap(id => {
+            const entity = kind === 'actor' ? save.actors?.[id]
+                : kind === 'location' ? save.atlas?.[id]
+                    : save.inventory?.find(item => item.id === id);
+            return entity && entity.active !== false
+                ? [this.buildEntityScriptAccessor(save, entity, kind, stats || [], fields)]
+                : [];
+        });
+    }
+
     // Wraps a live entity (actor/location/item) and its configured stat definitions into a FunctionScriptEntity
     // whose get/set accessors read/write the entity's own statMap by stat name. When `fieldAllowlist` is given
     // (actor/location only), also exposes getField/setField for that allowlist of simple metadata fields.
     private buildEntityScriptAccessor(
+        save: SaveType,
         entity: { id: string; name: string; statMap: { [key: string]: StatValue } },
         kind: FunctionScriptEntity['kind'],
         stats: Stat[],
@@ -1654,6 +1685,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             get: (statName: string) => {
                 const stat = findStat(statName);
                 return stat ? normalizeStatValue(statMap[stat.id], stat) : undefined;
+            },
+            getObjects: (statName: string) => {
+                const stat = findStat(statName);
+                return this.resolveScriptStatObjects(save, stat, stat ? statMap[stat.id] : undefined, statName);
             },
             set: (statName: string, value: StatValue) => {
                 const stat = findStat(statName);
@@ -1681,17 +1716,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private findActorScriptEntity(save: SaveType, name: string): FunctionScriptEntity | undefined {
         const actor = Object.values(save.actors || {}).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return actor ? this.buildEntityScriptAccessor(actor, 'actor', this.getConfiguration().actorStats || [], ACTOR_SCRIPT_FIELDS) : undefined;
+        return actor ? this.buildEntityScriptAccessor(save, actor, 'actor', this.getConfiguration().actorStats || [], ACTOR_SCRIPT_FIELDS) : undefined;
     }
 
     private findLocationScriptEntity(save: SaveType, name: string): FunctionScriptEntity | undefined {
         const location = Object.values(save.atlas || {}).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return location ? this.buildEntityScriptAccessor(location, 'location', this.getConfiguration().locationStats || [], LOCATION_SCRIPT_FIELDS) : undefined;
+        return location ? this.buildEntityScriptAccessor(save, location, 'location', this.getConfiguration().locationStats || [], LOCATION_SCRIPT_FIELDS) : undefined;
     }
 
     private findItemScriptEntity(save: SaveType, name: string): FunctionScriptEntity | undefined {
         const item = (save.inventory || []).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return item ? this.buildEntityScriptAccessor(item, 'item', this.getConfiguration().itemStats || [], ITEM_SCRIPT_FIELDS) : undefined;
+        return item ? this.buildEntityScriptAccessor(save, item, 'item', this.getConfiguration().itemStats || [], ITEM_SCRIPT_FIELDS) : undefined;
     }
 
     // Every active (non-deleted) actor/location/item, wrapped as FunctionScriptEntity, for scripts that need to
@@ -1700,21 +1735,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const actorStats = this.getConfiguration().actorStats || [];
         return Object.values(save.actors || {})
             .filter(actor => actor.active !== false)
-            .map(actor => this.buildEntityScriptAccessor(actor, 'actor', actorStats, ACTOR_SCRIPT_FIELDS));
+            .map(actor => this.buildEntityScriptAccessor(save, actor, 'actor', actorStats, ACTOR_SCRIPT_FIELDS));
     }
 
     private buildLocationScriptEntities(save: SaveType): FunctionScriptEntity[] {
         const locationStats = this.getConfiguration().locationStats || [];
         return Object.values(save.atlas || {})
             .filter(location => location.active !== false)
-            .map(location => this.buildEntityScriptAccessor(location, 'location', locationStats, LOCATION_SCRIPT_FIELDS));
+            .map(location => this.buildEntityScriptAccessor(save, location, 'location', locationStats, LOCATION_SCRIPT_FIELDS));
     }
 
     private buildItemScriptEntities(save: SaveType): FunctionScriptEntity[] {
         const itemStats = this.getConfiguration().itemStats || [];
         return (save.inventory || [])
             .filter(item => item.active !== false)
-            .map(item => this.buildEntityScriptAccessor(item, 'item', itemStats, ITEM_SCRIPT_FIELDS));
+            .map(item => this.buildEntityScriptAccessor(save, item, 'item', itemStats, ITEM_SCRIPT_FIELDS));
     }
 
     // Builds the full binding set a function stat's script executes with; `call` looks up another function
@@ -1780,7 +1815,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     throw new Error('Select an active test target.');
                 }
                 const fields = targetType === 'actor' ? ACTOR_SCRIPT_FIELDS : targetType === 'location' ? LOCATION_SCRIPT_FIELDS : ITEM_SCRIPT_FIELDS;
-                target = runtime.buildEntityScriptAccessor(entity, targetType, configuration[statsKey], fields);
+                target = runtime.buildEntityScriptAccessor(save, entity, targetType, configuration[statsKey], fields);
             }
             const value = runtime.runFunctionStatScript(save, stat, target, undefined, 0, message => errors.push(message));
             return { value, errors };
@@ -1811,7 +1846,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         if (update.targetType === 'location') {
             this.resolveUpdateTargetLocations(save, update.targetId).forEach(location => {
-                const target = this.buildEntityScriptAccessor(location, 'location', stats, LOCATION_SCRIPT_FIELDS);
+                const target = this.buildEntityScriptAccessor(save, location, 'location', stats, LOCATION_SCRIPT_FIELDS);
                 this.runFunctionStatScript(save, stat, target, undefined, depth);
             });
             return;
@@ -1819,14 +1854,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         if (update.targetType === 'item') {
             this.resolveUpdateTargetItems(save, update.targetId).forEach(item => {
-                const target = this.buildEntityScriptAccessor(item, 'item', stats, ITEM_SCRIPT_FIELDS);
+                const target = this.buildEntityScriptAccessor(save, item, 'item', stats, ITEM_SCRIPT_FIELDS);
                 this.runFunctionStatScript(save, stat, target, resolveFunctionScript(stat, item.functionScriptOverrides), depth);
             });
             return;
         }
 
         this.resolveUpdateTargetActors(save, update.targetId, context).forEach(actor => {
-            const target = this.buildEntityScriptAccessor(actor, 'actor', stats, ACTOR_SCRIPT_FIELDS);
+            const target = this.buildEntityScriptAccessor(save, actor, 'actor', stats, ACTOR_SCRIPT_FIELDS);
             this.runFunctionStatScript(save, stat, target, undefined, depth);
         });
     }

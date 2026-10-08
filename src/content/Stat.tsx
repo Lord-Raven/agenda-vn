@@ -319,10 +319,13 @@ export type FunctionScriptEntity = {
     name: string;
     kind: ContentType;
     get: (statName: string) => StatValue | undefined;
+    getObjects: (statName: string) => FunctionScriptObject[];
     set: (statName: string, value: StatValue) => void;
     getField?: (fieldName: string) => string | undefined;
     setField?: (fieldName: string, value: string) => void;
 };
+
+export type FunctionScriptObject = FunctionScriptEntity | StatOption;
 
 // The bindings a function stat's script body executes with (via `new Function`, see runFunctionScript):
 // `get`/`set` read/write global stats by name; `target` (when bound) is the entity this invocation concerns
@@ -332,6 +335,7 @@ export type FunctionScriptEntity = {
 // given - one scoped to that entity's kind), returning its return value.
 export type FunctionScriptBindings = {
     get: (statName: string) => StatValue | undefined;
+    getObjects: (statName: string) => FunctionScriptObject[];
     set: (statName: string, value: StatValue) => void;
     target?: FunctionScriptEntity;
     getActor: (name: string) => FunctionScriptEntity | undefined;
@@ -355,11 +359,11 @@ export const runFunctionScript = (script: string | undefined, bindings: Function
     }
     try {
         const scriptFunction = new Function(
-            'get', 'set', 'target', 'getActor', 'getLocation', 'getItem', 'actors', 'locations', 'items', 'call', body,
+            'get', 'set', 'target', 'getActor', 'getLocation', 'getItem', 'actors', 'locations', 'items', 'call', 'getObjects', body,
         );
         return scriptFunction(
             bindings.get, bindings.set, bindings.target, bindings.getActor, bindings.getLocation, bindings.getItem,
-            bindings.actors, bindings.locations, bindings.items, bindings.call,
+            bindings.actors, bindings.locations, bindings.items, bindings.call, bindings.getObjects,
         );
     } catch (error) {
         const message = `Function stat script error: ${(error as Error)?.message || error}`;
