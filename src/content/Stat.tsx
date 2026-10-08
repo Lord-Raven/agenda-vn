@@ -315,6 +315,7 @@ export type StatValueRule = {
 // definitions (`kind`) apply. `getField`/`setField` read/write a small allowlist of simple metadata fields
 // directly, bypassing the Stat system.
 export type FunctionScriptEntity = {
+    id: string;
     name: string;
     kind: ContentType;
     get: (statName: string) => StatValue | undefined;

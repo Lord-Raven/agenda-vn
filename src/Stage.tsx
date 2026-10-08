@@ -1639,7 +1639,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // whose get/set accessors read/write the entity's own statMap by stat name. When `fieldAllowlist` is given
     // (actor/location only), also exposes getField/setField for that allowlist of simple metadata fields.
     private buildEntityScriptAccessor(
-        entity: { name: string; statMap: { [key: string]: StatValue } },
+        entity: { id: string; name: string; statMap: { [key: string]: StatValue } },
         kind: FunctionScriptEntity['kind'],
         stats: Stat[],
         fieldAllowlist?: string[],
@@ -1648,6 +1648,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const entityFields = entity as unknown as Record<string, unknown>;
         const findStat = (statName: string) => stats.find(candidate => candidate.name.trim().toLowerCase() === `${statName || ''}`.trim().toLowerCase());
         const accessor: FunctionScriptEntity = {
+            id: entity.id,
             name: entity.name,
             kind,
             get: (statName: string) => {
