@@ -29,12 +29,12 @@ export enum Emotion {
 export const EMOTION_SYNONYMS: {[key in Emotion]: string[]} = {
     neutral: ['calm', 'placid', 'serene', 'tranquil', 'stoic', 'neutrality', 'composed', 'composure', 'unemotional', 'impassive', 'impassivity', 'detached', 'detachment',
         'indifferent', 'indifference', 'apathy', 'dispassionate', 'dispassion', 'unaffected', 'unaffectedness', 'resignation', 'resigned'],
-    approval: ['content', 'amusement', 'pleased', 'appreciative', 'appreciation', 'satisfaction', 'satisfied', 'enjoyment', 'enjoying', 'content', 
+    approval: ['content', 'amusement', 'amused', 'pleased', 'appreciative', 'appreciation', 'satisfaction', 'satisfied', 'enjoyment', 'enjoying', 'content', 
         'contentedness', 'contentment', 'cheerfulness', 'cheerful'],
     anger: ['angry', 'furious', 'fury', 'enraged', 'livid', 'wrath', 'wrathful', 'frustration', 'ire', 'rage'],
     confusion: ['confused', 'puzzled', 'baffled', 'stunned', 'confounded', 'perplexed', 'bewilderment', 'perplexity'],
     desire: ['seductive', 'sexy', 'desirous', 'longing', 'lust', 'yearning', 'passion', 'passionate'],
-    disappointment: ['annoyed', 'disapproval', 'dismayed', 'suspicious', 'suspicion', 'distrust', 'resentment', 'defensiveness', 'mockery', 'mocking', 'skepticism', 'disbelief'],
+    disappointment: ['annoyed', 'disapproval', 'dismayed', 'suspicious', 'suspicion', 'distrust', 'resentment', 'defensiveness', 'mockery', 'mocking', 'skepticism', 'skeptical', 'disbelief'],
     disgust: ['disgusted', 'grossed_out', 'sickened', 'grossed out', 'sick', 'revulsion', 'disdain', 'contempt', 'rivulsion'],
     embarrassment: ['embarrassed', 'shame', 'ashamed', 'sheepish', 'chagrin', 'mortification', 'abashment', 'selfconsciousness', 'self-consciousness', 'shy', 'shyness', 
         'bashfulness', 'bashful', 'flustered', 'fluster', 'awkwardness', 'awkward', 'discomfiture', 'discomfited', 'discomfort'],
@@ -46,7 +46,7 @@ export const EMOTION_SYNONYMS: {[key in Emotion]: string[]} = {
     injury: ['injured', 'wounded', 'hurt', 'pain', 'pained', 'injury', 'wound', 'harmed', 'bruised', 'shaken'],
     intrigue: ['intrigued', 'curious', 'curiosity', 'interest', 'absorbed', 'absorbing', 'engrossed', 'engrossing', 'mischief', 'mischievous', 'mischievousness'],
     joy: ['happy', 'happiness', 'joyfulness', 'thrilled', 'delighted', 'elated', 'jubilant', 'elation', 'humor', 'playfulness', 'playful', 'fun', 'delight', 'enthusiasm', 'pleasure',
-        'cheer', 'cheery', 'jovial', 'joviality', 'wry humor', 'wry', 'humor', 'humorous', 'glee', 'gleeful'],
+        'cheer', 'cheery', 'jovial', 'joviality', 'wry humor', 'wry', 'humor', 'humorous', 'glee', 'gleeful', 'giddy'],
     kindness: ['grateful', 'caring', 'thankful', 'sweet', 'affectionate', 'tenderness', 'care', 'fondness', 'warmth', 'trust', 'compassion', 'compassionate', 'encouragement', 'encouraging'],
     love: ['lovestruck', 'adoration', 'adoring', 'devotion', 'devoted', 'infatuated', 'infatuation', 'romantic', 'romance', 'affection', 'affectionate'],
     nervousness: ['anxious', 'uncertain', 'jittery', 'uneasy', 'unease', 'worry', 'worrying', 'vulnerability', 'vulnerable', 'hesitance', 'anxiety', 'caution', 'apprehension'],
@@ -54,7 +54,7 @@ export const EMOTION_SYNONYMS: {[key in Emotion]: string[]} = {
         'egotistical', 'smug', 'smugness', 'determination', 'determined', 'collected', 'cool', 'composed', 'composure', 'focus'],
     sadness: ['sad', 'upset', 'distress', 'sorrow', 'unhappiness', 'melancholy', 'gloom', 'dejection'],
     wonder: ['excited', 'optimistic', 'surprised', 'surprise', 'realization', 'excitement', 'relief', 'hope', 'fascinated', 'fascination', 'awe', 'awe-struck',
-        'amazement', 'amazed', 'inspired', 'inspiration', 'anticipation', 'admiration', 'reverence'],
+        'amazement', 'amazed', 'inspired', 'inspiration', 'anticipation', 'admiration', 'reverence', 'eager', 'eagerness'],
 }
 
 // Mapping from synonym to Emotion, built from EMOTION_SYNONYMS

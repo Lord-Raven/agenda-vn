@@ -457,7 +457,6 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
 
     let retry = 0;
     while (retry < 3) {
-
         const prompt =
             buildPrompt()
                 .addBlock(`Instructions`,
@@ -502,6 +501,15 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                             `Lore update tags flag existing lore entries that should be revised based on events in this entry. Include concise, specific guidance for the later lore revision. ` +
                             `Use the exact lore entry title in <Entry>: <LoreUpdate><Entry>Lore Entry Name</Entry><Guidance>Specific revision guidance based on this entry's events.</Guidance></LoreUpdate>`
                         );
+                    if (save.enableFontEffects !== false) {
+                        tagsBuilder.addBlock('Text Style Tags',
+                            `Use these square-bracket style tags sparingly inside <Message> text when they suit the moment. A style tag changes the presentation of the following text; use [] to reset to the default style. ` +
+                            `These are presentation tags, not game-mechanic/XML tags: keep them exactly in the message text using the form [styleName]Text to be styled[], and do not move them into metadata or remove them. ` +
+                            `Only use these supported styles: ` +
+                            `arcane (mystical shimmer), burn (smoldering flicker), flutter (light movement), glitch (digital distortion), hologram (glowing scanlines), ` +
+                            `quake (shaking), shine (radiant glow), shout (bold and loud), sigh (soft fading), spooky (wavy movement), tears (watery and soft), ` +
+                            `whisper (small, italicized, muted), and zalgo (archaic, corrupted effect).`)
+                    }
                     if (stage.areEventsEnabled()) {
                         tagsBuilder.addBlock('New Event Tags',
                             `Use a NewEvent tag when this entry specifies or implies a future calendar event. Include the event name, date, location (ID or name), required characters (IDs or names), user-facing description, secret guidance, whether it is mandatory, and optional finite recurrence. Mandatory events enforced at their start time by the game, so this flag should be used only for events that are essential to the plot or mechanics of the game. ` +
@@ -1164,4 +1172,3 @@ export function accumulateOutcomes(scriptEntries: ScriptEntry[], stage: Stage): 
 
     return order.map((key) => accumulator.get(key)).filter((outcome): outcome is Outcome => !!outcome);
 }
-
