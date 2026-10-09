@@ -369,15 +369,13 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             `${location?.id ? getLocationName(location.id, stage) : 'Unknown Location'}:\n  ${getLocationDescription(location?.id || '', stage) || 'No description available.'}`
         ).addBlock(`Current Date`,
             formatCurrentDate(save.currentDate, save.currentTimeOfDay)
-        ).addBlock(`Player Profile`,
-            `${playerName}:\n  ${stage.getPlayerActor().profile}`
-        ).addBlock(`Characters Present`, (builder) => {
+        ).addBlock(`Player`, (builder) => {
+            builder.addBlock(`Name`, playerName);
+            builder.addBlock(`Profile`, stage.getPlayerActor().profile);
+        }).addBlock(`Characters Present`, (builder) => {
             if (skit) {
                 currentActors.forEach(actor => {
-                    builder.addBlock(
-                        `${actor.name}`,
-                        buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id)).format(),
-                    );
+                    builder.addBlock(buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id)).format());
                 })
             }
         });
@@ -463,19 +461,16 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
         const prompt =
             buildPrompt()
                 .addBlock(`Instructions`,
-                    `${skit.script.length == 0 ? 'Produce the initial moments of a scene (perhaps joined in medias res)' : 'Extend or conclude the current scene script'} with three to five entries, ` +
-                    `based upon the Premise and the specified Scene Prompt. ` +
-                    `The script should tacitly consider characters motives, relationships, and past events. ` +
+                    `${skit.script.length == 0 ? 'Use the Scene Prompt to produce the initial moments of a scene (perhaps joined in medias res)' : 'Extend or conclude the current scene script'} with three to five formatted and tagged entries. ` +
+                    `The script should tacitly consider characters motives, relationships, stats, lore, and past events. ` +
                     `\n\nFollow the structure of the strict Example Script formatting; ` +
                     `actions are depicted in prose and character dialogue in quotation marks. ` +
-                    `Characters present their own actions and dialogue, while other events within the scene are attributed to NARRATOR. ` +
-                    `Although a script format is employed, the actual content should be professionally edited narrative prose. ` +
+                    `Characters present their own actions and dialogue, while other events within the scene are attributed to Narrator. ` +
                     (save.enableImpersonation ?
                         `Entries from the player, ${playerName}, are written in first-person, while other entries consistently refer to ${playerName} in second-person; all other characters are referred to in third-person, even in their own entries.` :
                         `New entries refer to the player, ${playerName}, in second-person; all other characters are referred to in third-person, even in their own entries.`) +
-                    `This scene is a brief visual novel skit within a video game; as such, the scene avoids major developments or concrete details which would fundamentally alter or subvert the mechanics of the game. ` +
-                    (skit.script.length == 0 ? 'As this is the initial, establishing moment of a new scene, evaluate the current outfit and alternative outfits of each character and use Outfit tags to update the characters to the most appropriate outfit for the moment. Begin the scene with appropriate tags at the "System:" prompt.' : 'Continue the scene at the "System:" prompt.') +
-                    `Generally, focus upon interpersonal dynamics, character growth, and discovery or trials within this strange world.` +
+                    `This scene is a visual novel skit within a video game; as such, the scene avoids major developments or concrete details which would fundamentally alter or subvert the mechanics of the game. ` +
+                    (skit.script.length == 0 ? 'As this is the initial, establishing moment of a new scene, evaluate the current outfit and alternative outfits of each character and use <OutfitChange> tags to update the characters to the most appropriate outfit for the moment. Begin the scene with appropriate tags at the "System:" prompt.' : 'Continue the scene at the "System:" prompt.') +
                     ((save.language || 'English').toLowerCase() !== 'english' ? `\n\nNote: The game is now being played in ${save.language}. Regardless of historic language use, generate this skit content in ${save.language} accordingly. Special tags (emotion, outfit, movement, etc.) continue to use English (these are invisible to the user).` : '')
                 )
                 .addBlock('Script Format',
@@ -519,13 +514,13 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 .addBlock('Context',
                     generateContext(skit, stage, 7 - retry * 2))
                 .addBlock('Example Script',
-                    `<Entry><Speaker>NARRATOR</Speaker><Message>The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.</Message></Entry>\n` +
-                    `<Entry><Speaker>CYANEA</Speaker><Message>"I can't believe we're finally here. It's been a long journey."</Message></Entry>\n` +
-                    `<Entry><Speaker>PERSEPHONE</Speaker><Message>"Yes, but the real challenge is just beginning. We must stay vigilant." Persephone gently chides Cyanea.</Message></Entry>\n` +
-                    `<Entry><Speaker>CYANEA</Speaker><Expression><Actor>Cyanea</Actor><Mood>Determination</Mood></Expression><Message>Cyanea frowns uncharacteristically with determination, "Of course." She nods with almost comical sobriety.</Message></Entry>\n` +
-                    `<Entry><Speaker>PERSEPHONE</Speaker><StatChange><Actor>Cyanea</Actor><Stat>Resolve</Stat><Amount>+1</Amount></StatChange><Message>"Good. That's the spirit we'll need." Persephone offers a rare, approving smile.</Message></Entry>\n` +
-                    (save.enableImpersonation ? `<Entry><Speaker>${playerName.toUpperCase()}</Speaker><Message>I smile warmly at the two women, "I agree. We need to be careful and work together."</Message></Entry>\n` : '') +
-                    `<Entry><Speaker>RED HOOD</Speaker><Movement><Actor>Red Hood</Actor><Location>Here</Location></Movement><Message>A crimson-clad figure approaches with supplies."</Message></Entry>\n`
+                    `System:\n<Entry>\n  <Speaker>\n    Narrator\n  </Speaker>\n  <Message>\n    The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.\n  </Message>\n</Entry>\n` +
+                    `<Entry>\n  <Speaker>\n    CYANEA\n  </Speaker>\n  <Message>\n    "I can't believe we're finally here. It's been a long journey."\n  </Message>\n</Entry>\n` +
+                    `<Entry>\n  <Speaker>\n    PERSEPHONE\n  </Speaker>\n  <Message>\n    "Yes, but the real challenge is just beginning. We must stay vigilant." Persephone gently chides Cyanea.\n  </Message>\n</Entry>\n` +
+                    `<Entry>\n  <Speaker>\n    CYANEA\n  </Speaker>\n  <Expression><Actor>Cyanea</Actor><Mood>Determination</Mood></Expression>\n  <Message>\n    Cyanea frowns uncharacteristically with determination, "Of course." She nods with almost comical sobriety.\n  </Message>\n</Entry>\n` +
+                    `<Entry>\n  <Speaker>\n    PERSEPHONE\n  </Speaker>\n  <StatChange>\n    <Actor>\n      Cyanea\n    </Actor>\n    <Stat>\n      Resolve\n    </Stat>\n    <Amount>+1</Amount>\n  </StatChange>\n  <Message>\n    "Good. That's the spirit we'll need." Persephone offers a rare, approving smile.\n  </Message>\n</Entry>\n` +
+                    (save.enableImpersonation ? `<Entry>\n  <Speaker>\n    ${playerName.toUpperCase()}\n  </Speaker>\n  <Message>\n    I smile warmly at the two women, "I agree. We need to be careful and work together."\n  </Message>\n</Entry>\n` : '') +
+                    `<Entry>\n  <Speaker>\n    RED HOOD\n  </Speaker>\n  <Movement>\n    <Actor>\n      Red Hood\n    </Actor>\n    <Location>Here</Location>\n  </Movement>\n  <Message>\n    A crimson-clad figure approaches with supplies.\n  </Message>\n</Entry>\n`
                 )
                 .format();
         console.log(prompt);
