@@ -15,7 +15,7 @@ import {
     StructuredFieldDefinition,
 } from "../utils/StructuredResponse.js";
 import { ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
-import { findStatOptionByValue, formatStatOptionValueText, isStatLlmMaintained, isStatLlmSeen, mapReferenceStatValue, normalizeStatValue, StatType, StatValue } from './Stat';
+import { findStatOptionByValue, formatStatOptionValueText, isStatLlmMaintained, isStatLlmSeen, mapReferenceStatValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatText, StatType, StatValue } from './Stat';
 import { build } from "vite";
 
 const getDayDifference = (startDate: string, endDate: string): number => {
@@ -42,6 +42,79 @@ const formatReferenceStatValue = (stat: { type: StatType }, value: unknown, stag
         return getLocationName(id, stage);
     })
 );
+
+const buildActorStatPromptContext = (stage: Stage, save: ReturnType<Stage['getSave']>): string => {
+    const configuration = stage.getConfiguration();
+    const actors = Object.values(save.actors || {}).filter(actor => actor?.id && actor.active !== false);
+    const baseContext = stage.getScheduleContext(save);
+    const statLines = (configuration.actorStats || [])
+        .filter(stat => stat?.id && stat.name?.trim())
+        .flatMap(stat => {
+            const visibleActors = actors.filter(actor => isStatLlmSeen(stat, {
+                ...baseContext,
+                currentActor: { id: actor.id, name: actor.name, statMap: actor.statMap },
+            }));
+            if (visibleActors.length === 0) {
+                return [];
+            }
+
+            const maintainedActors = visibleActors.filter(actor => isStatLlmMaintained(stat, {
+                ...baseContext,
+                currentActor: { id: actor.id, name: actor.name, statMap: actor.statMap },
+            }));
+            return [
+                `${stat.name} (visible for: ${visibleActors.map(actor => actor.name).join(', ')})`,
+                `Description: ${resolveStatText(stat.description, stage) || 'None provided.'}`,
+                `Guidance: ${resolveStatText(stat.guidance, stage) || 'None provided.'}`,
+                `StatChange: ${maintainedActors.length > 0
+                    ? `May be changed for ${maintainedActors.map(actor => actor.name).join(', ')}.`
+                    : 'Do not change; this stat is read-only for the LLM.'}`,
+            ].join('\n');
+        });
+
+    return statLines.length > 0
+        ? `Current values for present characters are included in their character context.\n\n${statLines.join('\n\n')}`
+        : '';
+};
+
+const buildGlobalStatPromptContext = (stage: Stage, save: ReturnType<Stage['getSave']>): string => {
+    const configuration = stage.getConfiguration();
+    const stats = configuration.globalStats || [];
+    const values = { ...(configuration.globalStatValues || {}), ...(save.globalStatValues || {}) };
+    const optionContext = { sourceStats: stats, globalStatValues: values };
+    const conditionContext = stage.getScheduleContext(save);
+    const statLines = stats
+        .filter(stat => stat?.id && stat.name?.trim() && isStatLlmSeen(stat, conditionContext))
+        .map(stat => {
+            const isFunction = stat.type === 'function';
+            const value = isFunction ? undefined : normalizeStatValue(values[stat.id], stat);
+            const optionValue = value === undefined ? undefined : formatStatOptionValueText(stat, value);
+            const referenceValue = value === undefined ? '' : formatReferenceStatValue(stat, value, stage);
+            const valueText = isFunction
+                ? 'Function stat (not directly changeable with StatChange)'
+                : optionValue || referenceValue || (typeof value === 'boolean' || typeof value === 'number' ? String(value) : String(value ?? 'None'));
+            const options = stat.type === 'option'
+                ? resolveAvailableStatOptions(stat, value, optionContext).map(option => option.name).filter(Boolean)
+                : [];
+
+            return [
+                `${stat.name} (${stat.setByPlayer ? 'player-controlled' : 'world stat'})`,
+                `Current value: ${valueText}`,
+                `Description: ${resolveStatText(stat.description, stage) || 'None provided.'}`,
+                `Guidance: ${resolveStatText(stat.guidance, stage) || 'None provided.'}`,
+                options.length > 0 ? `Valid options: ${options.join(', ')}` : '',
+                isFunction
+                    ? 'StatChange: Do not change this function stat directly.'
+                    : isStatLlmMaintained(stat, conditionContext)
+                        ? 'StatChange: May be changed when warranted by the scene.'
+                        : 'StatChange: Do not change; this stat is read-only for the LLM.',
+            ].filter(Boolean).join('\n');
+        });
+
+    return statLines.length > 0
+        ? statLines.join('\n\n')
+        : '';
+};
 
 // Date should be timezone agnostic here.
 export const formatDateLabel = (currentDate?: string): string => {
@@ -372,10 +445,10 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         ).addBlock(`Player`, (builder) => {
             builder.addBlock(`Name`, playerName);
             builder.addBlock(`Profile`, stage.getPlayerActor().profile);
-        }).addBlock(`Characters Present`, (builder) => {
+        }).addBlock(`Actors Present`, (builder) => {
             if (skit) {
                 currentActors.forEach(actor => {
-                    builder.addBlock(buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id)).format());
+                    builder.addBlock(actor.name, buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id)).format());
                 })
             }
         });
@@ -384,6 +457,8 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 export async function generateSkitScript(skit: Skit, stage: Stage): Promise<ScriptEntry[]> {
     const playerName = stage.getPlayerActor()?.name || 'J. Doe';
     const save = stage.getSave();
+    const actorStatContext = buildActorStatPromptContext(stage, save);
+    const globalStatContext = buildGlobalStatPromptContext(stage, save);
 
     if (!skit.guidance) {
         // Generate guidance and initial actors for this skit based on its type and the current context
@@ -416,6 +491,10 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
                     .addBlock('Additional Context',
                         generateContext(skit, stage, 5))
+                    .addBlock('Actor Stat Context',
+                        actorStatContext)
+                    .addBlock('Global Stat Context',
+                        globalStatContext)
                     .addBlock('Example Response',
                         buildStructuredExampleResponse(
                             SKIT_GUIDANCE_FIELDS,
@@ -517,7 +596,11 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         );
                     }
                     return tagsBuilder;
-                }).addBlock('Scene Prompt',
+                })
+                // Include all LLMSees Actor Stats here, with guidance. This gives the LLM information for how the stats impact Actor behavior and serves as a reference for StatChange tags.
+                .addBlock('Actor Stats', actorStatContext)
+                .addBlock('Global/Player Stats', globalStatContext)
+                .addBlock('Scene Prompt',
                     `Scene Prompt: ${skit.guidance}`)
                 .addBlock('Context',
                     generateContext(skit, stage, 7 - retry * 2))
