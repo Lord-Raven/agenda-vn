@@ -65,7 +65,7 @@ export const StatValueDisplay: FC<StatValueDisplayProps> = ({ stat, value, style
                 <Box
                     sx={{
                         flex: 1,
-                        height: 8,
+                        height: style?.fontSize ? '0.5em' : 8,
                         borderRadius: '999px',
                         background: 'color-mix(in srgb, var(--agenda-text-primary) 12%, transparent)',
                         overflow: 'hidden',
@@ -84,7 +84,7 @@ export const StatValueDisplay: FC<StatValueDisplayProps> = ({ stat, value, style
                     <Typography
                         sx={{
                             color: stat.displayColor || 'var(--agenda-text-primary)',
-                            fontSize: '0.75rem',
+                            fontSize: style?.fontSize ?? '0.75rem',
                             fontWeight: 700,
                             minWidth: '2.5em',
                             textAlign: 'right',

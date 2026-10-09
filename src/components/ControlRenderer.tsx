@@ -22,13 +22,15 @@ const boxStyle = {
     minWidth: 0,
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: 0.6,
-    padding: '8px 10px',
+    gap: 0.5,
+    padding: '6px 10px',
     borderRadius: '12px',
     border: '1px solid var(--agenda-panel-border)',
     background: 'color-mix(in srgb, var(--agenda-panel-surface) 88%, transparent)',
     boxShadow: 'inset 0 1px 0 color-mix(in srgb, var(--agenda-text-primary) 4%, transparent)',
 };
+
+const valueFontSize = 'clamp(1rem, 10cqi, 1.75rem)';
 
 const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]: { name: string } }): string => {
     const normalized = normalizeStatValue(value, stat);
@@ -95,6 +97,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                 </Typography>
             </Box>
 
+            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, minHeight: 32, containerType: 'inline-size' }}>
             {referenceKind && isReferenceListDisplayType(stat.type) ? (
                 <ContentListControl
                     kind={referenceKind}
@@ -121,13 +124,14 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                 <StatValueDisplay
                     stat={stat}
                     value={Number(normalizedValue)}
-                    style={{ minHeight: 20, ...(stat.displayType === 'rating' ? { justifyContent: 'flex-start' } : {}) }}
+                    style={{ minHeight: 20, ...(stat.displayType === 'rating' ? { justifyContent: 'flex-start' } : { fontSize: valueFontSize }) }}
                 />
             ) : (
-                <Typography sx={{ color: 'var(--agenda-text-primary)', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2, wordBreak: 'break-word' }}>
+                <Typography sx={{ color: 'var(--agenda-text-primary)', fontSize: valueFontSize, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
                     {resolveDisplayValue(stat, normalizedValue, stageInstance.getSave()?.atlas)}
                 </Typography>
             )}
+            </Box>
         </Box>
     );
 };

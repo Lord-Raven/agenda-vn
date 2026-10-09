@@ -25,8 +25,14 @@ interface ContentListPortraitsProps {
     label: string;
 }
 
-const PORTRAIT_SIZE = 36;
+const PORTRAIT_SIZE = 56;
 const PORTRAIT_OVERLAP = 6;
+const portraitStyle = {
+    width: 'clamp(36px, 28cqi, 56px)',
+    height: 'clamp(36px, 28cqi, 56px)',
+    boxSizing: 'border-box' as const,
+    fontSize: 'clamp(12px, 9cqi, 19px)',
+};
 
 export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label }) => {
     const rootRef = useRef<HTMLDivElement>(null);
@@ -64,7 +70,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
         const viewport = viewportRef.current;
         if (viewport) {
             viewport.scrollBy({
-                left: direction * Math.max(PORTRAIT_SIZE - PORTRAIT_OVERLAP, viewport.clientWidth - PORTRAIT_SIZE),
+                left: direction * Math.max((trackRef.current?.firstElementChild?.clientWidth ?? PORTRAIT_SIZE) - PORTRAIT_OVERLAP, viewport.clientWidth - PORTRAIT_SIZE),
                 behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
             });
         }
@@ -96,8 +102,8 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                 }}
             >
                 {/* A horizontal scroll container also clips vertically, so reserve room for scaled portraits and shadows. */}
-                <Box ref={trackRef} role="list" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '16px 8px', width: 'max-content', overflow: 'visible' }}>
-                    {values.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>None</span>}
+                <Box ref={trackRef} role="list" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '8px 6px', width: 'max-content', overflow: 'visible' }}>
+                    {values.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 'clamp(1rem, 10cqi, 1.75rem)' }}>None</span>}
                     {values.map((id, index) => {
                         const actor = kind === 'actor' ? save.actors?.[id] : undefined;
                         const item = kind === 'item' ? save.inventory?.find((candidate) => candidate.id === id) : undefined;
@@ -121,10 +127,10 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                                         '@media (prefers-reduced-motion: no-preference)': { transition: 'transform 0.15s ease-out' },
                                     }}
                                 >
-                                    {actor ? <ActorPortrait actor={actor} stage={stage} size={PORTRAIT_SIZE} title={name} />
-                                        : item ? <ItemPortrait item={item} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} borderRadius="50%" title={name} />
-                                            : location ? <LocationPortrait location={location} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} borderRadius="50%" title={name} />
-                                                : <Box sx={{ width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, display: 'grid', placeItems: 'center', borderRadius: '50%', border: '2px solid var(--agenda-line-strong)', color: 'var(--agenda-text-muted)' }}><FallbackIcon /></Box>}
+                                    {actor ? <ActorPortrait actor={actor} stage={stage} size={PORTRAIT_SIZE} style={portraitStyle} title={name} />
+                                        : item ? <ItemPortrait item={item} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} style={portraitStyle} borderRadius="50%" title={name} />
+                                            : location ? <LocationPortrait location={location} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} style={portraitStyle} borderRadius="50%" title={name} />
+                                                : <Box sx={{ ...portraitStyle, display: 'grid', placeItems: 'center', borderRadius: '50%', border: '2px solid var(--agenda-line-strong)', color: 'var(--agenda-text-muted)' }}><FallbackIcon sx={{ fontSize: '1.4em' }} /></Box>}
                                 </Box>
                             </Tooltip>
                         );
