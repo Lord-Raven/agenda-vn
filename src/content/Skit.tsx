@@ -275,21 +275,42 @@ export function getCurrentLocation(skit: Skit, upToEntryIndex: number): string {
     return currentLocation;
 }
 
-export function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage?: Stage): string {
-    return ((skit.script && skit.script.length > 0) || additionalEntries.length > 0) ?
-        [...skit.script, ...additionalEntries].map(e => {
-            const emotionText = Object.entries(e.actorEmotions || {}).map(([actorId, emotion]) => {
-                const actor = stage?.getSave().actors?.[actorId];
-                return actor ? `<Expression><Actor>${actor.name}</Actor><Mood>${emotion}</Mood></Expression>` : '';
-            }).join('');
-            const wearsText = Object.entries(e.actorOutfits || {}).map(([actorId, outfitId]) => {
-                const actor = stage?.getSave().actors?.[actorId];
+function buildScriptLogContext(builder: PromptBuilder, skit: Skit, additionalEntries: ScriptEntry[] = [], stage?: Stage): PromptBuilder | string {
+    const entries = [...(skit.script || []), ...additionalEntries];
+    if (entries.length === 0) {
+        return '(None so far)';
+    }
+
+    const actors = stage?.getSave().actors;
+    entries.forEach(entry => {
+        builder.addBlock('Entry', entryBuilder => {
+            entryBuilder.addBlock('Speaker', actors?.[entry.speakerId]?.name.toUpperCase() || entry.speakerId || 'NARRATOR');
+            Object.entries(entry.actorEmotions || {}).forEach(([actorId, emotion]) => {
+                const actor = actors?.[actorId];
+                if (actor) {
+                    entryBuilder.addBlock('Expression', expressionBuilder => expressionBuilder
+                        .addBlock('Actor', actor.name)
+                        .addBlock('Mood', emotion));
+                }
+            });
+            Object.entries(entry.actorOutfits || {}).forEach(([actorId, outfitId]) => {
+                const actor = actors?.[actorId];
                 const outfit = actor?.outfits.find(o => o.id === outfitId);
-                return actor && outfit ? `<OutfitChange><Actor>${actor.name}</Actor><Outfit>${outfit.name}</Outfit></OutfitChange>` : '';
-            }).join('');
-            return `<Entry><Speaker>${stage?.getSave().actors?.[e.speakerId]?.name.toUpperCase() || e.speakerId || 'NARRATOR'}</Speaker>${emotionText}${wearsText}<Message>${e.message}</Message></Entry>`;
-        }).join('\n')
-        : '(None so far)';
+                if (actor && outfit) {
+                    entryBuilder.addBlock('OutfitChange', outfitBuilder => outfitBuilder
+                        .addBlock('Actor', actor.name)
+                        .addBlock('Outfit', outfit.name));
+                }
+            });
+            entryBuilder.addBlock('Message', entry.message);
+        });
+    });
+    return builder;
+}
+
+export function buildScriptLog(skit: Skit, additionalEntries: ScriptEntry[] = [], stage?: Stage): string {
+    const log = buildScriptLogContext(buildPrompt('Script'), skit, additionalEntries, stage);
+    return typeof log === 'string' ? log : log.format();
 }
 
 export function generateContext(skit: Skit|undefined, stage: Stage, historyLength: number): ((b: PromptBuilder) => any) {
@@ -429,13 +450,20 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             });
         }).addBlock(`Recent Events`, (builder) => {
             pastEvents.forEach((event, index) => {
-                if (event.skit) {
-                    const locationName = event.skit.initialLocationId ? getLocationName(event.skit.initialLocationId, stage) : 'Unknown Location';
+                const eventSkit = event.skit;
+                if (eventSkit) {
+                    const locationName = eventSkit.initialLocationId ? getLocationName(eventSkit.initialLocationId, stage) : 'Unknown Location';
                     const daysAgo = event.date && save.currentDate
                         ? getDayDifference(event.date, save.currentDate)
                         : Math.max(1, index + 1);
-                    builder.addBlock(`Event_${index + 1}`, `Scene in ${locationName} (${daysAgo} days ago):\n` +
-                        (event.skit.summary ? `Summary: ${event.skit.summary}` : `Script:\n${buildScriptLog(event.skit, [], stage)}`));
+                    builder.addBlock(`Event_${index + 1}`, eventBuilder => {
+                        eventBuilder.addBlock('Description', `Scene in ${locationName} (${daysAgo} days ago)`);
+                        if (eventSkit.summary) {
+                            eventBuilder.addBlock('Summary', eventSkit.summary);
+                        } else {
+                            eventBuilder.addBlock('Script', scriptBuilder => buildScriptLogContext(scriptBuilder, eventSkit, [], stage));
+                        }
+                    });
                 }
             });
         }).addBlock(`Current Location`, 
@@ -448,7 +476,13 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         }).addBlock(`Actors Present`, (builder) => {
             if (skit) {
                 currentActors.forEach(actor => {
-                    builder.addBlock(actor.name, buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id)).format());
+                    builder.addBlock(actor.name, () => {
+                        const actorBuilder = buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id));
+                        if (actor.displayName && actor.displayName !== actor.name) {
+                            actorBuilder.addBlock('Display Name', actor.displayName);
+                        }
+                        return actorBuilder;
+                    });
                 })
             }
         });
