@@ -17,12 +17,14 @@ interface ControlManagementPanelProps {
 const PLACEMENT_LABELS: Record<Control['placement'], string> = {
     top: 'Top',
     bottom: 'Bottom',
+    actorCard: 'Actor Card',
 };
 
 const TYPE_LABELS: Record<Control['type'], string> = {
     button: 'Button',
     statDisplay: 'Stat Display',
     statEditor: 'Stat Editor',
+    actorStatDisplay: 'Actor Stat Display',
 };
 
 export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage }) => {
@@ -63,6 +65,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
         const sections: CategorizedEntrySection<Control>[] = [
             { id: 'top', title: PLACEMENT_LABELS.top, entries: controls.filter((control) => control.placement === 'top') },
             { id: 'bottom', title: PLACEMENT_LABELS.bottom, entries: controls.filter((control) => control.placement === 'bottom') },
+            { id: 'actorCard', title: PLACEMENT_LABELS.actorCard, entries: controls.filter((control) => control.placement === 'actorCard') },
         ];
         return sections;
     }, [controls]);
@@ -89,7 +92,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             active: true,
             name: candidateName,
             placement: sectionId === 'top' ? 'top' : 'bottom',
-            type: 'button',
+            type: sectionId === 'actorCard' ? 'actorStatDisplay' : 'button',
             label: candidateName,
         });
 

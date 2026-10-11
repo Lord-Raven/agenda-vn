@@ -42,8 +42,7 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             perActorDefaultRules: [],
             defaultValueRules: [],
             script: stat.script || '',
-            // A function stat has no value of its own, so it can't be exposed in UI or sent to/maintained by the LLM.
-            exposed: { value: false, conditions: [] },
+            // A function stat has no value of its own to send to or maintain through the LLM.
             llmSees: { value: false, conditions: [] },
             llmMaintained: { value: false, conditions: [] },
         };
@@ -138,8 +137,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
     };
 };
 
-export const canBeVisibleInUi = (stat: Stat): boolean => stat.exposed.value === true || stat.exposed.conditions.length > 0;
-
 export const renderStatTypeOptions = () => (
     <>
         <option value="actor">Actor</option>
@@ -214,9 +211,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     const isFunctionType = normalizedStat.type === 'function';
     const conditionStats = category === 'global' ? [...selfStats, ...actorStats] : [...selfStats, ...globalStats];
 
-    const descriptionVisible = category === 'global'
-        ? (stat.exposed.value === true || stat.setByPlayer === true)
-        : stat.exposed.value === true;
+    const descriptionVisible = !isFunctionType;
 
     const guidanceVisible = category === 'actor'
         ? (stat.llmSees.value === true || stat.llmSees.conditions.length > 0)
@@ -354,22 +349,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
                         {!isFunctionType && (
                         <>
-                        <ConditionalFlagEditor
-                            label="Visible In UI"
-                            enabledLabel="Exposed"
-                            disabledLabel="Hidden"
-                            flag={stat.exposed}
-                            onChange={(exposed) => onPatch({ exposed })}
-                            globalStats={conditionStats}
-                            actorStats={actorStats}
-                            actors={conditionActors}
-                            items={items}
-                            locations={locations}
-                            variableContentType={variableContentType}
-                            fieldLabelStyle={fieldLabelStyle}
-                            inlineFieldStyle={inlineFieldStyle}
-                        />
-
                         {category === 'global' && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Editable In Settings</label>
@@ -640,7 +619,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </div>
                         )}
 
-                        {canBeVisibleInUi(stat) && (
+                        {!isFunctionType && (
                             <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Label Icon</label>
                                 {renderIconPicker(stat.labelIconName, (iconName) => onPatch({ labelIconName: iconName || undefined }), true)}

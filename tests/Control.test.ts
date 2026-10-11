@@ -49,3 +49,29 @@ test('priority ordering preserves placement and availability filtering', () => {
         .sort(compareControlPriority);
     assert.deepEqual(visible.map((control) => control.name), ['First', 'Zulu', 'Alpha']);
 });
+
+test('actor stat displays always use actor-card placement and survive export/import', () => {
+    for (const placement of [undefined, 'top', 'bottom', 'actorCard']) {
+        const control = new Control({ type: 'actorStatDisplay', placement, statId: 'health' });
+        const imported = new Control(JSON.parse(JSON.stringify(control)));
+        assert.equal(imported.type, 'actorStatDisplay');
+        assert.equal(imported.placement, 'actorCard');
+        assert.equal(imported.statId, 'health');
+    }
+    assert.equal(new Control({ type: 'button', placement: 'actorCard' }).placement, 'bottom');
+});
+
+test('actor-card availability binds identity and stat rules to the displayed actor', () => {
+    const control = new Control({
+        type: 'actorStatDisplay',
+        availabilityConditions: [[
+            { type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' },
+            { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'health', comparison: 'greaterThan', value: 5 },
+        ]],
+    });
+    assert.equal(isControlAvailable(control, { currentActor: { id: 'alice', statMap: { health: 6 } } }), true);
+    assert.equal(isControlAvailable(control, { currentActor: { id: 'bob', statMap: { health: 6 } } }), false);
+    assert.equal(isControlAvailable(control, { currentActor: { id: 'alice', statMap: { health: 5 } } }), false);
+    control.active = false;
+    assert.equal(isControlAvailable(control, { currentActor: { id: 'alice', statMap: { health: 6 } } }), false);
+});

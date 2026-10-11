@@ -1,7 +1,7 @@
 import { FC, useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Stage } from '../Stage';
-import { isReferenceDisplayType, isReferenceListDisplayType, isStatExposed, formatReferenceStatText, Stat, StatValue } from '../content/Stat';
+import { isReferenceDisplayType, isReferenceListDisplayType, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, normalizeStatValue, Stat, StatValue } from '../content/Stat';
 import { Actor } from '../content/Actor';
 import { NamePlate } from './UiComponents';
 import { resolveIcon } from './StatRating';
@@ -16,10 +16,13 @@ interface ActorCardProps {
 
 const resolveStatValue = (actor: Actor, stat: Stat): StatValue => {
     const raw = (actor.statMap as { [key: string]: StatValue } | undefined)?.[stat.id];
-    return raw === undefined || raw === null || raw === '' ? stat.default : raw;
+    return normalizeStatValue(raw === undefined || raw === null || raw === '' ? stat.default : raw, stat);
 };
 
 const StatValueContainer: FC<{ stat: Stat; value: StatValue; save: ReturnType<Stage['getSave']> }> = ({ stat, value, save }) => {
+    if (stat.type === 'option' || stat.type === 'optionList') {
+        return <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatStatOptionValueText(stat, value)}</Box>;
+    }
     if (isReferenceListDisplayType(stat.type) || isReferenceDisplayType(stat.type)) {
         const displayValue = formatReferenceStatText(stat, value, { actors: save.actors, items: save.inventory, locations: save.atlas });
         return (
@@ -54,15 +57,14 @@ const StatValueContainer: FC<{ stat: Stat; value: StatValue; save: ReturnType<St
 };
 
 export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className = '' }) => {
-    const exposedStats = useMemo(() => {
-        const stageInstance = stage();
-        const configured = stageInstance.getConfiguration().actorStats || [];
-        const context = {
-            ...stageInstance.getScheduleContext(stageInstance.getSave()),
-            currentActor: actor ? { id: actor.id, name: actor.name, statMap: actor.statMap } : undefined,
-        };
-        return configured.filter(stat => stat?.name?.trim() && isStatExposed(stat, context));
-    }, [stage, actor?.id]);
+    const stageInstance = stage();
+    const configuredStats = stageInstance.getConfiguration().actorStats || [];
+    const statControls = actor ? stageInstance.getVisibleControls('actorCard', actor).flatMap(control => {
+        const stat = configuredStats.find(candidate => candidate.id === control.statId);
+        return control.type === 'actorStatDisplay' && stat?.name?.trim() && !isFunctionStatType(stat.type) && !stat.perActor
+            ? [{ control, stat }]
+            : [];
+    }) : [];
 
     const actorAge = useMemo(() => {
         const birthDate = (actor?.birthDate || '').trim();
@@ -131,7 +133,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                 </Box>
             )}
 
-            {exposedStats.length > 0 && (
+            {statControls.length > 0 && (
                 <Box
                     sx={{
                         display: 'flex',
@@ -141,12 +143,12 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                         borderTop: `1px solid color-mix(in srgb, ${themeColor} 40%, transparent)`,
                     }}
                 >
-                    {exposedStats.map(stat => {
+                    {statControls.map(({ control, stat }) => {
                         const LabelIcon = stat.labelIconName ? resolveIcon(stat.labelIconName) : null;
 
                         return (
                             <Box
-                                key={stat.id}
+                                key={control.id}
                                 sx={{
                                     display: 'grid',
                                     gridTemplateColumns: '1fr auto',

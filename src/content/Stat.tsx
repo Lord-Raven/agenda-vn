@@ -3,7 +3,7 @@ import { ContentTarget, ContentType, CONTENT_TYPES, ConditionCollection, Conditi
 
 // A boolean field whose effective value can be gated by conditions instead of always being fixed. With no
 // conditions, `value` always applies. With conditions, `value` applies only while at least one collection is
-// satisfied; otherwise the opposite of `value` applies (e.g. used for a stat's exposed/llmSees/llmMaintained
+// satisfied; otherwise the opposite of `value` applies (e.g. used for a stat's llmSees/llmMaintained
 // flags, letting them flip on/off based on other stats, calendar state, etc.).
 export type ConditionalFlag = {
     value: boolean;
@@ -407,7 +407,6 @@ export type Stat = {
     min?: number;
     max?: number;
     setByPlayer: boolean;
-    exposed: ConditionalFlag;
     iconName?: string;
     labelIconName?: string;
     displayColor?: string; // HTML color to use for display of this stat (stat bar or stat icons in a rating display; not for the label of the stat itself).
@@ -462,13 +461,11 @@ export const cloneStat = (stat: Stat): Stat => ({
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true,
-    exposed: cloneConditionalFlag(stat.exposed, false),
     iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
     labelIconName: stat.labelIconName || undefined,
     displayColor: stat.displayColor || undefined,
 });
 
-export const isStatExposed = (stat: Stat, context: ConditionContext): boolean => resolveConditionalFlag(stat.exposed, context, false);
 export const isStatLlmSeen = (stat: Stat, context: ConditionContext): boolean => resolveConditionalFlag(stat.llmSees, context, true);
 export const isStatLlmMaintained = (stat: Stat, context: ConditionContext): boolean => (
     isStatLlmSeen(stat, context) && resolveConditionalFlag(stat.llmMaintained, context, true)

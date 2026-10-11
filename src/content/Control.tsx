@@ -2,17 +2,15 @@ import { v4 as generateUuid } from 'uuid';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import { cloneStatUpdate, StatUpdate } from './Stat';
 
-// Where a control is rendered on the map screen: 'top' alongside the date/turn indicator (replacing the old
-// stat.exposed based Global Stat Bar contents), 'bottom' in a dedicated dock below the main map content.
-export type ControlPlacement = 'top' | 'bottom';
+// Actor stat displays render on actor cards; other controls render in the map's top or bottom dock.
+export type ControlPlacement = 'top' | 'bottom' | 'actorCard';
 
-// 'button' fires a defined set of stat updates when clicked. 'statDisplay' shows a read-only global stat
-// value (the same rendering the Global Stat Bar used to do directly from stat.exposed). 'statEditor' lets the
-// player change a global stat's value in place (e.g. picking an option from a dropdown).
-export type ControlType = 'button' | 'statDisplay' | 'statEditor';
+// 'button' fires stat updates; 'statDisplay'/'statEditor' show/edit a global stat.
+// 'actorStatDisplay' shows a read-only stat belonging to the actor whose card is displayed.
+export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'actorStatDisplay';
 export type ContentListDisplay = 'carousel' | 'abbreviated';
 
-export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor'];
+export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'actorStatDisplay'];
 
 export const isControlAvailable = (control: Control, context: ConditionContext): boolean => (
     control.active !== false && evaluateConditionCollections(control.availabilityConditions, context)
@@ -35,7 +33,7 @@ export class Control {
     iconName: string = '';
     actions: StatUpdate[] = [];
 
-    // Only meaningful when type is 'statDisplay' or 'statEditor': the global stat this control shows/edits.
+    // The global stat shown/edited, or the actor stat shown by 'actorStatDisplay'.
     statId: string = '';
     contentListDisplay: ContentListDisplay = 'carousel';
 
@@ -46,8 +44,8 @@ export class Control {
         }
         this.active = this.active !== false;
         this.priority = Number.isFinite(this.priority) ? this.priority : 0;
-        this.placement = this.placement === 'top' ? 'top' : 'bottom';
         this.type = CONTROL_TYPES.includes(this.type) ? this.type : 'button';
+        this.placement = this.type === 'actorStatDisplay' ? 'actorCard' : this.placement === 'top' ? 'top' : 'bottom';
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map((collection) => [...collection]) : [];
         this.label = `${this.label || ''}`;
         this.iconName = `${this.iconName || ''}`;

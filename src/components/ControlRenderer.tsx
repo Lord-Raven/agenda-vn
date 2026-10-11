@@ -52,6 +52,10 @@ const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]
 export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onActivate }) => {
     const stageInstance = stage();
 
+    if (control.type === 'actorStatDisplay') {
+        return null;
+    }
+
     if (control.type === 'button') {
         const Icon = control.iconName ? resolveIcon(control.iconName) : null;
         return (

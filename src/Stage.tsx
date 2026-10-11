@@ -153,7 +153,7 @@ export type GameConfiguration = {
     globalStats: Stat[], // Stats that apply to the game in general (player or world state)
     globalStatValues: {[key: string]: StatValue}, // Selected/default values for global stats
     statUpdateRules: StatUpdateRule[], // Recurring stat changes applied as in-game time advances
-    controls: Control[], // UI controls displayed at the top/bottom of the map screen (buttons, stat displays, stat editors)
+    controls: Control[], // UI controls displayed in map docks or on actor cards.
     uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
     titleImageUrl: string, // URL of a title image for the game
@@ -516,10 +516,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats };
     }
 
-    // Resolves the active (available) controls for the given placement, in priority order, for rendering
-    // on the map screen (see MapScreen/DefinedMapView and ControlBar).
-    getVisibleControls(placement: ControlPlacement): Control[] {
-        const context = this.getScheduleContext(this.getSave());
+    // Actor-card rules bind "Variable" actor targets to the actor whose card is displayed.
+    getVisibleControls(placement: ControlPlacement, actor?: Actor): Control[] {
+        const context = {
+            ...this.getScheduleContext(this.getSave()),
+            ...(placement === 'actorCard' ? { currentActor: actor } : {}),
+        };
         return (this.getConfiguration().controls || [])
             .filter((control) => control.placement === placement && isControlAvailable(control, context))
             .sort(compareControlPriority);

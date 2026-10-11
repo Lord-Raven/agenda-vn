@@ -10,7 +10,7 @@ import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 const stat = (name: string, type: StatType, extra: Partial<Stat> = {}): Stat => cloneStat({
     id: name, name, type, description: '', guidance: '', default: [],
     llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
-    exposed: { value: false, conditions: [] }, setByPlayer: false, ...extra,
+    setByPlayer: false, ...extra,
 });
 
 const fixture = () => {

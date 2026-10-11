@@ -255,10 +255,12 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.placement}
+                                    disabled={draft.type === 'actorStatDisplay'}
                                     onChange={(e) => setDraft((current) => ({ ...current, placement: e.target.value as ControlPlacement }))}
                                 >
                                     <option value="top">Top (with date/stats)</option>
                                     <option value="bottom">Bottom (control dock)</option>
+                                    {draft.type === 'actorStatDisplay' && <option value="actorCard">Actor Card</option>}
                                 </select>
                             </div>
                             <div>
@@ -266,11 +268,20 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.type}
-                                    onChange={(e) => setDraft((current) => ({ ...current, type: e.target.value as ControlType }))}
+                                    onChange={(e) => {
+                                        const type = e.target.value as ControlType;
+                                        setDraft((current) => ({
+                                            ...current,
+                                            type,
+                                            placement: type === 'actorStatDisplay' ? 'actorCard' : current.placement === 'actorCard' ? 'bottom' : current.placement,
+                                            statId: (type === 'actorStatDisplay') !== (current.type === 'actorStatDisplay') ? '' : current.statId,
+                                        }));
+                                    }}
                                 >
                                     <option value="button">Button</option>
                                     <option value="statDisplay">Stat Display</option>
                                     <option value="statEditor">Stat Editor</option>
+                                    <option value="actorStatDisplay">Actor Stat Display</option>
                                 </select>
                             </div>
                         </div>
@@ -288,10 +299,16 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         actors={actors}
                         items={items}
                         locations={locations}
+                        variableContentType={draft.type === 'actorStatDisplay' ? 'actor' : undefined}
                         onChange={(availabilityConditions) => setDraft((current) => ({ ...current, availabilityConditions }))}
                     />
                     {draft.availabilityConditions.length === 0 && (
                         <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Always rendered.</span>
+                    )}
+                    {draft.type === 'actorStatDisplay' && (
+                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                            Rendered on actor cards. Variable actor targets refer to the actor whose card is shown.
+                        </span>
                     )}
                 </section>
 
@@ -401,19 +418,19 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                     </>
                 ) : (
                     <section>
-                        <h2 style={sectionHeadingStyle}>{draft.type === 'statEditor' ? 'Stat Editor' : 'Stat Display'}</h2>
+                        <h2 style={sectionHeadingStyle}>{draft.type === 'actorStatDisplay' ? 'Actor Stat Display' : draft.type === 'statEditor' ? 'Stat Editor' : 'Stat Display'}</h2>
                         <div>
-                            <label style={labelStyle}>Global Stat</label>
+                            <label style={labelStyle}>{draft.type === 'actorStatDisplay' ? 'Actor Stat' : 'Global Stat'}</label>
                             <select
                                 style={selectStyle}
                                 value={draft.statId}
                                 onChange={(e) => setDraft((current) => ({ ...current, statId: e.target.value }))}
                             >
                                 <option value="">Select a stat...</option>
-                                {updatableGlobalStats.map((stat) => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
+                                {(draft.type === 'actorStatDisplay' ? updatableActorStats : updatableGlobalStats).map((stat) => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
                             </select>
                         </div>
-                        {isReferenceListDisplayType(globalStats.find((stat) => stat.id === draft.statId)?.type ?? 'text') && (
+                        {draft.type !== 'actorStatDisplay' && isReferenceListDisplayType(globalStats.find((stat) => stat.id === draft.statId)?.type ?? 'text') && (
                             <div style={{ marginTop: 15 }}>
                                 <label style={labelStyle} htmlFor={`content-list-display-${control.id}`}>Content List Display</label>
                                 <select
