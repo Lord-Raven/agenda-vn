@@ -8,6 +8,7 @@ import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
+import { Stage } from '../Stage';
 
 interface ConditionEditorProps {
     conditionCollections: ConditionCollection[];
@@ -18,6 +19,7 @@ interface ConditionEditorProps {
     actors?: ActorLike[];
     items?: ItemLike[];
     locations?: LocationLike[];
+    stage?: Stage | (() => Stage);
     // The content type whose context-bound entity can be targeted as 'Variable' (e.g. the actor a perActor
     // stat rule is being resolved for); omitted where no such entity is bound.
     variableContentType?: ContentType;
@@ -172,7 +174,9 @@ export const buildContentTargetOptions = (
 
 const META_TARGET_KEYS = ['variable', 'any', 'none'];
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], locationStats = [], itemStats = [], actors = [], items = [], locations = [], variableContentType, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true }) => {
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], locationStats = [], itemStats = [], actors = [], items = [], locations = [], stage, variableContentType, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true }) => {
+    const playerId = (typeof stage === 'function' ? stage() : stage)?.getSave().playerId;
+    actors = actors.filter(actor => actor.id !== playerId);
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
     const statsByContentType: Record<ContentType, Stat[]> = { actor: actorStats, location: locationStats, item: itemStats };
     const entitiesByContentType: Record<ContentType, ContentTargetEntity[]> = { actor: actors, location: locations, item: items };
@@ -317,7 +321,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             );
         }
         if (referenceKind) {
-            return <ReferenceSelect kind={referenceKind} value={String(condition.value ?? '')} onChange={(id) => updateValue(id)} actors={actors} items={items} locations={locations} style={{ width: '100%', minWidth: 0 }} />;
+            return <ReferenceSelect kind={referenceKind} value={String(condition.value ?? '')} onChange={(id) => updateValue(id)} actors={actors} items={items} locations={locations} stage={stage} style={{ width: '100%', minWidth: 0 }} />;
         }
         return <TextInput type="text" value={condition.value as number | string} placeholder="e.g. 3 or 1d6+1" onChange={(event) => {
             const raw = event.target.value;

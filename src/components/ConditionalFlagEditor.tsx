@@ -8,6 +8,7 @@ import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 import { Button } from './UiComponents';
 import { useTooltip } from './TooltipContext';
+import { Stage } from '../Stage';
 
 interface ConditionalFlagEditorProps {
     label: string;
@@ -22,6 +23,7 @@ interface ConditionalFlagEditorProps {
     actors?: Array<{ id: string; name: string; category?: string }>;
     items?: ItemLike[];
     locations?: LocationLike[];
+    stage?: Stage | (() => Stage);
     variableContentType?: ContentType;
     fieldLabelStyle?: React.CSSProperties;
     inlineFieldStyle?: React.CSSProperties;
@@ -42,6 +44,7 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
     actors = [],
     items = [],
     locations = [],
+    stage,
     variableContentType,
     fieldLabelStyle,
     inlineFieldStyle,
@@ -83,6 +86,7 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
                     locationStats={locationStats}
                     itemStats={itemStats}
                     actors={actors}
+                    stage={stage}
                     items={items}
                     locations={locations}
                     variableContentType={variableContentType}

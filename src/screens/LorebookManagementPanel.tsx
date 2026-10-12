@@ -619,6 +619,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                 conditionCollections={selectedLore.conditionCollections || []}
                                                 globalStats={stage().getConfiguration().globalStats || []}
                                                 actors={Object.values(stage().getSave().actors || {})}
+                                                stage={stage}
                                                 onChange={(conditionCollections) => updateSelectedLore({ conditionCollections })}
                                             />
                                         </div>

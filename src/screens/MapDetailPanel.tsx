@@ -398,6 +398,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                     conditionCollections={draft.availabilityConditions}
                     globalStats={stageInstance.getConfiguration().globalStats || []}
                     actors={Object.values(save.actors || {})}
+                    stage={stage}
                     onChange={(availabilityConditions) => updateDraft('availabilityConditions', availabilityConditions)}
                 />
             </section>
@@ -442,6 +443,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                     locationStats={stageInstance.getConfiguration().locationStats || []}
                                     itemStats={stageInstance.getConfiguration().itemStats || []}
                                     actors={Object.values(stageInstance.getSave().actors || {})}
+                                    stage={stage}
                                     locations={Object.values(stageInstance.getSave().atlas || {})}
                                     items={stageInstance.getSave().inventory || []}
                                     variableContentType="actor"
@@ -623,6 +625,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                             locationStats={stageInstance.getConfiguration().locationStats || []}
                                             itemStats={stageInstance.getConfiguration().itemStats || []}
                                             actors={Object.values(stageInstance.getSave().actors || {})}
+                                            stage={stage}
                                             locations={Object.values(stageInstance.getSave().atlas || {})}
                                             items={stageInstance.getSave().inventory || []}
                                             variableContentType="actor"

@@ -6,6 +6,7 @@ import { Button } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationPortrait, LocationLike } from './LocationPortrait';
 import { ConditionEditor } from './ConditionEditor';
+import { Stage } from '../Stage';
 
 interface ActorScheduleEditorProps {
     schedule: ActorSchedule;
@@ -13,6 +14,7 @@ interface ActorScheduleEditorProps {
     globalStats: Stat[];
     actorStats: Stat[];
     actors?: Array<{ id: string; name: string; category?: string }>;
+    stage?: Stage | (() => Stage);
     emptyLabel?: string;
     onChange: (schedule: ActorSchedule) => void;
 }
@@ -21,7 +23,7 @@ const cloneSchedule = (entries: Array<[string, ActorSchedule[string]]>): ActorSc
     entries.map(([destination, collections]) => [destination, collections.map(collection => [...collection])]),
 );
 
-export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, locations, globalStats: globalStats, actorStats, actors = [], emptyLabel = 'No schedule entries. This actor is generally available.', onChange }) => {
+export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, locations, globalStats: globalStats, actorStats, actors = [], stage, emptyLabel = 'No schedule entries. This actor is generally available.', onChange }) => {
     const entries = Object.entries(schedule);
     const targets = [
         { key: ACTOR_SCHEDULE_AVAILABLE, label: 'Available', icon: EventAvailable },
@@ -104,6 +106,7 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
                             globalStats={globalStats}
                             actorStats={actorStats}
                             actors={actors}
+                            stage={stage}
                             locations={locations}
                             variableContentType="actor"
                             onChange={collections => updateEntry(index, destination, collections)}

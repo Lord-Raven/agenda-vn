@@ -407,6 +407,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                 globalStats={stage().getConfiguration().globalStats || []}
                                 actorStats={stage().getConfiguration().actorStats || []}
                                 actors={Object.values(stage().getSave().actors || {})}
+                                stage={stage}
                                 items={itemOptions}
                                 locations={locationOptions}
                                 onChange={(availabilityConditions) => setEditedItem(current => ({ ...current, availabilityConditions }))}
@@ -679,6 +680,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                                             globalStats={stage().getConfiguration().globalStats || []}
                                                             actorStats={stage().getConfiguration().actorStats || []}
                                                             actors={Object.values(stage().getSave().actors || {})}
+                                                            stage={stage}
                                                             items={itemOptions}
                                                             locations={locationOptions}
                                                             onChange={(conditionCollections) => updateAlternative(index, { conditionCollections })}

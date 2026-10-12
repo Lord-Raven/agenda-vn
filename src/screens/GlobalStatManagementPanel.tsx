@@ -14,7 +14,7 @@ export const GlobalStatManagementPanel: FC<GlobalStatManagementPanelProps> = ({ 
     const configuration = stageInstance.getConfiguration();
     const save = stageInstance.getSave();
     const globalStats = configuration.globalStats || [];
-    const actors = Object.values(save.actors || {}).filter(actor => actor.active !== false);
+    const actors = Object.values(save.actors || {}).filter(actor => actor.id !== save.playerId && actor.active !== false);
     const items = (save.inventory || []).filter(item => item.active !== false);
     const locations = Object.values(save.atlas || {}).filter(location => location.active !== false);
     const optionContext = {

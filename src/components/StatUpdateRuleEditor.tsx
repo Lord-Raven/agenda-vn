@@ -102,6 +102,8 @@ const describeUpdate = (update: StatUpdate, stat: Stat | undefined): string => {
 
 export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, globalStats: globalStats, actorStats, locationStats = [], itemStats = [], actors, items = [], locations, stage, onChange }) => {
     const [collapsedRules, setCollapsedRules] = useState<Record<string, boolean>>({});
+    const playerId = (typeof stage === 'function' ? stage() : stage)?.getSave().playerId;
+    actors = actors.filter(actor => actor.id !== playerId);
     // perActor stats have no single target here, so they cannot be written by a rule.
     const updatableActorStats = actorStats.filter(stat => !stat.perActor);
     const entitiesByContentType: Record<ContentType, Array<{ id: string; name: string }>> = { actor: actors, location: locations, item: items };
@@ -187,6 +189,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                     locationStats={locationStats}
                                     itemStats={itemStats}
                                     actors={actors}
+                                    stage={stage}
                                     items={items}
                                     locations={locations}
                                     onChange={(conditions: ConditionCollection[]) => updateRule(rule.id, { conditions })}

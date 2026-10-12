@@ -2671,6 +2671,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     async uploadFile(fileName: string, file: File): Promise<string> {
         // Don't honor file's name; want to overwrite existing content that may have had a different actual name.
+        // TODO: Maybe check if this actually overwrites the way I hope it does.
         const updateResponse = await this.storage.set(fileName, file).forUser();
         if (!updateResponse.data || updateResponse.data.length == 0) {
             throw new Error('Failed to upload file to storage.');

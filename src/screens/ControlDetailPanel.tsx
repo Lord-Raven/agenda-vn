@@ -297,6 +297,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         locationStats={stageInstance.getConfiguration().locationStats || []}
                         itemStats={stageInstance.getConfiguration().itemStats || []}
                         actors={actors}
+                        stage={stage}
                         items={items}
                         locations={locations}
                         variableContentType={draft.type === 'actorStatDisplay' ? 'actor' : undefined}

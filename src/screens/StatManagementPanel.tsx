@@ -91,8 +91,8 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
     );
     const actorOptions = useMemo(
         () => Object.values(save.actors || {})
-            .filter(actor => actor.active !== false),
-        [save.actors],
+            .filter(actor => actor.id !== save.playerId && actor.active !== false),
+        [save.actors, save.playerId],
     );
     const itemOptions = useMemo(
         () => (save.inventory || [])
@@ -453,7 +453,7 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
         setCollapsedItemStats(prev => swapArrayItems(prev, index, targetIndex));
     };
 
-    const conditionActors = Object.values(save.actors || {});
+    const conditionActors = Object.values(save.actors || {}).filter(actor => actor.id !== save.playerId);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -650,7 +650,8 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
                     locations={locationOptions}
                     globalStats={globalStats}
                     actorStats={actorStats}
-                    actors={Object.values(save.actors || {})}
+                    actors={conditionActors}
+                    stage={stage}
                     emptyLabel="No universal schedule entries. Every actor falls back to their own schedule."
                     onChange={setUniversalSchedule}
                 />
@@ -667,7 +668,7 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
                     actorStats={actorStats}
                     locationStats={locationStats}
                     itemStats={itemStats}
-                    actors={Object.values(save.actors || {})}
+                    actors={conditionActors}
                     items={itemOptions}
                     locations={locationOptions}
                     stage={stage}

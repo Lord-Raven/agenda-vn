@@ -341,7 +341,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 scriptLabel={scriptLabel}
                                 onTest={(targetId) => stage().testFunctionStat(normalizedStat, category, targetId)}
                                 testTargets={category === 'global' ? undefined
-                                    : (category === 'actor' ? Object.values(stage().getSave().actors || {})
+                                    : (category === 'actor' ? Object.values(stage().getSave().actors || {}).filter(actor => actor.id !== stage().getSave().playerId)
                                         : category === 'location' ? Object.values(stage().getSave().atlas || {})
                                             : stage().getSave().inventory || []).filter(entity => entity.active !== false)}
                             />
@@ -387,6 +387,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             globalStats={conditionStats}
                             actorStats={actorStats}
                             actors={conditionActors}
+                            stage={stage}
                             items={items}
                             locations={locations}
                             variableContentType={variableContentType}
@@ -404,6 +405,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 globalStats={conditionStats}
                                 actorStats={actorStats}
                                 actors={conditionActors}
+                                stage={stage}
                                 items={items}
                                 locations={locations}
                                 variableContentType={variableContentType}
@@ -701,6 +703,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                         globalStats={conditionStats}
                                         actorStats={actorStats}
                                         actors={conditionActors}
+                                        stage={stage}
                                         items={items}
                                         locations={locations}
                                         variableContentType={variableContentType}

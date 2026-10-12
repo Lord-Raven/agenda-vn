@@ -791,6 +791,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                     globalStats={stage().getConfiguration().globalStats || []}
                                     actorStats={stage().getConfiguration().actorStats || []}
                                     actors={Object.values(stage().getSave().actors || {})}
+                                    stage={stage}
                                     items={itemOptions}
                                     locations={locationOptions}
                                     onChange={(availabilityCollections) => setEditedLocation(current => ({ ...current, availabilityCollections }))}
@@ -1237,6 +1238,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                                     globalStats={stage().getConfiguration().globalStats || []}
                                                                     actorStats={stage().getConfiguration().actorStats || []}
                                                                     actors={Object.values(stage().getSave().actors || {})}
+                                                                    stage={stage}
                                                                     items={itemOptions}
                                                                     locations={locationOptions}
                                                                     onChange={(conditionCollections) => updateAlternative(index, { conditionCollections })}

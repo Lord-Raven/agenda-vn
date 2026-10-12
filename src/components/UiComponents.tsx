@@ -618,8 +618,9 @@ export const ActorSelect: FC<ActorSelectProps> = ({
 	title = 'Choose actor',
 	style,
 }) => {
-	const sortedActors = [...actors].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-	const isMissing = Boolean(value) && !sortedActors.some((actor) => actor.id === value);
+	const playerId = (typeof stage === 'function' ? stage() : stage)?.getSave().playerId;
+	const sortedActors = actors.filter(actor => actor.id !== playerId).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+	const isMissing = Boolean(value) && value !== playerId && !sortedActors.some((actor) => actor.id === value);
 	const options: PickerOption[] = sortedActors.map((actor) => ({
 		key: actor.id,
 		label: actor.name || 'Unnamed actor',
@@ -668,8 +669,9 @@ export const ActorMultiSelect: FC<ActorMultiSelectProps> = ({
 	renderButton,
 	disabled,
 }) => {
-	const sortedActors = [...actors].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-	const missingIds = values.filter((id) => id && !sortedActors.some((actor) => actor.id === id));
+	const playerId = (typeof stage === 'function' ? stage() : stage)?.getSave().playerId;
+	const sortedActors = actors.filter(actor => actor.id !== playerId).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+	const missingIds = values.filter((id) => id && id !== playerId && !sortedActors.some((actor) => actor.id === id));
 	const options: PickerOption[] = sortedActors.map((actor) => ({
 		key: actor.id,
 		label: actor.name || 'Unnamed actor',

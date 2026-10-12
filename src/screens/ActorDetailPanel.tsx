@@ -248,7 +248,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
     const otherActiveActors = useMemo(() => {
         return (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {}))
-            .filter((candidate) => candidate.id !== actor.id)
+            .filter((candidate) => candidate.id !== actor.id && candidate.id !== stage().getSave().playerId)
             .filter((candidate) => candidate.active !== false)
             .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
     }, [actor.id, stage, isCreatorMode]);
@@ -2185,6 +2185,7 @@ ${indent}}`;
                                             globalStats={stage().getConfiguration().globalStats || []}
                                             actorStats={actorStats}
                                             actors={Object.values(stage().getSave().actors || {})}
+                                            stage={stage}
                                             onChange={(schedule) => setEditedActor(current => ({ ...current, schedule }))}
                                         />
                                     </div>
@@ -2433,6 +2434,7 @@ ${indent}}`;
                                                                                 globalStats={[...actorStats, ...(stage().getConfiguration().globalStats || [])]}
                                                                                 actorStats={actorStats}
                                                                                 actors={Object.values(stage().getSave().actors || {})}
+                                                                                stage={stage}
                                                                                 items={itemOptions}
                                                                                 locations={locationOptions}
                                                                                 onChange={(conditions) => updateActorStatModifierConditions(stat, modifier.id, conditions)}
@@ -2569,6 +2571,7 @@ ${indent}}`;
                                                                             globalStats={[...actorStats, ...(stage().getConfiguration().globalStats || [])]}
                                                                             actorStats={actorStats}
                                                                             actors={Object.values(stage().getSave().actors || {})}
+                                                                            stage={stage}
                                                                             items={itemOptions}
                                                                             locations={locationOptions}
                                                                             variableContentType="actor"
