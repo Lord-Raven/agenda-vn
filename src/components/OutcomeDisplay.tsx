@@ -105,6 +105,8 @@ interface OutcomeGroup {
     actor?: Actor;
 }
 
+const defaultOutcomeControl = new Control({ id: 'default-stat-outcome', type: 'statOutcome' });
+
 export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => {
     if (!outcomes || outcomes.length === 0) {
         return null;
@@ -127,8 +129,12 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
             return false;
         }
         const actor = target === 'actor' ? resolveActor(outcome.details?.actorId) : undefined;
-        const control = stage().getVisibleControls('outcome', actor).find((candidate) =>
-            candidate.type === 'statOutcome' && candidate.outcomeStatTarget === target && candidate.statId === stat.id);
+        const matchesStat = (candidate: Control): boolean =>
+            candidate.type === 'statOutcome' && candidate.outcomeStatTarget === target && candidate.statId === stat.id;
+        const hasConfiguredControl = stage().getConfiguration().controls.some(matchesStat);
+        const control = hasConfiguredControl
+            ? stage().getVisibleControls('outcome', actor).find(matchesStat)
+            : defaultOutcomeControl;
         if (!control) {
             return false;
         }
