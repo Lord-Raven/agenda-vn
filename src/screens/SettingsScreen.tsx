@@ -6,7 +6,6 @@ import { DEFAULT_UI_SETTINGS } from '../content/Style';
 import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
-import { resolveIcon } from '../components/StatRating';
 import { ScreenType } from './BaseScreen';
 import { StatValueInput } from '../components/StatValueInput';
 
@@ -474,8 +473,6 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                             ? resolveText(findStatOptionByValue(stat, selectedValue)?.option.description).trim()
                                             : '';
 
-                                        const StatIcon = stat.iconName ? resolveIcon(stat.iconName) : null;
-
                                         return (
                                             <div
                                                 key={statName}
@@ -490,7 +487,6 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 }}
                                             >
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
-                                                    {StatIcon && <StatIcon style={{ fontSize: '0.95rem', color: 'var(--agenda-highlight)' }} />}
                                                     <span>{statName}</span>
                                                 </div>
                                                 <div style={{ color: 'color-mix(in srgb, var(--agenda-text-muted) 80%, transparent)', fontSize: '13px' }}>

@@ -30,7 +30,6 @@ const defaultGlobalStat = (): Stat => ({
     setByPlayer: true,
     llmSees: { value: true, conditions: [] },
     llmMaintained: { value: true, conditions: [] },
-    iconName: 'star',
 });
 
 const defaultTypedStat = (): Stat => ({
@@ -42,14 +41,12 @@ const defaultTypedStat = (): Stat => ({
     guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
     default: 50,
     type: 'number',
-    displayType: 'percentage',
     min: 0,
     max: 100,
     options: [],
     setByPlayer: false,
     llmSees: { value: true, conditions: [] },
     llmMaintained: { value: true, conditions: [] },
-    iconName: 'star',
 });
 
 const swapArrayItems = <T,>(items: T[], indexA: number, indexB: number): T[] => {

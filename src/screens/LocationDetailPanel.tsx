@@ -47,7 +47,6 @@ const splitAvailabilityCollections = (collections: ConditionCollection[], states
 };
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 import { Stat, StatValue } from '../content/Stat';
-import { StatRating } from '../components/StatRating';
 
 const clampLocationStatValue = (value: number, stat: Stat): number => {
     let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
@@ -65,39 +64,7 @@ const resolveLocationStatRange = (stat: Stat): { min: number; max: number; step:
         return { min: stat.min, max: stat.max, step: 1, hasRange: true };
     }
 
-    if (stat.displayType === 'percentage' || stat.displayType === 'bar') {
-        return { min: 0, max: 100, step: 1, hasRange: true };
-    }
-
-    if (stat.displayType === 'rating') {
-        return {
-            min: 0,
-            max: Number.isFinite(stat.max) ? Math.max(1, Math.round(Number(stat.max))) : 5,
-            step: 1,
-            hasRange: true,
-        };
-    }
-
-    if (stat.displayType === 'letter grade') {
-        return { min: 0, max: 100, step: 1, hasRange: true };
-    }
-
     return { min: 0, max: 100, step: 1, hasRange: false };
-};
-
-const buildLocationStatLetterGradeOptions = (stat: Stat): Array<{ label: string; value: number }> => {
-    const { min, max } = resolveLocationStatRange(stat);
-    const labels = ['F', 'D', 'C', 'B', 'A', 'S'];
-    const span = Math.max(1, max - min);
-
-    return labels.map((label, index) => {
-        const ratio = index / (labels.length - 1);
-        const value = min + (span * ratio);
-        return {
-            label,
-            value: Number(value.toFixed(2)),
-        };
-    });
 };
 
 const createInitialLocationStatMap = (location: Location, locationStats: Stat[]): { [key: string]: StatValue } => {
@@ -819,12 +786,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                 ? value
                                                 : clampLocationStatValue(Number(stat.default) || 0, stat);
                                             const statRange = resolveLocationStatRange(stat);
-                                            const letterGradeOptions = buildLocationStatLetterGradeOptions(stat);
-                                            const nearestGrade = letterGradeOptions.reduce((closest, option) => {
-                                                const optionDelta = Math.abs(option.value - displayValue);
-                                                const closestDelta = Math.abs(closest.value - displayValue);
-                                                return optionDelta < closestDelta ? option : closest;
-                                            }, letterGradeOptions[0]);
                                             const isExpanded = expandedStatNames.has(stat.id);
 
                                             return (
@@ -891,47 +852,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                             </div>
                                                         )}
 
-                                                        {stat.type === 'number' && stat.displayType === 'rating' && (
-                                                            <StatRating
-                                                                stat={stat}
-                                                                value={displayValue}
-                                                                updateScore={(nextValue) => handleLocationStatValueChange(stat, nextValue)}
-                                                            />
-                                                        )}
-
-                                                        {stat.type === 'number' && stat.displayType === 'letter grade' && (
-                                                            <div>
-                                                                <select
-                                                                    value={nearestGrade.label}
-                                                                    onChange={(e) => {
-                                                                        const selectedOption = letterGradeOptions.find((option) => option.label === e.target.value);
-                                                                        if (!selectedOption) {
-                                                                            return;
-                                                                        }
-                                                                        handleLocationStatValueChange(stat, selectedOption.value);
-                                                                    }}
-                                                                    style={{
-                                                                        width: '100%',
-                                                                        padding: '10px',
-                                                                        fontSize: '14px',
-                                                                        backgroundColor: 'var(--agenda-surface-raised)',
-                                                                        border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                                                                        borderRadius: '5px',
-                                                                        color: 'var(--agenda-text-primary)',
-                                                                        fontFamily: 'inherit',
-                                                                        cursor: 'pointer',
-                                                                    }}
-                                                                >
-                                                                    {letterGradeOptions.map((option) => (
-                                                                        <option key={`${stat.id}-grade-${option.label}`} value={option.label}>
-                                                                            {option.label}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-                                                        )}
-
-                                                        {stat.type === 'number' && stat.displayType !== 'rating' && stat.displayType !== 'letter grade' && statRange.hasRange && (
+                                                        {stat.type === 'number' && statRange.hasRange && (
                                                             <input
                                                                 type="range"
                                                                 min={statRange.min}

@@ -38,7 +38,6 @@ export const resolveConditionalFlag = (flag: ConditionalFlag | undefined, contex
 // 'optionList' holds a pool of options (Stat.options) whose value is the list of currently active option ids;
 // 'option' stats may pull their choices from one via Stat.optionSourceStatId.
 export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'checkbox' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'function';
-export type StatDisplayType = 'straight' | 'percentage' | 'bar' | 'rating' | 'letter grade';
 export type StatValue = number | string | boolean | string[];
 
 export const isNumericDisplayType = (type: StatType): boolean => type === 'number';
@@ -143,9 +142,6 @@ export const formatReferenceStatText = (
 );
 
 export const normalizeLocationListValue = normalizeReferenceListValue;
-
-// Resolves the effective display style for a numeric stat, defaulting to a plain number.
-export const resolveStatDisplayType = (stat: Stat): StatDisplayType => (stat.type === 'number' ? (stat.displayType || 'straight') : 'straight');
 
 export type StatOption = {
     id?: string;
@@ -399,17 +395,12 @@ export type Stat = {
     guidance: string; // Guidance for the LLM on how to handle this stat. If llmSees is false, the blank for editing this can be omitted from StatManagementPanel.
     default: StatValue;
     type: StatType;
-    // Only meaningful when type is 'number'; controls how the numeric value is rendered (straight number, bar, etc).
-    displayType?: StatDisplayType;
     options?: StatOption[];
     // Only meaningful when type is 'option': id of a global 'optionList' stat to take options from instead of `options`.
     optionSourceStatId?: string;
     min?: number;
     max?: number;
     setByPlayer: boolean;
-    iconName?: string;
-    labelIconName?: string;
-    displayColor?: string; // HTML color to use for display of this stat (stat bar or stat icons in a rating display; not for the label of the stat itself).
 };
 
 type StatTextContext = {
@@ -451,7 +442,6 @@ export const cloneStat = (stat: Stat): Stat => ({
         ? normalizeReferenceListValue(stat.default)
         : (typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0))),
     type: stat.type,
-    displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
     options: (stat.options || []).map((option) => ({
         id: option.id,
         name: option.name,
@@ -461,9 +451,6 @@ export const cloneStat = (stat: Stat): Stat => ({
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
     setByPlayer: stat.setByPlayer === true,
-    iconName: stat.iconName || (stat.displayType === 'rating' ? 'star' : undefined),
-    labelIconName: stat.labelIconName || undefined,
-    displayColor: stat.displayColor || undefined,
 });
 
 export const isStatLlmSeen = (stat: Stat, context: ConditionContext): boolean => resolveConditionalFlag(stat.llmSees, context, true);

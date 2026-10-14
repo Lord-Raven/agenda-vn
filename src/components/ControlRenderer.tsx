@@ -52,7 +52,7 @@ const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]
 export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onActivate }) => {
     const stageInstance = stage();
 
-    if (control.type === 'actorStatDisplay') {
+    if (control.type === 'actorStatDisplay' || control.type === 'statOutcome') {
         return null;
     }
 
@@ -83,7 +83,8 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         ?? stageInstance.getConfiguration()?.globalStatValues?.[stat.id]
         ?? stat.default;
     const normalizedValue = normalizeStatValue(rawValue, stat);
-    const StatIcon = stat.labelIconName ? resolveIcon(stat.labelIconName) : null;
+    const StatIcon = control.iconName ? resolveIcon(control.iconName) : null;
+    const label = control.label.trim() || statName;
     const selectedOptionDescription = stat.type === 'option'
         ? resolveStatText(findStatOptionByValue(stat, normalizedValue)?.option.description, stageInstance).trim()
         : '';
@@ -97,7 +98,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', lineHeight: 1.2 }}>
                 {StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)' }} />}
                 <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.66rem', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
-                    {stat.name || ''}
+                    {label}
                 </Typography>
             </Box>
 
@@ -108,7 +109,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                     values={normalizeReferenceListValue(normalizedValue)}
                     stage={stageInstance}
                     display={control.contentListDisplay}
-                    label={statName}
+                    label={label}
                     onChange={control.type === 'statEditor' ? (nextValue) => {
                         stageInstance.setGlobalStatValue(stat.id, nextValue);
                         onActivate();
@@ -127,11 +128,12 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
             ) : stat.type === 'number' ? (
                 <StatValueDisplay
                     stat={stat}
+                    display={control}
                     value={Number(normalizedValue)}
-                    style={{ minHeight: 20, ...(stat.displayType === 'rating' ? { justifyContent: 'flex-start' } : { fontSize: valueFontSize }) }}
+                    style={{ minHeight: 20, ...(control.displayType === 'rating' ? { justifyContent: 'flex-start' } : { fontSize: valueFontSize }) }}
                 />
             ) : (
-                <Typography sx={{ color: 'var(--agenda-text-primary)', fontSize: valueFontSize, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
+                <Typography sx={{ color: control.displayColor || 'var(--agenda-text-primary)', fontSize: valueFontSize, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
                     {resolveDisplayValue(stat, normalizedValue, stageInstance.getSave()?.atlas)}
                 </Typography>
             )}

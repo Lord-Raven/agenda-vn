@@ -520,7 +520,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     getVisibleControls(placement: ControlPlacement, actor?: Actor): Control[] {
         const context = {
             ...this.getScheduleContext(this.getSave()),
-            ...(placement === 'actorCard' ? { currentActor: actor } : {}),
+            ...(placement === 'actorCard' || placement === 'outcome' ? { currentActor: actor } : {}),
         };
         return (this.getConfiguration().controls || [])
             .filter((control) => control.placement === placement && isControlAvailable(control, context))

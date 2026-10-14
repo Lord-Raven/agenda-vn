@@ -13,7 +13,6 @@ import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add, Female, Male, Transgender, RecordVoiceOver } from '@mui/icons-material';
 import { PickerOption, SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { buildHexColorSwatches, Button, Chip, ColorPickerInput, ConfirmDialog, GlassPanel, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
-import { StatRating } from '../components/StatRating';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { CachedImage } from '../components/CachedImage';
@@ -120,46 +119,7 @@ const resolveActorStatRange = (stat: Stat): { min: number; max: number; step: nu
         return { min: stat.min, max: stat.max, step: 1, hasRange: true };
     }
 
-    if (stat.displayType === 'percentage' || stat.displayType === 'bar') {
-        return { min: 0, max: 100, step: 1, hasRange: true };
-    }
-
-    if (stat.displayType === 'rating') {
-        return {
-            min: 0,
-            max: Number.isFinite(stat.max) ? Math.max(1, Math.round(Number(stat.max))) : 5,
-            step: 1,
-            hasRange: true,
-        };
-    }
-
-    if (stat.displayType === 'letter grade') {
-        return { min: 0, max: 100, step: 1, hasRange: true };
-    }
-
     return { min: 0, max: 100, step: 1, hasRange: false };
-};
-
-const buildLetterGradeOptions = (stat: Stat): Array<{ label: string; value: number }> => {
-    const { min, max } = resolveActorStatRange(stat);
-    // Labels vary by the range.
-    const possibleLabels: {[key: number]: string[]} = {
-        5: ['F', 'D', 'C', 'B', 'A'],
-        6: ['F', 'D', 'C', 'B', 'A', 'S'],
-        12: ['F', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+']
-    };
-    const span = Math.max(1, max - min);
-    // Get highest possibleLabels less than span
-    const labels = possibleLabels[Math.max(...Object.keys(possibleLabels).map(Number).filter(key => key <= span))] || possibleLabels[5];
-
-    return labels.map((label, index) => {
-        const ratio = index / (labels.length - 1);
-        const value = min + (span * ratio);
-        return {
-            label,
-            value: Number(value.toFixed(2)),
-        };
-    });
 };
 
 const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: string]: StatValue } => {
@@ -1123,9 +1083,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
                     stage={stage}
                 />
             );
-        }
-        if (stat.type === 'number' && stat.displayType === 'rating') {
-            return <StatRating stat={stat} value={Number.isFinite(value) ? Number(value) : 0} updateScore={(next) => onChange(next)} />;
         }
         const range = resolveActorStatRange(stat);
         return (
@@ -2220,12 +2177,6 @@ ${indent}}`;
                                                     ? value
                                                     : clampActorStatValue(Number(stat.default) || 0, stat);
                                                 const statRange = resolveActorStatRange(stat);
-                                                const letterGradeOptions = buildLetterGradeOptions(stat);
-                                                const nearestGrade = letterGradeOptions.reduce((closest, option) => {
-                                                    const optionDelta = Math.abs(option.value - displayValue);
-                                                    const closestDelta = Math.abs(closest.value - displayValue);
-                                                    return optionDelta < closestDelta ? option : closest;
-                                                }, letterGradeOptions[0]);
                                                 const isExpanded = expandedStatNames.has(stat.id);
 
                                                 return (
@@ -2300,47 +2251,7 @@ ${indent}}`;
                                                                 </div>
                                                             )}
 
-                                                            {stat.type === 'number' && stat.displayType === 'rating' && (
-                                                                <StatRating
-                                                                    stat={stat}
-                                                                    value={displayValue}
-                                                                    updateScore={(nextValue) => handleActorStatEditorValueChange(stat, nextValue)}
-                                                                />
-                                                            )}
-
-                                                            {stat.type === 'number' && stat.displayType === 'letter grade' && (
-                                                                <div>
-                                                                    <select
-                                                                        value={nearestGrade.label}
-                                                                        onChange={(e) => {
-                                                                            const selectedOption = letterGradeOptions.find((option) => option.label === e.target.value);
-                                                                            if (!selectedOption) {
-                                                                                return;
-                                                                            }
-                                                                            handleActorStatEditorValueChange(stat, selectedOption.value);
-                                                                        }}
-                                                                        style={{
-                                                                            width: '100%',
-                                                                            padding: '10px',
-                                                                            fontSize: '14px',
-                                                                            backgroundColor: 'var(--agenda-surface-raised)',
-                                                                            border: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                                                                            borderRadius: '5px',
-                                                                            color: 'var(--agenda-text-primary)',
-                                                                            fontFamily: 'inherit',
-                                                                            cursor: 'pointer',
-                                                                        }}
-                                                                    >
-                                                                        {letterGradeOptions.map((option) => (
-                                                                            <option key={`${stat.id}-grade-${option.label}`} value={option.label}>
-                                                                                {option.label}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-                                                            )}
-
-                                                            {stat.type === 'number' && stat.displayType !== 'rating' && stat.displayType !== 'letter grade' && statRange.hasRange && (
+                                                            {stat.type === 'number' && statRange.hasRange && (
                                                                 <input
                                                                     type="range"
                                                                     min={statRange.min}

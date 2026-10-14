@@ -2,10 +2,11 @@ import { FC, ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Actor } from '../content/Actor';
 import { Outcome, OutcomeType } from '../content/Outcome';
-import { formatStatOptionValueText, Stat, StatValue } from '../content/Stat';
+import { formatStatOptionValueText, isFunctionStatType, normalizeStatValue, Stat, StatValue } from '../content/Stat';
+import { Control } from '../content/Control';
 import { Stage } from '../Stage';
 import { ActorPortrait } from './ActorPortrait';
-import { resolveStatValueText } from './StatDisplay';
+import { resolveStatValueText, StatValueDisplay } from './StatDisplay';
 import { resolveIcon, StatRating } from './StatRating';
 
 interface OutcomeDisplayProps {
@@ -14,9 +15,9 @@ interface OutcomeDisplayProps {
 }
 
 // Unlike resolveStatValueText (numeric stats only), this also handles option/text/checkbox StatValues.
-const formatStatValue = (stat: Stat, value: StatValue): string => {
+const formatStatValue = (stat: Stat, value: StatValue, control: Control): string => {
     if (stat.type === 'number') {
-        return resolveStatValueText(stat, Number(value));
+        return resolveStatValueText(stat, Number(value), control.displayType);
     }
     if (stat.type === 'option' || stat.type === 'optionList') {
         return formatStatOptionValueText(stat, value) || `${value ?? ''}`;
@@ -27,8 +28,8 @@ const formatStatValue = (stat: Stat, value: StatValue): string => {
     return `${value ?? ''}`;
 };
 
-const renderStatOutcomeValue = (stat: Stat | undefined, currentValue: StatValue | undefined, nextValue: StatValue, fallbackCurrentValue: StatValue | undefined): ReactNode => {
-    if (stat?.type === 'number' && stat.displayType === 'rating') {
+const renderStatOutcomeValue = (stat: Stat, control: Control, currentValue: StatValue, nextValue: StatValue): ReactNode => {
+    if (stat.type === 'number' && control.displayType === 'rating') {
         const numericNextValue = Number(nextValue);
         const numericCurrentValue = Number(currentValue ?? stat.default ?? 0);
         if (Number.isFinite(numericNextValue)) {
@@ -36,6 +37,7 @@ const renderStatOutcomeValue = (stat: Stat | undefined, currentValue: StatValue 
             return (
                 <StatRating
                     stat={stat}
+                    display={control}
                     value={numericNextValue}
                     highlightDelta={highlightDelta}
                     style={{ height: 24, width: 'min(100%, 170px)', justifyContent: 'flex-start' }}
@@ -44,9 +46,20 @@ const renderStatOutcomeValue = (stat: Stat | undefined, currentValue: StatValue 
         }
     }
 
-    return stat
-        ? `${formatStatValue(stat, currentValue ?? stat.default)} → ${formatStatValue(stat, nextValue)}`
-        : `${fallbackCurrentValue ?? ''} → ${nextValue}`;
+    if (stat.type === 'number' && (control.displayType === 'bar' || control.displayType === 'percentage')) {
+        return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <StatValueDisplay stat={stat} display={control} value={Number(currentValue)} />
+                <Box component="span">→</Box>
+                <StatValueDisplay stat={stat} display={control} value={Number(nextValue)} />
+            </Box>
+        );
+    }
+    return (
+        <Box component="span" sx={{ color: control.displayColor || 'inherit' }}>
+            {`${formatStatValue(stat, currentValue, control)} → ${formatStatValue(stat, nextValue, control)}`}
+        </Box>
+    );
 };
 
 const getNumericStatChangeSign = (stat: Stat | undefined, outcome: Outcome, actor?: Actor): string => {
@@ -71,14 +84,14 @@ const getNumericStatChangeSign = (stat: Stat | undefined, outcome: Outcome, acto
     return '';
 };
 
-const formatStatNameWithSign = (stat: Stat | undefined, outcome: Outcome, actor?: Actor): string => {
-    const statName = `${outcome.details?.statName || ''}`.trim() || 'Stat';
+const formatStatNameWithSign = (stat: Stat, control: Control, outcome: Outcome, actor?: Actor): string => {
+    const statName = control.label.trim() || stat.name;
     const sign = getNumericStatChangeSign(stat, outcome, actor);
     return sign ? `${statName} ${sign}` : statName;
 };
 
-const renderStatNameLabel = (stat: Stat | undefined, label: string): ReactNode => {
-    const LabelIcon = stat?.labelIconName ? resolveIcon(stat.labelIconName) : null;
+const renderStatNameLabel = (control: Control, label: string): ReactNode => {
+    const LabelIcon = control.iconName ? resolveIcon(control.iconName) : null;
     return (
         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, maxWidth: '100%' }}>
             {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
@@ -102,7 +115,47 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
         return stage().getSave().actors?.[actorId] || undefined;
     };
 
-    const outcomeGroups = outcomes.reduce<OutcomeGroup[]>((groups, outcome) => {
+    const statMatches = new Map<Outcome, { stat: Stat; control: Control }>();
+    const visibleOutcomes = outcomes.filter((outcome) => {
+        if (outcome.type !== OutcomeType.ACTOR_STAT && outcome.type !== OutcomeType.PLAYER_STAT) {
+            return true;
+        }
+        const target = outcome.type === OutcomeType.ACTOR_STAT ? 'actor' : 'global';
+        const stats = target === 'actor' ? stage().getConfiguration().actorStats : stage().getConfiguration().globalStats;
+        const stat = stats.find((candidate) => candidate.name === `${outcome.details?.statName || ''}`.trim());
+        if (!stat || isFunctionStatType(stat.type) || stat.perActor) {
+            return false;
+        }
+        const actor = target === 'actor' ? resolveActor(outcome.details?.actorId) : undefined;
+        const control = stage().getVisibleControls('outcome', actor).find((candidate) =>
+            candidate.type === 'statOutcome' && candidate.outcomeStatTarget === target && candidate.statId === stat.id);
+        if (!control) {
+            return false;
+        }
+        statMatches.set(outcome, { stat, control });
+        return true;
+    });
+    if (visibleOutcomes.length === 0) {
+        return null;
+    }
+
+    const renderStatOutcome = (outcome: Outcome, actor?: Actor): ReactNode => {
+        const match = statMatches.get(outcome);
+        if (!match) {
+            return null;
+        }
+        const { stat, control } = match;
+        const rawValue = outcome.type === OutcomeType.ACTOR_STAT
+            ? actor?.statMap?.[stat.id]
+            : stage().getSave().globalStatValues?.[stat.id] ?? stage().getConfiguration().globalStatValues?.[stat.id];
+        const currentValue = normalizeStatValue(rawValue ?? stat.default, stat);
+        const nextValue = outcome.details?.absoluteValue !== undefined
+            ? normalizeStatValue(outcome.details.absoluteValue, stat)
+            : Number(currentValue) + Number(outcome.details?.changeValue ?? 0);
+        return renderStatOutcomeValue(stat, control, currentValue, nextValue);
+    };
+
+    const outcomeGroups = visibleOutcomes.reduce<OutcomeGroup[]>((groups, outcome) => {
         const actorId = typeof outcome.details?.actorId === 'string' ? outcome.details.actorId : '';
         const actor = outcome.type === OutcomeType.ACTOR_STAT ? resolveActor(actorId) : undefined;
         if (!actor) {
@@ -144,33 +197,11 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                 let topLine: ReactNode = outcome.description || '';
                 let bottomLine: ReactNode = '';
 
-                const renderActorStat = (actorStatOutcome: Outcome): ReactNode => {
-                    const statName = `${actorStatOutcome.details?.statName || ''}`.trim() || 'Stat';
-                    const stat = stage().getConfiguration().actorStats.find(candidate => candidate.name === statName);
-                    const currentValue = actor?.statMap?.[stat?.id || ''];
-                    if (actorStatOutcome.details?.absoluteValue !== undefined) {
-                        const nextValue = actorStatOutcome.details.absoluteValue;
-                        return renderStatOutcomeValue(stat, currentValue, nextValue, currentValue);
-                    }
-
-                    const delta = Number(actorStatOutcome.details?.changeValue ?? 0);
-                    const numericCurrentValue = Number(currentValue ?? 0);
-                    const previousValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
-                    const nextValue = previousValue + delta;
-                    const arrow = '→';
-                    return stat?.type === 'number' && stat.displayType === 'rating'
-                        ? renderStatOutcomeValue(stat, previousValue, nextValue, previousValue)
-                        : (stat
-                            ? `${resolveStatValueText(stat, previousValue)} ${arrow} ${resolveStatValueText(stat, nextValue)}`
-                            : `${previousValue} ${arrow} ${nextValue}`);
-                };
-
                 if (isGroupedActorStats) {
                     topLine = actor?.displayName || actor?.name || 'Actor';
                 } else if (outcome.type === OutcomeType.ACTOR_STAT) {
-                    const statName = `${outcome.details?.statName || ''}`.trim() || 'Stat';
-                    const stat = stage().getConfiguration().actorStats.find(candidate => candidate.name === statName);
-                    const statLabel = renderStatNameLabel(stat, formatStatNameWithSign(stat, outcome, actor));
+                    const { stat, control } = statMatches.get(outcome)!;
+                    const statLabel = renderStatNameLabel(control, formatStatNameWithSign(stat, control, outcome, actor));
                     topLine = (
                         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, maxWidth: '100%' }}>
                             <Box component="span" sx={{ color: 'var(--agenda-text-muted)' }}>{actor?.displayName || actor?.name || 'Actor'}</Box>
@@ -178,27 +209,11 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                             <Box component="span" sx={{ minWidth: 0, maxWidth: '100%' }}>{statLabel}</Box>
                         </Box>
                     );
-                    bottomLine = renderActorStat(outcome);
+                    bottomLine = renderStatOutcome(outcome, actor);
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
-                    const statName = `${outcome.details?.statName || ''}`.trim() || 'Player Stat';
-                    const stat = stage().getConfiguration().globalStats.find(candidate => candidate.name === statName);
-                    const currentValue = stage().getSave().globalStatValues?.[stat?.id || ''];
-                    topLine = `World · ${statName}`;
-                    if (outcome.details?.absoluteValue !== undefined) {
-                        const nextValue = outcome.details.absoluteValue;
-                        bottomLine = renderStatOutcomeValue(stat, currentValue, nextValue, currentValue);
-                    } else {
-                        const delta = Number(outcome.details?.changeValue ?? 0);
-                        const numericCurrentValue = Number(currentValue ?? 0);
-                        const previousValue = Number.isFinite(numericCurrentValue) ? numericCurrentValue : 0;
-                        const nextValue = previousValue + delta;
-                        const arrow = '→';
-                        bottomLine = stat?.type === 'number' && stat.displayType === 'rating'
-                            ? renderStatOutcomeValue(stat, previousValue, nextValue, previousValue)
-                            : (stat
-                                ? `${resolveStatValueText(stat, previousValue)} ${arrow} ${resolveStatValueText(stat, nextValue)}`
-                                : `${previousValue} ${arrow} ${nextValue}`);
-                    }
+                    const { stat, control } = statMatches.get(outcome)!;
+                    topLine = renderStatNameLabel(control, `World · ${control.label.trim() || stat.name}`);
+                    bottomLine = renderStatOutcome(outcome);
                 } else if (outcome.type === OutcomeType.LORE_UPDATE) {
                     topLine = 'Lore Update';
                     bottomLine = `${outcome.details?.loreTitle || 'Entry'}`;
@@ -252,15 +267,14 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                             {isGroupedActorStats ? (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, marginTop: 0.35 }}>
                                     {group.outcomes.map((actorStatOutcome, statIndex) => {
-                                        const statName = `${actorStatOutcome.details?.statName || ''}`.trim() || 'Stat';
-                                        const stat = stage().getConfiguration().actorStats.find(candidate => candidate.name === statName);
+                                        const { stat, control } = statMatches.get(actorStatOutcome)!;
                                         return (
                                             <Box key={`${actorStatOutcome.details?.statName || 'stat'}-${statIndex}`} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingLeft: 1.25, borderLeft: '2px solid color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)' }}>
                                                 <Typography variant="caption" sx={{ color: 'var(--agenda-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {renderStatNameLabel(stat, formatStatNameWithSign(stat, actorStatOutcome, actor))}
+                                                    {renderStatNameLabel(control, formatStatNameWithSign(stat, control, actorStatOutcome, actor))}
                                                 </Typography>
                                                 <Typography component="div" variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {renderActorStat(actorStatOutcome)}
+                                                    {renderStatOutcome(actorStatOutcome, actor)}
                                                 </Typography>
                                             </Box>
                                         );

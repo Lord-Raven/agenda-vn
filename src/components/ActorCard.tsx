@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { Stage } from '../Stage';
 import { isReferenceDisplayType, isReferenceListDisplayType, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, normalizeStatValue, Stat, StatValue } from '../content/Stat';
 import { Actor } from '../content/Actor';
+import { Control } from '../content/Control';
 import { NamePlate } from './UiComponents';
 import { resolveIcon } from './StatRating';
 import { StatValueDisplay } from './StatDisplay';
@@ -19,7 +20,7 @@ const resolveStatValue = (actor: Actor, stat: Stat): StatValue => {
     return normalizeStatValue(raw === undefined || raw === null || raw === '' ? stat.default : raw, stat);
 };
 
-const StatValueContainer: FC<{ stat: Stat; value: StatValue; save: ReturnType<Stage['getSave']> }> = ({ stat, value, save }) => {
+const StatValueContainer: FC<{ stat: Stat; control: Control; value: StatValue; save: ReturnType<Stage['getSave']> }> = ({ stat, control, value, save }) => {
     if (stat.type === 'option' || stat.type === 'optionList') {
         return <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatStatOptionValueText(stat, value)}</Box>;
     }
@@ -41,10 +42,10 @@ const StatValueContainer: FC<{ stat: Stat; value: StatValue; save: ReturnType<St
     const numericValue = Number(value);
 
     if (stat.type === 'number' && Number.isFinite(numericValue)) {
-        const isBarType = stat.displayType === 'percentage' || stat.displayType === 'bar';
+        const isBarType = control.displayType === 'percentage' || control.displayType === 'bar';
         return (
             <Box sx={{ width: isBarType ? '90px' : undefined, height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                <StatValueDisplay stat={stat} value={numericValue} />
+                <StatValueDisplay stat={stat} display={control} value={numericValue} />
             </Box>
         );
     }
@@ -144,7 +145,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                     }}
                 >
                     {statControls.map(({ control, stat }) => {
-                        const LabelIcon = stat.labelIconName ? resolveIcon(stat.labelIconName) : null;
+                        const LabelIcon = control.iconName ? resolveIcon(control.iconName) : null;
 
                         return (
                             <Box
@@ -160,9 +161,9 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                             >
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', minWidth: 0 }}>
                                     {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
-                                    <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.name || ''}</Box>
+                                    <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{control.label.trim() || stat.name}</Box>
                                 </Box>
-                                <StatValueContainer stat={stat} value={resolveStatValue(actor, stat)} save={stage().getSave()} />
+                                <StatValueContainer stat={stat} control={control} value={resolveStatValue(actor, stat)} save={stage().getSave()} />
                             </Box>
                         );
                     })}

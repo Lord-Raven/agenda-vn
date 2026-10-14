@@ -18,6 +18,7 @@ const PLACEMENT_LABELS: Record<Control['placement'], string> = {
     top: 'Top',
     bottom: 'Bottom',
     actorCard: 'Actor Card',
+    outcome: 'Outcomes',
 };
 
 const TYPE_LABELS: Record<Control['type'], string> = {
@@ -25,6 +26,7 @@ const TYPE_LABELS: Record<Control['type'], string> = {
     statDisplay: 'Stat Display',
     statEditor: 'Stat Editor',
     actorStatDisplay: 'Actor Stat Display',
+    statOutcome: 'Stat Outcome',
 };
 
 export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage }) => {
@@ -66,6 +68,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             { id: 'top', title: PLACEMENT_LABELS.top, entries: controls.filter((control) => control.placement === 'top') },
             { id: 'bottom', title: PLACEMENT_LABELS.bottom, entries: controls.filter((control) => control.placement === 'bottom') },
             { id: 'actorCard', title: PLACEMENT_LABELS.actorCard, entries: controls.filter((control) => control.placement === 'actorCard') },
+            { id: 'outcome', title: PLACEMENT_LABELS.outcome, entries: controls.filter((control) => control.placement === 'outcome') },
         ];
         return sections;
     }, [controls]);
@@ -92,8 +95,8 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             active: true,
             name: candidateName,
             placement: sectionId === 'top' ? 'top' : 'bottom',
-            type: sectionId === 'actorCard' ? 'actorStatDisplay' : 'button',
-            label: candidateName,
+            type: sectionId === 'outcome' ? 'statOutcome' : sectionId === 'actorCard' ? 'actorStatDisplay' : 'button',
+            label: sectionId === 'actorCard' || sectionId === 'outcome' ? '' : candidateName,
         });
 
         stage().updateConfiguration({ controls: [...configuredControls, control] });

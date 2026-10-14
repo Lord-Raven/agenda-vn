@@ -3,13 +3,12 @@ import { v4 as generateUuid } from 'uuid';
 import { Add, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import {
-    Stat, StatDisplayType, StatValue, StatValueRule,
+    Stat, StatValue, StatValueRule,
     findStatOptionByValue, getStatOptionValue, isFunctionStatType, isNumericDisplayType, isOptionListStatType,
     isReferenceDisplayType, isReferenceListDisplayType, isSourcedOptionStat, normalizeReferenceListValue,
     resolveStatDefault, resolveStatOptionPool,
 } from '../content/Stat';
-import { Button, ColorPickerInput, TextArea, TextInput } from './UiComponents';
-import { IconPicker } from './StatRating';
+import { Button, TextArea, TextInput } from './UiComponents';
 import { ConditionEditor } from './ConditionEditor';
 import { ConditionalFlagEditor } from './ConditionalFlagEditor';
 import { StatFunctionEditor } from './StatFunctionEditor';
@@ -37,7 +36,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             options: [],
             min: undefined,
             max: undefined,
-            displayType: undefined,
             perActor: false,
             perActorDefaultRules: [],
             defaultValueRules: [],
@@ -55,8 +53,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             default: typeof stat.default === 'string' ? stat.default : '',
             min: undefined,
             max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
         };
     }
 
@@ -74,10 +70,8 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
                     : options.map(option => option.id),
                 min: undefined,
                 max: undefined,
-                displayType: undefined,
                 perActor: false,
                 perActorDefaultRules: [],
-                iconName: stat.iconName || 'star',
             };
         }
         const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
@@ -87,8 +81,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             default: defaultValue,
             min: undefined,
             max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
         };
     }
 
@@ -99,8 +91,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             options: [],
             min: undefined,
             max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
         };
     }
 
@@ -111,8 +101,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             options: [],
             min: undefined,
             max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
         };
     }
 
@@ -123,8 +111,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             options: [],
             min: undefined,
             max: undefined,
-            displayType: undefined,
-            iconName: stat.iconName || 'star',
         };
     }
 
@@ -132,8 +118,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
         ...stat,
         default: Number.isFinite(stat.default) ? Number(stat.default) : 0,
         options: [],
-        displayType: stat.type === 'number' ? (stat.displayType || 'straight') : undefined,
-        iconName: stat.iconName || 'star',
     };
 };
 
@@ -282,10 +266,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
             [valueRulesConfig.fieldKey]: (stat[valueRulesConfig.fieldKey] || []).map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule),
         } as Partial<Stat>);
     };
-
-    const renderIconPicker = (value: string | undefined, onChange: (iconName: string | undefined) => void, allowClear = false) => (
-        <IconPicker value={value} onChange={onChange} allowClear={allowClear} />
-    );
 
     const renderValueInput = (value: StatValue, onChange: (value: StatValue) => void) => (
         <StatValueInput stat={stat} value={value} onChange={onChange} actors={valueActors} items={items} locations={locations} stage={stage} />
@@ -442,41 +422,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                         </>
                         )}
 
-                        {normalizedStat.type === 'number' && (
-                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                <label style={fieldLabelStyle}>Display</label>
-                                <select
-                                    className="input-base"
-                                    value={normalizedStat.displayType || 'straight'}
-                                    onChange={(e) => {
-                                        const nextDisplayType = e.target.value as StatDisplayType;
-                                        onPatch({
-                                            displayType: nextDisplayType,
-                                            iconName: nextDisplayType === 'rating' ? (stat.iconName || 'star') : stat.iconName,
-                                        });
-                                    }}
-                                >
-                                    <option value="straight">Straight Number</option>
-                                    <option value="percentage">Percentage</option>
-                                    <option value="bar">Bar</option>
-                                    <option value="rating">Rating</option>
-                                    <option value="letter grade">Letter Grade</option>
-                                </select>
-                            </div>
-                        )}
-
-                        {normalizedStat.type === 'number' && (
-                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                <label style={fieldLabelStyle}>Display Color</label>
-                                <ColorPickerInput
-                                    value={normalizedStat.displayColor || ''}
-                                    onChange={(displayColor) => onPatch({ displayColor })}
-                                    popoverTitle="Choose Display Color"
-                                    inputStyle={{ width: '100%' }}
-                                />
-                            </div>
-                        )}
-
                         {normalizedStat.type === 'option' && (optionListSources.length > 0 || isSourcedOption) && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Option Source</label>
@@ -611,20 +556,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                     />
                                     Checked
                                 </label>
-                            </div>
-                        )}
-
-                        {normalizedStat.type === 'number' && normalizedStat.displayType === 'rating' && (
-                            <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                <label style={fieldLabelStyle}>Rating Icon</label>
-                                {renderIconPicker(normalizedStat.iconName, (iconName) => onPatch({ iconName }))}
-                            </div>
-                        )}
-
-                        {!isFunctionType && (
-                            <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
-                                <label style={fieldLabelStyle}>Label Icon</label>
-                                {renderIconPicker(stat.labelIconName, (iconName) => onPatch({ labelIconName: iconName || undefined }), true)}
                             </div>
                         )}
 

@@ -786,6 +786,7 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
 
 interface StatRatingProps {
     stat: Stat;
+    display: { ratingIconName: string; displayColor: string };
     value: number;
     highlightDelta?: number;
     updateScore?: (value: number) => void;
@@ -837,17 +838,18 @@ const iconStyleBase: React.CSSProperties = {
 
 const renderStatIcon = (
     stat: Stat,
+    display: StatRatingProps['display'],
     pipValue: number,
     filled: boolean,
     highlight?: RatingPipHighlight,
     updateScore?: (value: number) => void,
 ) => {
-    const IconComponent = resolveIcon(stat.iconName);
+    const IconComponent = resolveIcon(display.ratingIconName);
     const label = `${stat.name} ${pipValue} of ${resolvePipCount(stat)}`;
     const highlightColor = highlight === 'decrease' ? '#ff5c73' : 'var(--agenda-highlight)';
     const fillColor = highlight
         ? highlightColor
-        : (filled ? (stat.displayColor || 'var(--agenda-highlight)') : 'rgba(11, 17, 28, 0.9)');
+        : (filled ? (display.displayColor || 'var(--agenda-highlight)') : 'rgba(11, 17, 28, 0.9)');
     const shadow = filled
         ? `drop-shadow(0 0 2px color-mix(in srgb, ${fillColor} 35%, transparent))`
         : (highlight === 'decrease'
@@ -881,6 +883,7 @@ export { RATING_ICON_OPTIONS, resolveIcon, type RatingIconKey };
 
 export const StatRating: FC<StatRatingProps> = ({
     stat,
+    display,
     value,
     highlightDelta,
     updateScore,
@@ -917,7 +920,7 @@ export const StatRating: FC<StatRatingProps> = ({
                 >
                     {Array.from({ length: maxPips }, (_, index) => {
                         const pipValue = index + 1;
-                        return renderStatIcon(stat, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore);
+                        return renderStatIcon(stat, display, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore);
                     })}
                 </div>
             </div>
@@ -965,7 +968,7 @@ export const StatRating: FC<StatRatingProps> = ({
                                 gap: '3px',
                             }}
                         >
-                            {topPips.map((pipValue) => renderStatIcon(stat, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore))}
+                            {topPips.map((pipValue) => renderStatIcon(stat, display, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore))}
                         </div>
 
                         {bottomPips.length > 0 && (
@@ -978,7 +981,7 @@ export const StatRating: FC<StatRatingProps> = ({
                                     margin: '-2px auto 0',
                                 }}
                             >
-                                {bottomPips.map((pipValue) => renderStatIcon(stat, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore))}
+                                {bottomPips.map((pipValue) => renderStatIcon(stat, display, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore))}
                             </div>
                         )}
                     </div>
