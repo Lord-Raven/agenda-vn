@@ -1,9 +1,9 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import { ArrowBackRounded, ArrowForwardRounded, EditNote, EventAvailable, MenuRounded, Settings } from "@mui/icons-material";
 import { Box, Typography } from "@mui/material";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Stage } from "../Stage";
-import { getLocationImageUrl, LOCATION_TIME_OF_DAY_LABELS, Location } from "../content/Location";
+import { getLocationImageUrl, Location } from "../content/Location";
 import { ScreenType } from "./BaseScreen";
 import { ContentManagementScreen } from "./ContentManagementScreen";
 import { useTooltip } from "../components/TooltipContext";
@@ -22,6 +22,7 @@ interface MapScreenProps {
 }
 
 const UNCATEGORIZED_LABEL = "Uncategorized";
+const LOCATION_LIST_EDGE_MASK = "linear-gradient(to bottom, transparent, black 24px, black calc(100% - 24px), transparent)";
 
 const normalizeCategory = (category?: string) => {
     const trimmed = `${category || ""}`.trim();
@@ -32,6 +33,7 @@ const sortLocationsByName = (left: Location, right: Location) => left.name.local
 
 export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVerticalLayout }) => {
     const { setTooltip, clearTooltip } = useTooltip();
+    const reduceMotion = useReducedMotion();
     const [showContentManagement, setShowContentManagement] = useState(false);
 
     const stageInstance = stage();
@@ -272,144 +274,166 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
 
                     <Box
                         sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1.25,
+                            display: "grid",
+                            gridTemplateRows: "minmax(0, 1fr)",
+                            flex: 1,
                             minHeight: 0,
-                            overflowX: "hidden",
-                            overflowY: "auto",
-                            // Leaves room for the 10px hover shift on the location buttons.
-                            pr: "14px",
+                            overflow: "hidden",
+                            maskImage: LOCATION_LIST_EDGE_MASK,
+                            WebkitMaskImage: LOCATION_LIST_EDGE_MASK,
                         }}
                     >
-                        {visibleLocations.length === 0 && (
+                        <AnimatePresence>
                             <Box
+                                component={motion.div}
+                                key={selectedCategory}
+                                initial={false}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: reduceMotion ? 0 : -16, pointerEvents: "none" }}
+                                transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
                                 sx={{
-                                    minHeight: 220,
+                                    gridArea: "1 / 1",
                                     display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    borderRadius: "16px",
-                                    border: "1px solid var(--agenda-panel-border)",
-                                    background: "linear-gradient(180deg, var(--agenda-panel-surface), color-mix(in srgb, var(--agenda-surface-base) 86%, transparent))",
-                                    color: "var(--agenda-text-muted)",
-                                    textAlign: "center",
-                                    px: 2,
+                                    flexDirection: "column",
+                                    gap: 1.25,
+                                    minHeight: 0,
+                                    overflowX: "hidden",
+                                    overflowY: "auto",
+                                    // Keep resting cards outside the fades and leave room for the hover shift.
+                                    py: "24px",
+                                    pr: "14px",
                                 }}
                             >
-                                <Typography sx={{ fontSize: "0.95rem" }}>
-                                    No active locations are available for this category yet.
-                                </Typography>
-                            </Box>
-                        )}
+                                {visibleLocations.length === 0 && (
+                                    <Box
+                                        sx={{
+                                            minHeight: 220,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            borderRadius: "16px",
+                                            border: "1px solid var(--agenda-panel-border)",
+                                            background: "linear-gradient(180deg, var(--agenda-panel-surface), color-mix(in srgb, var(--agenda-surface-base) 86%, transparent))",
+                                            color: "var(--agenda-text-muted)",
+                                            textAlign: "center",
+                                            px: 2,
+                                        }}
+                                    >
+                                        <Typography sx={{ fontSize: "0.95rem" }}>
+                                            No active locations are available for this category yet.
+                                        </Typography>
+                                    </Box>
+                                )}
 
-                        {visibleLocations.map((location, index) => {
-                            const imageUrl = getLocationImageUrl(location, stageInstance);
-                            const focalPoint = location.focalPoint || { x: 0.5, y: 0.5 };
-                            const borderColor = location.themeColor || "var(--agenda-accent-primary)";
-                            const currentEvent = stageInstance.getCurrentLocationEvent(location.id);
-                            const canVisit = stageInstance.canVisitLocation(location.id);
-                            const openLocation = () => {
-                                if (stageInstance.startLocationVisit(location.id)) {
-                                    setScreenType(ScreenType.SKIT);
-                                }
-                            };
+                                {visibleLocations.map((location, index) => {
+                                    const imageUrl = getLocationImageUrl(location, stageInstance);
+                                    const focalPoint = location.focalPoint || { x: 0.5, y: 0.5 };
+                                    const borderColor = location.themeColor || "var(--agenda-accent-primary)";
+                                    const currentEvent = stageInstance.getCurrentLocationEvent(location.id);
+                                    const canVisit = stageInstance.canVisitLocation(location.id);
+                                    const openLocation = () => {
+                                        if (stageInstance.startLocationVisit(location.id)) {
+                                            setScreenType(ScreenType.SKIT);
+                                        }
+                                    };
 
-                            return (
-                                <CachedBackgroundUrl key={location.id} url={imageUrl}>
-                                    {(cachedImageUrl) => (
-                                        <motion.button
-                                            type="button"
-                                            disabled={!canVisit}
-                                            onClick={openLocation}
-                                            initial={{ opacity: 0, y: 16 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            whileHover={canVisit ? { x: 10 } : undefined}
-                                            transition={{
-                                                opacity: { duration: 0.22, delay: Math.min(index * 0.04, 0.18) },
-                                                y: { duration: 0.22, delay: Math.min(index * 0.04, 0.18) },
-                                                x: { duration: 0.2, ease: 'easeOut' },
-                                            }}
-                                            style={{ width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'inherit', cursor: canVisit ? 'pointer' : 'not-allowed', opacity: canVisit ? 1 : 0.56 }}
-                                        >
-                                            <Box
-                                                sx={{
-                                                    position: "relative",
-                                                    minHeight: isVerticalLayout ? 180 : 210,
-                                                    borderRadius: "18px",
-                                                    overflow: "hidden",
-                                                    border: `1px solid ${borderColor}`,
-                                                    backgroundImage: cachedImageUrl
-                                                        ? `linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%), url(${cachedImageUrl})`
-                                                        : "linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%)",
-                                                    backgroundSize: "cover",
-                                                    backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
-                                                    boxShadow: "0 10px 28px color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)",
-                                                }}
-                                            >
-                                        <Box sx={{ position: "absolute", top: 12, right: 12, zIndex: 2 }}>
-                                            <LocationActorPortraits locationId={location.id} stage={stageInstance} size={isVerticalLayout ? 34 : 40} labelSide="left" />
-                                        </Box>
-                                        <Box
-                                            sx={{
-                                                position: "absolute",
-                                                inset: 0,
-                                                background: "linear-gradient(180deg, color-mix(in srgb, var(--agenda-surface-base) 20%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 14%, transparent) 36%, color-mix(in srgb, var(--agenda-surface-base) 76%, transparent) 100%)",
-                                            }}
-                                        />
-                                        <Box
-                                            sx={{
-                                                position: "relative",
-                                                zIndex: 1,
-                                                height: "100%",
-                                                display: "flex",
-                                                alignItems: "flex-end",
-                                                p: { xs: 1.5, md: 2 },
-                                            }}
-                                        >
-                                            <Box
-                                                sx={{
-                                                    maxWidth: "min(100%, 540px)",
-                                                    background: "color-mix(in srgb, var(--agenda-surface-base) 72%, transparent)",
-                                                    border: "1px solid color-mix(in srgb, var(--agenda-text-primary) 18%, transparent)",
-                                                    backdropFilter: "blur(8px)",
-                                                    borderRadius: "12px",
-                                                    px: 1.4,
-                                                    py: 1.1,
-                                                }}
-                                            >
-                                                <Typography
-                                                    sx={{
-                                                        color: "var(--agenda-text-primary)",
-                                                        fontFamily: "var(--agenda-font-flavor)",
-                                                        fontWeight: 700,
-                                                        fontSize: { xs: "1.15rem", md: "1.45rem" },
-                                                        lineHeight: 1.15,
-                                                        textShadow: "0 2px 10px color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)",
+                                    return (
+                                        <CachedBackgroundUrl key={location.id} url={imageUrl}>
+                                            {(cachedImageUrl) => (
+                                                <motion.button
+                                                    type="button"
+                                                    disabled={!canVisit}
+                                                    onClick={openLocation}
+                                                    initial={{ opacity: 0, y: reduceMotion ? 0 : 16 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    whileHover={canVisit ? { x: 10 } : undefined}
+                                                    transition={{
+                                                        opacity: { duration: reduceMotion ? 0 : 0.22, delay: reduceMotion ? 0 : Math.min(index * 0.04, 0.18) },
+                                                        y: { duration: reduceMotion ? 0 : 0.22, delay: reduceMotion ? 0 : Math.min(index * 0.04, 0.18) },
+                                                        x: { duration: 0.2, ease: 'easeOut' },
                                                     }}
+                                                    style={{ width: '100%', flexShrink: 0, padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'inherit', cursor: canVisit ? 'pointer' : 'not-allowed', opacity: canVisit ? 1 : 0.56 }}
                                                 >
-                                                    {location.name || "Unnamed Location"}
-                                                </Typography>
-                                                {currentEvent || !canVisit ? (
-                                                    <Typography
+                                                    <Box
                                                         sx={{
-                                                            color: currentEvent ? "var(--agenda-highlight)" : "var(--agenda-text-muted)",
-                                                            fontSize: "0.76rem",
-                                                            fontWeight: currentEvent ? 700 : 500,
-                                                            mt: 0.5,
+                                                            position: "relative",
+                                                            minHeight: isVerticalLayout ? 180 : 210,
+                                                            borderRadius: "18px",
+                                                            overflow: "hidden",
+                                                            border: `1px solid ${borderColor}`,
+                                                            backgroundImage: cachedImageUrl
+                                                                ? `linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%), url(${cachedImageUrl})`
+                                                                : "linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%)",
+                                                            backgroundSize: "cover",
+                                                            backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
+                                                            boxShadow: "0 10px 28px color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)",
                                                         }}
                                                     >
-                                                        {currentEvent ? currentEvent.name : "Unavailable"}
-                                                    </Typography>
-                                                ) : null}
-                                            </Box>
-                                        </Box>
-                                            </Box>
-                                        </motion.button>
-                                    )}
-                                </CachedBackgroundUrl>
-                            );
-                        })}
+                                                        <Box sx={{ position: "absolute", top: 12, right: 12, zIndex: 2 }}>
+                                                            <LocationActorPortraits locationId={location.id} stage={stageInstance} size={isVerticalLayout ? 34 : 40} labelSide="left" />
+                                                        </Box>
+                                                        <Box
+                                                            sx={{
+                                                                position: "absolute",
+                                                                inset: 0,
+                                                                background: "linear-gradient(180deg, color-mix(in srgb, var(--agenda-surface-base) 20%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 14%, transparent) 36%, color-mix(in srgb, var(--agenda-surface-base) 76%, transparent) 100%)",
+                                                            }}
+                                                        />
+                                                        <Box
+                                                            sx={{
+                                                                position: "relative",
+                                                                zIndex: 1,
+                                                                height: "100%",
+                                                                display: "flex",
+                                                                alignItems: "flex-end",
+                                                                p: { xs: 1.5, md: 2 },
+                                                            }}
+                                                        >
+                                                            <Box
+                                                                sx={{
+                                                                    maxWidth: "min(100%, 540px)",
+                                                                    background: "color-mix(in srgb, var(--agenda-surface-base) 72%, transparent)",
+                                                                    border: "1px solid color-mix(in srgb, var(--agenda-text-primary) 18%, transparent)",
+                                                                    backdropFilter: "blur(8px)",
+                                                                    borderRadius: "12px",
+                                                                    px: 1.4,
+                                                                    py: 1.1,
+                                                                }}
+                                                            >
+                                                                <Typography
+                                                                    sx={{
+                                                                        color: "var(--agenda-text-primary)",
+                                                                        fontFamily: "var(--agenda-font-flavor)",
+                                                                        fontWeight: 700,
+                                                                        fontSize: { xs: "1.15rem", md: "1.45rem" },
+                                                                        lineHeight: 1.15,
+                                                                        textShadow: "0 2px 10px color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)",
+                                                                    }}
+                                                                >
+                                                                    {location.name || "Unnamed Location"}
+                                                                </Typography>
+                                                                {currentEvent || !canVisit ? (
+                                                                    <Typography
+                                                                        sx={{
+                                                                            color: currentEvent ? "var(--agenda-highlight)" : "var(--agenda-text-muted)",
+                                                                            fontSize: "0.76rem",
+                                                                            fontWeight: currentEvent ? 700 : 500,
+                                                                            mt: 0.5,
+                                                                        }}
+                                                                    >
+                                                                        {currentEvent ? currentEvent.name : "Unavailable"}
+                                                                    </Typography>
+                                                                ) : null}
+                                                            </Box>
+                                                        </Box>
+                                                    </Box>
+                                                </motion.button>
+                                            )}
+                                        </CachedBackgroundUrl>
+                                    );
+                                })}
+                            </Box>
+                        </AnimatePresence>
                     </Box>
                 </GlassPanel>
 
