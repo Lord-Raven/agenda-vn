@@ -1,4 +1,4 @@
-import { FC, ReactNode, useMemo, useState } from 'react';
+import { FC, ReactNode, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DoNotDisturb } from '@mui/icons-material';
 
@@ -47,6 +47,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 }) => {
     const [search, setSearch] = useState(initialSearch);
     const [isOpen, setIsOpen] = useState(false);
+    const pointerStartedOnBackdrop = useRef(false);
     const optionGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: '8px' };
 
     const orderedOptions = useMemo(() => {
@@ -298,6 +299,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 disabled={disabled}
                 onClick={() => {
                     setSearch(initialSearch);
+                    pointerStartedOnBackdrop.current = false;
                     setIsOpen(true);
                 }}
                 style={{
@@ -325,7 +327,21 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
             </button>
 
             {isOpen && typeof document !== 'undefined' && createPortal(
-                <div style={{ position: 'fixed', inset: 0, background: 'color-mix(in srgb, var(--agenda-surface-base) 72%, transparent)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 2000 }} onClick={() => setIsOpen(false)}>
+                <div
+                    style={{ position: 'fixed', inset: 0, background: 'color-mix(in srgb, var(--agenda-surface-base) 72%, transparent)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 2000 }}
+                    onPointerDownCapture={(event) => {
+                        pointerStartedOnBackdrop.current = event.target === event.currentTarget;
+                    }}
+                    onPointerCancel={() => {
+                        pointerStartedOnBackdrop.current = false;
+                    }}
+                    onClick={(event) => {
+                        if (pointerStartedOnBackdrop.current && event.target === event.currentTarget) {
+                            setIsOpen(false);
+                        }
+                        pointerStartedOnBackdrop.current = false;
+                    }}
+                >
                     <div onClick={(event) => event.stopPropagation()} style={{ width: 'min(560px, 100%)', background: 'linear-gradient(135deg, var(--agenda-panel-surface) 0%, color-mix(in srgb, var(--agenda-surface-base) 92%, var(--agenda-panel-surface)) 100%)', border: '1px solid var(--agenda-panel-border)', borderRadius: '12px', padding: '18px', boxShadow: 'var(--agenda-shadow)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
                             <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>{title}</div>
