@@ -9,7 +9,7 @@ import { Button, ColorPickerInput, GlassPanel, TextInput, Title } from '../compo
 import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { StatUpdateOperationSelect, StatValueInput } from '../components/StatValueInput';
-import { IconPicker, resolveIcon } from '../components/StatRating';
+import { IconPicker } from '../components/StatRating';
 
 interface ControlDetailPanelProps {
     control: Control;
@@ -214,7 +214,6 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         setDraft((current) => ({ ...current, actions: current.actions.filter((update) => update.id !== updateId) }));
     };
 
-    const PreviewIcon = draft.iconName.trim() ? resolveIcon(draft.iconName.trim()) : null;
     const usesActorStat = draft.type === 'actorStatDisplay' || (draft.type === 'statOutcome' && draft.outcomeStatTarget === 'actor');
     const selectableStats = usesActorStat ? updatableActorStats : updatableGlobalStats;
     const selectedStat = selectableStats.find((stat) => stat.id === draft.statId);
@@ -348,16 +347,8 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     />
                                 </div>
                                 <div>
-                                    <label style={labelStyle}>Icon Name (optional)</label>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        {PreviewIcon && <PreviewIcon sx={{ color: 'var(--agenda-highlight)' }} />}
-                                        <TextInput
-                                            fullWidth
-                                            value={draft.iconName}
-                                            onChange={(e) => setDraft((current) => ({ ...current, iconName: e.target.value }))}
-                                            placeholder="MUI icon name, e.g. Star"
-                                        />
-                                    </div>
+                                    <label style={labelStyle}>Label Icon (optional)</label>
+                                    <IconPicker value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
                                 </div>
                             </div>
                         </section>
@@ -468,7 +459,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         </div>
                         <div style={{ marginTop: 15 }}>
                             <label style={labelStyle}>Label Icon (optional)</label>
-                            <IconPicker value={draft.iconName} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
+                            <IconPicker value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
                         </div>
                         {selectedStat?.type === 'number' && draft.type !== 'statEditor' && (
                             <div style={{ marginTop: 15 }}>
