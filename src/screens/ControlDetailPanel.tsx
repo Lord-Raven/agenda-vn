@@ -220,7 +220,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const selectedStat = selectableStats.find((stat) => stat.id === draft.statId);
 
     return (
-        <GlassPanel variant="default" style={{ overflow: 'visible', position: 'relative', padding: '20px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <GlassPanel variant="default" style={{ overflow: 'visible', position: 'relative', padding: '20px', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '20px' }}>
                 <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                     Control: {draft.name || '(Unnamed Control)'}
@@ -228,7 +228,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                 <Button variant="danger" onClick={handleDeactivate}>Deactivate</Button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', flex: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 <section>
                     <h2 style={sectionHeadingStyle}>Basic Information</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -284,6 +284,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.type}
+                                    disabled={draft.type === 'statOutcome'}
                                     onChange={(e) => {
                                         const type = e.target.value as ControlType;
                                         setDraft((current) => ({
@@ -298,42 +299,39 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <option value="statDisplay">Stat Display</option>
                                     <option value="statEditor">Stat Editor</option>
                                     <option value="actorStatDisplay">Actor Stat Display</option>
-                                    <option value="statOutcome">Stat Outcome</option>
+                                    <option value="statOutcome">Outcome</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <section>
-                    <h2 style={sectionHeadingStyle}>Availability</h2>
-                    <ConditionEditor
-                        conditionCollections={draft.availabilityConditions}
-                        globalStats={globalStats}
-                        actorStats={actorStats}
-                        locationStats={stageInstance.getConfiguration().locationStats || []}
-                        itemStats={stageInstance.getConfiguration().itemStats || []}
-                        actors={actors}
-                        stage={stage}
-                        items={items}
-                        locations={locations}
-                        variableContentType={usesActorStat ? 'actor' : undefined}
-                        onChange={(availabilityConditions) => setDraft((current) => ({ ...current, availabilityConditions }))}
-                    />
-                    {draft.availabilityConditions.length === 0 && (
-                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Always rendered.</span>
-                    )}
-                    {draft.type === 'actorStatDisplay' && (
-                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                            Rendered on actor cards. Variable actor targets refer to the actor whose card is shown.
-                        </span>
-                    )}
-                    {draft.type === 'statOutcome' && (
-                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                            Shows matching stat outcomes only while this control is available. Variable actor targets refer to the actor affected by the outcome.
-                        </span>
-                    )}
-                </section>
+                {draft.type !== 'statOutcome' && (
+                    <section>
+                        <h2 style={sectionHeadingStyle}>Availability</h2>
+                        <ConditionEditor
+                            conditionCollections={draft.availabilityConditions}
+                            globalStats={globalStats}
+                            actorStats={actorStats}
+                            locationStats={stageInstance.getConfiguration().locationStats || []}
+                            itemStats={stageInstance.getConfiguration().itemStats || []}
+                            actors={actors}
+                            stage={stage}
+                            items={items}
+                            locations={locations}
+                            variableContentType={usesActorStat ? 'actor' : undefined}
+                            onChange={(availabilityConditions) => setDraft((current) => ({ ...current, availabilityConditions }))}
+                        />
+                        {draft.availabilityConditions.length === 0 && (
+                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Always rendered.</span>
+                        )}
+                        {draft.type === 'actorStatDisplay' && (
+                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                Rendered on actor cards. Variable actor targets refer to the actor whose card is shown.
+                            </span>
+                        )}
+                    </section>
+                )}
 
                 {draft.type === 'button' ? (
                     <>
