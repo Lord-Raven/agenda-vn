@@ -8,6 +8,7 @@ import { FunctionEditor } from '../src/components/FunctionEditor';
 import { renderStatTypeOptions } from '../src/components/StatEntryEditor';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
 import { FunctionManagementPanel } from '../src/screens/FunctionManagementPanel';
+import { FunctionDetailPanel, FUNCTION_RETURN_TYPE_LABELS } from '../src/screens/FunctionDetailPanel';
 import { StatUpdateRuleEditor } from '../src/components/StatUpdateRuleEditor';
 import { StatValueInput } from '../src/components/StatValueInput';
 import { LocationSelect, ReferenceMultiSelect } from '../src/components/UiComponents';
@@ -37,15 +38,16 @@ const fixture = () => {
     return { stage, configuration };
 };
 
-test('functions have a dedicated management panel with add, reorder, and delete controls', () => {
+test('function management shows a return-type sidebar and a selection prompt instead of inline editors', () => {
     const { stage } = fixture();
     const html = renderToStaticMarkup(<FunctionManagementPanel stage={() => stage} />);
-    assert.match(html, /Functions/);
     assert.match(html, /Reward player/);
     assert.match(html, /Add Function/);
-    assert.match(html, /aria-label="Move function up"/);
-    assert.match(html, /aria-label="Move function down"/);
-    assert.match(html, /aria-label="Delete function"/);
+    assert.match(html, /Void \(action only\) \(1\)/);
+    assert.match(html, /Location \(0\)/);
+    assert.match(html, /Select a function to view and edit details/);
+    assert.match(html, /aria-pressed="false"/);
+    assert.doesNotMatch(html, /aria-label="Delete function"|<textarea/);
 });
 
 test('function management shows an empty state without definitions', () => {
@@ -54,6 +56,54 @@ test('function management shows an empty state without definitions', () => {
     const html = renderToStaticMarkup(<FunctionManagementPanel stage={() => stage} />);
     assert.match(html, /No functions defined/);
     assert.match(html, /Add Function/);
+});
+
+test('sidebar groups each function under its declared return type, including list types', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = FUNCTION_RETURN_TYPES.map(returnType => ({
+        id: returnType, name: `${returnType} example`, description: '', script: '', returnType,
+    }));
+    const html = renderToStaticMarkup(<FunctionManagementPanel stage={() => stage} />);
+    let previousEntryIndex = -1;
+    for (const type of FUNCTION_RETURN_TYPES) {
+        const titleIndex = html.indexOf(`${FUNCTION_RETURN_TYPE_LABELS[type]} (1)`);
+        const entryIndex = html.indexOf(`${type} example`);
+        assert.ok(titleIndex > previousEntryIndex, `${type} category follows the previous category`);
+        assert.ok(entryIndex > titleIndex, `${type} function is inside its category`);
+        previousEntryIndex = entryIndex;
+    }
+    assert.equal((html.match(/aria-pressed="false"/g) || []).length, FUNCTION_RETURN_TYPES.length);
+});
+
+test('selected function details include all editable fields, script testing, reorder and delete controls', () => {
+    const { stage, configuration } = fixture();
+    const html = renderToStaticMarkup(<FunctionDetailPanel fn={configuration.functions[0]} functions={configuration.functions} stage={stage}
+        onChange={() => {}} onMove={() => {}} onDelete={() => {}} />);
+    assert.match(html, /Function: Reward player/);
+    assert.match(html, /value="Reward player"/);
+    assert.match(html, /Return Type/);
+    assert.match(html, /value="void" selected=""/);
+    assert.match(html, /Give gold/);
+    assert.match(html, /set\(&quot;Gold&quot;, 10\);/);
+    assert.match(html, /Test/);
+    assert.match(html, /<button(?=[^>]*aria-label="Move function up")(?=[^>]*disabled="")[^>]*>/);
+    assert.match(html, /<button(?=[^>]*aria-label="Move function down")(?=[^>]*disabled="")[^>]*>/);
+    assert.match(html, /aria-label="Delete function"/);
+    for (const type of FUNCTION_RETURN_TYPES) assert.ok(html.includes(`value="${type}"`));
+});
+
+test('details show the current function only and preserve reorder availability', () => {
+    const { stage, configuration } = fixture();
+    const fn: GameFunction = { id: 'destination', name: 'Destination', description: 'Choose a place', script: 'return "place";', returnType: 'location' };
+    configuration.functions.push(fn);
+    const html = renderToStaticMarkup(<FunctionDetailPanel fn={fn} functions={configuration.functions} stage={stage}
+        onChange={() => {}} onMove={() => {}} onDelete={() => {}} />);
+    assert.match(html, /Function: Destination/);
+    assert.match(html, /value="location" selected=""/);
+    assert.match(html, /Choose a place/);
+    assert.doesNotMatch(html, /Reward player|Give gold/);
+    assert.doesNotMatch(html, /<button(?=[^>]*aria-label="Move function up")(?=[^>]*disabled="")[^>]*>/);
+    assert.match(html, /<button(?=[^>]*aria-label="Move function down")(?=[^>]*disabled="")[^>]*>/);
 });
 
 test('function editor offers isolated testing without scoped target selectors', () => {
