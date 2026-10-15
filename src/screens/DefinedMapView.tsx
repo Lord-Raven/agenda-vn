@@ -120,7 +120,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
 
     const preferredMap = useMemo(() => {
         if (latestLocationId) {
-            const linkedMap = sortedMaps.find(map => map.links.some(link => link.childId === latestLocationId));
+            const linkedMap = sortedMaps.find(map => map.links.some(link => stage().resolveValue(link.childId, 'location') === latestLocationId));
             if (linkedMap) {
                 return linkedMap;
             }
@@ -296,8 +296,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                 style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`, backgroundRepeat: 'no-repeat' }}
                             >
                                 {displayedMap.links.map((link, index) => {
-                                    const linkedLocation = save.atlas?.[link.childId];
-                                    const linkedMap = sortedMaps.find(map => map.id === link.childId);
+                                    const childId = String(stage().resolveValue(link.childId, 'location', save));
+                                    const linkedLocation = save.atlas?.[childId];
+                                    const linkedMap = sortedMaps.find(map => map.id === childId);
                                     if (!linkedLocation && !linkedMap) {
                                         return null;
                                     }
@@ -314,7 +315,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
                                     const configuration = stage().getConfiguration();
-                                    const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats });
+                                    const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, stage().getScheduleContext(save));
                                     const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
                                     const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize);
                                     const handleMarkerClick = () => {

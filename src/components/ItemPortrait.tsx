@@ -35,8 +35,9 @@ export const ItemPortrait: FC<ItemPortraitProps> = ({
     thumbnailSize,
 }) => {
     const renderedSize = Math.max(typeof width === 'number' ? width : 0, typeof height === 'number' ? height : 0) || 128;
+    const stageInstance = resolveStage(stage);
     const imageUrl = useThumbnailUrl(
-        item ? getItemImageUrl(item as Item, resolveStage(stage)?.getSave()) : undefined,
+        item ? getItemImageUrl(item as Item, stageInstance?.getScheduleContext(stageInstance.getSave())) : undefined,
         thumbnailSize ?? Math.round(renderedSize * 2),
     );
 

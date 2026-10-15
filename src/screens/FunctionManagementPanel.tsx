@@ -3,7 +3,7 @@ import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { IconButton } from '@mui/material';
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
-import { cloneGameFunction, GameFunction } from '../content/Function';
+import { cloneGameFunction, GameFunction, FUNCTION_RETURN_TYPES, FunctionReturnType } from '../content/Function';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { FunctionEditor } from '../components/FunctionEditor';
 
@@ -71,6 +71,16 @@ export const FunctionManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) =
                                     <TextInput fullWidth value={fn.name} onChange={event => patch(fn.id, { name: event.target.value })} />
                                 </label>
                                 <label style={{ color: 'var(--agenda-text-muted)' }}>
+                                    Return Type
+                                    <select className="input-base" value={fn.returnType || 'void'} onChange={event => patch(fn.id, { returnType: event.target.value as FunctionReturnType })}>
+                                        {FUNCTION_RETURN_TYPES.map(type => <option key={type} value={type}>{type === 'void' ? 'Void (action only)' : type === 'text' ? 'String (text)' : type}</option>)}
+                                    </select>
+                                </label>
+                                <p style={{ color: 'var(--agenda-text-muted)', margin: 0 }}>
+                                    Return IDs for content references, option IDs for options, and arrays of IDs for lists.
+                                    Typed functions can be selected as dynamic values. Reading a value is read-only, including nested calls.
+                                </p>
+                                <label style={{ color: 'var(--agenda-text-muted)' }}>
                                     Description
                                     <TextArea value={fn.description} onChange={event => patch(fn.id, { description: event.target.value })} rows={2} style={{ width: '100%' }} />
                                 </label>
@@ -79,7 +89,7 @@ export const FunctionManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) =
                         )}
                     </div>
                 ))}
-                <Button onClick={() => update([...functions, { id: generateUuid(), name: 'New Function', description: '', script: '' }])}>
+                <Button onClick={() => update([...functions, { id: generateUuid(), name: 'New Function', description: '', script: '', returnType: 'void' }])}>
                     <Add /> Add Function
                 </Button>
             </div>

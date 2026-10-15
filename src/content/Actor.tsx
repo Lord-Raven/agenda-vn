@@ -14,6 +14,8 @@ import {
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget, pickSeededItem } from './Condition';
 import { formatCurrentDate } from './Skit';
 import { ACTOR_VOICES, DEFAULT_VOICE_MODULATION, formatActorVoiceLabel, normalizeVoiceModulation, VoiceModulation } from './ActorVoice';
+import { resolveStatValue } from './Stat';
+import { isFunctionReference } from './Function';
 
 // A single conditional modifier to an actor's initial stat value; numeric stats are adjusted, while text/location stats are replaced.
 export type ActorStatModifier = {
@@ -80,20 +82,20 @@ export const resolvePerActorStatValue = (
 ): StatValue => {
     const explicitValue = hostActor.perActorStatMap?.[stat.name]?.[targetActorId];
     if (explicitValue !== undefined) {
-        return normalizeStatValue(explicitValue, stat);
+        return resolveStatValue(explicitValue, stat, context);
     }
 
     const hostRuleValue = resolvePerActorValueRule(hostActor.perActorValueRules?.[stat.name], stat, context);
     if (hostRuleValue !== undefined) {
-        return hostRuleValue;
+        return resolveStatValue(hostRuleValue, stat, context);
     }
 
     const statRuleValue = resolvePerActorValueRule(stat.perActorDefaultRules, stat, context);
     if (statRuleValue !== undefined) {
-        return statRuleValue;
+        return resolveStatValue(statRuleValue, stat, context);
     }
 
-    return resolveStatDefault(stat);
+    return resolveStatValue(stat.default, stat, context);
 };
 
 const cloneStatInitialMap = (statInitialMap: unknown): { [key: string]: ActorStatInitial } => {
@@ -169,7 +171,7 @@ const resolveScheduleStatDestination = (destination: string, actor: Pick<Actor, 
         if (!stat) {
             return '';
         }
-        return resolveStatLocationValue(stat, context.globalStatValues?.[stat.id], seed);
+        return resolveStatLocationValue(stat, resolveStatValue(context.globalStatValues?.[stat.id], stat, context), seed);
     }
     if (destination.startsWith(ACTOR_SCHEDULE_ACTOR_STAT_PREFIX)) {
         const statId = destination.slice(ACTOR_SCHEDULE_ACTOR_STAT_PREFIX.length);
@@ -177,9 +179,9 @@ const resolveScheduleStatDestination = (destination: string, actor: Pick<Actor, 
         if (!stat) {
             return '';
         }
-        return resolveStatLocationValue(stat, actor.statMap?.[stat.id], seed);
+        return resolveStatLocationValue(stat, resolveStatValue(actor.statMap?.[stat.id], stat, context), seed);
     }
-    return destination;
+    return String(context.resolveValue?.(destination, 'location') ?? destination);
 };
 
 // The actor's own rules are evaluated first, then the universal rules; the first matching destination wins,
@@ -389,19 +391,18 @@ function clampActorStatValue(value: number, stat: Stat): number {
 
 // Computes an actor's initial stat value from its configured initial value and any modifiers whose conditions currently evaluate true.
 export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatInitial | undefined, context: ConditionContext): StatValue {
-    if (stat.type === 'text' || stat.type === 'location' || stat.type === 'locationList') {
-        return (initial?.modifiers || []).reduce((currentValue, modifier) => {
-            return evaluateConditionCollections(modifier.conditions, context)
-                ? normalizeStatValue(modifier.amount, stat, { evaluateDiceNotation: true })
-                : currentValue;
-        }, normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true }));
+    const storedValue = normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
+    const modifiers = (initial?.modifiers || []).filter(modifier => evaluateConditionCollections(modifier.conditions, context));
+    if (isFunctionReference(storedValue) && modifiers.length === 0) {
+        return storedValue;
     }
-
-    if (stat.type === 'option') {
-        return normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
+    if (!isNumericDisplayType(stat.type) && stat.type !== 'checkbox') {
+        return modifiers.reduce((_, modifier) =>
+            normalizeStatValue(modifier.amount, stat, { evaluateDiceNotation: true }), storedValue);
     }
 
     if (stat.type === 'checkbox') {
+        if (isFunctionReference(storedValue)) return storedValue;
         const baseValue = typeof initial?.value === 'boolean'
             ? initial.value
             : typeof stat.default === 'boolean'
@@ -410,10 +411,11 @@ export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatIniti
         return baseValue;
     }
 
-    const normalizedBaseValue = normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
+    const normalizedBaseValue = resolveStatValue(storedValue, stat, context);
     const baseValue = Number.isFinite(normalizedBaseValue) ? Number(normalizedBaseValue) : 0;
-    const modifierTotal = (initial?.modifiers || []).reduce((total, modifier) => {
-        return evaluateConditionCollections(modifier.conditions, context) ? total + (Number.isFinite(modifier.amount) ? Number(modifier.amount) : 0) : total;
+    const modifierTotal = modifiers.reduce((total, modifier) => {
+        const amount = context.resolveValue?.(modifier.amount, stat.type) ?? modifier.amount;
+        return total + (Number.isFinite(amount) ? Number(amount) : 0);
     }, 0);
     return clampActorStatValue(baseValue + modifierTotal, stat);
 }
@@ -468,7 +470,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
-    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats }), stage) || 'None provided.';
+    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], stage.getScheduleContext(save)), stage) || 'None provided.';
     const otherActorsContext = Object.values(stage.getSave().actors || {})
         .filter(otherActor => otherActor?.id && otherActor.id !== actor.id && otherActor.active !== false && otherActor !== stage.getPlayerActor())
         .map(otherActor => {
@@ -570,6 +572,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
         actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
 
         actorStats.forEach((stat, index) => {
+            if (isFunctionReference(actor.statMap[stat.id])) return;
             const parsedValue = Number(parsedData[`stat_${index}`]);
             const currentValue = Number(actor.statMap[stat.id]);
             const fallbackValue = Number.isFinite(currentValue) ? currentValue : (Number.isFinite(stat.default) ? Number(stat.default) : 0);
@@ -985,18 +988,13 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
 
     if (options.includes('stats')) {
         const actorStatContext: ConditionContext = {
-            currentDate: save.currentDate,
-            currentTimeOfDay: save.currentTimeOfDay,
-            globalStatValues: save.globalStatValues,
-            globalStats: stage.getConfiguration().globalStats,
-            actorStats: stage.getConfiguration().actorStats,
-            actors: save.actors,
+            ...stage.getScheduleContext(save),
             currentActor: { id: actor.id, name: actor.name, statMap: actor.statMap },
         };
         const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim() && isStatLlmSeen(stat, actorStatContext));
         const scalarStatLines = actorStats
             .filter(stat => !stat.perActor && actor.statMap?.[stat.id] !== undefined)
-            .map(stat => `${stat.name}: ${formatActorStatValue(normalizeStatValue(actor.statMap[stat.id], stat), stat, save.atlas, save.actors, save.inventory)}`);
+            .map(stat => `${stat.name}: ${formatActorStatValue(stage.readStatValue(actor.statMap[stat.id], stat, save), stat, save.atlas, save.actors, save.inventory)}`);
         if (scalarStatLines.length > 0) {
             builder.addBlock('Stats', scalarStatLines.join('\n'));
         }
@@ -1007,12 +1005,7 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
         if (perActorStats.length > 0 && targetActors.length > 0) {
             const perActorLines = targetActors.map(target => {
                 const context: ConditionContext = {
-                    currentDate: save.currentDate,
-                    currentTimeOfDay: save.currentTimeOfDay,
-                    globalStatValues: save.globalStatValues,
-                    globalStats: stage.getConfiguration().globalStats,
-                    actorStats: stage.getConfiguration().actorStats,
-                    actors: save.actors,
+                    ...stage.getScheduleContext(save),
                     currentActor: { id: target.id, name: target.name, statMap: target.statMap },
                 };
                 const values = perActorStats

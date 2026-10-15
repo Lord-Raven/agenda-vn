@@ -95,6 +95,8 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
                                     allowClear={false}
                                     title="Choose schedule destination"
                                     placeholder="Search locations"
+                                    functionType="location"
+                                    stage={stage}
                                 />
                             </div>
                             <Button variant="secondary" disabled={index === 0} onClick={() => moveEntry(index, -1)} aria-label="Move schedule entry up" style={{ minWidth: 34, padding: 6 }}><ArrowUpward fontSize="small" /></Button>

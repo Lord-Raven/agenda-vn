@@ -18,7 +18,7 @@ export function getMapImageUrl(map: Map | undefined, stage?: Stage): string {
     if (!map) {
         return '';
     }
-    return getMatchingAlternativeImage(map.alternativeImages, stage?.getSave())?.imageUrl || map.imageUrl || '';
+    return getMatchingAlternativeImage(map.alternativeImages, stage?.getScheduleContext(stage.getSave()))?.imageUrl || map.imageUrl || '';
 }
 
 export const isMapAvailable = (map: Map, context: ConditionContext): boolean =>

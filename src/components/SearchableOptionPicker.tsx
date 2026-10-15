@@ -1,6 +1,9 @@
 import { FC, ReactNode, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DoNotDisturb } from '@mui/icons-material';
+import type { Stage } from '../Stage';
+import type { StatType } from '../content/Stat';
+import { functionPickerOptions, isFunctionReference } from '../content/Function';
 
 const MAX_SELECTED_PREVIEW = 6;
 
@@ -28,6 +31,8 @@ export interface SearchableOptionPickerProps {
     title?: string;
     renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
     disabled?: boolean;
+    functionType?: StatType;
+    stage?: Stage | (() => Stage);
 }
 
 export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
@@ -44,7 +49,24 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     title = 'Choose option',
     renderButton,
     disabled = false,
+    functionType,
+    stage,
 }) => {
+    const stageInstance = typeof stage === 'function' ? stage() : stage;
+    if (functionType) {
+        const listType = functionType === 'actor' ? 'actorList' : functionType === 'item' ? 'itemList' : functionType === 'location' ? 'locationList' : functionType === 'option' ? 'optionList' : undefined;
+        const functionOptions = [
+            ...functionPickerOptions(stageInstance?.getConfiguration().functions, functionType),
+            ...(multiple && listType ? functionPickerOptions(stageInstance?.getConfiguration().functions, listType) : []),
+        ];
+        options = [...options.filter(option => !isFunctionReference(option.key)), ...functionOptions];
+        const selected = multiple ? values || [] : value ? [value] : [];
+        for (const key of selected.filter(isFunctionReference)) {
+            if (!options.some(option => option.key === key)) {
+                options.push({ key, label: 'Missing or incompatible function', category: 'Functions' });
+            }
+        }
+    }
     const [search, setSearch] = useState(initialSearch);
     const [isOpen, setIsOpen] = useState(false);
     const pointerStartedOnBackdrop = useRef(false);

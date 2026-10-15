@@ -1,5 +1,7 @@
 import { FC, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import type { Stage } from '../Stage';
+import { functionPickerOptions, isFunctionReference } from '../content/Function';
 import {
     AttachMoney,
     Favorite,
@@ -605,35 +607,44 @@ const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [
 
 type RatingIconKey = (typeof RATING_ICON_OPTIONS)[number]['key'];
 
-const resolveIcon = (iconName?: string) => {
+const resolveIcon = (iconName?: string, stage?: Stage) => {
+    if (isFunctionReference(iconName)) {
+        if (!stage) {
+            throw new globalThis.Error('A stage is required to evaluate a function-backed icon.');
+        }
+        iconName = String(stage.resolveValue(iconName, 'text'));
+    }
     const match = RATING_ICON_OPTIONS.find(option => option.key === iconName);
     return match?.icon || Star;
 };
 
 interface IconPickerProps {
+    stage?: Stage | (() => Stage);
     value?: string;
     onChange: (iconName: string | undefined) => void;
     allowClear?: boolean;
     placeholder?: string;
 }
 
-export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = false, placeholder = 'Search icon' }) => {
+export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = false, placeholder = 'Search icon', stage }) => {
     const [search, setSearch] = useState('');
     const [isOpen, setIsOpen] = useState(false);
+    const stageInstance = typeof stage === 'function' ? stage() : stage;
+    const functionOptions = functionPickerOptions(stageInstance?.getConfiguration().functions, 'text');
 
     const filteredOptions = useMemo(() => {
         const query = search.trim().toLowerCase();
-        return RATING_ICON_OPTIONS.filter((option) => {
+        return [...RATING_ICON_OPTIONS, ...functionOptions.map(fn => ({ key: fn.key, labels: [fn.label, fn.description], icon: Build }))].filter((option) => {
             if (!query) {
                 return true;
             }
             return option.labels.join(' ').toLowerCase().includes(query) || option.key.toLowerCase().includes(query);
         });
-    }, [search]);
+    }, [search, stageInstance?.getConfiguration().functions]);
 
     const selectedValue = value ?? (allowClear ? undefined : 'star');
     const previewIconName = value ?? (allowClear ? undefined : 'star');
-    const PreviewIcon = previewIconName ? resolveIcon(previewIconName) : DoNotDisturb;
+    const PreviewIcon = isFunctionReference(previewIconName) ? Build : previewIconName ? resolveIcon(previewIconName) : DoNotDisturb;
 
     const handleSelect = (nextValue?: string) => {
         onChange(nextValue);

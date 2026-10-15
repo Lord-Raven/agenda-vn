@@ -5,7 +5,7 @@ import { Stage } from '../Stage';
 import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
-import { Stat, StatValue, formatReferenceStatText, formatStatOptionValueText, normalizeStatValue, resolveReferenceKind } from './Stat';
+import { Stat, StatValue, formatReferenceStatText, formatStatOptionValueText, resolveReferenceKind } from './Stat';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -104,7 +104,7 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
     const lookup = { actors: save.actors, items: save.inventory, locations: save.atlas };
 
     const formatValue = (stat: Stat, rawValue: unknown): string => {
-        const value = normalizeStatValue(rawValue, stat);
+        const value = stage.readStatValue(rawValue, stat, save);
         if (stat.type === 'checkbox') {
             return value === true ? 'yes' : 'no';
         }

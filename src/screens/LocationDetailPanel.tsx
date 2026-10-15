@@ -20,6 +20,7 @@ import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
 import { StatValueInput } from '../components/StatValueInput';
+import { isFunctionReference, functionPickerOptions } from '../content/Function';
 
 type LocationAvailabilityState = 'unavailable' | 'disabled';
 
@@ -781,6 +782,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                         padding: '12px',
                                     }}>
                                         {locationStats.map((stat) => {
+                                            const hasFunctionSource = isFunctionReference(editedStatMap[stat.id]) || functionPickerOptions(stage().getConfiguration().functions, stat.type).length > 0;
                                             const value = Number(editedStatMap[stat.id]);
                                             const displayValue = Number.isFinite(value)
                                                 ? value
@@ -801,7 +803,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                         backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)',
                                                     }}
                                                 >
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', height: '40px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', minHeight: '40px' }}>
                                                         <Button
                                                             variant="secondary"
                                                             onClick={() => toggleLocationStatExpanded(stat.id)}
@@ -827,6 +829,8 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                             </span>
                                                         </Button>
 
+                                                        {hasFunctionSource ? <StatValueInput stat={stat} value={editedStatMap[stat.id]} onChange={value => handleLocationStatReferenceChange(stat, value)}
+                                                            stage={stage} actors={actorOptions} items={itemOptions} locations={locationOptions} /> : <>
                                                         {stat.type === 'checkbox' && (
                                                             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
                                                                 <input
@@ -896,6 +900,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                                 style={{ maxWidth: '220px' }}
                                                             />
                                                         )}
+                                                        </>}
                                                     </div>
 
                                                     {isExpanded && !!stat.description?.trim() && (

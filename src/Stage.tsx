@@ -5,7 +5,8 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, GameAction, applyStatUpdateValue, cloneStat, cloneGameAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReferenceId, listElementType, validateFunctionResult } from './content/Function';
+import { resolveStatValue } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
@@ -129,6 +130,7 @@ const MAX_STAT_UPDATE_PERIODS = 128;
 
 // Prevent cyclical function calls from recursing indefinitely.
 const MAX_FUNCTION_INVOCATION_DEPTH = 8;
+type ScriptContext = { readOnly: boolean; stack: string[] };
 
 // Simple (string) metadata fields a function script may read/write directly on an actor/location/item via
 // getField/setField, bypassing the Stat system entirely. Deliberately excludes complex fields (schedule,
@@ -351,7 +353,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 return stat ? { stat } : undefined;
             }
             const save = this.saveData?.saves?.[this.saveData.lastSaveSlot];
-            return { stat: globalStat, value: save?.globalStatValues?.[statId] ?? configuration?.globalStatValues?.[statId] };
+            return { stat: globalStat, value: save?.globalStatValues?.[statId] ?? configuration?.globalStatValues?.[statId],
+                resolveValue: (value, type) => this.resolveValue(value, type, save) };
         });
         const {
             characters,
@@ -518,7 +521,44 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // that point at a location-type ActorStat rather than a fixed location id.
     getScheduleContext(save: SaveType): ScheduleContext {
         const configuration = this.getConfiguration();
-        return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats };
+        return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats,
+            resolveValue: (value, type) => this.resolveValue(value, type, save) };
+    }
+
+    resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = []): StatValue {
+        if (isFunctionReference(value)) {
+            const id = functionReferenceId(value);
+            const fn = this.getConfiguration().functions.find(candidate => candidate.id === id);
+            if (!fn) {
+                throw new Error(`Unknown function reference: ${id}`);
+            }
+            if (fn.returnType !== type) {
+                throw new Error(`Function "${fn.name}" returns ${fn.returnType || 'void'}, not ${type}.`);
+            }
+            const errors: string[] = [];
+            const result = this.runGameFunction(save, fn, stack.length, message => errors.push(message), { readOnly: true, stack });
+            if (errors.length) {
+                throw new Error(errors.join('\n'));
+            }
+            validateFunctionResult(result, type);
+            return result as StatValue;
+        }
+        const elementType = listElementType(type);
+        if (elementType && Array.isArray(value)) {
+            return value.flatMap(entry => {
+                if (!isFunctionReference(entry)) {
+                    return typeof entry === 'string' ? [entry] : [];
+                }
+                const fn = this.getConfiguration().functions.find(candidate => candidate.id === functionReferenceId(entry));
+                const resolved = this.resolveValue(entry, fn?.returnType === type ? type : elementType, save, stack);
+                return Array.isArray(resolved) ? resolved : [String(resolved)];
+            });
+        }
+        return value as StatValue;
+    }
+
+    readStatValue(value: unknown, stat: Stat, save: SaveType = this.getSave(), stack: string[] = []): StatValue {
+        return resolveStatValue(value, stat, { resolveValue: (source, type) => this.resolveValue(source, type, save, stack) });
     }
 
     // Actor-card rules bind "Variable" actor targets to the actor whose card is displayed.
@@ -782,20 +822,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             inventory,
             timeline: [],
             timestamp: Date.now(),
+            currentDate: startingDate,
+            currentTimeOfDay: 'morning',
+            globalStatValues: {},
         } as SaveType;
 
         const seededEvents = (configuration.calendarEvents || []).flatMap(event =>
             this.expandRecurringEvent(this.normalizeCalendarEventForSave(cloneCalendarEvent(event), draftSaveContext)),
         );
 
-        const globalStatValues = buildInitialGlobalStatValues(configuration.globalStats || [], selectedGlobalStatValues, {
-            actors: Object.values(actors),
-            atlas,
-            inventory,
-            actorStats: configuration.actorStats,
-            locationStats: configuration.locationStats,
-            itemStats: configuration.itemStats,
-        });
+        const globalStatValues = buildInitialGlobalStatValues(configuration.globalStats || [], selectedGlobalStatValues,
+            this.getScheduleContext(draftSaveContext), draftSaveContext.globalStatValues);
 
         return {playerId: this.primaryUser.anonymizedId,
             actors,
@@ -973,6 +1010,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         return (save.upcomingEvents || [])
             .filter(event => this.isFutureEvent(event))
+            .map(event => this.resolveCalendarEvent(event, save))
             .sort((a, b) => this.compareCalendarEvents(a, b));
     }
 
@@ -1139,7 +1177,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const save = this.getSave();
         this.ensureCalendarState(save);
 
-        const selectedEvent = (save.upcomingEvents || []).find(event => event.id === eventId);
+        const storedEvent = (save.upcomingEvents || []).find(event => event.id === eventId);
+        const selectedEvent = storedEvent ? this.resolveCalendarEvent(storedEvent, save) : undefined;
         if (!selectedEvent) {
             return null;
         }
@@ -1210,6 +1249,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const currentTimeOfDay = save.currentTimeOfDay || 'morning';
 
         return [...(save.upcomingEvents || [])]
+            .map(event => this.resolveCalendarEvent(event, save))
             .filter((event) => event.locationId === locationId)
             .filter((event) => event.date === currentDate)
             .filter((event) => event.duration.includes(currentTimeOfDay))
@@ -1618,6 +1658,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // The entity instances (with statMaps) a non-global update targets, per its targetType.
     private resolveUpdateTargetEntities(save: SaveType, update: StatUpdate, context: ConditionContext): Array<Actor | Location | Item> {
+        if (update.targetType !== 'global') {
+            update = { ...update, targetId: String(this.resolveValue(update.targetId, update.targetType, save)) };
+        }
         switch (update.targetType) {
             case 'location': return this.resolveUpdateTargetLocations(save, update.targetId);
             case 'item': return this.resolveUpdateTargetItems(save, update.targetId);
@@ -1627,19 +1670,22 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // Builds the get/set accessors a function script uses to read/write a global stat by name.
-    private buildGlobalScriptAccessors(save: SaveType): Pick<FunctionScriptBindings, 'get' | 'getObjects' | 'set'> {
+    private buildGlobalScriptAccessors(save: SaveType, context: ScriptContext): Pick<FunctionScriptBindings, 'get' | 'getObjects' | 'set'> {
         const stats = this.getConfiguration().globalStats || [];
         const findStat = (name: string) => stats.find(candidate => candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
         return {
             get: (name: string) => {
                 const stat = findStat(name);
-                return stat ? normalizeStatValue(save.globalStatValues?.[stat.id], stat) : undefined;
+                return stat ? this.readStatValue(save.globalStatValues?.[stat.id], stat, save, context.stack) : undefined;
             },
             getObjects: (name: string) => {
                 const stat = findStat(name);
-                return this.resolveScriptStatObjects(save, stat, stat ? save.globalStatValues?.[stat.id] : undefined, name);
+                return this.resolveScriptStatObjects(save, stat, stat ? save.globalStatValues?.[stat.id] : undefined, name, context);
             },
             set: (name: string, value: StatValue) => {
+                if (context.readOnly) {
+                    throw new Error('Function-backed values are read-only: set() is not allowed.');
+                }
                 const stat = findStat(name);
                 if (!stat) {
                     return;
@@ -1650,11 +1696,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
     }
 
-    private resolveScriptStatObjects(save: SaveType, stat: Stat | undefined, value: StatValue | undefined, name: string): FunctionScriptObject[] {
+    private resolveScriptStatObjects(save: SaveType, stat: Stat | undefined, value: StatValue | undefined, name: string, context: ScriptContext): FunctionScriptObject[] {
         if (!stat || !isListStatType(stat.type)) {
             throw new Error(`getObjects("${name}") requires an option list or content list stat.`);
         }
-        const ids = normalizeStatValue(value, stat) as string[];
+        const ids = this.readStatValue(value, stat, save, context.stack) as string[];
         if (stat.type === 'optionList') {
             const options = resolveStatOptionPool(stat);
             return ids.flatMap(id => {
@@ -1671,7 +1717,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 : kind === 'location' ? save.atlas?.[id]
                     : save.inventory?.find(item => item.id === id);
             return entity && entity.active !== false
-                ? [this.buildEntityScriptAccessor(save, entity, kind, stats || [], fields)]
+                ? [this.buildEntityScriptAccessor(save, entity, kind, stats || [], fields, context)]
                 : [];
         });
     }
@@ -1685,6 +1731,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         kind: FunctionScriptEntity['kind'],
         stats: Stat[],
         fieldAllowlist?: string[],
+        context: ScriptContext = { readOnly: false, stack: [] },
     ): FunctionScriptEntity {
         const statMap = entity.statMap;
         const entityFields = entity as unknown as Record<string, unknown>;
@@ -1695,13 +1742,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             kind,
             get: (statName: string) => {
                 const stat = findStat(statName);
-                return stat ? normalizeStatValue(statMap[stat.id], stat) : undefined;
+                return stat ? this.readStatValue(statMap[stat.id], stat, save, context.stack) : undefined;
             },
             getObjects: (statName: string) => {
                 const stat = findStat(statName);
-                return this.resolveScriptStatObjects(save, stat, stat ? statMap[stat.id] : undefined, statName);
+                return this.resolveScriptStatObjects(save, stat, stat ? statMap[stat.id] : undefined, statName, context);
             },
             set: (statName: string, value: StatValue) => {
+                if (context.readOnly) {
+                    throw new Error('Function-backed values are read-only: entity.set() is not allowed.');
+                }
                 const stat = findStat(statName);
                 if (!stat) {
                     return;
@@ -1716,6 +1766,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 return field ? String(entityFields[field] ?? '') : undefined;
             };
             accessor.setField = (fieldName: string, value: string) => {
+                if (context.readOnly) {
+                    throw new Error('Function-backed values are read-only: setField() is not allowed.');
+                }
                 const field = findField(fieldName);
                 if (field) {
                     entityFields[field] = `${value ?? ''}`;
@@ -1725,45 +1778,45 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return accessor;
     }
 
-    private findActorScriptEntity(save: SaveType, name: string): FunctionScriptEntity | undefined {
+    private findActorScriptEntity(save: SaveType, name: string, context: ScriptContext): FunctionScriptEntity | undefined {
         const actor = Object.values(save.actors || {}).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return actor ? this.buildEntityScriptAccessor(save, actor, 'actor', this.getConfiguration().actorStats || [], ACTOR_SCRIPT_FIELDS) : undefined;
+        return actor ? this.buildEntityScriptAccessor(save, actor, 'actor', this.getConfiguration().actorStats || [], ACTOR_SCRIPT_FIELDS, context) : undefined;
     }
 
-    private findLocationScriptEntity(save: SaveType, name: string): FunctionScriptEntity | undefined {
+    private findLocationScriptEntity(save: SaveType, name: string, context: ScriptContext): FunctionScriptEntity | undefined {
         const location = Object.values(save.atlas || {}).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return location ? this.buildEntityScriptAccessor(save, location, 'location', this.getConfiguration().locationStats || [], LOCATION_SCRIPT_FIELDS) : undefined;
+        return location ? this.buildEntityScriptAccessor(save, location, 'location', this.getConfiguration().locationStats || [], LOCATION_SCRIPT_FIELDS, context) : undefined;
     }
 
-    private findItemScriptEntity(save: SaveType, name: string): FunctionScriptEntity | undefined {
+    private findItemScriptEntity(save: SaveType, name: string, context: ScriptContext): FunctionScriptEntity | undefined {
         const item = (save.inventory || []).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return item ? this.buildEntityScriptAccessor(save, item, 'item', this.getConfiguration().itemStats || [], ITEM_SCRIPT_FIELDS) : undefined;
+        return item ? this.buildEntityScriptAccessor(save, item, 'item', this.getConfiguration().itemStats || [], ITEM_SCRIPT_FIELDS, context) : undefined;
     }
 
     // Every active (non-deleted) actor/location/item, wrapped as FunctionScriptEntity, for scripts that need to
     // loop over the full cast (e.g. `actors().forEach(a => ...)`).
-    private buildActorScriptEntities(save: SaveType): FunctionScriptEntity[] {
+    private buildActorScriptEntities(save: SaveType, context: ScriptContext): FunctionScriptEntity[] {
         const actorStats = this.getConfiguration().actorStats || [];
         return Object.values(save.actors || {})
             .filter(actor => actor.active !== false)
-            .map(actor => this.buildEntityScriptAccessor(save, actor, 'actor', actorStats, ACTOR_SCRIPT_FIELDS));
+            .map(actor => this.buildEntityScriptAccessor(save, actor, 'actor', actorStats, ACTOR_SCRIPT_FIELDS, context));
     }
 
-    private buildLocationScriptEntities(save: SaveType): FunctionScriptEntity[] {
+    private buildLocationScriptEntities(save: SaveType, context: ScriptContext): FunctionScriptEntity[] {
         const locationStats = this.getConfiguration().locationStats || [];
         return Object.values(save.atlas || {})
             .filter(location => location.active !== false)
-            .map(location => this.buildEntityScriptAccessor(save, location, 'location', locationStats, LOCATION_SCRIPT_FIELDS));
+            .map(location => this.buildEntityScriptAccessor(save, location, 'location', locationStats, LOCATION_SCRIPT_FIELDS, context));
     }
 
-    private buildItemScriptEntities(save: SaveType): FunctionScriptEntity[] {
+    private buildItemScriptEntities(save: SaveType, context: ScriptContext): FunctionScriptEntity[] {
         const itemStats = this.getConfiguration().itemStats || [];
         return (save.inventory || [])
             .filter(item => item.active !== false)
-            .map(item => this.buildEntityScriptAccessor(save, item, 'item', itemStats, ITEM_SCRIPT_FIELDS));
+            .map(item => this.buildEntityScriptAccessor(save, item, 'item', itemStats, ITEM_SCRIPT_FIELDS, context));
     }
 
-    private buildFunctionScriptBindings(save: SaveType, depth: number, onError?: (message: string) => void): FunctionScriptBindings {
+    private buildFunctionScriptBindings(save: SaveType, depth: number, context: ScriptContext, onError?: (message: string) => void): FunctionScriptBindings {
         const configuration = this.getConfiguration();
         const call = (name: string): unknown => {
             if (depth >= MAX_FUNCTION_INVOCATION_DEPTH) {
@@ -1774,25 +1827,37 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (!fn) {
                 throw new Error(`Unknown function: ${name}`);
             }
-            return this.runGameFunction(save, fn, depth + 1, onError);
+            return this.runGameFunction(save, fn, depth + 1, onError, context);
         };
         return {
-            ...this.buildGlobalScriptAccessors(save),
-            getActor: (name: string) => this.findActorScriptEntity(save, name),
-            getLocation: (name: string) => this.findLocationScriptEntity(save, name),
-            getItem: (name: string) => this.findItemScriptEntity(save, name),
-            actors: () => this.buildActorScriptEntities(save),
-            locations: () => this.buildLocationScriptEntities(save),
-            items: () => this.buildItemScriptEntities(save),
+            ...this.buildGlobalScriptAccessors(save, context),
+            getActor: (name: string) => this.findActorScriptEntity(save, name, context),
+            getLocation: (name: string) => this.findLocationScriptEntity(save, name, context),
+            getItem: (name: string) => this.findItemScriptEntity(save, name, context),
+            actors: () => this.buildActorScriptEntities(save, context),
+            locations: () => this.buildLocationScriptEntities(save, context),
+            items: () => this.buildItemScriptEntities(save, context),
             call,
         };
     }
 
-    private runGameFunction(save: SaveType, fn: GameFunction, depth: number, onError?: (message: string) => void): unknown {
-        return runFunctionScript(fn.script, this.buildFunctionScriptBindings(save, depth, onError), onError);
+    private runGameFunction(save: SaveType, fn: GameFunction, depth: number, onError?: (message: string) => void, context: ScriptContext = { readOnly: false, stack: [] }): unknown {
+        if (context.stack.includes(fn.id) || context.stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
+            throw new Error(`Maximum function invocation depth exceeded or cyclic function reference: ${fn.name}`);
+        }
+        const nextContext = { ...context, stack: [...context.stack, fn.id] };
+        let failed = false;
+        const reportError = (message: string) => {
+            failed = true;
+            if (onError) onError(message);
+            else console.error(message);
+        };
+        const result = runFunctionScript(fn.script, this.buildFunctionScriptBindings(save, depth, nextContext, reportError), reportError);
+        if (!failed) validateFunctionResult(result, fn.returnType || 'void');
+        return result;
     }
 
-    testFunction(fn: GameFunction, functions: GameFunction[] = this.getConfiguration().functions): FunctionScriptTestResult {
+    testFunction(fn: GameFunction, functions: GameFunction[] = this.getConfiguration().functions, readOnly: boolean = fn.returnType !== undefined && fn.returnType !== 'void'): FunctionScriptTestResult {
         const errors: string[] = [];
         try {
             const save = structuredClone(this.getSave());
@@ -1800,7 +1865,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             configuration.functions = structuredClone([...functions.filter(candidate => candidate.id !== fn.id), fn]);
             const runtime: Stage = Object.create(this);
             runtime.getConfiguration = () => configuration;
-            const value = runtime.runGameFunction(save, fn, 0, message => errors.push(message));
+            const value = runtime.runGameFunction(save, fn, 0, message => errors.push(message), { readOnly, stack: [] });
             return { value, errors };
         } catch (error) {
             errors.push((error as Error)?.message || String(error));
@@ -1816,7 +1881,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         if (update.targetType === 'global') {
             save.globalStatValues = save.globalStatValues || {};
-            save.globalStatValues[stat.id] = applyStatUpdateValue(save.globalStatValues[stat.id], update, stat);
+            save.globalStatValues[stat.id] = this.applyResolvedStatUpdate(save.globalStatValues[stat.id], update, stat, save);
             return;
         }
 
@@ -1827,8 +1892,25 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         this.resolveUpdateTargetEntities(save, update, context).forEach(entity => {
             entity.statMap = entity.statMap || {};
-            entity.statMap[stat.id] = applyStatUpdateValue(entity.statMap[stat.id], update, stat);
+            entity.statMap[stat.id] = this.applyResolvedStatUpdate(entity.statMap[stat.id], update, stat, save);
         });
+    }
+
+    private applyResolvedStatUpdate(current: StatValue | undefined, update: StatUpdate, stat: Stat, save: SaveType): StatValue {
+        if (update.operation === 'set' || (stat.type !== 'number' && stat.type !== 'optionList')) {
+            return applyStatUpdateValue(current, update, stat);
+        }
+        const currentValue = this.readStatValue(current, stat, save);
+        const operand = stat.type === 'optionList' && !Array.isArray(update.value)
+            ? [update.value] : update.value;
+        return applyStatUpdateValue(currentValue, {
+            ...update, value: this.resolveValue(operand, stat.type, save),
+        }, { ...stat, default: currentValue });
+    }
+
+    resolveCalendarEvent(event: CalendarEvent, save: SaveType = this.getSave()): CalendarEvent {
+        const actorIds = this.resolveValue(event.actorIds || event.participantActorIds || [], 'actorList', save) as string[];
+        return { ...event, locationId: String(this.resolveValue(event.locationId, 'location', save)), actorIds, participantActorIds: [...actorIds] };
     }
 
     private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType, useConfiguration: boolean = false): CalendarEvent {
@@ -1840,17 +1922,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             ? configuration.actors || []
             : Object.values(save.actors || {});
         const fallbackLocationId = allLocations[0]?.id || '';
-        const locationId = allLocations.some(location => location.id === event.locationId)
+        const locationId = isFunctionReference(event.locationId) || allLocations.some(location => location.id === event.locationId)
             ? event.locationId
             : fallbackLocationId;
         const name = `${event.name || ''}`.trim() || 'Untitled Event';
         const date = `${event.date || ''}`.trim() || (save.currentDate || this.getStartingDate(save));
         const actorIds = Array.from(new Set(
             (event.actorIds || event.participantActorIds || [])
-                .filter(actorId => allActors.some(actor => actor.id === actorId && actor.active !== false))
+                .filter(actorId => isFunctionReference(actorId) || allActors.some(actor => actor.id === actorId && actor.active !== false))
                 .map(actorId => `${actorId}`),
         ));
-            const locationName = allLocations.find(location => location.id === locationId)?.name || 'an unknown location';
+        const locationName = allLocations.find(location => location.id === locationId)?.name || 'an unknown location';
         const description = `${event.description || ''}`.trim() || `${name} at ${locationName}.`;
         const guidance = `${event.guidance || description || name}`.trim();
 
@@ -2366,6 +2448,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     startSkit(calendarEvent: CalendarEvent): Skit | null {
         const save = this.getSave();
+        calendarEvent = this.resolveCalendarEvent(calendarEvent, save);
         const selectedLocation = save.atlas[calendarEvent.locationId];
 
         if (!selectedLocation) {
@@ -2466,7 +2549,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                             }
                             const targetStatId = resolvedStat?.id || incomingStatName;
                             actor.statMap = actor.statMap || {};
-                            const existingValue = Number(actor.statMap[targetStatId]);
+                            const existingValue = Number(resolvedStat ? this.readStatValue(actor.statMap[targetStatId], resolvedStat, save) : actor.statMap[targetStatId]);
                             const currentValue = Number.isFinite(existingValue)
                                 ? existingValue
                                 : (resolvedStat
@@ -2495,7 +2578,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                         } else {
                             const changeValue = Number(outcome.details?.changeValue ?? 0);
                             if (Number.isFinite(changeValue) && changeValue !== 0) {
-                                const existingValue = Number(save.globalStatValues[resolvedGlobalStat.id]);
+                                const existingValue = Number(this.readStatValue(save.globalStatValues[resolvedGlobalStat.id], resolvedGlobalStat, save));
                                 const currentValue = Number.isFinite(existingValue)
                                     ? existingValue
                                     : Number(normalizeStatValue(Number(resolvedGlobalStat.default) || 0, resolvedGlobalStat));
@@ -2633,7 +2716,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 continue;
             }
 
-            const value = normalizeStatValue(save.globalStatValues?.[stat.id], stat);
+            const value = this.readStatValue(save.globalStatValues?.[stat.id], stat, save);
             const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
             const valueText = formatStatOptionValueText(stat, value) || (resolveReferenceKind(stat.type)
                 ? formatReferenceStatText(stat, value, { actors: save.actors, items: save.inventory, locations: save.atlas })

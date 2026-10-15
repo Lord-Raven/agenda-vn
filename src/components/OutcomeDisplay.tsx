@@ -2,7 +2,7 @@ import { FC, ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Actor } from '../content/Actor';
 import { Outcome, OutcomeType } from '../content/Outcome';
-import { formatStatOptionValueText, normalizeStatValue, Stat, StatValue } from '../content/Stat';
+import { formatStatOptionValueText, Stat, StatValue } from '../content/Stat';
 import { Control } from '../content/Control';
 import { Stage } from '../Stage';
 import { ActorPortrait } from './ActorPortrait';
@@ -62,14 +62,14 @@ const renderStatOutcomeValue = (stat: Stat, control: Control, currentValue: Stat
     );
 };
 
-const getNumericStatChangeSign = (stat: Stat | undefined, outcome: Outcome, actor?: Actor): string => {
+const getNumericStatChangeSign = (stat: Stat | undefined, outcome: Outcome, stage: Stage, actor?: Actor): string => {
     if (!stat || stat.type !== 'number') {
         return '';
     }
 
     if (outcome.details?.absoluteValue !== undefined) {
-        const currentValue = Number(actor?.statMap?.[stat.id] ?? stat.default ?? 0);
-        const nextValue = Number(outcome.details.absoluteValue);
+        const currentValue = Number(stage.readStatValue(actor?.statMap?.[stat.id] ?? stage.getSave().globalStatValues?.[stat.id], stat));
+        const nextValue = Number(stage.readStatValue(outcome.details.absoluteValue, stat));
         if (Number.isFinite(currentValue) && Number.isFinite(nextValue)) {
             return nextValue > currentValue ? '+' : nextValue < currentValue ? '-' : '';
         }
@@ -84,14 +84,14 @@ const getNumericStatChangeSign = (stat: Stat | undefined, outcome: Outcome, acto
     return '';
 };
 
-const formatStatNameWithSign = (stat: Stat, control: Control, outcome: Outcome, actor?: Actor): string => {
+const formatStatNameWithSign = (stat: Stat, control: Control, outcome: Outcome, stage: Stage, actor?: Actor): string => {
     const statName = control.label.trim() || stat.name;
-    const sign = getNumericStatChangeSign(stat, outcome, actor);
+    const sign = getNumericStatChangeSign(stat, outcome, stage, actor);
     return sign ? `${statName} ${sign}` : statName;
 };
 
-const renderStatNameLabel = (control: Control, label: string): ReactNode => {
-    const LabelIcon = control.iconName ? resolveIcon(control.iconName) : null;
+const renderStatNameLabel = (control: Control, label: string, stage: Stage): ReactNode => {
+    const LabelIcon = control.iconName ? resolveIcon(control.iconName, stage) : null;
     return (
         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, maxWidth: '100%' }}>
             {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
@@ -138,7 +138,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
         if (!control) {
             return false;
         }
-        statMatches.set(outcome, { stat, control });
+        statMatches.set(outcome, { stat, control: Object.assign(new Control(control), { ratingIconName: control.displayType === 'rating' ? String(stage().resolveValue(control.ratingIconName, 'text')) : control.ratingIconName }) });
         return true;
     });
     if (visibleOutcomes.length === 0) {
@@ -154,9 +154,9 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
         const rawValue = outcome.type === OutcomeType.ACTOR_STAT
             ? actor?.statMap?.[stat.id]
             : stage().getSave().globalStatValues?.[stat.id] ?? stage().getConfiguration().globalStatValues?.[stat.id];
-        const currentValue = normalizeStatValue(rawValue ?? stat.default, stat);
+        const currentValue = stage().readStatValue(rawValue ?? stat.default, stat);
         const nextValue = outcome.details?.absoluteValue !== undefined
-            ? normalizeStatValue(outcome.details.absoluteValue, stat)
+            ? stage().readStatValue(outcome.details.absoluteValue, stat)
             : Number(currentValue) + Number(outcome.details?.changeValue ?? 0);
         return renderStatOutcomeValue(stat, control, currentValue, nextValue);
     };
@@ -207,7 +207,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     topLine = actor?.displayName || actor?.name || 'Actor';
                 } else if (outcome.type === OutcomeType.ACTOR_STAT) {
                     const { stat, control } = statMatches.get(outcome)!;
-                    const statLabel = renderStatNameLabel(control, formatStatNameWithSign(stat, control, outcome, actor));
+                    const statLabel = renderStatNameLabel(control, formatStatNameWithSign(stat, control, outcome, stage(), actor), stage());
                     topLine = (
                         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, maxWidth: '100%' }}>
                             <Box component="span" sx={{ color: 'var(--agenda-text-muted)' }}>{actor?.displayName || actor?.name || 'Actor'}</Box>
@@ -218,7 +218,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     bottomLine = renderStatOutcome(outcome, actor);
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
                     const { stat, control } = statMatches.get(outcome)!;
-                    topLine = renderStatNameLabel(control, `World · ${control.label.trim() || stat.name}`);
+                    topLine = renderStatNameLabel(control, `World · ${control.label.trim() || stat.name}`, stage());
                     bottomLine = renderStatOutcome(outcome);
                 } else if (outcome.type === OutcomeType.LORE_UPDATE) {
                     topLine = 'Lore Update';
@@ -277,7 +277,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                                         return (
                                             <Box key={`${actorStatOutcome.details?.statName || 'stat'}-${statIndex}`} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingLeft: 1.25, borderLeft: '2px solid color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)' }}>
                                                 <Typography variant="caption" sx={{ color: 'var(--agenda-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {renderStatNameLabel(control, formatStatNameWithSign(stat, control, actorStatOutcome, actor))}
+                                                    {renderStatNameLabel(control, formatStatNameWithSign(stat, control, actorStatOutcome, stage(), actor), stage())}
                                                 </Typography>
                                                 <Typography component="div" variant="body2" sx={{ color: 'var(--agenda-text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                     {renderStatOutcome(actorStatOutcome, actor)}

@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatValue, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, includeNewOptionListOptions, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeReferenceListValue, normalizeStatValue, cloneStat } from '../content/Stat';
+import { Stat, StatValue, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, includeNewOptionListOptions, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, cloneStat } from '../content/Stat';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
@@ -201,22 +201,7 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
                     return;
                 }
 
-                if (isReferenceDisplayType(stat.type)) {
-                    const existing = actor.statMap[stat.id];
-                    actor.statMap[stat.id] = typeof existing === 'string' ? existing : (typeof stat.default === 'string' ? stat.default : '');
-                    return;
-                }
-
-                if (isReferenceListDisplayType(stat.type)) {
-                    const existing = actor.statMap[stat.id];
-                    actor.statMap[stat.id] = Array.isArray(existing) ? normalizeReferenceListValue(existing) : normalizeReferenceListValue(stat.default);
-                    return;
-                }
-
-                const existing = actor.statMap[stat.id];
-                const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
-                const value = Number.isFinite(existing) ? Number(existing) : fallback;
-                actor.statMap[stat.id] = clampStatValue(value, stat);
+                actor.statMap[stat.id] = normalizeStatValue(actor.statMap[stat.id], stat);
             });
 
             Object.keys(actor.statMap).forEach(statId => {
@@ -238,22 +223,7 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
                     return;
                 }
 
-                if (isReferenceDisplayType(stat.type)) {
-                    const existing = location.statMap[stat.id];
-                    location.statMap[stat.id] = typeof existing === 'string' ? existing : (typeof stat.default === 'string' ? stat.default : '');
-                    return;
-                }
-
-                if (isReferenceListDisplayType(stat.type)) {
-                    const existing = location.statMap[stat.id];
-                    location.statMap[stat.id] = Array.isArray(existing) ? normalizeReferenceListValue(existing) : normalizeReferenceListValue(stat.default);
-                    return;
-                }
-
-                const existing = location.statMap[stat.id];
-                const fallback = Number.isFinite(stat.default) ? Number(stat.default) : 0;
-                const value = Number.isFinite(existing) ? Number(existing) : fallback;
-                location.statMap[stat.id] = clampStatValue(value, stat);
+                location.statMap[stat.id] = normalizeStatValue(location.statMap[stat.id], stat);
             });
 
             Object.keys(location.statMap).forEach(statId => {

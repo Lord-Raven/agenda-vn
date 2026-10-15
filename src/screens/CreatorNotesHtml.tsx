@@ -3,6 +3,7 @@ import { Stage } from '../Stage';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { Location, getLocationImageUrl } from '../content/Location';
 import { buildGoogleFontImportRules } from '@lord-raven/novel-visualizer';
+import { isFunctionReference } from '../content/Function';
 
 export interface CreatorNotesHtmlProps {
     stage: Stage;
@@ -35,6 +36,8 @@ export const buildCreatorNotesHtml = ({
     slideshowLocationIds,
 }: CreatorNotesHtmlProps): string => {
     const gameDescription = creatorNotes?.trim() || 'A story-driven visual novel where lives, choices, and memory reshape the world.';
+    if (castActorIds?.some(isFunctionReference)) castActorIds = stage.resolveValue(castActorIds, 'actorList') as string[];
+    if (slideshowLocationIds?.some(isFunctionReference)) slideshowLocationIds = stage.resolveValue(slideshowLocationIds, 'locationList') as string[];
 
     const castActors = castActorIds && castActorIds.length > 0
         ? activeActors.filter(actor => castActorIds.includes(actor.id))

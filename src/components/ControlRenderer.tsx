@@ -8,6 +8,7 @@ import { StatValueDisplay } from './StatDisplay';
 import { StatValueInput } from './StatValueInput';
 import { Button } from './UiComponents';
 import { ContentListControl } from './ContentListControl';
+import { isFunctionReference } from '../content/Function';
 
 interface ControlRendererProps {
     control: Control;
@@ -57,7 +58,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     }
 
     if (control.type === 'button') {
-        const Icon = control.iconName ? resolveIcon(control.iconName) : null;
+        const Icon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;
         return (
             <Button
                 variant="secondary"
@@ -82,8 +83,8 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     const rawValue = stageInstance.getSave()?.globalStatValues?.[stat.id]
         ?? stageInstance.getConfiguration()?.globalStatValues?.[stat.id]
         ?? stat.default;
-    const normalizedValue = normalizeStatValue(rawValue, stat);
-    const StatIcon = control.iconName ? resolveIcon(control.iconName) : null;
+    const normalizedValue = control.type === 'statEditor' ? normalizeStatValue(rawValue, stat) : stageInstance.readStatValue(rawValue, stat);
+    const StatIcon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;
     const label = control.label.trim() || statName;
     const selectedOptionDescription = stat.type === 'option'
         ? resolveStatText(findStatOptionByValue(stat, normalizedValue)?.option.description, stageInstance).trim()
@@ -103,10 +104,10 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
             </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, minHeight: 32, containerType: 'inline-size' }}>
-            {referenceKind && isReferenceListDisplayType(stat.type) ? (
+            {referenceKind && isReferenceListDisplayType(stat.type) && !(control.type === 'statEditor' && isFunctionReference(rawValue)) ? (
                 <ContentListControl
                     kind={referenceKind}
-                    values={normalizeReferenceListValue(normalizedValue)}
+                    values={normalizeReferenceListValue(control.type === 'statEditor' ? rawValue : normalizedValue)}
                     stage={stageInstance}
                     display={control.contentListDisplay}
                     label={label}
@@ -118,17 +119,20 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
             ) : control.type === 'statEditor' ? (
                 <StatValueInput
                     stat={stat}
-                    value={normalizedValue}
+                    value={rawValue}
                     onChange={(nextValue) => {
                         stageInstance.setGlobalStatValue(stat.id, nextValue);
                         onActivate();
                     }}
                     stage={stage}
+                    actors={Object.values(stageInstance.getSave().actors || {})}
+                    items={stageInstance.getSave().inventory || []}
+                    locations={Object.values(stageInstance.getSave().atlas || {})}
                 />
             ) : stat.type === 'number' ? (
                 <StatValueDisplay
                     stat={stat}
-                    display={control}
+                    display={{ ...control, ratingIconName: control.displayType === 'rating' ? String(stageInstance.resolveValue(control.ratingIconName, 'text')) : control.ratingIconName }}
                     value={Number(normalizedValue)}
                     style={{ minHeight: 20, ...(control.displayType === 'rating' ? { justifyContent: 'flex-start' } : { fontSize: valueFontSize }) }}
                 />

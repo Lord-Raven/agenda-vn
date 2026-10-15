@@ -82,7 +82,7 @@ const buildGlobalStatPromptContext = (stage: Stage, save: ReturnType<Stage['getS
         .addBlock('GeneralGuidance',
             'These are the established global-level stats and current values managed by this game; they should be used to appropriately guide the narrative and can be updated via inclusion of StatChange tags.');
     visibleStats.forEach(stat => builder.addBlock(stat.name, statBuilder => {
-            const value = normalizeStatValue(values[stat.id], stat);
+            const value = stage.readStatValue(values[stat.id], stat, save);
             const optionValue = value === undefined ? undefined : formatStatOptionValueText(stat, value);
             const referenceValue = value === undefined ? '' : formatReferenceStatValue(stat, value, stage);
             const valueText = optionValue || referenceValue || (typeof value === 'boolean' || typeof value === 'number' ? String(value) : String(value ?? 'None'));
@@ -327,7 +327,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        const value = normalizeStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat);
+        const value = stage.readStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat, save);
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
         const valueText = formatStatOptionValueText(stat, value) || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
@@ -355,7 +355,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        const value = normalizeStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat);
+        const value = stage.readStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat, save);
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
         const valueText = formatStatOptionValueText(stat, value) || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {

@@ -213,7 +213,7 @@ export function getLocationImageUrl(location: Location | undefined, stage?: Stag
 		return '';
 	}
 
-	return getMatchingAlternativeImage(location.alternativeImages, stage?.getSave())?.imageUrl || location.imageUrl || '';
+	return getMatchingAlternativeImage(location.alternativeImages, stage?.getScheduleContext(stage.getSave()))?.imageUrl || location.imageUrl || '';
 }
 
 export function getLocationImagePrompt(location: Location | undefined): string {

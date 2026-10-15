@@ -1,5 +1,6 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
-import { findStatOptionByValue, normalizeStatValue, type Stat, type StatValue } from './Stat';
+import { findStatOptionByValue, normalizeStatValue, resolveStatValue, type Stat, type StatValue } from './Stat';
+import { listElementType, type FunctionValueResolver } from './Function';
 
 // 'contains'/'notContains' test list membership for list stats, or substring match for text.
 export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual' | 'contains' | 'notContains';
@@ -67,6 +68,7 @@ export type ConditionEntityCollection = ConditionEntity[] | Record<string, Condi
 
 // Field names mirror SaveType (actors/atlas/inventory) so a spread save works as a context directly.
 export type ConditionContext = {
+    resolveValue?: FunctionValueResolver;
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
     globalStatValues?: Record<string, StatValue>;
@@ -185,7 +187,16 @@ const resolveConditionValue = (condition: Condition, context: ConditionContext):
     if (variableContentType) {
         return getContextCurrentContent(context, variableContentType)?.id || '';
     }
-    return isDiceNotation(value) ? rollDiceNotation(value, buildDiceSeed(condition, context)) : value;
+    const stat = condition.type === 'globalStat' ? context.globalStats?.find(stat => stat.id === condition.statId)
+        : condition.type === 'contentStat' ? getContextContentStats(context, condition.contentType).find(stat => stat.id === condition.statId) : undefined;
+    const type = condition.type === 'contentIdentity' ? condition.contentType
+        : stat ? listElementType(stat.type) || stat.type
+            : condition.type === 'calendar' && condition.field !== 'dayOfWeek' && condition.field !== 'timeOfDay' ? 'number' : 'text';
+    const resolved = context.resolveValue?.(value, type) ?? value;
+    if (Array.isArray(resolved)) {
+        throw new Error('A condition comparison requires a scalar function result.');
+    }
+    return isDiceNotation(resolved) ? rollDiceNotation(resolved, buildDiceSeed(condition, context)) : resolved;
 };
 
 const normalizeStatConditionValue = (value: string | number | boolean, stat: Stat | undefined): string | number | boolean => {
@@ -259,6 +270,7 @@ const getCalendarValue = (condition: CalendarCondition, context: ConditionContex
 // the content type, 'variable' refers to the one currently under consideration (see getContextCurrentContent),
 // and any other value is a specific entity id.
 const resolveConditionContentSubjects = (contentType: ContentType, targetId: ContentTarget, context: ConditionContext): { mode: 'any' | 'none' | 'single'; entities: ConditionEntity[] } => {
+    targetId = String(context.resolveValue?.(targetId, contentType) ?? targetId);
     if (targetId === 'variable') {
         const current = getContextCurrentContent(context, contentType);
         return { mode: 'single', entities: current ? [current] : [] };
@@ -275,7 +287,7 @@ export const evaluateContentStatCondition = (condition: ContentStatCondition, co
     const { mode, entities } = resolveConditionContentSubjects(condition.contentType, condition.targetId, context);
     const stat = getContextContentStats(context, condition.contentType).find(candidate => candidate.id === condition.statId);
     const resolvedValue = normalizeStatConditionValue(resolveConditionValue(condition, context), stat);
-    const matches = (entity: ConditionEntity) => compareValues(stat ? normalizeStatValue(entity.statMap?.[stat.id], stat) : undefined, resolvedValue, condition.comparison);
+    const matches = (entity: ConditionEntity) => compareValues(stat ? resolveStatValue(entity.statMap?.[stat.id], stat, context) : undefined, resolvedValue, condition.comparison);
 
     if (mode === 'any') return entities.some(matches);
     if (mode === 'none') return !entities.some(matches);
@@ -284,7 +296,7 @@ export const evaluateContentStatCondition = (condition: ContentStatCondition, co
 
 export const evaluateContentIdentityCondition = (condition: ContentIdentityCondition, context: ConditionContext): boolean => {
     const current = getContextCurrentContent(context, condition.contentType);
-    return !!current && compareValues(current.id, condition.value, condition.comparison);
+    return !!current && compareValues(current.id, resolveConditionValue(condition, context), condition.comparison);
 };
 
 export const evaluateCondition = (condition: Condition, context: ConditionContext): boolean => {
@@ -295,7 +307,7 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
 
     if (condition.type === 'globalStat') {
         const stat = context.globalStats?.find(candidate => candidate.id === condition.statId);
-        const actual = stat ? normalizeStatValue(context.globalStatValues?.[condition.statId], stat) : undefined;
+        const actual = stat ? resolveStatValue(context.globalStatValues?.[condition.statId], stat, context) : undefined;
         return compareValues(actual, normalizeStatConditionValue(resolveConditionValue(condition, context), stat), condition.comparison);
     }
 

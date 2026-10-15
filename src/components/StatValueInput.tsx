@@ -4,6 +4,8 @@ import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
+import { functionPickerOptions, isFunctionReference, listElementType } from '../content/Function';
+import { SearchableOptionPicker } from './SearchableOptionPicker';
 
 interface StatValueInputProps {
     stat?: Stat;
@@ -20,10 +22,36 @@ interface StatValueInputProps {
 }
 
 export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, optionContext }) => {
+    const stageInstance = typeof stage === 'function' ? stage() : stage;
     if (!stat) {
         return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
     }
 
+    const functions = functionPickerOptions(stageInstance?.getConfiguration().functions, stat.type);
+    const functionSelector = functions.length > 0 || isFunctionReference(value) ? (
+        <select className="input-base" aria-label="Value source" value={isFunctionReference(value) ? value : ''}
+            onChange={event => onChange(event.target.value || normalizeStatValue(undefined, { ...stat, default: listElementType(stat.type) ? [] : stat.type === 'number' ? 0 : stat.type === 'checkbox' ? false : '' }))}>
+            <option value="">Literal value</option>
+            {isFunctionReference(value) && !functions.some(fn => fn.key === value) && <option value={value}>Missing or incompatible function</option>}
+            {functions.map(fn => <option key={fn.key} value={fn.key}>{fn.label}</option>)}
+        </select>
+    ) : null;
+    if (isFunctionReference(value)) {
+        return functionSelector;
+    }
+    return (
+        <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
+            {functionSelector}
+            <LiteralStatValueInput stat={stat} value={value} onChange={onChange} actors={actors} items={items} locations={locations} stage={stage} allowExpression={allowExpression} optionContext={optionContext} />
+        </div>
+    );
+};
+
+const LiteralStatValueInput: FC<StatValueInputProps & { stat: Stat }> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, optionContext }) => {
+    const stageInstance = typeof stage === 'function' ? stage() : stage;
+    if (stageInstance) {
+        optionContext = { ...optionContext, resolveValue: (source, type) => stageInstance.resolveValue(source, type) };
+    }
     if (stat.type === 'checkbox') {
         return (
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
@@ -48,6 +76,11 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     if (isOptionListStatType(stat.type)) {
         const selectedIds = Array.isArray(value) ? (normalizeStatValue(value, stat) as string[]) : [];
         const pool = resolveStatOptionPool(stat);
+        if (functionPickerOptions(stageInstance?.getConfiguration().functions, 'option').length || functionPickerOptions(stageInstance?.getConfiguration().functions, 'optionList').length || selectedIds.some(isFunctionReference)) {
+            return <SearchableOptionPicker multiple values={selectedIds} onChange={next => onChange(Array.isArray(next) ? next : [])}
+                options={pool.map(option => ({ key: option.id!, label: option.name, description: option.description }))}
+                functionType="option" stage={stage} title="Choose active options" />;
+        }
         if (pool.length === 0) {
             return <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>No options defined.</span>;
         }

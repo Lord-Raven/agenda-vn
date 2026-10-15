@@ -148,6 +148,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
 
 export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, stage, display, label, onChange }) => {
     const save = stage.getSave();
+    const resolvedValues = stage.resolveValue(values, kind === 'actor' ? 'actorList' : kind === 'item' ? 'itemList' : 'locationList') as string[];
     const carousel = display !== 'abbreviated';
     const actors = Object.values(save.actors || {});
     const items = save.inventory || [];
@@ -155,11 +156,11 @@ export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, 
 
     return (
         <>
-            {carousel && <ContentListPortraits kind={kind} values={values} stage={stage} label={label} />}
+            {carousel && <ContentListPortraits kind={kind} values={resolvedValues} stage={stage} label={label} />}
             {(!carousel || onChange) && (
                 <ReferenceMultiSelect
                     kind={kind}
-                    values={values}
+                    values={onChange ? values : resolvedValues}
                     onChange={(nextValues) => onChange?.(nextValues)}
                     actors={actors.filter((actor) => actor.active !== false)}
                     items={items.filter((item) => item.active !== false)}

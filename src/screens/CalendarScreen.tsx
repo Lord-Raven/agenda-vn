@@ -186,10 +186,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
     const currentDayNumber = stageInstance.getDayNumberForDate(currentDateKey);
     const formatDateLabel = (dateKey: string) => (isTurnBased ? `Day ${stageInstance.getDayNumberForDate(dateKey)}` : formatDate(dateKey));
 
-    const allEvents = useMemo(
-        () => [...(save.upcomingEvents || [])].sort((left, right) => compareEventSchedule(left, right)),
-        [save.upcomingEvents, save.currentDate, save.currentTimeOfDay, stageInstance],
-    );
+    const allEvents = (save.upcomingEvents || []).map(event => stageInstance.resolveCalendarEvent(event, save))
+        .sort((left, right) => compareEventSchedule(left, right));
 
     const [viewMonth, setViewMonth] = useState(() => startOfMonth(currentDate));
     const [timelineStartDay, setTimelineStartDay] = useState(() => Math.max(1, currentDayNumber - Math.floor(TIMELINE_PAGE_SIZE / 2)));

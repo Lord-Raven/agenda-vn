@@ -531,6 +531,8 @@ export const LocationSelect: FC<LocationSelectProps> = ({
 				emptyLabel={emptyLabel}
 				title={title}
 				placeholder="Search locations"
+				functionType="location"
+				stage={stage}
 			/>
 		</div>
 	);
@@ -590,6 +592,8 @@ export const LocationMultiSelect: FC<LocationMultiSelectProps> = ({
 				emptyLabel={emptyLabel}
 				title={title}
 				placeholder="Search locations"
+				functionType="location"
+				stage={stage}
 				renderButton={renderButton}
 				disabled={disabled}
 			/>
@@ -641,6 +645,8 @@ export const ActorSelect: FC<ActorSelectProps> = ({
 				emptyLabel={emptyLabel}
 				title={title}
 				placeholder="Search actors"
+				functionType="actor"
+				stage={stage}
 			/>
 		</div>
 	);
@@ -690,6 +696,8 @@ export const ActorMultiSelect: FC<ActorMultiSelectProps> = ({
 				emptyLabel={emptyLabel}
 				title={title}
 				placeholder="Search actors"
+				functionType="actor"
+				stage={stage}
 				renderButton={renderButton}
 				disabled={disabled}
 			/>
@@ -740,6 +748,8 @@ export const ItemSelect: FC<ItemSelectProps> = ({
 				emptyLabel={emptyLabel}
 				title={title}
 				placeholder="Search items"
+				functionType="item"
+				stage={stage}
 			/>
 		</div>
 	);
@@ -788,6 +798,8 @@ export const ItemMultiSelect: FC<ItemMultiSelectProps> = ({
 				emptyLabel={emptyLabel}
 				title={title}
 				placeholder="Search items"
+				functionType="item"
+				stage={stage}
 				renderButton={renderButton}
 				disabled={disabled}
 			/>

@@ -6,12 +6,13 @@ import {
     Stat, StatValue, StatValueRule,
     findStatOptionByValue, getStatOptionValue, isNumericDisplayType, isOptionListStatType,
     isReferenceDisplayType, isReferenceListDisplayType, isSourcedOptionStat, normalizeReferenceListValue,
-    resolveStatDefault, resolveStatOptionPool,
+    resolveStatDefault,
 } from '../content/Stat';
 import { Button, TextArea, TextInput } from './UiComponents';
 import { ConditionEditor } from './ConditionEditor';
 import { ConditionalFlagEditor } from './ConditionalFlagEditor';
 import { StatValueInput } from './StatValueInput';
+import { isFunctionReference } from '../content/Function';
 import { ActorLike } from './UiComponents';
 import { ItemLike } from './ItemPortrait';
 import { LocationLike } from './LocationPortrait';
@@ -24,6 +25,9 @@ export const resolveStatDefaultValue = (stat: Stat): StatValue => resolveStatDef
 // cleared/defaulted consistently, regardless of whether the stat is a global/actor/location/item stat.
 export const normalizeStatShape = (stat: Stat): Stat => {
     const normalized = normalizeStatShapeForType(stat);
+    if (isFunctionReference(stat.default)) {
+        normalized.default = stat.default;
+    }
     return normalized.type === 'option' ? normalized : { ...normalized, optionSourceStatId: undefined };
 };
 
@@ -48,7 +52,7 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
                 ...stat,
                 options,
                 default: Array.isArray(stat.default)
-                    ? normalizeReferenceListValue(stat.default).filter(id => optionIds.has(id))
+                    ? normalizeReferenceListValue(stat.default).filter(id => isFunctionReference(id) || optionIds.has(id))
                     : options.map(option => option.id),
                 min: undefined,
                 max: undefined,
@@ -162,14 +166,12 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     fieldLabelStyle, inlineFieldStyle, inlineFieldTopStyle, compactChipLabelStyle,
 }) => {
     const normalizedStat = normalizeStatShape(stat);
-    const optionEntries = normalizedStat.options || [];
     // Raw (unfiltered) options, so blank-named rows stay visible and indices match updateOption/removeOption.
     const editableOptionEntries = stat.options || [];
     const isSourcedOption = isSourcedOptionStat(normalizedStat);
     // Global lists, plus (for entity stats) lists on the same entity, whose active options are that entity's own.
     const optionListSources = [...globalStats, ...(category === 'global' ? [] : selfStats)]
         .filter(candidate => isOptionListStatType(candidate.type) && candidate.id !== stat.id);
-    const sourcedOptionEntries = isSourcedOption ? resolveStatOptionPool(normalizedStat, { sourceStats: optionListSources }) : [];
     const variableContentType = category === 'actor' ? 'actor' : undefined;
     const conditionStats = category === 'global' ? [...selfStats, ...actorStats] : [...selfStats, ...globalStats];
 
@@ -202,7 +204,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
     const removeOption = (optionIndex: number) => {
         const options = (stat.options || []).filter((_, idx) => idx !== optionIndex);
-        if (isOptionListStatType(stat.type)) {
+        if (isOptionListStatType(stat.type) || isFunctionReference(stat.default)) {
             onPatch({ options });
             return;
         }
@@ -215,6 +217,10 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
         const nextLabel = `Option ${options.length + 1}`;
         options.push({ id: generateUuid(), name: nextLabel, description: '' });
         if (isOptionListStatType(stat.type)) {
+            if (isFunctionReference(stat.default)) {
+                onPatch({ options });
+                return;
+            }
             const activeIds = Array.isArray(stat.default) ? normalizeReferenceListValue(stat.default) : [];
             onPatch({ options, default: [...activeIds, options[options.length - 1].id!] });
             return;
@@ -402,16 +408,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                         {isSourcedOption && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Option</label>
-                                <select
-                                    className="input-base"
-                                    value={findStatOptionByValue(normalizedStat, normalizedStat.default, { sourceStats: optionListSources })?.value || ''}
-                                    onChange={(e) => onPatch({ default: e.target.value })}
-                                >
-                                    <option value="">First available option</option>
-                                    {sourcedOptionEntries.map(option => (
-                                        <option key={option.id} value={option.id}>{option.name}</option>
-                                    ))}
-                                </select>
+                                {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
@@ -420,22 +417,12 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 {isOptionListStatType(normalizedStat.type) ? (
                                     <div style={{ ...inlineFieldTopStyle, marginBottom: 4 }}>
                                         <label style={fieldLabelStyle}>Initially Active</label>
-                                        <StatValueInput stat={normalizedStat} value={normalizedStat.default} onChange={(defaultValue) => onPatch({ default: defaultValue })} />
+                                        {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                                     </div>
                                 ) : (
                                 <div style={{ ...inlineFieldStyle, marginBottom: 4 }}>
                                     <label style={fieldLabelStyle}>Default Option</label>
-                                    <select
-                                        className="input-base"
-                                        value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                        onChange={(e) => onPatch({ default: e.target.value })}
-                                    >
-                                        {optionEntries.map((option, idx) => (
-                                            <option key={getStatOptionValue(option, idx)} value={getStatOptionValue(option, idx)}>
-                                                {option.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                                 </div>
                                 )}
 
@@ -476,12 +463,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                         {normalizedStat.type === 'text' && (
                             <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Value</label>
-                                <TextArea
-                                    value={typeof normalizedStat.default === 'string' ? normalizedStat.default : ''}
-                                    onChange={(e) => onPatch({ default: e.target.value })}
-                                    rows={2}
-                                    style={{ width: '100%', resize: 'vertical' }}
-                                />
+                                {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
@@ -502,14 +484,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                         {normalizedStat.type === 'checkbox' && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Value</label>
-                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={normalizedStat.default === true}
-                                        onChange={(e) => onPatch({ default: e.target.checked })}
-                                    />
-                                    Checked
-                                </label>
+                                {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
@@ -519,12 +494,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
                                     <div>
                                         <div style={compactChipLabelStyle}>Default</div>
-                                        <TextInput
-                                            fullWidth
-                                            type="number"
-                                            value={String(Number.isFinite(normalizedStat.default) ? Number(normalizedStat.default) : 0)}
-                                            onChange={(e) => onPatch({ default: Number(e.target.value) || 0 })}
-                                        />
+                                        {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                                     </div>
                                     <div>
                                         <div style={compactChipLabelStyle}>Min</div>

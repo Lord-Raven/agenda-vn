@@ -446,6 +446,8 @@ export const CalendarEventManagementPanel: FC<CalendarEventManagementPanelProps>
                     <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Participants</label>
                         <SearchableOptionPicker
+                            functionType="actor"
+                            stage={stage}
                             multiple
                             values={draft.actorIds || []}
                             onChange={(nextValue) => updateActorSelection(Array.isArray(nextValue) ? nextValue : [])}

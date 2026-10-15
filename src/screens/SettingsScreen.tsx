@@ -8,6 +8,7 @@ import { Close, Forum, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
 import { ScreenType } from './BaseScreen';
 import { StatValueInput } from '../components/StatValueInput';
+import { isFunctionReference, functionPickerOptions } from '../content/Function';
 
 export const DEFAULT_PLAYER_THEME_COLOR = '#66bbee';
 
@@ -468,6 +469,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         .map((stat) => {
                                         const statName = (stat.name || '').trim();
                                         const selectedValue = normalizeGlobalStatValue(globalStatValues[stat.id], stat);
+                                        const hasFunctionSource = isFunctionReference(selectedValue) || functionPickerOptions(stageInstance.getConfiguration().functions, stat.type).length > 0;
                                         const optionEntries = resolveAvailableStatOptions(stat, selectedValue, { sourceStats: globalStats, globalStatValues });
                                         const selectedOptionDescription = stat.type === 'option'
                                             ? resolveText(findStatOptionByValue(stat, selectedValue)?.option.description).trim()
@@ -493,6 +495,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     {resolveText(stat.description)}
                                                 </div>
 
+                                                {hasFunctionSource ? <StatValueInput stat={stat} value={selectedValue} onChange={value => handleGlobalStatValueChange(stat, value)}
+                                                    stage={stage} actors={Object.values(stageInstance.getSave().actors)} items={stageInstance.getSave().inventory} locations={Object.values(stageInstance.getSave().atlas)} /> : <>
                                                 {stat.type === 'option' && optionEntries.length > 0 && (
                                                     <select
                                                         className="input-base"
@@ -557,6 +561,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                         )}
                                                     </>
                                                 )}
+                                                </>}
                                             </div>
                                         );
                                     })}

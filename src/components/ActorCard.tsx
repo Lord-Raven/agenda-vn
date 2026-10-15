@@ -1,7 +1,7 @@
 import { FC, useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Stage } from '../Stage';
-import { isReferenceDisplayType, isReferenceListDisplayType, formatReferenceStatText, formatStatOptionValueText, normalizeStatValue, Stat, StatValue } from '../content/Stat';
+import { isReferenceDisplayType, isReferenceListDisplayType, formatReferenceStatText, formatStatOptionValueText, Stat, StatValue } from '../content/Stat';
 import { Actor } from '../content/Actor';
 import { Control } from '../content/Control';
 import { NamePlate } from './UiComponents';
@@ -15,9 +15,9 @@ interface ActorCardProps {
     className?: string;
 }
 
-const resolveStatValue = (actor: Actor, stat: Stat): StatValue => {
+const resolveStatValue = (actor: Actor, stat: Stat, stage: Stage): StatValue => {
     const raw = (actor.statMap as { [key: string]: StatValue } | undefined)?.[stat.id];
-    return normalizeStatValue(raw === undefined || raw === null || raw === '' ? stat.default : raw, stat);
+    return stage.readStatValue(raw === undefined || raw === null || raw === '' ? stat.default : raw, stat);
 };
 
 const StatValueContainer: FC<{ stat: Stat; control: Control; value: StatValue; save: ReturnType<Stage['getSave']> }> = ({ stat, control, value, save }) => {
@@ -145,7 +145,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                     }}
                 >
                     {statControls.map(({ control, stat }) => {
-                        const LabelIcon = control.iconName ? resolveIcon(control.iconName) : null;
+                        const LabelIcon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;
 
                         return (
                             <Box
@@ -163,7 +163,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                                     {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
                                     <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{control.label.trim() || stat.name}</Box>
                                 </Box>
-                                <StatValueContainer stat={stat} control={control} value={resolveStatValue(actor, stat)} save={stage().getSave()} />
+                                <StatValueContainer stat={stat} control={{ ...control, ratingIconName: control.displayType === 'rating' ? String(stageInstance.resolveValue(control.ratingIconName, 'text')) : control.ratingIconName }} value={resolveStatValue(actor, stat, stageInstance)} save={stage().getSave()} />
                             </Box>
                         );
                     })}

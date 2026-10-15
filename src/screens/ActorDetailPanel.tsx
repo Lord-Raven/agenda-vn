@@ -18,6 +18,7 @@ import { ConditionEditor } from '../components/ConditionEditor';
 import { CachedImage } from '../components/CachedImage';
 import { OutfitPositioningModal } from '../components/OutfitPositioningModal';
 import { StatValueInput } from '../components/StatValueInput';
+import { isFunctionReference, functionPickerOptions } from '../content/Function';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -131,6 +132,7 @@ const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: st
 };
 
 const normalizeActorStatModifierAmount = (stat: Stat, amount: unknown): StatValue => {
+    if (isFunctionReference(amount)) return amount;
     if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
         return typeof amount === 'string' ? amount : String(resolveStatDefault(stat));
     }
@@ -897,6 +899,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     };
 
     const handleActorStatInitialValueChange = (stat: Stat, value: StatValue) => {
+        if (isFunctionReference(value)) {
+            setEditedStatInitialMap(prev => ({ ...prev, [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value } }));
+            return;
+        }
         if (stat.type === 'checkbox') {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
@@ -926,6 +932,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     };
 
     const handleActorStatEditorValueChange = (stat: Stat, value: StatValue) => {
+        if (isFunctionReference(value) && !isCreatorMode) {
+            setEditedStatMap(prev => ({ ...prev, [stat.id]: value }));
+            return;
+        }
         if (isCreatorMode) {
             handleActorStatInitialValueChange(stat, value);
         } else {
@@ -992,12 +1002,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const buildPerActorConditionContext = (targetActor: Actor): ConditionContext => {
         const save = stage().getSave();
         return {
-            currentDate: save.currentDate,
-            currentTimeOfDay: save.currentTimeOfDay,
-            globalStatValues: save.globalStatValues as Record<string, StatValue>,
-            globalStats: stage().getConfiguration().globalStats,
-            actorStats: stage().getConfiguration().actorStats,
-            actors: save.actors,
+            ...stage().getScheduleContext(save),
             currentActor: { id: targetActor.id, name: targetActor.name, statMap: targetActor.statMap },
         };
     };
@@ -1055,6 +1060,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         : editedStatMap;
 
     const renderPerActorValueInput = (stat: Stat, value: StatValue, onChange: (value: StatValue) => void) => {
+        if (isFunctionReference(value) || functionPickerOptions(stage().getConfiguration().functions, stat.type).length) {
+            return <StatValueInput stat={stat} value={value} onChange={onChange} stage={stage} actors={actorOptions} items={itemOptions} locations={locationOptions} />;
+        }
         if (stat.type === 'checkbox') {
             return <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
         }
@@ -2172,6 +2180,7 @@ ${indent}}`;
                                             {actorStats.map((stat) => {
                                                 const statInitial = cloneActorStatInitial(editedStatInitialMap[stat.id], stat);
                                                 const editorValue = isCreatorMode ? statInitial.value : editedStatMap[stat.id];
+                                                const hasFunctionSource = isFunctionReference(editorValue) || functionPickerOptions(stage().getConfiguration().functions, stat.type).length > 0;
                                                 const value = Number(editorValue);
                                                 const displayValue = Number.isFinite(value)
                                                     ? value
@@ -2192,7 +2201,7 @@ ${indent}}`;
                                                             backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)',
                                                         }}
                                                     >
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', height: '40px' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', minHeight: '40px' }}>
                                                             <Button
                                                                 variant="secondary"
                                                                 onClick={() => toggleStatExpanded(stat.id)}
@@ -2218,6 +2227,8 @@ ${indent}}`;
                                                                 </span>
                                                             </Button>
 
+                                                            {hasFunctionSource ? <StatValueInput stat={stat} value={editorValue} onChange={value => handleActorStatEditorValueChange(stat, value)}
+                                                                stage={stage} actors={actorOptions} items={itemOptions} locations={locationOptions} optionContext={{ entityStatValues: entityOptionValues }} /> : <>
                                                             {stat.type === 'checkbox' && (
                                                                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
                                                                     <input
@@ -2286,6 +2297,7 @@ ${indent}}`;
                                                                     ))}
                                                                 </select>
                                                             )}
+                                                            </>}
                                                         </div>
 
                                                         {isExpanded && (
@@ -2515,7 +2527,7 @@ ${indent}}`;
                                                                 )}
                                                                 {otherActiveActors.map((targetActor) => {
                                                                     const hasOverride = hasExplicitPerActorOverride(stat, targetActor.id);
-                                                                    const displayedValue = resolveDisplayedPerActorValue(stat, targetActor);
+                                                                    const displayedValue = editedPerActorStatMap[stat.id]?.[targetActor.id] ?? resolveDisplayedPerActorValue(stat, targetActor);
                                                                     return (
                                                                         <div
                                                                             key={targetActor.id}

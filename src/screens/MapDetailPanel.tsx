@@ -313,6 +313,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
     };
 
     const resolveTargetName = (childId: string) => {
+        childId = String(stageInstance.resolveValue(childId, 'location'));
         const mapTarget = activeMaps.find(candidate => candidate.id === childId);
         if (mapTarget) {
             return mapTarget.name;
@@ -431,6 +432,8 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                         ]}
                                         title="Choose link target"
                                         placeholder="Search locations and maps"
+                                        functionType="location"
+                                        stage={stage}
                                     />
                                     <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
                                     <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
@@ -478,7 +481,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                         <CenterFocusStrong style={{ fontSize: 18 }} />
                     </div>
                     {map.links.map((link, index) => {
-                        const locationImageUrl = activeLocations.find(location => location.id === link.childId)?.imageUrl;
+                        const locationImageUrl = activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl;
                         return (
                             <div
                                 key={`${link.childId}-marker-${index}`}

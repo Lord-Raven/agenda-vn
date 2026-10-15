@@ -245,6 +245,8 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                                             allowClear={false}
                                                             title={`Choose ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()} target`}
                                                             placeholder={`Search ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()}s`}
+                                                            functionType={update.targetType}
+                                                            stage={stage}
                                                         />
                                                     </div>
                                                 ) : null}

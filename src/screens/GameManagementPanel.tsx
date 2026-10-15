@@ -618,6 +618,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         emptyLabel="All actors"
                         title="Choose cast members"
                         placeholder="Search actors"
+                        functionType="actor"
+                        stage={stage}
                     />
                 </div>
 
@@ -634,6 +636,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                         emptyLabel="Default locations"
                         title="Choose slideshow locations"
                         placeholder="Search locations"
+                        functionType="location"
+                        stage={stage}
                     />
                 </div>
 

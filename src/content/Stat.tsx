@@ -1,6 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { ContentTarget, ContentType, CONTENT_TYPES, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
-import type { FunctionInvocation } from './Function';
+import type { FunctionInvocation, FunctionValueResolver } from './Function';
+import { isFunctionReference } from './Function';
 
 // A boolean field whose effective value can be gated by conditions instead of always being fixed. With no
 // conditions, `value` always applies. With conditions, `value` applies only while at least one collection is
@@ -169,7 +170,7 @@ export const getStatOptionValue = resolveStatOptionId;
 
 // Supplies optionList stat definitions (from any stat category, looked up by id) to option stats that source
 // their choices from one; `value` is only known for global lists. Registered by the Stage.
-export type OptionListSourceResolver = (statId: string) => { stat: Stat; value?: StatValue } | undefined;
+export type OptionListSourceResolver = (statId: string) => { stat: Stat; value?: StatValue; resolveValue?: FunctionValueResolver } | undefined;
 let optionListSourceResolver: OptionListSourceResolver | undefined;
 
 export const setOptionListSourceResolver = (resolver: OptionListSourceResolver | undefined) => {
@@ -182,15 +183,17 @@ export type OptionListSourceContext = {
     sourceStats?: Stat[];
     globalStatValues?: { [statId: string]: StatValue };
     entityStatValues?: { [statId: string]: StatValue };
+    resolveValue?: FunctionValueResolver;
 };
 
-const resolveOptionListSource = (statId: string, context?: OptionListSourceContext): { stat: Stat; value?: StatValue } | undefined => {
+const resolveOptionListSource = (statId: string, context?: OptionListSourceContext): ReturnType<OptionListSourceResolver> => {
     const resolved = optionListSourceResolver?.(statId);
     const stat = context?.sourceStats?.find((candidate) => candidate.id === statId) || resolved?.stat;
     if (stat?.type !== 'optionList') {
         return undefined;
     }
-    return { stat, value: context?.entityStatValues?.[statId] ?? context?.globalStatValues?.[statId] ?? resolved?.value };
+    return { stat, value: context?.entityStatValues?.[statId] ?? context?.globalStatValues?.[statId] ?? resolved?.value,
+        resolveValue: context?.resolveValue ?? resolved?.resolveValue };
 };
 
 export const isSourcedOptionStat = (stat: Stat | undefined): boolean => (
@@ -225,7 +228,7 @@ export const resolveAvailableStatOptions = (stat: Stat | undefined, currentValue
     if (!source) {
         return pool;
     }
-    const activeIds = new Set(normalizeStatValue(source.value, source.stat) as string[]);
+    const activeIds = new Set(resolveStatValue(source.value, source.stat, source) as string[]);
     const currentId = findStatOptionByValue(stat, currentValue, context)?.value;
     return pool.filter((option) => activeIds.has(option.id!) || option.id === currentId);
 };
@@ -364,7 +367,7 @@ export const cloneStat = (stat: Stat): Stat => ({
     llmSees: cloneConditionalFlag(stat.llmSees, true),
     llmMaintained: cloneConditionalFlag(stat.llmMaintained, true),
     guidance: stat.guidance,
-    default: isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type)
+    default: isFunctionReference(stat.default) ? stat.default : isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type)
         ? normalizeReferenceListValue(stat.default)
         : (typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0))),
     type: stat.type,
@@ -385,6 +388,9 @@ export const isStatLlmMaintained = (stat: Stat, context: ConditionContext): bool
 );
 
 export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): StatValue => {
+    if (isFunctionReference(stat.default)) {
+        return stat.default;
+    }
     if (stat.type === 'option') {
         const defaultOption = findStatOptionByValue(stat, stat.default);
         if (defaultOption) {
@@ -421,6 +427,12 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
 };
 
 export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValueOptions = {}): StatValue => {
+    if (value == null && isFunctionReference(stat.default)) {
+        return stat.default;
+    }
+    if (isFunctionReference(value)) {
+        return value;
+    }
     if (stat.type === 'option') {
         const selectedOption = findStatOptionByValue(stat, value);
         if (selectedOption) {
@@ -481,10 +493,18 @@ export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValu
     return resolved;
 };
 
+export const resolveStatValue = (value: unknown, stat: Stat, context: { resolveValue?: FunctionValueResolver }): StatValue => {
+    if (!context.resolveValue) {
+        return normalizeStatValue(value, stat);
+    }
+    const resolved = context.resolveValue(value ?? stat.default, stat.type);
+    return normalizeStatValue(resolved, { ...stat, default: resolved });
+};
+
 // Maps option ids/names to canonical ids of an optionList's pool, dropping unknown entries and duplicates.
 const normalizeOptionListIds = (values: unknown[], stat: Stat): string[] => {
     const ids = values
-        .map((entry) => findStatOptionByValue(stat, entry)?.value)
+        .map((entry) => isFunctionReference(entry) ? entry : findStatOptionByValue(stat, entry)?.value)
         .filter((id): id is string => !!id);
     return Array.from(new Set(ids));
 };
@@ -510,7 +530,8 @@ export const includeNewOptionListOptions = (value: StatValue | undefined, previo
         return value;
     }
     const previousIds = new Set(resolveStatOptionPool(previousStat).map((option) => option.id!));
-    const defaultIds = new Set(resolveStatDefault(nextStat) as string[]);
+    const defaultValue = resolveStatDefault(nextStat);
+    const defaultIds = new Set(Array.isArray(defaultValue) ? defaultValue : []);
     const addedIds = resolveStatOptionPool(nextStat)
         .map((option) => option.id!)
         .filter((id) => !previousIds.has(id) && defaultIds.has(id) && !value.includes(id));
@@ -537,8 +558,8 @@ export const buildInitialGlobalStatValues = (
     stats: Stat[],
     selectedValues: Record<string, StatValue> = {},
     context: ConditionContext = {},
+    values: Record<string, StatValue> = {},
 ): Record<string, StatValue> => {
-    const values: Record<string, StatValue> = {};
     const initialContext = { ...context, globalStats: stats, globalStatValues: values };
     stats.filter(stat => stat?.id && stat.name?.trim()).forEach(stat => {
         const selectedValue = selectedValues[stat.id];
@@ -611,6 +632,9 @@ export const cloneStatUpdateRules = (rules: unknown): StatUpdateRule[] => (Array
 // update's value as a dice/relative expression, so 'adjust' adds the rolled amount while 'set' replaces with
 // it; non-numeric stats always write a literal value.
 export const applyStatUpdateValue = (currentValue: StatValue | undefined, update: StatUpdate, stat: Stat): StatValue => {
+    if (update.operation === 'set' && isFunctionReference(update.value)) {
+        return update.value;
+    }
     if (isOptionListStatType(stat.type)) {
         const changed = normalizeStatValue(Array.isArray(update.value) ? update.value : [update.value], stat) as string[];
         if (update.operation === 'set') {

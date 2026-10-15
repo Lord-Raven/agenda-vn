@@ -9,6 +9,8 @@ import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 import { Stage } from '../Stage';
+import { functionPickerOptions, isFunctionReference, listElementType } from '../content/Function';
+import { StatValueInput } from './StatValueInput';
 
 interface ConditionEditorProps {
     conditionCollections: ConditionCollection[];
@@ -268,6 +270,27 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
 
     const renderValueInput = (condition: Condition, collectionIndex: number, conditionIndex: number) => {
         const updateValue = (value: string | number | boolean) => updateCondition(collectionIndex, conditionIndex, { ...condition, value } as Condition);
+        if (condition.type === 'calendar') {
+            const type = condition.field === 'timeOfDay' || condition.field === 'dayOfWeek' ? 'text' : 'number';
+            const stageInstance = typeof stage === 'function' ? stage() : stage;
+            const functions = functionPickerOptions(stageInstance?.getConfiguration().functions, type);
+            if (functions.length || isFunctionReference(condition.value)) {
+                return <div style={{ display: 'grid', gap: 6 }}>
+                    <select style={selectStyle} aria-label="Value source" value={isFunctionReference(condition.value) ? condition.value : ''}
+                        onChange={event => updateValue(event.target.value || (type === 'number' ? 1 : condition.field === 'timeOfDay' ? 'morning' : 'monday'))}>
+                        <option value="">Literal value</option>
+                        {isFunctionReference(condition.value) && !functions.some(fn => fn.key === condition.value) && <option value={condition.value}>Missing or incompatible function</option>}
+                        {functions.map(fn => <option key={fn.key} value={fn.key}>{fn.label}</option>)}
+                    </select>
+                    {!isFunctionReference(condition.value) && (type === 'number'
+                        ? <TextInput type="text" value={String(condition.value)} onChange={event => updateValue(event.target.value)} />
+                        : <select style={selectStyle} value={String(condition.value)} onChange={event => updateValue(event.target.value)}>
+                            {(condition.field === 'timeOfDay' ? CALENDAR_TIME_OF_DAY_ORDER : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']).map(value =>
+                                <option key={value} value={value}>{condition.field === 'timeOfDay' ? formatTimeSlot(value) : value}</option>)}
+                        </select>)}
+                </div>;
+            }
+        }
         if (condition.type === 'contentIdentity') {
             const concreteOptions = concreteTargetOptionsFor(condition.contentType);
             const label = CONTENT_TYPE_LABELS[condition.contentType].toLowerCase();
@@ -280,6 +303,8 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                     emptyLabel="None"
                     title={`Choose ${label}`}
                     placeholder={`Search ${label}s`}
+                    functionType={condition.contentType}
+                    stage={stage}
                 />
             );
         }
@@ -292,14 +317,11 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         const stat = condition.type === 'globalStat' || condition.type === 'contentStat'
             ? statsForCondition(condition).find(candidate => candidate.id === condition.statId)
             : undefined;
-        if (stat?.type === 'option' || stat?.type === 'optionList') {
-            const selectedOption = findStatOptionByValue(stat, condition.value);
-            return <select style={selectStyle} value={selectedOption?.value || ''} onChange={(event) => updateValue(event.target.value)}>{resolveStatOptionPool(stat).map((option) => (
-                <option key={option.id} value={option.id}>{option.name}</option>
-            ))}</select>;
-        }
-        if (stat?.type === 'checkbox') {
-            return <input type="checkbox" checked={Boolean(condition.value === true || condition.value === 'true')} onChange={(event) => updateValue(event.target.checked)} />;
+        if (stat && !resolveReferenceKind(stat.type)) {
+            return <StatValueInput stat={{ ...stat, type: listElementType(stat.type) || stat.type }} value={condition.value}
+                onChange={value => {
+                    if (!Array.isArray(value)) updateValue(value);
+                }} stage={stage} allowExpression />;
         }
         const referenceKind = stat ? resolveReferenceKind(stat.type) : undefined;
         if (referenceKind && referenceKind === variableContentType) {
@@ -317,6 +339,8 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                     emptyLabel="None"
                     title={`Choose ${label}`}
                     placeholder={`Search ${label}s`}
+                    functionType={referenceKind}
+                    stage={stage}
                 />
             );
         }
@@ -394,6 +418,8 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                     emptyLabel="None"
                                     title={`Choose ${CONTENT_TYPE_LABELS[condition.contentType].toLowerCase()} target`}
                                     placeholder={`Search ${CONTENT_TYPE_LABELS[condition.contentType].toLowerCase()}s`}
+                                    functionType={condition.contentType}
+                                    stage={stage}
                                 />
                             </div>
                         ) : null}

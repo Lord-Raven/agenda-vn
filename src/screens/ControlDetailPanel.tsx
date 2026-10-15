@@ -349,7 +349,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Label Icon (optional)</label>
-                                    <IconPicker value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
+                                    <IconPicker stage={stage} value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
                                 </div>
                             </div>
                         </section>
@@ -406,6 +406,8 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                                     allowClear={false}
                                                     title={`Choose ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()} target`}
                                                     placeholder={`Search ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()}s`}
+                                                    functionType={update.targetType}
+                                                    stage={stage}
                                                 />
                                             ) : <div />}
                                             <select
@@ -475,7 +477,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         </div>
                         <div style={{ marginTop: 15 }}>
                             <label style={labelStyle}>Label Icon (optional)</label>
-                            <IconPicker value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
+                            <IconPicker stage={stage} value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
                         </div>
                         {selectedStat?.type === 'number' && draft.type !== 'statEditor' && (
                             <div style={{ marginTop: 15 }}>
@@ -491,7 +493,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 {draft.displayType === 'rating' && (
                                     <div style={{ marginTop: 15 }}>
                                         <label style={labelStyle}>Rating Icon</label>
-                                        <IconPicker value={draft.ratingIconName} onChange={(ratingIconName) => setDraft((current) => ({ ...current, ratingIconName: ratingIconName || 'star' }))} />
+                                        <IconPicker stage={stage} value={draft.ratingIconName} onChange={(ratingIconName) => setDraft((current) => ({ ...current, ratingIconName: ratingIconName || 'star' }))} />
                                     </div>
                                 )}
                             </div>

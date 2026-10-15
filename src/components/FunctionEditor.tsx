@@ -101,6 +101,13 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                         normalization pipeline, while direct field writes skip that pipeline and mutate the underlying
                         content object.
                     </Typography>
+                    <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
+                        Declare a return type to offer this function in matching value pickers. Return a primitive,
+                        content ID, option ID, or array of IDs matching that type. Lists can mix literal IDs with
+                        functions; list-returning entries are expanded in order. Function-backed values are evaluated
+                        on every read and cannot use set or setField, including through nested calls.
+                        Explicit action invocations can still write to the game.
+                    </Typography>
                 </Box>
             </Popover>
             <TextArea
