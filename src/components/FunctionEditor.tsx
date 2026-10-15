@@ -2,16 +2,12 @@ import { FC, useState } from 'react';
 import { Box, IconButton, Popover, Tooltip, Typography } from '@mui/material';
 import { PlayArrow } from '@mui/icons-material';
 import { Button, TextArea } from './UiComponents';
-import { FunctionScriptTestResult } from '../content/Stat';
+import { FunctionScriptTestResult } from '../content/Function';
 
-interface StatFunctionEditorProps {
+interface FunctionEditorProps {
     script: string;
     onScriptChange: (script: string) => void;
-    // Label used for the script field; entities that support per-instance overrides of a function (e.g. Item)
-    // should describe this as the default/fallback implementation.
-    scriptLabel?: string;
-    onTest?: (targetId?: string) => FunctionScriptTestResult;
-    testTargets?: { id: string; name: string }[];
+    onTest: () => FunctionScriptTestResult;
 }
 
 const fieldLabelStyle = { color: 'var(--agenda-text-muted)', fontSize: 12 };
@@ -27,71 +23,45 @@ const formatTestValue = (value: unknown): string => {
     }
 };
 
-// Editor for a 'function' stat's script body: plain JavaScript run via runFunctionScript when invoked. The
-// script can read/write global stats via `get(name)`/`set(name, value)`, a bound `target` entity's own stats
-// via `target.get(name)`/`target.set(name, value)` (when a target is bound), other named or looped actors/
-// locations/items via `getActor(name)`, `getLocation(name)`, `getItem(name)`, `actors()`, `locations()`,
-// `items()`, and other function stats via `call(name)`. It may optionally `return` a value for the caller to use.
-export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
-    script, onScriptChange,
-    scriptLabel = 'Script',
-    onTest, testTargets,
+export const FunctionEditor: FC<FunctionEditorProps> = ({
+    script, onScriptChange, onTest,
 }) => {
     const [helpAnchor, setHelpAnchor] = useState<HTMLElement | null>(null);
-    const [selectedTargetId, setSelectedTargetId] = useState('');
-    const targetId = testTargets?.find(candidate => candidate.id === selectedTargetId)?.id || testTargets?.[0]?.id;
-    const [testRun, setTestRun] = useState<{ script: string; targetId?: string; result: FunctionScriptTestResult } | null>(null);
-    const testResult = testRun?.script === script && testRun.targetId === targetId ? testRun.result : undefined;
+    const [testRun, setTestRun] = useState<{ script: string; result: FunctionScriptTestResult } | null>(null);
+    const testResult = testRun?.script === script ? testRun.result : undefined;
 
     return (
         <div style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <label style={fieldLabelStyle}>{scriptLabel}</label>
+                <label style={fieldLabelStyle}>Script</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%' }}>
-                {onTest && (
-                    <>
-                        {testTargets && (
-                            <select
-                                className="input-base"
-                                aria-label="Function test target"
-                                value={targetId || ''}
-                                onChange={(event) => setSelectedTargetId(event.target.value)}
-                                style={{ minWidth: 0, maxWidth: '100%' }}
-                            >
-                                {testTargets.length === 0 && <option value="">No active targets</option>}
-                                {testTargets.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
-                            </select>
-                        )}
-                        <Tooltip title="Test with a clone of the current game state">
+                    <Tooltip title="Test with a clone of the current game state">
                         <span>
-                        <Button
-                            variant="secondary"
-                            disabled={testTargets !== undefined && !targetId}
-                            onClick={() => setTestRun({ script, targetId, result: onTest(targetId) })}
-                        >
-                            <PlayArrow fontSize="small" /> Test
-                        </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setTestRun({ script, result: onTest() })}
+                            >
+                                <PlayArrow fontSize="small" /> Test
+                            </Button>
                         </span>
-                        </Tooltip>
-                    </>
-                )}
-                <IconButton
-                    size="small"
-                    aria-label="Function script reference"
-                    aria-expanded={Boolean(helpAnchor)}
-                    onClick={(event) => setHelpAnchor(event.currentTarget)}
-                    style={{
-                        width: 20,
-                        height: 20,
-                        padding: 0,
-                        borderRadius: '50%',
-                        color: 'var(--agenda-text-muted)',
-                        border: '1px solid color-mix(in srgb, var(--agenda-text-muted) 45%, transparent)',
-                        background: 'transparent',
-                    }}
-                >
-                    ?
-                </IconButton>
+                    </Tooltip>
+                    <IconButton
+                        size="small"
+                        aria-label="Function script reference"
+                        aria-expanded={Boolean(helpAnchor)}
+                        onClick={(event) => setHelpAnchor(event.currentTarget)}
+                        style={{
+                            width: 20,
+                            height: 20,
+                            padding: 0,
+                            borderRadius: '50%',
+                            color: 'var(--agenda-text-muted)',
+                            border: '1px solid color-mix(in srgb, var(--agenda-text-muted) 45%, transparent)',
+                            background: 'transparent',
+                        }}
+                    >
+                        ?
+                    </IconButton>
                 </div>
             </div>
             <Popover
@@ -105,14 +75,13 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
                 <Box style={{ display: 'grid', gap: 8 }}>
                     <Typography variant="subtitle2" style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>Function script reference</Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
-                        Use <strong>get(name)</strong> / <strong>set(name, value)</strong> to read or update global stats. Use
-                        <strong> target.get(name)</strong> / <strong>target.set(name, value)</strong> for the current bound actor,
-                        location, or item, and <strong>getActor(name)</strong>, <strong>getLocation(name)</strong>, and
+                        Functions are global and take no parameters. Use <strong>get(name)</strong> / <strong>set(name, value)</strong> to read or update global stats.
+                        Use <strong>getActor(name)</strong>, <strong>getLocation(name)</strong>, and
                         <strong>getItem(name)</strong> to resolve another entity by name.
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
-                        <strong>get(name)</strong> still returns IDs for lists. Use <strong>getObjects(name)</strong> or
-                        <strong> target.getObjects(name)</strong> (also available on other entity accessors) to resolve
+                        <strong>get(name)</strong> returns IDs for lists. Use <strong>getObjects(name)</strong>
+                        {' '}(also available on entity accessors) to resolve
                         an option list or actor/item/location list in its stored order. Content entries expose
                         <strong> id</strong>, <strong>name</strong>, <strong>kind</strong>, and the same
                         <strong> get/set/getField/setField</strong> methods as other entity accessors.
@@ -127,7 +96,7 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
                         description, category, imageUrl, themeColor).
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
-                        This script may optionally <strong>return</strong> a value; other function stats can call it with
+                        This script may optionally <strong>return</strong> a value; other functions can call it with
                         <strong>call(name)</strong>. Any stats written through <strong>set</strong> go through the normal stat
                         normalization pipeline, while direct field writes skip that pipeline and mutate the underlying
                         content object.
@@ -146,9 +115,6 @@ export const StatFunctionEditor: FC<StatFunctionEditorProps> = ({
                     '    const role = actor.getField(\'role\');',
                     '});',
                     'const descriptions = getObjects(\'Choices\').map(option => option.description);',
-                    'if (target) {',
-                    '    target.set(\'Affinity\', target.get(\'Affinity\') + 1);',
-                    '}',
                     '',
                     '// Loop through every active actor, location, and item:',
                     'actors().forEach(actor => {',

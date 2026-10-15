@@ -82,13 +82,10 @@ const buildGlobalStatPromptContext = (stage: Stage, save: ReturnType<Stage['getS
         .addBlock('GeneralGuidance',
             'These are the established global-level stats and current values managed by this game; they should be used to appropriately guide the narrative and can be updated via inclusion of StatChange tags.');
     visibleStats.forEach(stat => builder.addBlock(stat.name, statBuilder => {
-            const isFunction = stat.type === 'function';
-            const value = isFunction ? undefined : normalizeStatValue(values[stat.id], stat);
+            const value = normalizeStatValue(values[stat.id], stat);
             const optionValue = value === undefined ? undefined : formatStatOptionValueText(stat, value);
             const referenceValue = value === undefined ? '' : formatReferenceStatValue(stat, value, stage);
-            const valueText = isFunction
-                ? 'Function stat (not directly changeable with StatChange)'
-                : optionValue || referenceValue || (typeof value === 'boolean' || typeof value === 'number' ? String(value) : String(value ?? 'None'));
+            const valueText = optionValue || referenceValue || (typeof value === 'boolean' || typeof value === 'number' ? String(value) : String(value ?? 'None'));
             const options = stat.type === 'option'
                 ? resolveAvailableStatOptions(stat, value, optionContext).map(option => option.name).filter(Boolean)
                 : [];
@@ -96,7 +93,7 @@ const buildGlobalStatPromptContext = (stage: Stage, save: ReturnType<Stage['getS
             statBuilder
                 .addBlock('Value', valueText)
                 .addBlock('Guidance', resolveStatText(stat.guidance, stage) || 'None provided.')
-                .addBlock('Updatable', String(!isFunction && isStatLlmMaintained(stat, conditionContext)));
+                .addBlock('Updatable', String(isStatLlmMaintained(stat, conditionContext)));
             if (options.length > 0) {
                 statBuilder.addBlock('ValidOptions', options.join(', '));
             }

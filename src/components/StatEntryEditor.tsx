@@ -4,14 +4,13 @@ import { Add, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import {
     Stat, StatValue, StatValueRule,
-    findStatOptionByValue, getStatOptionValue, isFunctionStatType, isNumericDisplayType, isOptionListStatType,
+    findStatOptionByValue, getStatOptionValue, isNumericDisplayType, isOptionListStatType,
     isReferenceDisplayType, isReferenceListDisplayType, isSourcedOptionStat, normalizeReferenceListValue,
     resolveStatDefault, resolveStatOptionPool,
 } from '../content/Stat';
 import { Button, TextArea, TextInput } from './UiComponents';
 import { ConditionEditor } from './ConditionEditor';
 import { ConditionalFlagEditor } from './ConditionalFlagEditor';
-import { StatFunctionEditor } from './StatFunctionEditor';
 import { StatValueInput } from './StatValueInput';
 import { ActorLike } from './UiComponents';
 import { ItemLike } from './ItemPortrait';
@@ -29,23 +28,6 @@ export const normalizeStatShape = (stat: Stat): Stat => {
 };
 
 const normalizeStatShapeForType = (stat: Stat): Stat => {
-    if (isFunctionStatType(stat.type)) {
-        return {
-            ...stat,
-            default: '',
-            options: [],
-            min: undefined,
-            max: undefined,
-            perActor: false,
-            perActorDefaultRules: [],
-            defaultValueRules: [],
-            script: stat.script || '',
-            // A function stat has no value of its own to send to or maintain through the LLM.
-            llmSees: { value: false, conditions: [] },
-            llmMaintained: { value: false, conditions: [] },
-        };
-    }
-
     if (stat.type === 'option' && isSourcedOptionStat(stat)) {
         // Options come from the source list; the stat's own options are kept in case the source is cleared.
         return {
@@ -126,7 +108,6 @@ export const renderStatTypeOptions = () => (
         <option value="actor">Actor</option>
         <option value="actorList">Actor List</option>
         <option value="checkbox">Checkbox</option>
-        <option value="function">Function</option>
         <option value="item">Item</option>
         <option value="itemList">Item List</option>
         <option value="location">Location</option>
@@ -165,7 +146,6 @@ interface StatEntryEditorProps {
     items: ItemLike[];
     locations: LocationLike[];
     stage: () => Stage;
-    scriptLabel?: string;
     fieldLabelStyle: React.CSSProperties;
     inlineFieldStyle: React.CSSProperties;
     inlineFieldTopStyle: React.CSSProperties;
@@ -179,7 +159,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     stat, index, total, typeLabel, category,
     collapsed, onToggleCollapse, onMove, onRemove, onPatch, onNameChange,
     selfStats, globalStats, actorStats, conditionActors, valueActors, items, locations, stage,
-    scriptLabel,
     fieldLabelStyle, inlineFieldStyle, inlineFieldTopStyle, compactChipLabelStyle,
 }) => {
     const normalizedStat = normalizeStatShape(stat);
@@ -192,10 +171,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
         .filter(candidate => isOptionListStatType(candidate.type) && candidate.id !== stat.id);
     const sourcedOptionEntries = isSourcedOption ? resolveStatOptionPool(normalizedStat, { sourceStats: optionListSources }) : [];
     const variableContentType = category === 'actor' ? 'actor' : undefined;
-    const isFunctionType = normalizedStat.type === 'function';
     const conditionStats = category === 'global' ? [...selfStats, ...actorStats] : [...selfStats, ...globalStats];
-
-    const descriptionVisible = !isFunctionType;
 
     const guidanceVisible = category === 'actor'
         ? (stat.llmSees.value === true || stat.llmSees.conditions.length > 0)
@@ -206,7 +182,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
             fieldKey: 'defaultValueRules',
             title: 'Default Value Rules',
             description: "Evaluated in order when a new game starts. The first matching rule wins and seeds this stat's starting value; falls back to the Default above if none match.",
-            visible: normalizedStat.type !== 'function',
+            visible: true,
         }
         : category === 'actor'
             ? {
@@ -314,21 +290,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </select>
                         </div>
 
-                        {isFunctionType && (
-                            <StatFunctionEditor
-                                script={normalizedStat.script || ''}
-                                onScriptChange={(script) => onPatch({ script })}
-                                scriptLabel={scriptLabel}
-                                onTest={(targetId) => stage().testFunctionStat(normalizedStat, category, targetId)}
-                                testTargets={category === 'global' ? undefined
-                                    : (category === 'actor' ? Object.values(stage().getSave().actors || {}).filter(actor => actor.id !== stage().getSave().playerId)
-                                        : category === 'location' ? Object.values(stage().getSave().atlas || {})
-                                            : stage().getSave().inventory || []).filter(entity => entity.active !== false)}
-                            />
-                        )}
-
-                        {!isFunctionType && (
-                        <>
                         {category === 'global' && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Editable In Settings</label>
@@ -394,18 +355,16 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             />
                         )}
 
-                        {descriptionVisible && (
-                            <div style={inlineFieldTopStyle}>
-                                <label style={fieldLabelStyle}>Description</label>
-                                <TextArea
-                                    value={stat.description}
-                                    onChange={(e) => onPatch({ description: e.target.value })}
-                                    rows={2}
-                                    placeholder={category === 'global' ? undefined : 'Describe what this stat represents.'}
-                                    style={{ width: '100%', resize: 'vertical' }}
-                                />
-                            </div>
-                        )}
+                        <div style={inlineFieldTopStyle}>
+                            <label style={fieldLabelStyle}>Description</label>
+                            <TextArea
+                                value={stat.description}
+                                onChange={(e) => onPatch({ description: e.target.value })}
+                                rows={2}
+                                placeholder={category === 'global' ? undefined : 'Describe what this stat represents.'}
+                                style={{ width: '100%', resize: 'vertical' }}
+                            />
+                        </div>
 
                         {guidanceVisible && (
                             <div style={inlineFieldTopStyle}>
@@ -419,9 +378,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 />
                             </div>
                         )}
-                        </>
-                        )}
-
                         {normalizedStat.type === 'option' && (optionListSources.length > 0 || isSourcedOption) && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Option Source</label>
@@ -494,17 +450,15 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                                 placeholder="Option name"
                                             />
                                         </div>
-                                        {descriptionVisible && (
-                                            <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
-                                                <label style={fieldLabelStyle}>Option Description</label>
-                                                <TextArea
-                                                    value={option.description}
-                                                    onChange={(e) => updateOption(optionIndex, { description: e.target.value })}
-                                                    rows={2}
-                                                    style={{ width: '100%', resize: 'vertical' }}
-                                                />
-                                            </div>
-                                        )}
+                                        <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
+                                            <label style={fieldLabelStyle}>Option Description</label>
+                                            <TextArea
+                                                value={option.description}
+                                                onChange={(e) => updateOption(optionIndex, { description: e.target.value })}
+                                                rows={2}
+                                                style={{ width: '100%', resize: 'vertical' }}
+                                            />
+                                        </div>
                                         <div style={{ marginTop: 8 }}>
                                             <Button variant="danger" onClick={() => removeOption(optionIndex)}>
                                                 Remove Option
@@ -595,7 +549,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                         )}
                     </div>
 
-                    {valueRulesConfig && normalizedStat.type !== 'function' && valueRulesConfig.visible && (
+                    {valueRulesConfig && valueRulesConfig.visible && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 10 }}>
                             <label style={fieldLabelStyle}>{valueRulesConfig.title}</label>
                             <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>

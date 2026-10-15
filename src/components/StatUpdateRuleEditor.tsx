@@ -1,7 +1,8 @@
 import { FC, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
-import { Stat, StatValue, StatUpdate, StatUpdateRule, formatStatOptionValueText, isFunctionStatType, isNumericDisplayType, isOptionListStatType } from '../content/Stat';
+import { Stat, StatValue, StatUpdate, StatUpdateRule, GameAction, cloneGameAction, formatStatOptionValueText, isNumericDisplayType, isOptionListStatType } from '../content/Stat';
+import { GameFunction } from '../content/Function';
 import { ContentType, CONTENT_TYPES, Condition, ConditionCollection } from '../content/Condition';
 import { formatTimeSlot } from '../content/CalendarEvent';
 import { Stage } from '../Stage';
@@ -85,12 +86,15 @@ const describeTrigger = (rule: StatUpdateRule): string => {
     return hasOtherConditions ? `${base} (conditional)` : base;
 };
 
-const describeUpdate = (update: StatUpdate, stat: Stat | undefined): string => {
+const describeUpdate = (update: GameAction, stat: Stat | GameFunction | undefined): string => {
     if (!stat) {
         return update.kind === 'function' ? 'Unassigned function' : 'Unassigned stat';
     }
     if (update.kind === 'function') {
         return `Invoke ${stat.name}`;
+    }
+    if (!('type' in stat)) {
+        return 'Unassigned stat';
     }
     if (isOptionListStatType(stat.type)) {
         const verb = update.operation === 'set' ? 'set to' : (update.operation === 'remove' ? 'remove' : 'add');
@@ -103,6 +107,7 @@ const describeUpdate = (update: StatUpdate, stat: Stat | undefined): string => {
 export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, globalStats: globalStats, actorStats, locationStats = [], itemStats = [], actors, items = [], locations, stage, onChange }) => {
     const [collapsedRules, setCollapsedRules] = useState<Record<string, boolean>>({});
     const playerId = (typeof stage === 'function' ? stage() : stage)?.getSave().playerId;
+    const functions = (typeof stage === 'function' ? stage() : stage)?.getConfiguration().functions || [];
     actors = actors.filter(actor => actor.id !== playerId);
     // perActor stats have no single target here, so they cannot be written by a rule.
     const updatableActorStats = actorStats.filter(stat => !stat.perActor);
@@ -122,9 +127,9 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
         onChange(rules.map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule));
     };
 
-    const updateStatUpdate = (ruleId: string, updateId: string, patch: Partial<StatUpdate>) => {
+    const updateStatUpdate = (ruleId: string, updateId: string, patch: Partial<GameAction>) => {
         onChange(rules.map(rule => rule.id === ruleId
-            ? { ...rule, updates: rule.updates.map(update => update.id === updateId ? { ...update, ...patch } : update) }
+            ? { ...rule, updates: rule.updates.map(update => update.id === updateId ? cloneGameAction({ ...update, ...patch }) : update) }
             : rule));
     };
 
@@ -138,21 +143,18 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
         onChange(nextRules);
     };
 
-    const statsForTargetType = (targetType: StatUpdate['targetType'], includePerActor: boolean = false): Stat[] => {
+    const statsForTargetType = (targetType: StatUpdate['targetType']): Stat[] => {
         switch (targetType) {
             case 'global': return globalStats;
             case 'location': return locationStats;
             case 'item': return itemStats;
-            default: return includePerActor ? actorStats : updatableActorStats;
+            default: return updatableActorStats;
         }
     };
     const statsForUpdate = (update: StatUpdate): Stat[] => statsForTargetType(update.targetType);
-    const functionStatsForTargetType = (targetType: StatUpdate['targetType']): Stat[] => (
-        statsForTargetType(targetType, true).filter(stat => isFunctionStatType(stat.type))
-    );
-    const resolveUpdateStat = (update: StatUpdate): Stat | undefined => (
+    const resolveUpdateStat = (update: GameAction): Stat | GameFunction | undefined => (
         update.kind === 'function'
-            ? functionStatsForTargetType(update.targetType).find(stat => stat.id === update.statId)
+            ? functions.find(fn => fn.id === update.functionId)
             : statsForUpdate(update).find(stat => stat.id === update.statId)
     );
 
@@ -201,9 +203,8 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                 <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13, marginTop: 4 }}>Then</label>
                                 {rule.updates.map((update) => {
                                     const kind = update.kind === 'function' ? 'function' : 'stat';
-                                    const stat = resolveUpdateStat(update);
-                                    const availableStats = statsForUpdate(update);
-                                    const availableFunctionStats = functionStatsForTargetType(update.targetType);
+                                    const stat = update.kind === 'function' ? undefined : statsForUpdate(update).find(stat => stat.id === update.statId);
+                                    const availableStats = update.kind === 'function' ? [] : statsForUpdate(update);
                                     return (
                                         <div key={update.id} style={{ display: 'grid', gap: 8, padding: 8, border: '1px dashed var(--agenda-line-subtle)', borderRadius: 6 }}>
                                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -213,35 +214,28 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                                     onChange={(event) => {
                                                         const nextKind = event.target.value as 'stat' | 'function';
                                                         if (nextKind === 'function') {
-                                                            const functionStats = functionStatsForTargetType(update.targetType);
-                                                            updateStatUpdate(rule.id, update.id, { kind: 'function', statId: functionStats[0]?.id || '' });
+                                                            updateStatUpdate(rule.id, update.id, { kind: 'function', functionId: functions[0]?.id || '' });
                                                         } else {
-                                                            const nextStats = statsForUpdate(update);
-                                                            updateStatUpdate(rule.id, update.id, { kind: 'stat', statId: nextStats[0]?.id || '', value: 0 });
+                                                            updateStatUpdate(rule.id, update.id, { ...createUpdate(), id: update.id, kind: 'stat' });
                                                         }
                                                     }}
                                                 >
                                                     <option value="stat">Update a stat</option>
                                                     <option value="function">Invoke a function</option>
                                                 </select>
-                                                <select
+                                                {update.kind !== 'function' && <select
                                                     style={{ ...selectStyle, width: 'auto', minWidth: 100 }}
                                                     value={update.targetType}
                                                     onChange={(event) => {
                                                         const targetType = event.target.value as StatUpdate['targetType'];
-                                                        if (kind === 'function') {
-                                                            const functionStats = functionStatsForTargetType(targetType);
-                                                            updateStatUpdate(rule.id, update.id, { targetType, targetId: 'any', statId: functionStats[0]?.id || '' });
-                                                        } else {
-                                                            const nextStats = statsForTargetType(targetType);
-                                                            updateStatUpdate(rule.id, update.id, { targetType, targetId: 'any', statId: nextStats[0]?.id || '', value: 0 });
-                                                        }
+                                                        const nextStats = statsForTargetType(targetType);
+                                                        updateStatUpdate(rule.id, update.id, { targetType, targetId: 'any', statId: nextStats[0]?.id || '', value: 0 });
                                                     }}
                                                 >
                                                     <option value="global">Global</option>
                                                     {CONTENT_TYPES.map(contentType => <option key={contentType} value={contentType}>{CONTENT_TYPE_LABELS[contentType]}</option>)}
-                                                </select>
-                                                {update.targetType !== 'global' ? (
+                                                </select>}
+                                                {update.kind !== 'function' && update.targetType !== 'global' ? (
                                                     <div style={{ flex: '1 1 180px', minWidth: 160 }}>
                                                         <SearchableOptionPicker
                                                             value={update.targetId}
@@ -265,7 +259,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                                 </Button>
                                             </div>
 
-                                            {kind === 'stat' ? (
+                                            {update.kind !== 'function' ? (
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1.3fr) minmax(100px, 110px) minmax(100px, 1fr)', gap: 8, alignItems: 'center', minWidth: 0 }}>
                                                     <select
                                                         style={selectStyle}
@@ -295,13 +289,14 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                                 <div style={{ display: 'grid', gap: 6 }}>
                                                     <select
                                                         style={selectStyle}
-                                                        value={update.statId}
-                                                        onChange={(event) => updateStatUpdate(rule.id, update.id, { statId: event.target.value })}
+                                                        value={update.functionId}
+                                                        onChange={(event) => updateStatUpdate(rule.id, update.id, { functionId: event.target.value })}
                                                     >
-                                                        {availableFunctionStats.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                                                        <option value="">Select a function...</option>
+                                                        {functions.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
                                                     </select>
-                                                    {availableFunctionStats.length === 0 && (
-                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>No function stats defined for this target.</span>
+                                                    {functions.length === 0 && (
+                                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>No functions defined. Add one in Functions.</span>
                                                     )}
                                                 </div>
                                             )}

@@ -1,7 +1,7 @@
 import React, { FC, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
-import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2 } from '@mui/icons-material';
+import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2, Code } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorManagementPanel } from './ActorManagementPanel';
 import { LocationManagementPanel } from './LocationManagementPanel';
@@ -13,16 +13,17 @@ import { MapManagementPanel } from './MapManagementPanel';
 import { StatManagementPanel } from './StatManagementPanel';
 import { ItemManagementPanel } from './ItemManagementPanel';
 import { ControlManagementPanel } from './ControlManagementPanel';
+import { FunctionManagementPanel } from './FunctionManagementPanel';
 
 interface ContentManagementScreenProps {
     stage: () => Stage;
     onClose: () => void;
 }
 
-type TabType = 'game' | 'style' | 'stats' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
+type TabType = 'game' | 'style' | 'stats' | 'functions' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
 const tabStorageKey = 'contentManagement.activeTab';
-const tabs: TabType[] = ['game', 'style', 'stats', 'controls', 'lorebook', 'actors', 'locations', 'items', 'maps', 'calendarEvents'];
-const creatorTabs: TabType[] = ['game', 'style', 'controls'];
+const tabs: TabType[] = ['game', 'style', 'stats', 'functions', 'controls', 'lorebook', 'actors', 'locations', 'items', 'maps', 'calendarEvents'];
+const creatorTabs: TabType[] = ['game', 'style', 'functions', 'controls'];
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
@@ -209,6 +210,12 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     Stats
                                 </Button>
                                 {isCreatorMode && (
+                                    <Button onClick={() => setActiveTab('functions')} variant={activeTab === 'functions' ? 'primary' : 'secondary'}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: activeTab === 'functions' ? 1 : 0.6 }}>
+                                        <Code /> Functions ({stage().getConfiguration().functions.length})
+                                    </Button>
+                                )}
+                                {isCreatorMode && (
                                     <Button
                                         onClick={() => setActiveTab('controls')}
                                         variant={activeTab === 'controls' ? 'primary' : 'secondary'}
@@ -360,6 +367,9 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 )}
 
                                 {/* Controls Tab */}
+                                {isCreatorMode && activeTab === 'functions' && (
+                                    <FunctionManagementPanel stage={stage} />
+                                )}
                                 {activeTab === 'controls' && (
                                     <ControlManagementPanel stage={stage} />
                                 )}

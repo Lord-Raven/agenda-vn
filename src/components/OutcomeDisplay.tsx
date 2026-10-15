@@ -2,7 +2,7 @@ import { FC, ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Actor } from '../content/Actor';
 import { Outcome, OutcomeType } from '../content/Outcome';
-import { formatStatOptionValueText, isFunctionStatType, normalizeStatValue, Stat, StatValue } from '../content/Stat';
+import { formatStatOptionValueText, normalizeStatValue, Stat, StatValue } from '../content/Stat';
 import { Control } from '../content/Control';
 import { Stage } from '../Stage';
 import { ActorPortrait } from './ActorPortrait';
@@ -125,7 +125,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
         const target = outcome.type === OutcomeType.ACTOR_STAT ? 'actor' : 'global';
         const stats = target === 'actor' ? stage().getConfiguration().actorStats : stage().getConfiguration().globalStats;
         const stat = stats.find((candidate) => candidate.name === `${outcome.details?.statName || ''}`.trim());
-        if (!stat || isFunctionStatType(stat.type) || stat.perActor) {
+        if (!stat || stat.perActor) {
             return false;
         }
         const actor = target === 'actor' ? resolveActor(outcome.details?.actorId) : undefined;

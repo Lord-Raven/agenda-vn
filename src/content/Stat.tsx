@@ -1,5 +1,6 @@
 import { v4 as generateUuid } from 'uuid';
 import { ContentTarget, ContentType, CONTENT_TYPES, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
+import type { FunctionInvocation } from './Function';
 
 // A boolean field whose effective value can be gated by conditions instead of always being fixed. With no
 // conditions, `value` always applies. With conditions, `value` applies only while at least one collection is
@@ -32,17 +33,13 @@ export const resolveConditionalFlag = (flag: ConditionalFlag | undefined, contex
     return evaluateConditionCollections(flag.conditions, context) ? flag.value : !flag.value;
 };
 
-// Reference stats hold content IDs rather than display values. List variants hold a set of IDs. 'function'
-// stats hold no value at all - they are a JavaScript snippet (Stat.script) invoked on demand, rather than
-// something read/written as a scalar. See runFunctionScript.
+// Reference stats hold content IDs rather than display values. List variants hold a set of IDs.
 // 'optionList' holds a pool of options (Stat.options) whose value is the list of currently active option ids;
 // 'option' stats may pull their choices from one via Stat.optionSourceStatId.
-export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'checkbox' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'function';
+export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'checkbox' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList';
 export type StatValue = number | string | boolean | string[];
 
 export const isNumericDisplayType = (type: StatType): boolean => type === 'number';
-
-export const isFunctionStatType = (type: StatType): boolean => type === 'function';
 
 export const isOptionListStatType = (type: StatType): boolean => type === 'optionList';
 
@@ -306,73 +303,6 @@ export type StatValueRule = {
     conditions: ConditionCollection[];
 };
 
-// An entity a function script's `target` (or a `getActor`/`getLocation`/`getItem`/`actors`/`locations`/`items`
-// lookup) resolves to: its own stats can be read/written by name via `get`/`set`, scoped to whichever stat
-// definitions (`kind`) apply. `getField`/`setField` read/write a small allowlist of simple metadata fields
-// directly, bypassing the Stat system. `getObjects` resolves list IDs into these accessors or option copies.
-export type FunctionScriptEntity = {
-    id: string;
-    name: string;
-    kind: ContentType;
-    get: (statName: string) => StatValue | undefined;
-    getObjects: (statName: string) => FunctionScriptObject[];
-    set: (statName: string, value: StatValue) => void;
-    getField?: (fieldName: string) => string | undefined;
-    setField?: (fieldName: string, value: string) => void;
-};
-
-export type FunctionScriptObject = FunctionScriptEntity | StatOption;
-
-// The bindings a function stat's script body executes with (via `new Function`, see runFunctionScript):
-// `get`/`set` read/write global stats by name; `target` (when bound) is the entity this invocation concerns
-// (e.g. the actor a StatUpdate targeted, or an Item's own stats); `getActor`/`getLocation`/`getItem` look up
-// any other named entity's stats; `actors`/`locations`/`items` list every active (non-deleted) entity of that
-// kind for looping; `call` invokes another function stat by name (global, or - if a target/explicit entity is
-// given - one scoped to that entity's kind), returning its return value. `getObjects` resolves global list
-// stats into entity accessors or option copies without changing the IDs returned by `get`.
-export type FunctionScriptBindings = {
-    get: (statName: string) => StatValue | undefined;
-    getObjects: (statName: string) => FunctionScriptObject[];
-    set: (statName: string, value: StatValue) => void;
-    target?: FunctionScriptEntity;
-    getActor: (name: string) => FunctionScriptEntity | undefined;
-    getLocation: (name: string) => FunctionScriptEntity | undefined;
-    getItem: (name: string) => FunctionScriptEntity | undefined;
-    actors: () => FunctionScriptEntity[];
-    locations: () => FunctionScriptEntity[];
-    items: () => FunctionScriptEntity[];
-    call: (name: string, target?: FunctionScriptEntity) => unknown;
-};
-
-// Compiles and runs a function stat's script body with the given bindings. Scripts are plain JavaScript
-// (may `return` a value) and can only touch game state through the bound accessors - never through direct
-// object references - so every mutation still goes through the normal normalize/clamp pipeline.
-export type FunctionScriptTestResult = { value: unknown; errors: string[] };
-
-export const runFunctionScript = (script: string | undefined, bindings: FunctionScriptBindings, onError?: (message: string) => void): unknown => {
-    const body = `${script || ''}`.trim();
-    if (!body) {
-        return undefined;
-    }
-    try {
-        const scriptFunction = new Function(
-            'get', 'set', 'target', 'getActor', 'getLocation', 'getItem', 'actors', 'locations', 'items', 'call', 'getObjects', body,
-        );
-        return scriptFunction(
-            bindings.get, bindings.set, bindings.target, bindings.getActor, bindings.getLocation, bindings.getItem,
-            bindings.actors, bindings.locations, bindings.items, bindings.call, bindings.getObjects,
-        );
-    } catch (error) {
-        const message = `Function stat script error: ${(error as Error)?.message || error}`;
-        if (onError) {
-            onError(message);
-        } else {
-            console.error(message);
-        }
-        return undefined;
-    }
-};
-
 // Represents a custom stat that applies to all actors in the game.
 export type Stat = {
     id: string;
@@ -387,9 +317,6 @@ export type Stat = {
     // For global stats: rules used to resolve this stat's initial value when a new game starts, evaluated in
     // order (first matching wins); falls back to `default` if none match. See buildInitialGlobalStatValues.
     defaultValueRules?: StatValueRule[];
-    // Only meaningful when type is 'function': the JavaScript body run on invocation (see runFunctionScript).
-    // Entities that own this stat (e.g. an Item) may override this default per-instance; see resolveFunctionScript.
-    script?: string;
     llmSees: ConditionalFlag; // If true (the resolved value), this stat can be included in context provided to the LLM; if false, this stat is omitted from context (intended for purely mechanical use); if false, llmMaintained is also treated as false.
     llmMaintained: ConditionalFlag; // If true (the resolved value), this stat can be updated by the LLM in skit outcomes (see Skit.tsx).
     guidance: string; // Guidance for the LLM on how to handle this stat. If llmSees is false, the blank for editing this can be omitted from StatManagementPanel.
@@ -434,7 +361,6 @@ export const cloneStat = (stat: Stat): Stat => ({
     perActor: stat.perActor === true,
     perActorDefaultRules: cloneStatValueRules(stat.perActorDefaultRules),
     defaultValueRules: cloneStatValueRules(stat.defaultValueRules),
-    script: `${stat.script || ''}`,
     llmSees: cloneConditionalFlag(stat.llmSees, true),
     llmMaintained: cloneConditionalFlag(stat.llmMaintained, true),
     guidance: stat.guidance,
@@ -459,10 +385,6 @@ export const isStatLlmMaintained = (stat: Stat, context: ConditionContext): bool
 );
 
 export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): StatValue => {
-    if (isFunctionStatType(stat.type)) {
-        return ''; // function stats are a callable definition, not a scalar value
-    }
-
     if (stat.type === 'option') {
         const defaultOption = findStatOptionByValue(stat, stat.default);
         if (defaultOption) {
@@ -499,10 +421,6 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
 };
 
 export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValueOptions = {}): StatValue => {
-    if (isFunctionStatType(stat.type)) {
-        return ''; // function stats are a callable definition, not a scalar value
-    }
-
     if (stat.type === 'option') {
         const selectedOption = findStatOptionByValue(stat, value);
         if (selectedOption) {
@@ -622,7 +540,7 @@ export const buildInitialGlobalStatValues = (
 ): Record<string, StatValue> => {
     const values: Record<string, StatValue> = {};
     const initialContext = { ...context, globalStats: stats, globalStatValues: values };
-    stats.filter(stat => stat?.id && stat.name?.trim() && !isFunctionStatType(stat.type)).forEach(stat => {
+    stats.filter(stat => stat?.id && stat.name?.trim()).forEach(stat => {
         const selectedValue = selectedValues[stat.id];
         values[stat.id] = selectedValue !== undefined
             ? normalizeStatValue(selectedValue, stat)
@@ -635,42 +553,34 @@ export type StatUpdateTargetType = 'global' | ContentType;
 // For optionList stats, 'adjust' adds the given options to the active list and 'remove' removes them.
 export type StatUpdateOperation = 'set' | 'adjust' | 'remove';
 
-// Whether a StatUpdateRule action writes a stat directly ('stat', the original/default behavior) or invokes
-// a 'function' typed stat instead (running that stat's script, see runFunctionScript).
-export type StatUpdateActionKind = 'stat' | 'function';
-
-// A single action performed by a StatUpdateRule: either a stat write ('stat', the original behavior) or a
-// function stat invocation ('function'). Shares StatValue (and, for numeric stats, the same dice/relative
-// expression support) with StatValueRule so both rule flavors can use the same editors.
+// A stat write, sharing the same value and expression support as StatValueRule.
 export type StatUpdate = {
     id: string;
     // Defaults to 'stat' when absent (back-compat with existing saved rules/actions).
-    kind?: StatUpdateActionKind;
+    kind?: 'stat';
     targetType: StatUpdateTargetType;
-    // Which entity owns the target stat ('stat' kind) or the function stat being invoked ('function' kind).
+    // Which entity owns the target stat.
     // Meaningful for 'actor'/'location'/'item' updates: 'any' targets every active entity of that type,
     // otherwise a specific actor/location/item id. Ignored for 'global' updates.
     targetId: ContentTarget;
-    // Only meaningful when kind is 'stat': the stat being written. When kind is 'function': the function-typed
-    // stat being invoked (its script is bound the resolved actor, or no target for a 'player' invocation).
     statId: string;
     operation: StatUpdateOperation;
     value: StatValue;
 };
 
-export const isFunctionInvocationUpdate = (update: StatUpdate): boolean => update.kind === 'function';
+export type GameAction = StatUpdate | FunctionInvocation;
 
 // A recurring "every <calendar condition> do these things" rule; conditions are the same ConditionCollections
 // used by schedules and per-actor default rules, and are re-evaluated for each in-game period entered.
 export type StatUpdateRule = {
     id: string;
     conditions: ConditionCollection[];
-    updates: StatUpdate[];
+    updates: GameAction[];
 };
 
 export const cloneStatUpdate = (update: any): StatUpdate => ({
     id: update?.id || generateUuid(),
-    kind: update?.kind === 'function' ? 'function' : 'stat',
+    kind: 'stat',
     targetType: update?.targetType === 'global' ? 'global' : (CONTENT_TYPES.find(type => type === update?.targetType) || 'actor'),
     targetId: `${update?.targetId || 'any'}`,
     statId: `${update?.statId || ''}`,
@@ -680,38 +590,22 @@ export const cloneStatUpdate = (update: any): StatUpdate => ({
         : (typeof update?.value === 'boolean' || typeof update?.value === 'number' || typeof update?.value === 'string' ? update.value : 0),
 });
 
+export const cloneGameAction = (source: unknown): GameAction => {
+    const action = source && typeof source === 'object' ? source as Record<string, unknown> : {};
+    return action.kind === 'function'
+        ? { id: typeof action.id === 'string' && action.id ? action.id : generateUuid(), kind: 'function', functionId: typeof action.functionId === 'string' ? action.functionId : '' }
+        : cloneStatUpdate(action);
+};
+
 export const cloneStatUpdateRule = (rule: any): StatUpdateRule => ({
     id: rule?.id || generateUuid(),
     conditions: Array.isArray(rule?.conditions)
         ? rule.conditions.map((collection: unknown) => Array.isArray(collection) ? [...collection] : [])
         : [],
-    updates: Array.isArray(rule?.updates) ? rule.updates.map(cloneStatUpdate) : [],
+    updates: Array.isArray(rule?.updates) ? rule.updates.map(cloneGameAction) : [],
 });
 
 export const cloneStatUpdateRules = (rules: unknown): StatUpdateRule[] => (Array.isArray(rules) ? rules : []).map(cloneStatUpdateRule);
-
-// A per-instance override of a function stat's script, keyed by the function stat's id (e.g.
-// Item.functionScriptOverrides['onUse-stat-id'] holds one item's own implementation of that item stat's
-// "onUse" function). Mirrors the ActorStat.perActor override pattern (see PerActorValueRuleMap).
-export type FunctionScriptOverrideMap = { [statId: string]: string };
-
-export const cloneFunctionScriptOverrideMap = (map: unknown): FunctionScriptOverrideMap => {
-    const source = (map && typeof map === 'object') ? map as Record<string, unknown> : {};
-    const next: FunctionScriptOverrideMap = {};
-    for (const statId of Object.keys(source)) {
-        if (typeof source[statId] === 'string') {
-            next[statId] = source[statId] as string;
-        }
-    }
-    return next;
-};
-
-// Resolves the effective script for invoking a function stat on a given entity instance: an explicit,
-// non-empty override on that instance takes precedence, otherwise the stat definition's own script.
-export const resolveFunctionScript = (stat: Stat, overrides: FunctionScriptOverrideMap | undefined): string => {
-    const override = overrides?.[stat.id];
-    return override && override.trim() ? override : (stat.script || '');
-};
 
 // Resolves the value a stat update writes, given the target's current value. Numeric stats evaluate the
 // update's value as a dice/relative expression, so 'adjust' adds the rolled amount while 'set' replaces with

@@ -1,6 +1,6 @@
 import { FC, useState } from 'react';
 import { Stage } from '../Stage';
-import { isFunctionStatType, normalizeStatValue } from '../content/Stat';
+import { normalizeStatValue } from '../content/Stat';
 import { GlassPanel, Title } from '../components/UiComponents';
 import { StatValueInput } from '../components/StatValueInput';
 
@@ -52,28 +52,22 @@ export const GlobalStatManagementPanel: FC<GlobalStatManagementPanelProps> = ({ 
                                 {stat.description}
                             </div>
                         )}
-                        {isFunctionStatType(stat.type) ? (
-                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: '12px' }}>
-                                Function stats have no stored value to edit.
-                            </span>
-                        ) : (
-                            <StatValueInput
-                                stat={stat}
-                                value={normalizeStatValue(
-                                    save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id] ?? stat.default,
-                                    stat,
-                                )}
-                                onChange={value => {
-                                    stageInstance.setGlobalStatValue(stat.id, value);
-                                    setRevision(current => current + 1);
-                                }}
-                                actors={actors}
-                                items={items}
-                                locations={locations}
-                                stage={stage}
-                                optionContext={optionContext}
-                            />
-                        )}
+                        <StatValueInput
+                            stat={stat}
+                            value={normalizeStatValue(
+                                save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id] ?? stat.default,
+                                stat,
+                            )}
+                            onChange={value => {
+                                stageInstance.setGlobalStatValue(stat.id, value);
+                                setRevision(current => current + 1);
+                            }}
+                            actors={actors}
+                            items={items}
+                            locations={locations}
+                            stage={stage}
+                            optionContext={optionContext}
+                        />
                     </div>
                 ))}
             </div>

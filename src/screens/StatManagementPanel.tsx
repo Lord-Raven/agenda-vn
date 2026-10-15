@@ -626,7 +626,6 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
                             items={itemOptions}
                             locations={locationOptions}
                             stage={stage}
-                            scriptLabel="Default Script"
                             fieldLabelStyle={fieldLabelStyle}
                             inlineFieldStyle={inlineFieldStyle}
                             inlineFieldTopStyle={inlineFieldTopStyle}
@@ -657,7 +656,7 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
             <GlassPanel variant="default" style={{ padding: '18px' }}>
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Stat Update Events</Title>
                 <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '11px', marginBottom: 10 }}>
-                    Recurring stat changes applied at the start of every in-game time period whose conditions match. Numeric stats accept dice or relative notation (e.g. "1d6+1" or "-2").
+                    Recurring stat changes or global function calls applied at the start of every in-game time period whose conditions match. Define scripts in Functions. Numeric stats accept dice or relative notation (e.g. "1d6+1" or "-2").
                 </span>
                 <StatUpdateRuleEditor
                     rules={statUpdateRules}

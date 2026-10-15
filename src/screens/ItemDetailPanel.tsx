@@ -12,12 +12,11 @@ import {
 } from '../content/Item';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 import { ConditionCollection } from '../content/Condition';
-import { cloneFunctionScriptOverrideMap, FunctionScriptOverrideMap, isFunctionStatType, resolveFunctionScript, Stat, StatValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
+import { Stat, StatValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
 import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { StatValueInput } from '../components/StatValueInput';
-import { StatFunctionEditor } from '../components/StatFunctionEditor';
 
 const createInitialItemStatMap = (item: Item, itemStats: Stat[]): { [key: string]: StatValue } => {
     const nextMap: { [key: string]: StatValue } = {};
@@ -53,9 +52,6 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         return Object.values(uniqueStatMap);
     }, [stage]);
 
-    const scalarItemStats = useMemo(() => itemStats.filter((stat) => !isFunctionStatType(stat.type)), [itemStats]);
-    const functionItemStats = useMemo(() => itemStats.filter((stat) => isFunctionStatType(stat.type)), [itemStats]);
-
     const locationOptions = useMemo(() => Object.values(stage().getSave().atlas || {})
         .filter((candidate) => candidate.active !== false), [stage]);
     const actorOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {}))
@@ -73,8 +69,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         alternativeImages: item.alternativeImages?.map(createAlternativeImage) || [],
         availabilityConditions: (item.availabilityConditions || []).map((collection) => [...collection] as ConditionCollection),
     });
-    const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: StatValue }>(() => createInitialItemStatMap(item, scalarItemStats));
-    const [editedFunctionScriptOverrides, setEditedFunctionScriptOverrides] = useState<FunctionScriptOverrideMap>(() => cloneFunctionScriptOverrideMap(item.functionScriptOverrides));
+    const [editedStatMap, setEditedStatMap] = useState<{ [key: string]: StatValue }>(() => createInitialItemStatMap(item, itemStats));
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [isUploadingAlternativeImages, setIsUploadingAlternativeImages] = useState<Record<number, boolean>>({});
     const [collapsedAlternativeImages, setCollapsedAlternativeImages] = useState<boolean[]>(() =>
@@ -83,11 +78,10 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
     const [expandedStatIds, setExpandedStatIds] = useState<Set<string>>(new Set());
     const editedItemRef = useRef(editedItem);
     const editedStatMapRef = useRef(editedStatMap);
-    const editedFunctionScriptOverridesRef = useRef(editedFunctionScriptOverrides);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
 
-    const persistItem = (nextItem: typeof editedItem, nextStatMap: { [key: string]: StatValue }, nextFunctionScriptOverrides: FunctionScriptOverrideMap = editedFunctionScriptOverridesRef.current) => {
+    const persistItem = (nextItem: typeof editedItem, nextStatMap: { [key: string]: StatValue }) => {
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
             autoSaveTimeoutRef.current = null;
@@ -104,16 +98,9 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         persistedItem.alternativeImages = nextItem.alternativeImages.map(createAlternativeImage);
         persistedItem.availabilityConditions = nextItem.availabilityConditions.map((collection) => [...collection]);
         persistedItem.statMap = persistedItem.statMap && typeof persistedItem.statMap === 'object' ? { ...persistedItem.statMap } : {};
-        persistedItem.functionScriptOverrides = cloneFunctionScriptOverrideMap(nextFunctionScriptOverrides);
-        const activeFunctionStatIds = new Set(functionItemStats.map((stat) => stat.id));
-        Object.keys(persistedItem.functionScriptOverrides).forEach((statId) => {
-            if (!activeFunctionStatIds.has(statId)) {
-                delete persistedItem.functionScriptOverrides[statId];
-            }
-        });
 
         const activeStatIds = new Set<string>();
-        scalarItemStats.forEach((stat) => {
+        itemStats.forEach((stat) => {
             activeStatIds.add(stat.id);
             persistedItem.statMap[stat.id] = normalizeStatValue(nextStatMap[stat.id], stat);
         });
@@ -156,13 +143,8 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
     }, [editedStatMap]);
 
     useEffect(() => {
-        editedFunctionScriptOverridesRef.current = editedFunctionScriptOverrides;
-    }, [editedFunctionScriptOverrides]);
-
-    useEffect(() => {
-        setEditedStatMap(createInitialItemStatMap(item, scalarItemStats));
-        setEditedFunctionScriptOverrides(cloneFunctionScriptOverrideMap(item.functionScriptOverrides));
-    }, [item, scalarItemStats]);
+        setEditedStatMap(createInitialItemStatMap(item, itemStats));
+    }, [item, itemStats]);
 
     useEffect(() => {
         if (!didMountRef.current) {
@@ -175,7 +157,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         }
 
         autoSaveTimeoutRef.current = window.setTimeout(() => {
-            persistItem(editedItemRef.current, editedStatMapRef.current, editedFunctionScriptOverridesRef.current);
+            persistItem(editedItemRef.current, editedStatMapRef.current);
         }, 300);
 
         return () => {
@@ -183,12 +165,12 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                 clearTimeout(autoSaveTimeoutRef.current);
             }
         };
-    }, [editedItem, editedStatMap, editedFunctionScriptOverrides]);
+    }, [editedItem, editedStatMap]);
 
     useEffect(() => {
         return () => {
             if (autoSaveTimeoutRef.current) {
-                persistItem(editedItemRef.current, editedStatMapRef.current, editedFunctionScriptOverridesRef.current);
+                persistItem(editedItemRef.current, editedStatMapRef.current);
             }
         };
     }, []);
@@ -414,11 +396,11 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                             />
                         </section>
 
-                        {scalarItemStats.length > 0 && (
+                        {itemStats.length > 0 && (
                             <section>
                                 <h2 style={sectionHeadingStyle}>Item Stats</h2>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    {scalarItemStats.map((stat) => {
+                                    {itemStats.map((stat) => {
                                         const isExpanded = expandedStatIds.has(stat.id);
                                         return (
                                             <div
@@ -482,60 +464,6 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                                         {stat.description}
                                                     </div>
                                                 )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </section>
-                        )}
-
-                        {functionItemStats.length > 0 && (
-                            <section>
-                                <h2 style={sectionHeadingStyle}>Item Functions</h2>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                                    {functionItemStats.map((stat) => {
-                                        const hasOverride = !!(editedFunctionScriptOverrides[stat.id] || '').trim();
-                                        const activeScript = resolveFunctionScript(stat, editedFunctionScriptOverrides);
-                                        return (
-                                            <div
-                                                key={stat.id}
-                                                style={{
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    gap: '8px',
-                                                    border: '1px solid color-mix(in srgb, var(--agenda-highlight) 18%, transparent)',
-                                                    borderRadius: '6px',
-                                                    padding: '10px',
-                                                    backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)',
-                                                }}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                                    <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>{stat.name}</span>
-                                                    {hasOverride && (
-                                                        <Button
-                                                            variant="secondary"
-                                                            onClick={() => setEditedFunctionScriptOverrides((current) => {
-                                                                const next = { ...current };
-                                                                delete next[stat.id];
-                                                                return next;
-                                                            })}
-                                                        >
-                                                            Reset to Default
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                                {!!stat.description?.trim() && (
-                                                    <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 75%, transparent)', fontSize: '12px' }}>
-                                                        {stat.description}
-                                                    </div>
-                                                )}
-                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                    {hasOverride ? "This item overrides the stat's default script." : "Using the stat's default script; editing below creates an override for this item."}
-                                                </span>
-                                                <StatFunctionEditor
-                                                    script={activeScript}
-                                                    onScriptChange={(script) => setEditedFunctionScriptOverrides((current) => ({ ...current, [stat.id]: script }))}
-                                                />
                                             </div>
                                         );
                                     })}

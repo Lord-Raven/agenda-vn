@@ -4,7 +4,7 @@ import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ContentListDisplay, Control, ControlPlacement, ControlType, StatDisplayType } from '../content/Control';
 import { ConditionCollection, CONTENT_TYPES, ContentType } from '../content/Condition';
-import { isFunctionStatType, isReferenceListDisplayType, Stat, StatUpdate, StatValue } from '../content/Stat';
+import { isReferenceListDisplayType, Stat, StatUpdate, GameAction, cloneGameAction } from '../content/Stat';
 import { Button, ColorPickerInput, GlassPanel, TextInput, Title } from '../components/UiComponents';
 import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -32,7 +32,7 @@ type ControlDraft = {
     ratingIconName: string;
     outcomeStatTarget: Control['outcomeStatTarget'];
     availabilityConditions: ConditionCollection[];
-    actions: StatUpdate[];
+    actions: GameAction[];
 };
 
 const createDraft = (control: Control): ControlDraft => ({
@@ -92,10 +92,11 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const stageInstance = stage();
     const globalStats = useMemo(() => stageInstance.getConfiguration().globalStats || [], [stageInstance]);
     const actorStats = useMemo(() => stageInstance.getConfiguration().actorStats || [], [stageInstance]);
-    const updatableGlobalStats = useMemo(() => globalStats.filter((stat) => !isFunctionStatType(stat.type)), [globalStats]);
-    const updatableActorStats = useMemo(() => actorStats.filter((stat) => !isFunctionStatType(stat.type) && !stat.perActor), [actorStats]);
-    const updatableLocationStats = useMemo(() => (stageInstance.getConfiguration().locationStats || []).filter((stat) => !isFunctionStatType(stat.type)), [stageInstance]);
-    const updatableItemStats = useMemo(() => (stageInstance.getConfiguration().itemStats || []).filter((stat) => !isFunctionStatType(stat.type)), [stageInstance]);
+    const updatableGlobalStats = globalStats;
+    const updatableActorStats = useMemo(() => actorStats.filter((stat) => !stat.perActor), [actorStats]);
+    const updatableLocationStats = useMemo(() => stageInstance.getConfiguration().locationStats || [], [stageInstance]);
+    const updatableItemStats = useMemo(() => stageInstance.getConfiguration().itemStats || [], [stageInstance]);
+    const functions = stageInstance.getConfiguration().functions || [];
     const actors = useMemo(() => stageInstance.getConfiguration().actors || [], [stageInstance]);
     const items = useMemo(() => stageInstance.getConfiguration().items || [], [stageInstance]);
     const locations = useMemo(() => stageInstance.getConfiguration().locations || [], [stageInstance]);
@@ -203,10 +204,10 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         setDraft((current) => ({ ...current, actions: [...current.actions, newUpdate] }));
     };
 
-    const updateAction = (updateId: string, patch: Partial<StatUpdate>) => {
+    const updateAction = (updateId: string, patch: Partial<GameAction>) => {
         setDraft((current) => ({
             ...current,
-            actions: current.actions.map((update) => update.id === updateId ? { ...update, ...patch } : update),
+            actions: current.actions.map((update) => update.id === updateId ? cloneGameAction({ ...update, ...patch }) : update),
         }));
     };
 
@@ -357,19 +358,33 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <h2 style={sectionHeadingStyle}>Actions (fired on click)</h2>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 {draft.actions.map((update) => {
-                                    const stat = resolveUpdateStat(update);
-                                    const availableStats = statsForUpdate(update);
+                                    const stat = update.kind === 'function' ? undefined : resolveUpdateStat(update);
+                                    const availableStats = update.kind === 'function' ? [] : statsForUpdate(update);
                                     return (
                                         <div
                                             key={update.id}
                                             style={{
                                                 display: 'grid',
-                                                gridTemplateColumns: 'minmax(90px, 110px) minmax(120px, 1.2fr) minmax(120px, 1.3fr) minmax(100px, 110px) minmax(100px, 1fr) auto',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
                                                 gap: 8,
                                                 alignItems: 'center',
                                                 minWidth: 0,
                                             }}
                                         >
+                                            <select style={selectStyle} aria-label="Action kind" value={update.kind || 'stat'}
+                                                onChange={event => updateAction(update.id, event.target.value === 'function'
+                                                    ? { kind: 'function', functionId: functions[0]?.id || '' }
+                                                    : { kind: 'stat', targetType: 'global', targetId: 'any', statId: updatableGlobalStats[0]?.id || '', operation: 'adjust', value: 0 })}>
+                                                <option value="stat">Update a stat</option>
+                                                <option value="function">Invoke a function</option>
+                                            </select>
+                                            {update.kind === 'function' ? (
+                                                <select style={selectStyle} aria-label="Function" value={update.functionId}
+                                                    onChange={event => updateAction(update.id, { functionId: event.target.value })}>
+                                                    <option value="">Select a function...</option>
+                                                    {functions.map(fn => <option key={fn.id} value={fn.id}>{fn.name}</option>)}
+                                                </select>
+                                            ) : <>
                                             <select
                                                 style={selectStyle}
                                                 value={update.targetType}
@@ -408,7 +423,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             />
                                             <StatValueInput
                                                 stat={stat}
-                                                value={update.value as StatValue}
+                                                value={update.value}
                                                 onChange={(value) => updateAction(update.id, { value })}
                                                 actors={actors}
                                                 items={items}
@@ -416,6 +431,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                                 stage={stage}
                                                 allowExpression
                                             />
+                                            </>}
                                             <Button variant="danger" onClick={() => removeAction(update.id)} aria-label="Delete action" style={iconButtonStyle}>
                                                 <Delete fontSize="small" />
                                             </Button>

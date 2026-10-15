@@ -5,7 +5,7 @@ import { Stage } from '../Stage';
 import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
-import { Stat, StatValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, normalizeStatValue, resolveReferenceKind } from './Stat';
+import { Stat, StatValue, formatReferenceStatText, formatStatOptionValueText, normalizeStatValue, resolveReferenceKind } from './Stat';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -96,7 +96,7 @@ const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined
 };
 
 // Resolves template tags in lore text for LLM/display use. Unresolvable tags (unknown stat, no target actor,
-// perActor/function stats) are left untouched. Don't use on text that will be written back to the lore entry.
+// perActor stats) are left untouched. Don't use on text that will be written back to the lore entry.
 export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor): string {
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
@@ -118,7 +118,7 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
         const tagName = tag.toLowerCase();
         if (tagName === 'global') {
             const stat = statKey ? findStatByKey(configuration.globalStats, statKey) : undefined;
-            if (!stat || isFunctionStatType(stat.type)) {
+            if (!stat) {
                 return match;
             }
             return formatValue(stat, save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id]);
@@ -133,7 +133,7 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
         }
 
         const stat = findStatByKey(configuration.actorStats, statKey);
-        if (!actor || !stat || stat.perActor || isFunctionStatType(stat.type)) {
+        if (!actor || !stat || stat.perActor) {
             return match;
         }
         return formatValue(stat, actor.statMap?.[stat.id]);

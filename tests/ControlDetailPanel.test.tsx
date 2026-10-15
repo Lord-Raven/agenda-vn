@@ -11,7 +11,7 @@ const renderPanel = (type: ControlType, iconName: string) => {
     const configuration: GameConfiguration = {
         actors: [], items: [], locations: [], maps: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: [], itemStats: [], locationStats: [],
-        globalStats: [], globalStatValues: {}, statUpdateRules: [], controls: [control],
+        globalStats: [], functions: [], globalStatValues: {}, statUpdateRules: [], controls: [control],
         uiSettings: DEFAULT_UI_SETTINGS, title: '', titleImageUrl: '', titleImagePrompt: '',
         backgroundImageUrl: '', backgroundImagePrompt: '', startingDate: '2026-10-14',
         artStyle: '', creatorNotes: '', versionNotes: '', castActorIds: [], slideshowLocationIds: [],

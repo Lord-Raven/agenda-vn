@@ -4,7 +4,8 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isFunctionStatType, isListStatType, resolveStatOptionPool, resolveReferenceKind, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, applyStatUpdateValue, cloneStat, cloneStatUpdate, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveFunctionScript, resolveStatText, setOptionListSourceResolver } from './content/Stat';
+import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, GameAction, applyStatUpdateValue, cloneStat, cloneGameAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult } from './content/Function';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
@@ -126,8 +127,7 @@ const CALENDAR_TIME_ORDER: CalendarTimeOfDay[] = ['morning', 'afternoon', 'eveni
 // large jump (or malformed dates) cannot spin indefinitely.
 const MAX_STAT_UPDATE_PERIODS = 128;
 
-// Upper bound on how deeply a StatUpdateRule's function invocation can recurse (a function's own rules
-// invoking another function, etc.), so a cyclical setup (e.g. A invokes B invokes A) cannot spin indefinitely.
+// Prevent cyclical function calls from recursing indefinitely.
 const MAX_FUNCTION_INVOCATION_DEPTH = 8;
 
 // Simple (string) metadata fields a function script may read/write directly on an actor/location/item via
@@ -151,6 +151,7 @@ export type GameConfiguration = {
     locationStats: Stat[], // All custom location stats and defaults (applies to current and new games)
     itemStats: Stat[], // All custom item stats and defaults (applies to current and new games)
     globalStats: Stat[], // Stats that apply to the game in general (player or world state)
+    functions: GameFunction[], // Global scripts invoked by actions or other functions
     globalStatValues: {[key: string]: StatValue}, // Selected/default values for global stats
     statUpdateRules: StatUpdateRule[], // Recurring stat changes applied as in-game time advances
     controls: Control[], // UI controls displayed in map docks or on actor cards.
@@ -211,7 +212,7 @@ const cloneItem = (item: Item, stripImagePrompts: boolean = false): Item => new 
 const cloneControl = (control: Control): Control => new Control({
     ...control,
     availabilityConditions: (control.availabilityConditions || []).map((collection) => [...collection]),
-    actions: (control.actions || []).map(cloneStatUpdate),
+    actions: (control.actions || []).map(cloneGameAction),
 });
 
 const cloneMap = (map: GameMap): GameMap => new GameMap({
@@ -267,6 +268,7 @@ export type PortableGameConfiguration = {
     locationStats: Stat[];
     itemStats: Stat[];
     globalStats: Stat[];
+    functions: GameFunction[];
     globalStatValues: { [key: string]: StatValue };
     actors: Actor[];
     locations: Location[];
@@ -297,6 +299,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     locationStats: (input.locationStats || []).map(cloneStat),
     itemStats: (input.itemStats || []).map(cloneStat),
     globalStats: (input.globalStats || []).map(cloneStat),
+    functions: (input.functions || []).map(cloneGameFunction),
     globalStatValues: { ...(input.globalStatValues || {}) },
     actors: (input.actors || []).map(actor => cloneActor(actor)),
     locations: (input.locations || []).map(location => cloneLocation(location)),
@@ -395,6 +398,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locationStats: [],
             itemStats: [],
             globalStats: [],
+            functions: [],
             globalStatValues: {},
             statUpdateRules: [],
             controls: [],
@@ -472,6 +476,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         configuration.locationStats = configuration.locationStats || defaultConfiguration.locationStats;
         configuration.itemStats = configuration.itemStats || defaultConfiguration.itemStats;
         configuration.globalStats = configuration.globalStats || defaultConfiguration.globalStats;
+        configuration.functions = configuration.functions || defaultConfiguration.functions;
         configuration.globalStatValues = configuration.globalStatValues || defaultConfiguration.globalStatValues;
         configuration.statUpdateRules = configuration.statUpdateRules || defaultConfiguration.statUpdateRules;
         configuration.controls = (configuration.controls || defaultConfiguration.controls).map((control) => control instanceof Control ? control : cloneControl(control));
@@ -527,7 +532,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .sort(compareControlPriority);
     }
 
-    // Applies a 'button' control's defined stat updates (its "function") and saves.
+    // Applies a button control's actions and saves.
     runControlActions(control: Control) {
         const save = this.getSave();
         const context = this.getScheduleContext(save);
@@ -1552,18 +1557,22 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // Applies a single StatUpdateRule action: a direct stat write ('stat' kind, the original behavior) or a
-    // function stat invocation ('function' kind, see invokeFunctionUpdate). `depth` guards against runaway
-    // recursion when a function's own rules invoke further functions.
-    private applyStatUpdateAction(save: SaveType, update: StatUpdate, context: ConditionContext, depth: number = 0) {
+    // global function invocation ('function' kind).
+    private applyStatUpdateAction(save: SaveType, update: GameAction, context: ConditionContext) {
         if (update.kind === 'function') {
-            this.invokeFunctionUpdate(save, update, context, depth);
+            const fn = this.getConfiguration().functions.find(candidate => candidate.id === update.functionId);
+            if (!fn) {
+                console.error(`Unknown function: ${update.functionId}`);
+                return;
+            }
+            this.runGameFunction(save, fn, 0);
             return;
         }
         this.applyStatUpdate(save, update, context);
     }
 
-    // Resolves the actor(s) an update/invocation targets for a given ContentTarget: the 'any'/'none'
-    // meta-targets, 'variable' (context.currentActor, e.g. while invoking a function on a specific actor), or
+    // Resolves the actor(s) an update targets for a given ContentTarget: the 'any'/'none'
+    // meta-targets, 'variable' (context.currentActor), or
     // a literal actor id.
     private resolveUpdateTargetActors(save: SaveType, actorId: string, context: ConditionContext): Actor[] {
         const activeActors = Object.values(save.actors || {}).filter(actor => actor.active !== false);
@@ -1754,31 +1763,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .map(item => this.buildEntityScriptAccessor(save, item, 'item', itemStats, ITEM_SCRIPT_FIELDS));
     }
 
-    // Builds the full binding set a function stat's script executes with; `call` looks up another function
-    // stat by name (globals first, then - if a target/explicit entity is given - the stats matching its kind)
-    // and recursively runs it, capped by MAX_FUNCTION_INVOCATION_DEPTH to guard against invocation cycles.
-    private buildFunctionScriptBindings(save: SaveType, target: FunctionScriptEntity | undefined, depth: number, onError?: (message: string) => void): FunctionScriptBindings {
+    private buildFunctionScriptBindings(save: SaveType, depth: number, onError?: (message: string) => void): FunctionScriptBindings {
         const configuration = this.getConfiguration();
-        const call = (name: string, explicitTarget?: FunctionScriptEntity): unknown => {
+        const call = (name: string): unknown => {
             if (depth >= MAX_FUNCTION_INVOCATION_DEPTH) {
-                return undefined;
+                throw new Error('Maximum function invocation depth exceeded.');
             }
-            const scopeTarget = explicitTarget || target;
             const normalizedName = `${name || ''}`.trim().toLowerCase();
-            const globalMatch = (configuration.globalStats || []).find(candidate => isFunctionStatType(candidate.type) && candidate.name.trim().toLowerCase() === normalizedName);
-            if (globalMatch) {
-                return this.runFunctionStatScript(save, globalMatch, undefined, undefined, depth + 1, onError);
+            const fn = (configuration.functions || []).find(candidate => candidate.name.trim().toLowerCase() === normalizedName);
+            if (!fn) {
+                throw new Error(`Unknown function: ${name}`);
             }
-            if (!scopeTarget) {
-                return undefined;
-            }
-            const statsByKind = scopeTarget.kind === 'actor' ? configuration.actorStats : scopeTarget.kind === 'location' ? configuration.locationStats : configuration.itemStats;
-            const scopedMatch = (statsByKind || []).find(candidate => isFunctionStatType(candidate.type) && candidate.name.trim().toLowerCase() === normalizedName);
-            return scopedMatch ? this.runFunctionStatScript(save, scopedMatch, scopeTarget, undefined, depth + 1, onError) : undefined;
+            return this.runGameFunction(save, fn, depth + 1, onError);
         };
         return {
             ...this.buildGlobalScriptAccessors(save),
-            target,
             getActor: (name: string) => this.findActorScriptEntity(save, name),
             getLocation: (name: string) => this.findLocationScriptEntity(save, name),
             getItem: (name: string) => this.findItemScriptEntity(save, name),
@@ -1789,85 +1788,25 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
     }
 
-    // Runs a function stat's script (or an explicit override, e.g. an Item's per-instance implementation)
-    // bound to the given target entity (if any).
-    private runFunctionStatScript(save: SaveType, stat: Stat, target: FunctionScriptEntity | undefined, overrideScript: string | undefined, depth: number, onError?: (message: string) => void): unknown {
-        const script = overrideScript !== undefined ? overrideScript : (stat.script || '');
-        if (!script.trim()) {
-            return undefined;
-        }
-        return runFunctionScript(script, this.buildFunctionScriptBindings(save, target, depth, onError), onError);
+    private runGameFunction(save: SaveType, fn: GameFunction, depth: number, onError?: (message: string) => void): unknown {
+        return runFunctionScript(fn.script, this.buildFunctionScriptBindings(save, depth, onError), onError);
     }
 
-    testFunctionStat(stat: Stat, targetType: StatUpdate['targetType'] = 'global', targetId?: string): { value: unknown; errors: string[] } {
+    testFunction(fn: GameFunction, functions: GameFunction[] = this.getConfiguration().functions): FunctionScriptTestResult {
         const errors: string[] = [];
         try {
             const save = structuredClone(this.getSave());
             const configuration = structuredClone(this.getConfiguration());
-            const statsKey = targetType === 'global' ? 'globalStats' : targetType === 'actor' ? 'actorStats' : targetType === 'location' ? 'locationStats' : 'itemStats';
-            configuration[statsKey] = [...(configuration[statsKey] || []).filter(candidate => candidate.id !== stat.id), structuredClone(stat)];
+            configuration.functions = structuredClone([...functions.filter(candidate => candidate.id !== fn.id), fn]);
             const runtime: Stage = Object.create(this);
             runtime.getConfiguration = () => configuration;
-            let target: FunctionScriptEntity | undefined;
-            if (targetType !== 'global') {
-                const entity = targetType === 'actor' ? save.actors?.[targetId || '']
-                    : targetType === 'location' ? save.atlas?.[targetId || '']
-                        : save.inventory?.find(item => item.id === targetId);
-                if (!entity || entity.active === false) {
-                    throw new Error('Select an active test target.');
-                }
-                const fields = targetType === 'actor' ? ACTOR_SCRIPT_FIELDS : targetType === 'location' ? LOCATION_SCRIPT_FIELDS : ITEM_SCRIPT_FIELDS;
-                target = runtime.buildEntityScriptAccessor(save, entity, targetType, configuration[statsKey], fields);
-            }
-            const value = runtime.runFunctionStatScript(save, stat, target, undefined, 0, message => errors.push(message));
+            const value = runtime.runGameFunction(save, fn, 0, message => errors.push(message));
             return { value, errors };
         } catch (error) {
             errors.push((error as Error)?.message || String(error));
             return { value: undefined, errors };
         }
     }
-
-    // Invokes the function-typed stat targeted by a 'function' kind StatUpdate: runs its script once for the
-    // global (targetType 'global', no target bound) or once per resolved actor/location/item (target bound to
-    // that entity; items use their own functionScriptOverrides when set). depth guards against runaway
-    // recursion (a script's `call()` invoking further functions).
-    private invokeFunctionUpdate(save: SaveType, update: StatUpdate, context: ConditionContext, depth: number) {
-        if (depth >= MAX_FUNCTION_INVOCATION_DEPTH) {
-            return;
-        }
-        const stats = this.getStatsForUpdateTarget(update.targetType);
-        const stat = stats.find(candidate => candidate.id === update.statId);
-        if (!stat || !isFunctionStatType(stat.type)) {
-            return;
-        }
-
-        if (update.targetType === 'global') {
-            this.runFunctionStatScript(save, stat, undefined, undefined, depth);
-            return;
-        }
-
-        if (update.targetType === 'location') {
-            this.resolveUpdateTargetLocations(save, update.targetId).forEach(location => {
-                const target = this.buildEntityScriptAccessor(save, location, 'location', stats, LOCATION_SCRIPT_FIELDS);
-                this.runFunctionStatScript(save, stat, target, undefined, depth);
-            });
-            return;
-        }
-
-        if (update.targetType === 'item') {
-            this.resolveUpdateTargetItems(save, update.targetId).forEach(item => {
-                const target = this.buildEntityScriptAccessor(save, item, 'item', stats, ITEM_SCRIPT_FIELDS);
-                this.runFunctionStatScript(save, stat, target, resolveFunctionScript(stat, item.functionScriptOverrides), depth);
-            });
-            return;
-        }
-
-        this.resolveUpdateTargetActors(save, update.targetId, context).forEach(actor => {
-            const target = this.buildEntityScriptAccessor(save, actor, 'actor', stats, ACTOR_SCRIPT_FIELDS);
-            this.runFunctionStatScript(save, stat, target, undefined, depth);
-        });
-    }
-
 
     private applyStatUpdate(save: SaveType, update: StatUpdate, context: ConditionContext = {}) {
         const stat = this.getStatsForUpdateTarget(update.targetType).find(candidate => candidate.id === update.statId);
@@ -2162,7 +2101,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private syncActorStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().actorStats || [])
-            .filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
+            .filter(stat => stat?.name?.trim());
         const scalarStats = configuredStats.filter(stat => !stat.perActor);
         const perActorStats = configuredStats.filter(stat => stat.perActor);
         const statIds = new Set(scalarStats.map(stat => stat.id));
@@ -2216,7 +2155,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private syncLocationStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().locationStats || [])
-            .filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
+            .filter(stat => stat?.name?.trim());
         const statIds = new Set(configuredStats.map(stat => stat.id));
 
         Object.values(save.atlas || {}).forEach(location => {
@@ -2239,7 +2178,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private syncItemStats(save: SaveType) {
         const configuredStats = (this.getConfiguration().itemStats || [])
-            .filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
+            .filter(stat => stat?.name?.trim());
         const statIds = new Set(configuredStats.map(stat => stat.id));
 
         save.inventory = (save.inventory || []).map(item => item instanceof Item ? item : cloneItem(item));
@@ -2262,7 +2201,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private syncGlobalStats(save: SaveType) {
-        const configuredStats = (this.getConfiguration().globalStats || []).filter(stat => stat?.name?.trim() && !isFunctionStatType(stat.type));
+        const configuredStats = (this.getConfiguration().globalStats || []).filter(stat => stat?.name?.trim());
         const currentValues = save.globalStatValues && typeof save.globalStatValues === 'object'
             ? save.globalStatValues
             : {};
@@ -3113,6 +3052,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locationStats: configuration.locationStats,
             itemStats: configuration.itemStats,
             globalStats: configuration.globalStats,
+            functions: configuration.functions,
             globalStatValues,
             actors: (configuration.actors || []).filter(actor => actor.active !== false),
             locations: (configuration.locations || []).filter(location => location.active !== false),

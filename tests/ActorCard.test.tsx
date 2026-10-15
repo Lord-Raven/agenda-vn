@@ -78,13 +78,12 @@ test('actor-card rules react to stat changes, global state, actor identity, and 
     assert.doesNotMatch(render(), /Health/);
 });
 
-test('actor stat displays support option labels, checkboxes, references, and reject valueless stats', () => {
+test('actor stat displays support option labels, checkboxes, references, and reject per-actor stats', () => {
     const { actor, configuration, render } = fixture();
     configuration.actorStats = [
         makeStat('Mood', { type: 'option', default: 'happy', options: [{ id: 'happy', name: 'Happy', description: '' }] }),
         makeStat('Ready', { type: 'checkbox', default: true }),
         makeStat('Friends', { type: 'actorList', default: [actor.id] }),
-        makeStat('Script', { type: 'function' }),
         makeStat('Relationship', { perActor: true }),
     ];
     configuration.controls = configuration.actorStats.map(stat => new Control({ type: 'actorStatDisplay', statId: stat.id }));
@@ -93,7 +92,7 @@ test('actor stat displays support option labels, checkboxes, references, and rej
     assert.match(html, /True/);
     assert.match(html, /Friends/);
     assert.match(html, /Alice/);
-    assert.doesNotMatch(html, /Script|Relationship/);
+    assert.doesNotMatch(html, /Relationship/);
 });
 
 test('cloning legacy stats drops exposure without creating controls', () => {
