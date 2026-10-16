@@ -42,7 +42,6 @@ test('function management shows a return-type sidebar and a selection prompt ins
     const { stage } = fixture();
     const html = renderToStaticMarkup(<FunctionManagementPanel stage={() => stage} />);
     assert.match(html, /Reward player/);
-    assert.match(html, /Add Function/);
     assert.match(html, /Void \(action only\) \(1\)/);
     assert.match(html, /Location \(0\)/);
     assert.match(html, /Select a function to view and edit details/);
@@ -55,7 +54,6 @@ test('function management shows an empty state without definitions', () => {
     configuration.functions = [];
     const html = renderToStaticMarkup(<FunctionManagementPanel stage={() => stage} />);
     assert.match(html, /No functions defined/);
-    assert.match(html, /Add Function/);
 });
 
 test('sidebar groups each function under its declared return type, including list types', () => {

@@ -5,7 +5,7 @@
 project_name: "Agenda VN Engine"
 
 # A short tagline to show in search.
-tagline: "A system for generating simple calendar-based visual novels."
+tagline: "A system for generating simple visual novels."
 
 # 'PUBLIC', 'PRIVATE', or 'UNLISTED'.
 visibility: 'UNLISTED'
@@ -30,7 +30,7 @@ tags:
 
 creator_notes: "
 <div>
-  This is a stage for creating visual novels on Chub.
+  This is a stage for creating visual novels on Chub. In Alpha. I could end up breaking things, so use at your own risk!
 </div>
 "
 

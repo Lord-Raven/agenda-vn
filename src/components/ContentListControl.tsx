@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Inventory2, Person, Place } from '@mui/icons
 import { Stage } from '../Stage';
 import { ContentListDisplay } from '../content/Control';
 import { ReferenceKind } from '../content/Stat';
+import { ActorCard } from './ActorCard';
 import { ActorPortrait } from './ActorPortrait';
 import { ItemPortrait } from './ItemPortrait';
 import { LocationPortrait } from './LocationPortrait';
@@ -110,28 +111,44 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                         const location = kind === 'location' ? save.atlas?.[id] : undefined;
                         const name = actor ? actor.displayName ?? actor.name : item?.name ?? location?.name ?? `Unknown ${kind}`;
                         const FallbackIcon = kind === 'actor' ? Person : kind === 'item' ? Inventory2 : Place;
+                        const portrait = (
+                            <Box
+                                role="listitem"
+                                tabIndex={0}
+                                aria-label={name}
+                                sx={{
+                                    flexShrink: 0,
+                                    marginLeft: index > 0 ? `-${PORTRAIT_OVERLAP}px` : 0,
+                                    position: 'relative',
+                                    overflow: 'visible',
+                                    scrollSnapAlign: 'start',
+                                    borderRadius: '50%',
+                                    '&:hover, &:focus-visible': { zIndex: 1, transform: 'scale(1.1)', outline: '2px solid var(--agenda-highlight)', outlineOffset: 1 },
+                                    '@media (prefers-reduced-motion: no-preference)': { transition: 'transform 0.15s ease-out' },
+                                }}
+                            >
+                                {actor ? <ActorPortrait actor={actor} stage={stage} size={PORTRAIT_SIZE} style={portraitStyle} title="" />
+                                    : item ? <ItemPortrait item={item} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} style={portraitStyle} borderRadius="50%" title={name} />
+                                        : location ? <LocationPortrait location={location} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} style={portraitStyle} borderRadius="50%" title={name} />
+                                            : <Box sx={{ ...portraitStyle, display: 'grid', placeItems: 'center', borderRadius: '50%', border: '2px solid var(--agenda-line-strong)', color: 'var(--agenda-text-muted)' }}><FallbackIcon sx={{ fontSize: '1.4em' }} /></Box>}
+                            </Box>
+                        );
+                        if (actor) {
+                            return (
+                                <Tooltip
+                                    key={`${id}-${index}`}
+                                    title={<ActorCard actor={actor} stage={() => stage} />}
+                                    placement="bottom"
+                                    enterTouchDelay={0}
+                                    slotProps={{ tooltip: { sx: { backgroundColor: 'transparent', padding: 0, maxWidth: 'none' } } }}
+                                >
+                                    {portrait}
+                                </Tooltip>
+                            );
+                        }
                         return (
                             <Tooltip key={`${id}-${index}`} title={name} arrow enterTouchDelay={0}>
-                                <Box
-                                    role="listitem"
-                                    tabIndex={0}
-                                    aria-label={name}
-                                    sx={{
-                                        flexShrink: 0,
-                                        marginLeft: index > 0 ? `-${PORTRAIT_OVERLAP}px` : 0,
-                                        position: 'relative',
-                                        overflow: 'visible',
-                                        scrollSnapAlign: 'start',
-                                        borderRadius: '50%',
-                                        '&:hover, &:focus-visible': { zIndex: 1, transform: 'scale(1.1)', outline: '2px solid var(--agenda-highlight)', outlineOffset: 1 },
-                                        '@media (prefers-reduced-motion: no-preference)': { transition: 'transform 0.15s ease-out' },
-                                    }}
-                                >
-                                    {actor ? <ActorPortrait actor={actor} stage={stage} size={PORTRAIT_SIZE} style={portraitStyle} title={name} />
-                                        : item ? <ItemPortrait item={item} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} style={portraitStyle} borderRadius="50%" title={name} />
-                                            : location ? <LocationPortrait location={location} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} style={portraitStyle} borderRadius="50%" title={name} />
-                                                : <Box sx={{ ...portraitStyle, display: 'grid', placeItems: 'center', borderRadius: '50%', border: '2px solid var(--agenda-line-strong)', color: 'var(--agenda-text-muted)' }}><FallbackIcon sx={{ fontSize: '1.4em' }} /></Box>}
-                                </Box>
+                                {portrait}
                             </Tooltip>
                         );
                     })}

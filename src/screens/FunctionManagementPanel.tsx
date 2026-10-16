@@ -77,7 +77,6 @@ export const FunctionManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) =
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) minmax(0, 1fr)', gap: '20px', flex: 1, minHeight: 0, height: '100%' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0 }}>
-                <Button onClick={() => create('void')}><Add /> Add Function</Button>
                 <CategorizedEntrySidebar
                     sections={sections}
                     collapsedSections={collapsedCategories}
