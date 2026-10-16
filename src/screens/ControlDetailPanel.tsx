@@ -21,6 +21,7 @@ interface ControlDetailPanelProps {
 type ControlDraft = {
     name: string;
     priority: number;
+    widthWeight: number;
     placement: ControlPlacement;
     type: ControlType;
     label: string;
@@ -38,6 +39,7 @@ type ControlDraft = {
 const createDraft = (control: Control): ControlDraft => ({
     name: control.name,
     priority: control.priority,
+    widthWeight: control.widthWeight ?? 1,
     placement: control.placement,
     type: control.type,
     label: control.label,
@@ -117,6 +119,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             ...control,
             name: nextDraft.name,
             priority: nextDraft.priority,
+            widthWeight: nextDraft.widthWeight,
             placement: nextDraft.placement,
             type: nextDraft.type,
             label: nextDraft.label,
@@ -264,6 +267,33 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 Lower numbers display first. Equal priorities keep configuration order.
                             </span>
                         </div>
+                        {draft.type !== 'actorStatDisplay' && draft.type !== 'statOutcome' && (
+                            <div>
+                                <label htmlFor={`control-width-weight-${control.id}`} style={labelStyle}>Width Weight</label>
+                                <TextInput
+                                    id={`control-width-weight-${control.id}`}
+                                    fullWidth
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={draft.widthWeight}
+                                    onChange={(e) => {
+                                        const widthWeight = Number(e.target.value);
+                                        if (!Number.isFinite(widthWeight) || widthWeight <= 0) {
+                                            e.target.setCustomValidity('Enter a finite width weight greater than zero.');
+                                            e.target.reportValidity();
+                                            return;
+                                        }
+                                        e.target.setCustomValidity('');
+                                        setDraft((current) => ({ ...current, widthWeight }));
+                                    }}
+                                />
+                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                    Relative width among controls on the same row, including buttons. Default: 1.
+                                    Use 2 for twice the space or 0.5 for half. Controls wrap onto new rows when needed.
+                                </span>
+                            </div>
+                        )}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                             <div>
                                 <label style={labelStyle}>Placement</label>

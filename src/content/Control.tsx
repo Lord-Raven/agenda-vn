@@ -27,6 +27,7 @@ export class Control {
     active: boolean = true;
     name: string = ''; // Internal/admin label shown in ControlManagementPanel; not necessarily displayed in-game.
     priority: number = 0; // Lower numbers display first; ties keep configuration order.
+    widthWeight: number = 1; // Relative width within a top/bottom control row.
     placement: ControlPlacement = 'bottom';
     type: ControlType = 'button';
     availabilityConditions: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
@@ -51,6 +52,7 @@ export class Control {
         }
         this.active = this.active !== false;
         this.priority = Number.isFinite(this.priority) ? this.priority : 0;
+        this.widthWeight = Number.isFinite(this.widthWeight) && this.widthWeight > 0 ? this.widthWeight : 1;
         this.type = CONTROL_TYPES.includes(this.type) ? this.type : 'button';
         this.placement = this.type === 'statOutcome' ? 'outcome' : this.type === 'actorStatDisplay' ? 'actorCard' : this.placement === 'top' ? 'top' : 'bottom';
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map((collection) => [...collection]) : [];

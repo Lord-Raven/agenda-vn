@@ -19,8 +19,6 @@ interface ControlRendererProps {
 }
 
 const boxStyle = {
-    flex: '1 1 150px',
-    minWidth: 0,
     display: 'flex',
     flexDirection: 'column' as const,
     gap: 0.5,
@@ -57,6 +55,13 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         return null;
     }
 
+    const widthWeight = control.widthWeight ?? 1;
+    const sizingStyle = {
+        flex: `${widthWeight} 1 calc(150px * ${widthWeight})`,
+        minWidth: 0,
+        boxSizing: 'border-box' as const,
+    };
+
     if (control.type === 'button') {
         const Icon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;
         return (
@@ -66,7 +71,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                     stageInstance.runControlActions(control);
                     onActivate();
                 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', flex: '0 0 auto', whiteSpace: 'nowrap' }}
+                style={{ ...sizingStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 14px', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
             >
                 {Icon && <Icon fontSize="small" />}
                 {control.label?.trim() || control.name?.trim() || 'Button'}
@@ -95,7 +100,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     const referenceKind = resolveReferenceKind(stat.type);
 
     return (
-        <Box title={tooltipText || undefined} sx={boxStyle}>
+        <Box title={tooltipText || undefined} sx={{ ...boxStyle, ...sizingStyle }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', lineHeight: 1.2 }}>
                 {StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)' }} />}
                 <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.66rem', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>

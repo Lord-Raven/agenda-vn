@@ -2,6 +2,26 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { compareControlPriority, Control, isControlAvailable } from '../src/content/Control';
 
+test('new and legacy controls default to equal width weights', () => {
+    assert.equal(new Control({}).widthWeight, 1);
+    assert.equal(new Control({ widthWeight: undefined }).widthWeight, 1);
+});
+
+test('width weight accepts positive finite numbers and normalizes invalid configuration values', () => {
+    for (const widthWeight of [0.1, 0.5, 1, 2, 100]) {
+        assert.equal(new Control({ widthWeight }).widthWeight, widthWeight);
+    }
+    for (const widthWeight of [0, -1, NaN, Infinity, -Infinity, null, '2']) {
+        assert.equal(new Control({ widthWeight }).widthWeight, 1);
+    }
+});
+
+test('width weight survives cloning and JSON export/import', () => {
+    const original = new Control({ widthWeight: 2.5 });
+    assert.equal(new Control({ ...original }).widthWeight, 2.5);
+    assert.equal(new Control(JSON.parse(JSON.stringify(original))).widthWeight, 2.5);
+});
+
 test('new and legacy controls default to priority zero', () => {
     assert.equal(new Control({}).priority, 0);
     assert.equal(new Control({ name: 'Legacy control' }).priority, 0);
