@@ -7,6 +7,7 @@ import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, GameAction, applyStatUpdateValue, cloneStat, cloneGameAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReferenceId, listElementType, validateFunctionResult } from './content/Function';
 import { resolveStatValue } from './content/Stat';
+import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
@@ -1161,7 +1162,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return null;
         }
 
-        this.advanceCalendarAfterEvent(save, nextEvent);
+        const nextSkit = this.advanceCalendarAfterEvent(save, nextEvent);
         save.timeline.push({
             calendarEventId: nextEvent.id,
             date: nextEvent.date,
@@ -1169,6 +1170,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         save.upcomingEvents = (save.upcomingEvents || []).filter(event => event.id !== nextEvent.id);
 
         this.rebuildUpcomingEvents(save);
+        if (nextSkit) {
+            save.timeline.push({ date: save.currentDate, skit: nextSkit });
+        }
         this.saveGame();
         return nextEvent;
     }
@@ -1539,7 +1543,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private advanceCalendarAfterEvent(save: SaveType, event: CalendarEvent) {
         const eventDate = `${event.date || ''}`.trim() || save.currentDate || this.getStartingDate(save);
-        this.advanceTimeToNextSlot(save, eventDate, this.getEventEndTimeOfDay(event));
+        return this.advanceTimeToNextSlot(save, eventDate, this.getEventEndTimeOfDay(event));
     }
 
     // Advances the save's calendar position to the slot following (date, timeOfDay), rolling to the next day
@@ -1556,26 +1560,27 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             save.currentTimeOfDay = this.getNextTimeOfDay(timeOfDay);
         }
 
-        this.applyStatUpdateRules(save, previousDate, previousTimeOfDay);
+        return this.applyStatUpdateRules(save, previousDate, previousTimeOfDay);
     }
 
     // Replays the configured stat update rules for every in-game period entered between the previous calendar
     // position (exclusive) and the save's current one (inclusive), so recurring rules such as "every morning"
     // still fire for periods skipped by a multi-day jump.
-    private applyStatUpdateRules(save: SaveType, previousDate: string, previousTimeOfDay: CalendarTimeOfDay) {
+    private applyStatUpdateRules(save: SaveType, previousDate: string, previousTimeOfDay: CalendarTimeOfDay): Skit | null {
         const rules = this.getConfiguration().statUpdateRules || [];
         if (rules.length === 0) {
-            return;
+            return null;
         }
 
         const targetDate = save.currentDate || previousDate;
         const targetTimeOfDay = save.currentTimeOfDay || previousTimeOfDay;
         let date = previousDate;
         let timeOfDay = previousTimeOfDay;
+        let nextSkit: Skit | null = null;
 
         for (let step = 0; step < MAX_STAT_UPDATE_PERIODS; step++) {
             if (date === targetDate && timeOfDay === targetTimeOfDay) {
-                return;
+                return nextSkit;
             }
 
             if (timeOfDay === 'night') {
@@ -1586,14 +1591,69 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
 
             if (date > targetDate) {
-                return;
+                return nextSkit;
             }
 
             const context: ConditionContext = { ...this.getScheduleContext(save), currentDate: date, currentTimeOfDay: timeOfDay };
             rules
                 .filter(rule => evaluateConditionCollections(rule.conditions, context))
-                .forEach(rule => (rule.updates || []).forEach(update => this.applyStatUpdateAction(save, update, context)));
+                .forEach(rule => (rule.updates || []).forEach(update => {
+                    if (update.kind === 'skit') {
+                        if (!nextSkit) {
+                            nextSkit = this.createStatUpdateSkit(save, update);
+                        }
+                    } else {
+                        this.applyStatUpdateAction(save, update, context);
+                    }
+                }));
         }
+        return nextSkit;
+    }
+
+    private resolveSkitActionValue(save: SaveType, source: SkitActionValue, type: StatType): StatValue {
+        if (typeof source !== 'object' || Array.isArray(source)) {
+            const value = this.resolveValue(source, type, save);
+            validateFunctionResult(value, type);
+            return value;
+        }
+        const configuration = this.getConfiguration();
+        const stats = source.targetType === 'global' ? configuration.globalStats
+            : source.targetType === 'actor' ? configuration.actorStats
+                : source.targetType === 'location' ? configuration.locationStats : configuration.itemStats;
+        const stat = stats.find(candidate => candidate.id === source.statId);
+        if (!stat || stat.type !== type || stat.perActor) {
+            throw new Error(`Skit action requires a ${type} stat: ${source.statId}`);
+        }
+        if (source.targetType === 'global') {
+            return this.readStatValue(save.globalStatValues?.[stat.id], stat, save);
+        }
+        const entity = source.targetType === 'actor' ? save.actors[source.targetId]
+            : source.targetType === 'location' ? save.atlas[source.targetId]
+                : save.inventory.find(item => item.id === source.targetId);
+        if (!entity || entity.active === false) {
+            throw new Error(`Unknown skit stat owner: ${source.targetType} ${source.targetId}`);
+        }
+        return this.readStatValue(entity.statMap?.[stat.id], stat, save);
+    }
+
+    private createStatUpdateSkit(save: SaveType, action: StartSkitAction): Skit {
+        const locationId = this.resolveSkitActionValue(save, action.locationId, 'location');
+        const actorIds = this.resolveSkitActionValue(save, action.actorIds, 'actorList');
+        const guidance = action.guidance === undefined ? '' : this.resolveSkitActionValue(save, action.guidance, 'text');
+        if (typeof locationId !== 'string' || !save.atlas[locationId] || save.atlas[locationId].active === false) {
+            throw new Error(`Unknown skit action location: ${locationId}`);
+        }
+        if (!Array.isArray(actorIds) || actorIds.some(id => !save.actors[id] || save.actors[id].active === false)) {
+            throw new Error(`Invalid skit action participants: ${actorIds}`);
+        }
+        if (typeof guidance !== 'string') {
+            throw new Error('Skit action guidance must be text.');
+        }
+        return new Skit({
+            initialLocationId: locationId,
+            initialActors: [...new Set(actorIds.filter(id => id !== save.playerId))],
+            guidance
+        });
     }
 
     // Applies a single StatUpdateRule action: a direct stat write ('stat' kind, the original behavior) or a
@@ -2611,19 +2671,23 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const timelineEntry = (save.timeline || []).find(entry => entry.skit === currentSkit);
         const currentDate = save.currentDate || this.getStartingDate(save);
         const currentTimeOfDay = save.currentTimeOfDay || 'morning';
-        if (timelineEntry?.calendarEventId) {
-            this.advanceTimeToNextSlot(save, timelineEntry.date || currentDate, timelineEntry.calendarEventEndTimeOfDay || currentTimeOfDay);
-        } else {
-            this.advanceTimeToNextSlot(save, currentDate, currentTimeOfDay);
-        }
+        const nextSkit = timelineEntry?.calendarEventId
+            ? this.advanceTimeToNextSlot(save, timelineEntry.date || currentDate, timelineEntry.calendarEventEndTimeOfDay || currentTimeOfDay)
+            : this.advanceTimeToNextSlot(save, currentDate, currentTimeOfDay);
 
         this.rebuildUpcomingEvents(save)
         if (this.areEventsEnabled()) {
             this.showPriorityMessage('Calendar updated with new upcoming events.');
         }
 
+        if (nextSkit) {
+            save.timeline.push({ date: save.currentDate, skit: nextSkit });
+        }
         this.saveGame();
 
+        if (nextSkit) {
+            return nextSkit;
+        }
         const mandatoryEvent = this.getCurrentMandatoryEvent(save);
         return mandatoryEvent ? this.startCalendarEventSkit(mandatoryEvent.id) : null;
     }

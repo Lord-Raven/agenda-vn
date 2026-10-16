@@ -591,12 +591,30 @@ export type StatUpdate = {
 
 export type GameAction = StatUpdate | FunctionInvocation;
 
+export type SkitStatReference = {
+    targetType: StatUpdateTargetType;
+    targetId: string;
+    statId: string;
+};
+
+export type SkitActionValue = StatValue | SkitStatReference;
+
+export type StartSkitAction = {
+    id: string;
+    kind: 'skit';
+    locationId: SkitActionValue;
+    actorIds: SkitActionValue;
+    guidance?: SkitActionValue;
+};
+
+export type StatUpdateAction = GameAction | StartSkitAction;
+
 // A recurring "every <calendar condition> do these things" rule; conditions are the same ConditionCollections
 // used by schedules and per-actor default rules, and are re-evaluated for each in-game period entered.
 export type StatUpdateRule = {
     id: string;
     conditions: ConditionCollection[];
-    updates: GameAction[];
+    updates: StatUpdateAction[];
 };
 
 export const cloneStatUpdate = (update: any): StatUpdate => ({
@@ -618,12 +636,39 @@ export const cloneGameAction = (source: unknown): GameAction => {
         : cloneStatUpdate(action);
 };
 
+const cloneSkitActionValue = (value: unknown, fallback: StatValue): SkitActionValue => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+        const reference = value as Partial<SkitStatReference>;
+        return {
+            targetType: reference.targetType === 'global' ? 'global' : CONTENT_TYPES.find(type => type === reference.targetType) || 'actor',
+            targetId: typeof reference.targetId === 'string' ? reference.targetId : '',
+            statId: typeof reference.statId === 'string' ? reference.statId : '',
+        };
+    }
+    return Array.isArray(value) ? normalizeReferenceListValue(value)
+        : typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number' ? value : fallback;
+};
+
+export const cloneStatUpdateAction = (source: unknown): StatUpdateAction => {
+    const action = source && typeof source === 'object' ? source as Record<string, unknown> : {};
+    if (action.kind !== 'skit') {
+        return cloneGameAction(source);
+    }
+    return {
+        id: typeof action.id === 'string' && action.id ? action.id : generateUuid(),
+        kind: 'skit',
+        locationId: cloneSkitActionValue(action.locationId, ''),
+        actorIds: cloneSkitActionValue(action.actorIds, []),
+        ...(action.guidance === undefined ? {} : { guidance: cloneSkitActionValue(action.guidance, '') }),
+    };
+};
+
 export const cloneStatUpdateRule = (rule: any): StatUpdateRule => ({
     id: rule?.id || generateUuid(),
     conditions: Array.isArray(rule?.conditions)
         ? rule.conditions.map((collection: unknown) => Array.isArray(collection) ? [...collection] : [])
         : [],
-    updates: Array.isArray(rule?.updates) ? rule.updates.map(cloneGameAction) : [],
+    updates: Array.isArray(rule?.updates) ? rule.updates.map(cloneStatUpdateAction) : [],
 });
 
 export const cloneStatUpdateRules = (rules: unknown): StatUpdateRule[] => (Array.isArray(rules) ? rules : []).map(cloneStatUpdateRule);

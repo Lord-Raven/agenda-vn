@@ -16,7 +16,6 @@ import {
 } from "../utils/StructuredResponse.js";
 import { ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
 import { findStatOptionByValue, formatStatOptionValueText, isStatLlmMaintained, isStatLlmSeen, mapReferenceStatValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatText, StatType, StatValue } from './Stat';
-import { build } from "vite";
 
 const getDayDifference = (startDate: string, endDate: string): number => {
     const start = new Date(`${startDate}T00:00:00Z`);

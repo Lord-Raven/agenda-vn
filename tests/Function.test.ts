@@ -4,7 +4,8 @@ import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } fr
 import { Actor, resolveActorSchedule, resolveInitialActorStatValue } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
 import { Location } from '../src/content/Location';
-import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveAvailableStatOptions, Stat, StatType, StatValue } from '../src/content/Stat';
+import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveAvailableStatOptions, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
+import { generateSkitScript, Skit } from '../src/content/Skit';
 import { cloneGameFunction, functionPickerOptions, functionReference, GameFunction } from '../src/content/Function';
 import { evaluateCondition } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
@@ -234,6 +235,184 @@ test('recurring rules invoke a global function once for each matching time perio
     }];
     stage['applyStatUpdateRules'](save, '2026-10-15', 'morning');
     assert.equal(save.globalStatValues?.Score, 3);
+});
+
+const skitAction = (extra: Partial<StartSkitAction> = {}): StartSkitAction => ({
+    id: 'skit-action', kind: 'skit', locationId: 'place', actorIds: ['b'], ...extra,
+});
+
+test('skit actions survive configuration cloning without sharing participant lists or stat references', () => {
+    const action = skitAction({ guidance: { targetType: 'actor', targetId: 'b', statId: 'Directions' } });
+    const cloned = cloneStatUpdateRules([{ id: 'rule', conditions: [], updates: [action] }]);
+    assert.deepEqual(cloned[0].updates[0], action);
+    const copy = cloned[0].updates[0] as StartSkitAction;
+    assert.notEqual(copy.actorIds, action.actorIds);
+    assert.notEqual(copy.guidance, action.guidance);
+    assert.equal(copy.guidance && typeof copy.guidance === 'object' && !Array.isArray(copy.guidance) && copy.guidance.targetId, 'b');
+});
+
+test('skit actions resolve literal, typed function, and stat inputs when encountered', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.functions = [
+        typedFunction('destination', 'location', 'return "place";'),
+        typedFunction('cast', 'actorList', 'return ["b", "a", "b"];'),
+        typedFunction('directions', 'text', 'return "Meet at dusk";'),
+    ];
+    const actions = [
+        skitAction(),
+        skitAction({ locationId: functionReference('destination'), actorIds: functionReference('cast'), guidance: functionReference('directions') }),
+    ];
+    for (const targetType of ['global', 'actor', 'location', 'item'] as const) {
+        const definitions = [
+            stat('Destination', 'location', { default: functionReference('destination') }),
+            stat('Cast', 'actorList', { default: functionReference('cast') }),
+            stat('Directions', 'text', { default: functionReference('directions') }),
+        ];
+        configuration[`${targetType === 'global' ? 'global' : targetType}Stats`].push(...definitions);
+        const targetId = targetType === 'actor' ? 'b' : targetType === 'location' ? 'place' : targetType === 'item' ? 'item' : '';
+        actions.push(skitAction({
+            locationId: { targetType, targetId, statId: 'Destination' },
+            actorIds: { targetType, targetId, statId: 'Cast' },
+            guidance: { targetType, targetId, statId: 'Directions' },
+        }));
+    }
+    for (const action of actions) {
+        const skit = stage['createStatUpdateSkit'](save, action);
+        assert.equal(skit.initialLocationId, 'place');
+        assert.deepEqual(skit.initialActors, ['b']);
+        assert.equal(skit.guidance, action.guidance ? 'Meet at dusk' : '');
+        assert.deepEqual(save.timeline, []);
+    }
+});
+
+test('invalid skit sources fail explicitly rather than silently starting a different scene', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.functions = [typedFunction('wrong', 'number', 'return 1;')];
+    for (const action of [
+        skitAction({ locationId: 'missing' }),
+        skitAction({ actorIds: ['missing'] }),
+        skitAction({ actorIds: ['deleted'] }),
+        skitAction({ locationId: functionReference('wrong') }),
+        skitAction({ locationId: { targetType: 'global', targetId: '', statId: 'Score' } }),
+        skitAction({ guidance: { targetType: 'actor', targetId: 'missing', statId: 'Directions' } }),
+    ]) {
+        assert.throws(() => stage['createStatUpdateSkit'](save, action));
+    }
+    assert.deepEqual(save.timeline, []);
+});
+
+const endingSkitFixture = (eventsEnabled = true) => {
+    const result = fixture();
+    const { stage, save, configuration } = result;
+    const current = new Skit({ initialLocationId: 'place', initialActors: ['b'] });
+    save.currentDate = '2026-10-15';
+    save.currentTimeOfDay = 'morning';
+    save.timeline.push({ date: save.currentDate, skit: current });
+    configuration.useEvents = eventsEnabled;
+    stage['flagLoreForUpdate'] = async () => {};
+    stage.summaryCheck = async () => {};
+    stage.showPriorityMessage = () => {};
+    stage.rebuildUpcomingEvents = () => save.upcomingEvents || [];
+    stage.saveGame = () => {};
+    return { ...result, current };
+};
+
+test('the first rule skit wins over mandatory events after every remaining action has resolved and is saved', () => {
+    const { stage, save, configuration, current } = endingSkitFixture();
+    save.upcomingEvents = [{
+        id: 'mandatory', name: 'Mandatory', date: save.currentDate!, duration: ['afternoon'],
+        locationId: 'place', actorIds: ['b'], description: '', guidance: 'Mandatory scene', mandatory: true,
+    }];
+    configuration.functions = [gameFunction('set("Score", get("Score") + 1);')];
+    configuration.statUpdateRules = [
+        { id: 'first', conditions: [], updates: [
+            skitAction({ guidance: 'First scene' }),
+            { id: 'write', targetType: 'global', targetId: '', statId: 'Score', operation: 'adjust', value: 2 },
+            { id: 'invoke', kind: 'function', functionId: 'test-function' },
+        ] },
+        { id: 'second', conditions: [], updates: [
+            skitAction({ locationId: functionReference('should-not-evaluate'), guidance: 'Second scene' }),
+            { id: 'later', targetType: 'global', targetId: '', statId: 'Score', operation: 'adjust', value: 1 },
+        ] },
+    ];
+    stage.rebuildUpcomingEvents = () => {
+        assert.equal(save.globalStatValues?.Score, 6);
+        assert.equal(stage.getCurrentSkit(), null);
+        return save.upcomingEvents || [];
+    };
+    let persistedSkit: Skit | null = null;
+    stage.saveGame = () => { persistedSkit = stage.getCurrentSkit(); };
+    const next = stage.endSkit();
+    assert.ok(next);
+    assert.equal(next.guidance, 'First scene');
+    assert.equal(current.over, true);
+    assert.equal(save.currentTimeOfDay, 'afternoon');
+    assert.equal(save.timeline.length, 2);
+    assert.equal(stage.getCurrentSkit(), next);
+    assert.equal(persistedSkit, next);
+    assert.equal(save.upcomingEvents.length, 1);
+});
+
+test('rule skits run with calendar events disabled, while no match preserves the ordinary end flow', () => {
+    const { stage, save, configuration } = endingSkitFixture(false);
+    configuration.statUpdateRules = [{ id: 'rule', conditions: [], updates: [skitAction()] }];
+    assert.ok(stage.endSkit());
+    assert.equal(save.timeline.length, 2);
+    configuration.statUpdateRules[0].conditions = [[{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]];
+    assert.equal(stage.endSkit(), null);
+    assert.equal(stage.getCurrentSkit(), null);
+});
+
+test('mandatory skit fallback is unchanged when no rule skit fires', () => {
+    const { stage, save } = endingSkitFixture();
+    save.upcomingEvents = [{
+        id: 'mandatory', name: 'Mandatory', date: save.currentDate!, duration: ['afternoon'],
+        locationId: 'place', actorIds: ['b'], description: '', guidance: 'Mandatory scene', mandatory: true,
+    }];
+    let startedId = '';
+    const mandatory = new Skit({ guidance: 'Mandatory scene' });
+    stage.startCalendarEventSkit = id => { startedId = id; return mandatory; };
+    assert.equal(stage.endSkit(), mandatory);
+    assert.equal(startedId, 'mandatory');
+});
+
+test('multi-period event completion keeps only the first rule skit while replaying all stat writes', () => {
+    const { stage, save, configuration } = endingSkitFixture(false);
+    save.timeline[0].calendarEventId = 'long-event';
+    save.timeline[0].calendarEventEndTimeOfDay = 'night';
+    configuration.statUpdateRules = [{ id: 'rule', conditions: [], updates: [
+        { id: 'write', targetType: 'global', targetId: '', statId: 'Score', operation: 'adjust', value: 1 },
+        skitAction({ guidance: functionReference('current-score') }),
+    ] }];
+    configuration.functions = [typedFunction('current-score', 'text', 'return String(get("Score"));')];
+    const next = stage.endSkit();
+    assert.equal(next?.guidance, '3');
+    assert.equal(save.globalStatValues?.Score, 6);
+    assert.equal(save.currentDate, '2026-10-16');
+    assert.equal(save.currentTimeOfDay, 'morning');
+    assert.equal(save.timeline.length, 2);
+});
+
+test('automatic guidance preserves the explicit cast, including unscheduled actors and an empty cast', async () => {
+    for (const actorIds of [['b'], []]) {
+        const { stage, save } = fixture();
+        const skit = stage['createStatUpdateSkit'](save, skitAction({ actorIds }));
+        save.timeline.push({ skit, date: '2026-10-15' });
+        let guidancePrompt = '';
+        stage.pushMessage = () => {};
+        stage.generateText = async prompt => {
+            if (!guidancePrompt) {
+                guidancePrompt = prompt;
+                return '<Reasoning>A quiet scene</Reasoning><Guidance>A chance encounter</Guidance><Participants><Participant>Unexpected actor</Participant></Participants>';
+            }
+            return '<Entry><Speaker>Narrator</Speaker><Message>A quiet moment passes.</Message></Entry>';
+        };
+        const entries = await generateSkitScript(skit, stage);
+        assert.equal(entries.length, 1);
+        assert.equal(skit.guidance, 'A chance encounter');
+        assert.deepEqual(skit.initialActors, actorIds);
+        assert.match(guidancePrompt, /fixed cast/);
+    }
 });
 
 test('configuration updates retain functions independently of stat changes', () => {

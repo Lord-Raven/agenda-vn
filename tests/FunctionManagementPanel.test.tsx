@@ -9,7 +9,7 @@ import { renderStatTypeOptions } from '../src/components/StatEntryEditor';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
 import { FunctionManagementPanel } from '../src/screens/FunctionManagementPanel';
 import { FunctionDetailPanel, FUNCTION_RETURN_TYPE_LABELS } from '../src/screens/FunctionDetailPanel';
-import { StatUpdateRuleEditor } from '../src/components/StatUpdateRuleEditor';
+import { SkitActionInput, StatUpdateRuleEditor } from '../src/components/StatUpdateRuleEditor';
 import { StatValueInput } from '../src/components/StatValueInput';
 import { LocationSelect, ReferenceMultiSelect } from '../src/components/UiComponents';
 import { IconPicker, resolveIcon } from '../src/components/StatRating';
@@ -132,6 +132,43 @@ test('recurring rules describe global function invocations by their separate def
         rules={[{ id: 'rule', conditions: [], updates: [{ id: 'action', kind: 'function', functionId: 'reward' }] }]} onChange={() => {}} />);
     assert.match(html, /Invoke Reward player/);
     assert.doesNotMatch(html, /Unassigned function/);
+});
+
+test('recurring rule summaries identify skit actions, and actions can be added without stat definitions', () => {
+    const { stage } = fixture();
+    const html = renderToStaticMarkup(<StatUpdateRuleEditor stage={stage} globalStats={[]} actorStats={[]} actors={[]} locations={[]}
+        rules={[{ id: 'rule', conditions: [], updates: [{ id: 'action', kind: 'skit', locationId: 'place', actorIds: [] }] }]} onChange={() => {}} />);
+    assert.match(html, /Start a skit/);
+    assert.doesNotMatch(html, /Unassigned stat/);
+    const addRule = renderToStaticMarkup(<StatUpdateRuleEditor stage={stage} globalStats={[]} actorStats={[]} actors={[]} locations={[]}
+        rules={[]} onChange={() => {}} />);
+    assert.match(addRule, /Add stat update event/);
+    assert.doesNotMatch(addRule, /disabled/);
+});
+
+test('skit input selectors offer typed functions and typed stats from each owner kind without evaluating them', () => {
+    const { stage, configuration } = fixture();
+    for (const type of ['location', 'actorList', 'text'] as const) {
+        configuration.functions = [{
+            id: 'source', name: 'Typed source', description: '', returnType: type,
+            script: 'throw new Error("Do not evaluate while editing");',
+        }];
+        const props = {
+            type, label: type, stage,
+            globalStats: [valueStat(type), valueStat('number')],
+            actorStats: [valueStat(type)], locationStats: [valueStat(type)], itemStats: [valueStat(type)],
+            actors: [{ id: 'actor', name: 'Actor' }], locations: [{ id: 'place', name: 'Place' }], items: [{ id: 'item', name: 'Item' }],
+            onChange: () => {},
+        };
+        const literal = renderToStaticMarkup(<SkitActionInput {...props} value={functionReference('source')} />);
+        assert.match(literal, /Typed source\(\)/);
+        for (const targetType of ['global', 'actor', 'location', 'item'] as const) {
+            const html = renderToStaticMarkup(<SkitActionInput {...props} value={{ targetType, targetId: targetType === 'actor' ? 'actor' : targetType === 'location' ? 'place' : 'item', statId: type }} />);
+            assert.ok(html.includes(`value="${targetType}" selected=""`));
+            assert.ok(html.includes(`value="${type}" selected=""`));
+            assert.doesNotMatch(html, /value="number"/);
+        }
+    }
 });
 
 const valueStat = (type: StatType) => cloneStat({
