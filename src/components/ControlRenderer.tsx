@@ -94,7 +94,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     const selectedOptionDescription = stat.type === 'option'
         ? resolveStatText(findStatOptionByValue(stat, normalizedValue)?.option.description, stageInstance).trim()
         : '';
-    const tooltipText = [resolveStatText(stat.description, stageInstance).trim(), selectedOptionDescription]
+    const tooltipText = [resolveStatText(control.description, stageInstance).trim(), selectedOptionDescription]
         .filter(Boolean)
         .join('\n\n');
     const referenceKind = resolveReferenceKind(stat.type);

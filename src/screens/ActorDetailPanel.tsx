@@ -2302,12 +2302,6 @@ ${indent}}`;
 
                                                         {isExpanded && (
                                                             <>
-                                                                {!!stat.description?.trim() && (
-                                                                    <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 75%, transparent)', fontSize: '12px' }}>
-                                                                        {stat.description}
-                                                                    </div>
-                                                                )}
-
                                                                 {isCreatorMode && (isNumericDisplayType(stat.type) || stat.type === 'text' || isReferenceDisplayType(stat.type) || isListStatType(stat.type)) && (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                                     <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
@@ -2447,11 +2441,6 @@ ${indent}}`;
 
                                                     {isExpanded && (
                                                         <>
-                                                            {!!stat.description?.trim() && (
-                                                                <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 75%, transparent)', fontSize: '12px' }}>
-                                                                    {stat.description}
-                                                                </div>
-                                                            )}
 
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
                                                                 <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>

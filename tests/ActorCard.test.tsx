@@ -9,9 +9,9 @@ import { cloneStat, Stat } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 
 const makeStat = (id: string, extra: Partial<Stat> = {}): Stat => cloneStat({
-    id, name: id, type: 'number', default: 10, description: '', guidance: '',
+    id, name: id, type: 'number', default: 10, guidance: '',
     llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
-    setByPlayer: false, ...extra,
+    ...extra,
 });
 
 const fixture = () => {

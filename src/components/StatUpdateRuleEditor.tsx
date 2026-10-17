@@ -121,8 +121,8 @@ export const SkitActionInput: FC<SkitActionInputProps> = ({ label, type, value, 
     const matchingStats = (targetType: StatUpdate['targetType']) => statsByType[targetType].filter(stat => stat.type === type && !stat.perActor);
     const literalDefault = type === 'actorList' ? [] : '';
     const inputStat = cloneStat({
-        id: type, name: label, type, default: literalDefault, description: '', guidance: '',
-        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] }, setByPlayer: false,
+        id: type, name: label, type, default: literalDefault, guidance: '',
+        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
     });
     const literalValue = typeof value === 'object' && !Array.isArray(value) ? literalDefault : value;
     return (

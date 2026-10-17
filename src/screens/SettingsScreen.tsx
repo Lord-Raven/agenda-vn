@@ -2,6 +2,7 @@ import { FC, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SaveType, Stage } from '../Stage';
 import { findStatOptionByValue, Stat, StatValue, applyUserPlaceholder, isNumericDisplayType, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, resolveAvailableStatOptions } from '../content/Stat';
+import { compareControlPriority, Control } from '../content/Control';
 import { DEFAULT_UI_SETTINGS } from '../content/Style';
 import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
 import { Close, Forum, VoiceChat } from '@mui/icons-material';
@@ -94,9 +95,15 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
     });
 
     const [globalStats] = useState<Stat[]>(() => resolveActiveGlobalStats(stageInstance));
+    const settingsControls = (stageInstance.getConfiguration().controls || [])
+        .filter((control) => control.active !== false && control.type === 'settings' && globalStats.some((stat) => stat.id === control.statId))
+        .sort(compareControlPriority);
+    const settingsStats = settingsControls
+        .map((control) => globalStats.find((stat) => stat.id === control.statId))
+        .filter((stat): stat is Stat => !!stat);
     const [globalStatValues, setGlobalStatValues] = useState<{ [key: string]: StatValue }>(() => {
         const preferredValues = isNewGame ? {} : stageInstance.getSave()?.globalStatValues || {};
-        return buildGlobalStatValues(globalStats, preferredValues);
+        return buildGlobalStatValues(settingsStats, preferredValues);
     });
 
     const [languageSuggestions, setLanguageSuggestions] = useState<string[]>([]);
@@ -133,7 +140,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         console.log('Saving settings:', settings);
         const playerThemeColor = resolvePlayerThemeColor(settings.playerColor);
         const resolvedGlobalStatValues = buildGlobalStatValues(
-            isNewGame ? globalStats.filter(stat => stat.setByPlayer) : globalStats,
+            settingsStats,
             globalStatValues,
         );
         console.log("Resolved Global Stat Values:");
@@ -168,7 +175,10 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             saveData.enableTextToSpeech = settings.enableTextToSpeech;
             saveData.betaMode = settings.betaMode;
             saveData.language = settings.language;
-            saveData.globalStatValues = resolvedGlobalStatValues;
+            saveData.globalStatValues = {
+                ...(saveData.globalStatValues || {}),
+                ...resolvedGlobalStatValues,
+            };
 
             const player = stageInstance.getPlayerActor();
             player.name = settings.playerName;
@@ -450,7 +460,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                 />
                             </div>
 
-                            {globalStats.filter((stat) => stat.setByPlayer === true).length > 0 && (
+                            {settingsControls.length > 0 && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     <label
                                         style={{
@@ -464,10 +474,14 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         Player Settings
                                     </label>
 
-                                    {globalStats
-                                        .filter((stat) => stat.setByPlayer === true)
-                                        .map((stat) => {
+                                    {settingsControls
+                                        .map((control) => {
+                                        const stat = globalStats.find((candidate) => candidate.id === control.statId);
+                                        if (!stat) {
+                                            return null;
+                                        }
                                         const statName = (stat.name || '').trim();
+                                        const controlDescription = resolveText(control.description).trim();
                                         const selectedValue = normalizeGlobalStatValue(globalStatValues[stat.id], stat);
                                         const hasFunctionSource = isFunctionReference(selectedValue) || functionPickerOptions(stageInstance.getConfiguration().functions, stat.type).length > 0;
                                         const optionEntries = resolveAvailableStatOptions(stat, selectedValue, { sourceStats: globalStats, globalStatValues });
@@ -477,7 +491,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
 
                                         return (
                                             <div
-                                                key={statName}
+                                                key={control.id}
                                                 style={{
                                                     padding: '12px',
                                                     borderRadius: '8px',
@@ -491,9 +505,11 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
                                                     <span>{statName}</span>
                                                 </div>
-                                                <div style={{ color: 'color-mix(in srgb, var(--agenda-text-muted) 80%, transparent)', fontSize: '13px' }}>
-                                                    {resolveText(stat.description)}
-                                                </div>
+                                                {!!controlDescription && (
+                                                    <div style={{ color: 'color-mix(in srgb, var(--agenda-text-muted) 80%, transparent)', fontSize: '13px' }}>
+                                                        {controlDescription}
+                                                    </div>
+                                                )}
 
                                                 {hasFunctionSource ? <StatValueInput stat={stat} value={selectedValue} onChange={value => handleGlobalStatValueChange(stat, value)}
                                                     stage={stage} actors={Object.values(stageInstance.getSave().actors)} items={stageInstance.getSave().inventory} locations={Object.values(stageInstance.getSave().atlas)} /> : <>

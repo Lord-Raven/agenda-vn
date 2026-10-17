@@ -172,9 +172,8 @@ test('skit input selectors offer typed functions and typed stats from each owner
 });
 
 const valueStat = (type: StatType) => cloneStat({
-    id: type, name: type, type, description: '', guidance: '', default: 0,
+    id: type, name: type, type, guidance: '', default: 0,
     llmSees: { value: true, conditions: [] }, llmMaintained: { value: true, conditions: [] },
-    setByPlayer: false,
 });
 
 test('every stat input offers matching typed functions and preserves the selected reference without evaluating it', () => {

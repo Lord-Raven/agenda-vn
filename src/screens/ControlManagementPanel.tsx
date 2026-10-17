@@ -19,6 +19,7 @@ const PLACEMENT_LABELS: Record<Control['placement'], string> = {
     bottom: 'Bottom',
     actorCard: 'Actor Card',
     outcome: 'Outcomes',
+    settings: 'Settings',
 };
 
 const TYPE_LABELS: Record<Control['type'], string> = {
@@ -27,6 +28,7 @@ const TYPE_LABELS: Record<Control['type'], string> = {
     statEditor: 'Stat Editor',
     actorStatDisplay: 'Actor Stat Display',
     statOutcome: 'Stat Outcome',
+    settings: 'Settings',
 };
 
 export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage }) => {
@@ -69,6 +71,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             { id: 'bottom', title: PLACEMENT_LABELS.bottom, entries: controls.filter((control) => control.placement === 'bottom') },
             { id: 'actorCard', title: PLACEMENT_LABELS.actorCard, entries: controls.filter((control) => control.placement === 'actorCard') },
             { id: 'outcome', title: PLACEMENT_LABELS.outcome, entries: controls.filter((control) => control.placement === 'outcome') },
+            { id: 'settings', title: PLACEMENT_LABELS.settings, entries: controls.filter((control) => control.type === 'settings') },
         ];
         return sections;
     }, [controls]);
@@ -94,9 +97,9 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
         const control = new Control({
             active: true,
             name: candidateName,
-            placement: sectionId === 'top' ? 'top' : 'bottom',
-            type: sectionId === 'outcome' ? 'statOutcome' : sectionId === 'actorCard' ? 'actorStatDisplay' : 'button',
-            label: sectionId === 'actorCard' || sectionId === 'outcome' ? '' : candidateName,
+            placement: sectionId === 'top' ? 'top' : sectionId === 'settings' ? 'settings' : 'bottom',
+            type: sectionId === 'outcome' ? 'statOutcome' : sectionId === 'actorCard' ? 'actorStatDisplay' : sectionId === 'settings' ? 'settings' : 'button',
+            label: sectionId === 'actorCard' || sectionId === 'outcome' || sectionId === 'settings' ? '' : candidateName,
         });
 
         stage().updateConfiguration({ controls: [...configuredControls, control] });

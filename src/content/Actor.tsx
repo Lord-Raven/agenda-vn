@@ -372,7 +372,6 @@ function buildActorStatFields(actorStats: Stat[], stage?: Stage): StructuredFiel
         label: `STAT ${index + 1}`,
         description:
             `${stat.type === 'checkbox' ? 'Boolean value' : 'Numeric value'} for "${stat.name}".` +
-            ` Description: ${resolveStatText(stat.description, stage) || 'N/A'}.` +
             ` Guidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}.` +
             `${stat.type === 'checkbox' ? ` Default: ${stat.default === true}.` : ` Range: ${typeof stat.min === 'number' ? stat.min : '-inf'} to ${typeof stat.max === 'number' ? stat.max : '+inf'}. Default: ${Number.isFinite(stat.default) ? Number(stat.default) : 0}.`}`,
     }));
@@ -450,12 +449,12 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
     const actorStatContext = actorStats.length > 0
         ? actorStats.map((stat, index) => {
             if (stat.type === 'checkbox') {
-                return `${index + 1}. ${stat.name}\nDescription: ${resolveStatText(stat.description, stage) || 'N/A'}\nGuidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}\nType: checkbox\nDefault: ${stat.default === true}`;
+                return `${index + 1}. ${stat.name}\nGuidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}\nType: checkbox\nDefault: ${stat.default === true}`;
             }
             const defaultValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
             const minValue = typeof stat.min === 'number' ? `${stat.min}` : '-inf';
             const maxValue = typeof stat.max === 'number' ? `${stat.max}` : '+inf';
-            return `${index + 1}. ${stat.name}\nDescription: ${resolveStatText(stat.description, stage) || 'N/A'}\nGuidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}\nRange: ${minValue} to ${maxValue}\nDefault: ${defaultValue}`;
+            return `${index + 1}. ${stat.name}\nGuidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}\nRange: ${minValue} to ${maxValue}\nDefault: ${defaultValue}`;
         }).join('\n\n')
         : 'No custom actor stats are configured.';
 

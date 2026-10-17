@@ -20,7 +20,6 @@ const defaultGlobalStat = (): Stat => {
     return {
         id,
         name: 'New Setting',
-        description: 'Describe what this player setting controls.',
         guidance: 'How this setting should influence generated narrative and behavior.',
         default: 'Default',
         type: 'option',
@@ -30,7 +29,6 @@ const defaultGlobalStat = (): Stat => {
             description: 'Default option behavior for this setting.',
         }],
         defaultValueRules: [{ id: `default:${id}`, value: 'Default', conditions: [] }],
-        setByPlayer: true,
         llmSees: { value: true, conditions: [] },
         llmMaintained: { value: true, conditions: [] },
     };
@@ -41,7 +39,6 @@ const defaultTypedStat = (): Stat => {
     return {
         id,
         name: 'Name',
-        description: 'A user-facing description of this stat.',
         perActor: false,
         perActorDefaultRules: [{ id: `default:${id}`, value: 50, conditions: [] }],
         guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
@@ -50,7 +47,6 @@ const defaultTypedStat = (): Stat => {
         min: 0,
         max: 100,
         options: [],
-        setByPlayer: false,
         llmSees: { value: true, conditions: [] },
         llmMaintained: { value: true, conditions: [] },
     };

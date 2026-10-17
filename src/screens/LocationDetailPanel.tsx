@@ -903,11 +903,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                         </>}
                                                     </div>
 
-                                                    {isExpanded && !!stat.description?.trim() && (
-                                                        <div style={{ color: 'color-mix(in srgb, var(--agenda-text-primary) 75%, transparent)', fontSize: '12px' }}>
-                                                            {stat.description}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             );
                                         })}

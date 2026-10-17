@@ -157,7 +157,7 @@ export type GameConfiguration = {
     functions: GameFunction[], // Global scripts invoked by actions or other functions
     globalStatValues: {[key: string]: StatValue}, // Selected/default values for global stats
     statUpdateRules: StatUpdateRule[], // Recurring stat changes applied as in-game time advances
-    controls: Control[], // UI controls displayed in map docks or on actor cards.
+    controls: Control[], // UI controls displayed in map docks, Settings, outcomes, or actor cards.
     uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
     titleImageUrl: string, // URL of a title image for the game
@@ -2769,12 +2769,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private buildActiveSettingContextSummary(save: SaveType): string {
         const agendaConfig = this.getConfiguration();
+        const settingControls = (agendaConfig?.controls || []).filter((control) => control.active !== false && control.type === 'settings');
         if (!agendaConfig?.globalStats?.length) {
             return 'No player stat context is active.';
         }
 
+        const settingsByStatId = new Map(settingControls.map((control) => [control.statId, control]));
         const lines: string[] = [];
         for (const stat of agendaConfig.globalStats) {
+            const control = settingsByStatId.get(stat.id);
             const statName = (stat.name || '').trim();
             if (!statName) {
                 continue;
@@ -2790,7 +2793,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 const optionDescription = resolveStatText(selectedOption?.option.description, this).trim();
                 const line = [
                     `${statName}: ${valueText}`,
-                    resolveStatText(stat.description, this).trim(),
+                    resolveStatText(control?.description, this).trim(),
                     optionDescription,
                 ].filter(Boolean).join('\n');
                 lines.push(line);
@@ -2799,7 +2802,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             const line = [
                 `${statName}: ${valueText}`,
-                resolveStatText(stat.description, this).trim(),
+                resolveStatText(control?.description, this).trim(),
             ].filter(Boolean).join('\n');
             lines.push(line);
         }

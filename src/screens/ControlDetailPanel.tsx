@@ -5,7 +5,7 @@ import { Stage } from '../Stage';
 import { ContentListDisplay, Control, ControlPlacement, ControlType, StatDisplayType } from '../content/Control';
 import { ConditionCollection, CONTENT_TYPES, ContentType } from '../content/Condition';
 import { isReferenceListDisplayType, Stat, StatUpdate, GameAction, cloneGameAction } from '../content/Stat';
-import { Button, ColorPickerInput, GlassPanel, TextInput, Title } from '../components/UiComponents';
+import { Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { StatUpdateOperationSelect, StatValueInput } from '../components/StatValueInput';
@@ -26,6 +26,7 @@ type ControlDraft = {
     type: ControlType;
     label: string;
     iconName: string;
+    description: string;
     statId: string;
     contentListDisplay: ContentListDisplay;
     displayType: StatDisplayType;
@@ -44,6 +45,7 @@ const createDraft = (control: Control): ControlDraft => ({
     type: control.type,
     label: control.label,
     iconName: control.iconName,
+    description: control.description,
     statId: control.statId,
     contentListDisplay: control.contentListDisplay ?? 'carousel',
     displayType: control.displayType,
@@ -124,6 +126,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             type: nextDraft.type,
             label: nextDraft.label,
             iconName: nextDraft.iconName,
+            description: nextDraft.description,
             statId: nextDraft.statId,
             contentListDisplay: nextDraft.contentListDisplay,
             displayType: nextDraft.displayType,
@@ -267,7 +270,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 Lower numbers display first. Equal priorities keep configuration order.
                             </span>
                         </div>
-                        {draft.type !== 'actorStatDisplay' && draft.type !== 'statOutcome' && (
+                        {draft.type !== 'actorStatDisplay' && draft.type !== 'statOutcome' && draft.type !== 'settings' && (
                             <div>
                                 <label htmlFor={`control-width-weight-${control.id}`} style={labelStyle}>Width Weight</label>
                                 <TextInput
@@ -300,13 +303,14 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.placement}
-                                    disabled={draft.type === 'actorStatDisplay' || draft.type === 'statOutcome'}
+                                    disabled={draft.type === 'actorStatDisplay' || draft.type === 'statOutcome' || draft.type === 'settings'}
                                     onChange={(e) => setDraft((current) => ({ ...current, placement: e.target.value as ControlPlacement }))}
                                 >
                                     <option value="top">Top (with date/stats)</option>
                                     <option value="bottom">Bottom (control dock)</option>
                                     {draft.type === 'actorStatDisplay' && <option value="actorCard">Actor Card</option>}
                                     {draft.type === 'statOutcome' && <option value="outcome">Outcomes</option>}
+                                    {draft.type === 'settings' && <option value="settings">Settings</option>}
                                 </select>
                             </div>
                             <div>
@@ -320,7 +324,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         setDraft((current) => ({
                                             ...current,
                                             type,
-                                            placement: type === 'statOutcome' ? 'outcome' : type === 'actorStatDisplay' ? 'actorCard' : current.placement === 'actorCard' || current.placement === 'outcome' ? 'bottom' : current.placement,
+                                            placement: type === 'statOutcome' ? 'outcome' : type === 'actorStatDisplay' ? 'actorCard' : type === 'settings' ? 'settings' : current.placement === 'actorCard' || current.placement === 'outcome' || current.placement === 'settings' ? 'bottom' : current.placement,
                                             statId: '',
                                         }));
                                     }}
@@ -330,13 +334,14 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <option value="statEditor">Stat Editor</option>
                                     <option value="actorStatDisplay">Actor Stat Display</option>
                                     <option value="statOutcome">Outcome</option>
+                                    <option value="settings">Settings</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                {draft.type !== 'statOutcome' && (
+                {draft.type !== 'statOutcome' && draft.type !== 'settings' && (
                     <section>
                         <h2 style={sectionHeadingStyle}>Availability</h2>
                         <ConditionEditor
@@ -478,7 +483,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                     </>
                 ) : (
                     <section>
-                        <h2 style={sectionHeadingStyle}>{draft.type === 'statOutcome' ? 'Stat Outcome' : draft.type === 'actorStatDisplay' ? 'Actor Stat Display' : draft.type === 'statEditor' ? 'Stat Editor' : 'Stat Display'}</h2>
+                        <h2 style={sectionHeadingStyle}>{draft.type === 'statOutcome' ? 'Stat Outcome' : draft.type === 'actorStatDisplay' ? 'Actor Stat Display' : draft.type === 'statEditor' ? 'Stat Editor' : draft.type === 'settings' ? 'Settings' : 'Stat Display'}</h2>
                         {draft.type === 'statOutcome' && (
                             <div style={{ marginBottom: 15 }}>
                                 <label style={labelStyle}>Stat Target</label>
@@ -500,16 +505,32 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 {selectableStats.map((stat) => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
                             </select>
                         </div>
-                        <div style={{ marginTop: 15 }}>
-                            <label style={labelStyle}>Label (optional)</label>
-                            <TextInput fullWidth value={draft.label} placeholder={selectedStat?.name || 'Use stat name'}
-                                onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))} />
-                        </div>
-                        <div style={{ marginTop: 15 }}>
-                            <label style={labelStyle}>Label Icon (optional)</label>
-                            <IconPicker stage={stage} value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
-                        </div>
-                        {selectedStat?.type === 'number' && draft.type !== 'statEditor' && (
+                        {draft.type !== 'settings' && (
+                            <div style={{ marginTop: 15 }}>
+                                <label style={labelStyle}>Label (optional)</label>
+                                <TextInput fullWidth value={draft.label} placeholder={selectedStat?.name || 'Use stat name'}
+                                    onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))} />
+                            </div>
+                        )}
+                        {(draft.type === 'statDisplay' || draft.type === 'statEditor' || draft.type === 'actorStatDisplay' || draft.type === 'settings') && (
+                            <div style={{ marginTop: 15 }}>
+                                <label style={labelStyle}>Description</label>
+                                <TextArea
+                                    value={draft.description}
+                                    onChange={(e) => setDraft((current) => ({ ...current, description: e.target.value }))}
+                                    rows={2}
+                                    placeholder="Description shown with this control"
+                                    style={{ width: '100%', resize: 'vertical' }}
+                                />
+                            </div>
+                        )}
+                        {draft.type !== 'settings' && (
+                            <div style={{ marginTop: 15 }}>
+                                <label style={labelStyle}>Label Icon (optional)</label>
+                                <IconPicker stage={stage} value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
+                            </div>
+                        )}
+                        {(draft.type === 'statDisplay' || draft.type === 'actorStatDisplay') && selectedStat?.type === 'number' && (
                             <div style={{ marginTop: 15 }}>
                                 <label style={labelStyle}>Display</label>
                                 <select style={selectStyle} value={draft.displayType}
@@ -528,7 +549,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 )}
                             </div>
                         )}
-                        {draft.type !== 'statEditor' && (
+                        {(draft.type === 'statDisplay' || draft.type === 'actorStatDisplay') && (
                             <div style={{ marginTop: 15 }}>
                                 <label style={labelStyle}>Display Color</label>
                                 <ColorPickerInput value={draft.displayColor} popoverTitle="Choose Display Color"

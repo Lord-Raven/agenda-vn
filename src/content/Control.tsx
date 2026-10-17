@@ -2,18 +2,19 @@ import { v4 as generateUuid } from 'uuid';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import { cloneGameAction, GameAction } from './Stat';
 
-// Actor stat displays render on actor cards; other controls render in the map's top or bottom dock.
-export type ControlPlacement = 'top' | 'bottom' | 'actorCard' | 'outcome';
+// Settings controls render in SettingsScreen; actor stat displays render on actor cards.
+export type ControlPlacement = 'top' | 'bottom' | 'actorCard' | 'outcome' | 'settings';
 
 // 'button' fires stat updates; 'statDisplay'/'statEditor' show/edit a global stat.
-// 'actorStatDisplay' shows a read-only stat belonging to the actor whose card is displayed.
-export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'actorStatDisplay' | 'statOutcome';
+// 'actorStatDisplay' shows a read-only stat belonging to the actor whose card is displayed;
+// 'settings' exposes a global stat as a player-editable setting.
+export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'actorStatDisplay' | 'statOutcome' | 'settings';
 export type ContentListDisplay = 'carousel' | 'abbreviated';
 export const STAT_DISPLAY_TYPES = ['straight', 'percentage', 'bar', 'rating', 'letter grade'] as const;
 export type StatDisplayType = typeof STAT_DISPLAY_TYPES[number];
 export type StatDisplaySettings = Pick<Control, 'displayType' | 'displayColor' | 'ratingIconName'>;
 
-export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'actorStatDisplay', 'statOutcome'];
+export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'actorStatDisplay', 'statOutcome', 'settings'];
 
 export const isControlAvailable = (control: Control, context: ConditionContext): boolean => (
     control.active !== false && evaluateConditionCollections(control.availabilityConditions, context)
@@ -35,6 +36,7 @@ export class Control {
     // Stat controls fall back to the stat's name when label is blank; iconName decorates the label.
     label: string = '';
     iconName: string = '';
+    description: string = '';
     actions: GameAction[] = [];
 
     // The global stat shown/edited, or the actor stat shown by 'actorStatDisplay'.
@@ -54,10 +56,11 @@ export class Control {
         this.priority = Number.isFinite(this.priority) ? this.priority : 0;
         this.widthWeight = Number.isFinite(this.widthWeight) && this.widthWeight > 0 ? this.widthWeight : 1;
         this.type = CONTROL_TYPES.includes(this.type) ? this.type : 'button';
-        this.placement = this.type === 'statOutcome' ? 'outcome' : this.type === 'actorStatDisplay' ? 'actorCard' : this.placement === 'top' ? 'top' : 'bottom';
+        this.placement = this.type === 'statOutcome' ? 'outcome' : this.type === 'actorStatDisplay' ? 'actorCard' : this.type === 'settings' ? 'settings' : this.placement === 'top' ? 'top' : 'bottom';
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map((collection) => [...collection]) : [];
         this.label = `${this.label || ''}`;
         this.iconName = `${this.iconName || ''}`;
+        this.description = `${this.description || ''}`;
         this.actions = Array.isArray(this.actions) ? this.actions.map(cloneGameAction) : [];
         this.statId = `${this.statId || ''}`;
         this.contentListDisplay = this.contentListDisplay === 'abbreviated' ? 'abbreviated' : 'carousel';

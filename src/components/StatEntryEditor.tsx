@@ -157,7 +157,7 @@ interface StatEntryEditorProps {
 }
 
 // Single stat editor card shared by the Global/Actor/Location/Item stat sections of StatManagementPanel.
-// Most fields behave identically across categories; the handful of differences (setByPlayer, perActor,
+// Most fields behave identically across categories; the handful of differences (perActor,
 // default-value rules, description/guidance visibility, allowed condition targets) are driven by `category`.
 export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     stat, index, total, typeLabel, category,
@@ -333,20 +333,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </select>
                         </div>
 
-                        {category === 'global' && (
-                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                <label style={fieldLabelStyle}>Editable In Settings</label>
-                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={stat.setByPlayer === true}
-                                        onChange={(e) => onPatch({ setByPlayer: e.target.checked })}
-                                    />
-                                    Set by Player
-                                </label>
-                            </div>
-                        )}
-
                         {/*Temporarily removing this feature:
                         category === 'actor' && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
@@ -397,17 +383,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 inlineFieldStyle={inlineFieldStyle}
                             />
                         )}
-
-                        <div style={inlineFieldTopStyle}>
-                            <label style={fieldLabelStyle}>Description</label>
-                            <TextArea
-                                value={stat.description}
-                                onChange={(e) => onPatch({ description: e.target.value })}
-                                rows={2}
-                                placeholder={category === 'global' ? undefined : 'Describe what this stat represents.'}
-                                style={{ width: '100%', resize: 'vertical' }}
-                            />
-                        </div>
 
                         {guidanceVisible && (
                             <div style={inlineFieldTopStyle}>

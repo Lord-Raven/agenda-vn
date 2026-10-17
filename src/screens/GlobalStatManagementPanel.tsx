@@ -47,11 +47,6 @@ export const GlobalStatManagementPanel: FC<GlobalStatManagementPanelProps> = ({ 
                         <div style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
                             {stat.name}
                         </div>
-                        {!!stat.description?.trim() && (
-                            <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px' }}>
-                                {stat.description}
-                            </div>
-                        )}
                         <StatValueInput
                             stat={stat}
                             value={normalizeStatValue(

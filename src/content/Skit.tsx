@@ -319,10 +319,14 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
     const agendaContext = formatLoreEntriesAsContext(activeConstantLore, stage);
 
+    const settingControls = (agendaConfig?.controls || []).filter((control) => control.active !== false && control.type === 'settings');
+    const settingsByStatId = new Map(settingControls.map((control) => [control.statId, control]));
+
     // Exposed settings are conscious choices player's made; present them as settings.
     const playerSettingContext = (agendaConfig?.globalStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
-        if (!statName || !stat.setByPlayer || !isStatLlmSeen(stat, conditionContext)) {
+        const control = settingsByStatId.get(stat.id);
+        if (!statName || !control || !isStatLlmSeen(stat, conditionContext)) {
             return '';
         }
 
@@ -337,20 +341,21 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             const optionDescription = selectedOption?.option.description?.trim() || '';
             return [
                 `${statName}: ${valueText}`,
+                control.description?.trim(),
                 optionDescription,
             ].filter(Boolean).join('\n');
         }
 
         return [
             `${statName}: ${valueText}`,
-            stat.description?.trim(),
+            control.description?.trim(),
         ].filter(Boolean).join('\n');
     }).filter(Boolean).join('\n\n');
 
     // Unexposed settings are more like stats beyond their control; present them that way.
     const globalStatContext = (agendaConfig?.globalStats || []).map((stat) => {
         const statName = (stat.name || '').trim();
-        if (!statName || stat.setByPlayer || !isStatLlmSeen(stat, conditionContext)) {
+        if (!statName || settingsByStatId.has(stat.id) || !isStatLlmSeen(stat, conditionContext)) {
             return '';
         }
 
@@ -371,7 +376,6 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
         return [
             `${statName}: ${valueText}`,
-            stat.description?.trim(),
         ].filter(Boolean).join('\n');
     }).filter(Boolean).join('\n\n');
 

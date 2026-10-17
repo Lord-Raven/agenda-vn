@@ -1,7 +1,7 @@
 import { FC, useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Stage } from '../Stage';
-import { isReferenceDisplayType, isReferenceListDisplayType, formatReferenceStatText, formatStatOptionValueText, Stat, StatValue } from '../content/Stat';
+import { isReferenceDisplayType, isReferenceListDisplayType, formatReferenceStatText, formatStatOptionValueText, resolveStatText, Stat, StatValue } from '../content/Stat';
 import { Actor } from '../content/Actor';
 import { Control } from '../content/Control';
 import { NamePlate } from './UiComponents';
@@ -157,7 +157,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                                     gap: 1,
                                     fontSize: '0.85rem',
                                 }}
-                                title={stat.description || undefined}
+                                title={resolveStatText(control.description, stageInstance) || undefined}
                             >
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', minWidth: 0 }}>
                                     {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}

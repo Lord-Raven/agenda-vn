@@ -310,7 +310,6 @@ export type StatValueRule = {
 export type Stat = {
     id: string;
     name: string;
-    description: string;
     // When true, this stat's value on a given actor is a mapping of target actorId to a value of `type`
     // (e.g. the host actor's affinity toward each other actor), rather than a single scalar value.
     perActor?: boolean;
@@ -330,7 +329,6 @@ export type Stat = {
     optionSourceStatId?: string;
     min?: number;
     max?: number;
-    setByPlayer: boolean;
 };
 
 type StatTextContext = {
@@ -360,7 +358,6 @@ export const cloneStatValueRules = (rules: StatValueRule[] | undefined): StatVal
 export const cloneStat = (stat: Stat): Stat => ({
     id: stat.id || generateUuid(),
     name: stat.name,
-    description: stat.description,
     perActor: stat.perActor === true,
     perActorDefaultRules: cloneStatValueRules(stat.perActorDefaultRules),
     defaultValueRules: cloneStatValueRules(stat.defaultValueRules),
@@ -379,7 +376,6 @@ export const cloneStat = (stat: Stat): Stat => ({
     optionSourceStatId: stat.type === 'option' && stat.optionSourceStatId ? stat.optionSourceStatId : undefined,
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
-    setByPlayer: stat.setByPlayer === true,
 });
 
 export const isStatLlmSeen = (stat: Stat, context: ConditionContext): boolean => resolveConditionalFlag(stat.llmSees, context, true);

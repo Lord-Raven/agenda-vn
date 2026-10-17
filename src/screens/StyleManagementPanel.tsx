@@ -11,7 +11,7 @@ import {
     UI_SETTINGS_GENERATION_FIELDS,
 } from '../content/Style';
 import { formatLoreEntriesAsContext, selectConstantLoreEntries } from '../content/Lore';
-import { findStatOptionByValue, formatStatOptionValueText } from '../content/Stat';
+import { findStatOptionByValue, formatStatOptionValueText, resolveStatText } from '../content/Stat';
 import { parseStructuredResponse } from '../utils/StructuredResponse.js';
 import { AlphaColorPickerInput, buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextInput, Title } from '../components/UiComponents';
 
@@ -125,6 +125,10 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     return '';
                 }
 
+                const settingDescription = resolveStatText(
+                    (configuration.controls || []).find((control) => control.type === 'settings' && control.statId === stat.id)?.description,
+                    stageInstance,
+                ).trim();
                 const selectedValue = configuration.globalStatValues?.[stat.id] ?? stat.default;
                 const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, selectedValue) : undefined;
                 const valueText = formatStatOptionValueText(stat, selectedValue) || (typeof selectedValue === 'number' ? String(selectedValue) : String(selectedValue || ''));
@@ -135,14 +139,14 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                 if (stat.type === 'option') {
                     return [
                         `${statName}: ${valueText}`,
-                        stat.description?.trim(),
+                        settingDescription,
                         selectedOption?.option.description?.trim() || '',
                     ].filter(Boolean).join('\n');
                 }
 
                 return [
                     `${statName}: ${valueText}`,
-                    stat.description?.trim(),
+                    settingDescription,
                 ].filter(Boolean).join('\n');
             }).filter(Boolean).join('\n\n') || 'None selected.';
 

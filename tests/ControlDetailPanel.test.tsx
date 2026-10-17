@@ -37,12 +37,11 @@ for (const placement of ['top', 'bottom'] as const) {
     for (const type of ['button', 'statDisplay', 'statEditor'] as const) {
         test(`${placement} ${type} uses proportional flex sizing for default, larger and smaller weights`, () => {
             for (const widthWeight of [undefined, 0.5, 1, 2]) {
-                const control = new Control({ type, placement, widthWeight, statId: 'score', label: 'Score' });
+                const control = new Control({ type, placement, widthWeight, statId: 'score', label: 'Score', description: 'Control description' });
                 const stage = createStage(control);
                 stage.getConfiguration().globalStats = [cloneStat({
-                    id: 'score', name: 'Score', type: 'number', description: '', guidance: '', default: 10,
+                    id: 'score', name: 'Score', type: 'number', guidance: '', default: 10,
                     llmSees: { value: true, conditions: [] }, llmMaintained: { value: true, conditions: [] },
-                    setByPlayer: false,
                 })];
                 const html = renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />);
                 const weight = widthWeight ?? 1;
@@ -50,10 +49,20 @@ for (const placement of ['top', 'bottom'] as const) {
                 assert.match(html, /box-sizing:border-box/);
                 assert.match(html, /min-width:0/);
                 assert.match(html, /Score/);
+                assert.match(html, /title="Control description"/);
             }
         });
     }
 }
+
+test('settings controls use the Settings placement and own a description', () => {
+    const control = new Control({ type: 'settings', placement: 'top', description: 'Player-facing guidance' });
+    assert.equal(control.placement, 'settings');
+
+    const html = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => createStage(control)} />);
+    assert.match(html, /Description/);
+    assert.doesNotMatch(html, /Width Weight|Label Icon/);
+});
 
 for (const type of ['button', 'statDisplay', 'statEditor', 'actorStatDisplay', 'statOutcome'] satisfies ControlType[]) {
     test(`${type} exposes width weight only for top/bottom controls`, () => {
