@@ -5,7 +5,7 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, GameAction, applyStatUpdateValue, cloneStat, cloneGameAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReferenceId, listElementType, validateFunctionResult } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, listElementType, validateFunctionResult } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
@@ -1612,6 +1612,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private resolveSkitActionValue(save: SaveType, source: SkitActionValue, type: StatType): StatValue {
         if (typeof source !== 'object' || Array.isArray(source)) {
+            if (type === 'text' && typeof source === 'string' && source.trim()) {
+                const name = source.trim().toLowerCase();
+                const fn = !isFunctionReference(source) && this.getConfiguration().functions.find(candidate => candidate.returnType === 'text' && candidate.name.trim().toLowerCase() === name);
+                if (fn) {
+                    source = functionReference(fn.id);
+                }
+            }
             const value = this.resolveValue(source, type, save);
             validateFunctionResult(value, type);
             return value;

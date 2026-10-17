@@ -146,7 +146,7 @@ test('recurring rule summaries identify skit actions, and actions can be added w
     assert.doesNotMatch(addRule, /disabled/);
 });
 
-test('skit input selectors offer typed functions and typed stats from each owner kind without evaluating them', () => {
+test('skit inputs use function-aware pickers and a plain guidance field without source dropdowns', () => {
     const { stage, configuration } = fixture();
     for (const type of ['location', 'actorList', 'text'] as const) {
         configuration.functions = [{
@@ -161,14 +161,47 @@ test('skit input selectors offer typed functions and typed stats from each owner
             onChange: () => {},
         };
         const literal = renderToStaticMarkup(<SkitActionInput {...props} value={functionReference('source')} />);
-        assert.match(literal, /Typed source\(\)/);
+        assert.doesNotMatch(literal, /<select/);
+        if (type === 'text') {
+            assert.match(literal, /<input[^>]*value="function:source"/);
+            const guidance = renderToStaticMarkup(<SkitActionInput {...props} value="Typed source" />);
+            assert.match(guidance, /<input[^>]*value="Typed source"/);
+            const blank = renderToStaticMarkup(<SkitActionInput {...props} value="" />);
+            assert.match(blank, /<input[^>]*value=""/);
+        } else {
+            assert.match(literal, /Typed source\(\)/);
+        }
         for (const targetType of ['global', 'actor', 'location', 'item'] as const) {
             const html = renderToStaticMarkup(<SkitActionInput {...props} value={{ targetType, targetId: targetType === 'actor' ? 'actor' : targetType === 'location' ? 'place' : 'item', statId: type }} />);
-            assert.ok(html.includes(`value="${targetType}" selected=""`));
-            assert.ok(html.includes(`value="${type}" selected=""`));
-            assert.doesNotMatch(html, /value="number"/);
+            assert.match(html, /Existing stat binding:/);
+            assert.match(html, /Replace/);
+            assert.doesNotMatch(html, /<select|<input/);
         }
+        const missing = renderToStaticMarkup(<SkitActionInput {...props} value={{ targetType: 'global', targetId: '', statId: 'missing' }} />);
+        assert.match(missing, /missing or incompatible stat/);
     }
+});
+
+test('skit pickers retain literal locations and mixed actor/function lists without source dropdowns', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = [
+        { id: 'cast', name: 'Cast', description: '', returnType: 'actorList', script: 'throw new Error("No preview");' },
+        { id: 'guest', name: 'Guest', description: '', returnType: 'actor', script: 'throw new Error("No preview");' },
+    ];
+    const props = {
+        stage, globalStats: [], actorStats: [],
+        actors: [{ id: 'actor', name: 'Alice' }], locations: [{ id: 'place', name: 'Town' }],
+        onChange: () => {},
+    };
+    const location = renderToStaticMarkup(<SkitActionInput {...props} type="location" label="Location" value="place" />);
+    assert.match(location, /Town/);
+    assert.doesNotMatch(location, /<select/);
+    const actors = renderToStaticMarkup(<SkitActionInput {...props} type="actorList" label="Participants"
+        value={['actor', functionReference('cast'), functionReference('guest')]} />);
+    assert.match(actors, /Alice/);
+    assert.match(actors, /Cast\(\)/);
+    assert.match(actors, /Guest\(\)/);
+    assert.doesNotMatch(actors, /<select/);
 });
 
 const valueStat = (type: StatType) => cloneStat({

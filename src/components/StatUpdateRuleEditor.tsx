@@ -1,12 +1,12 @@
 import { FC, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
-import { Stat, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, SkitActionValue, cloneStat, cloneStatUpdateAction, formatStatOptionValueText, isNumericDisplayType, isOptionListStatType } from '../content/Stat';
-import { GameFunction } from '../content/Function';
+import { Stat, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, SkitActionValue, cloneStatUpdateAction, formatStatOptionValueText, isNumericDisplayType, isOptionListStatType } from '../content/Stat';
+import { GameFunction, isFunctionReference } from '../content/Function';
 import { ContentType, CONTENT_TYPES, Condition, ConditionCollection } from '../content/Condition';
 import { formatTimeSlot } from '../content/CalendarEvent';
 import { Stage } from '../Stage';
-import { Button } from './UiComponents';
+import { Button, LocationSelect, ReferenceMultiSelect, TextInput } from './UiComponents';
 import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from './ConditionEditor';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { StatUpdateOperationSelect, StatValueInput } from './StatValueInput';
@@ -118,44 +118,25 @@ export const SkitActionInput: FC<SkitActionInputProps> = ({ label, type, value, 
     const reference = typeof value === 'object' && !Array.isArray(value) ? value : undefined;
     const statsByType = { global: globalStats, actor: actorStats, location: locationStats, item: itemStats };
     const entitiesByType = { global: [], actor: actors, location: locations, item: items };
-    const matchingStats = (targetType: StatUpdate['targetType']) => statsByType[targetType].filter(stat => stat.type === type && !stat.perActor);
     const literalDefault = type === 'actorList' ? [] : '';
-    const inputStat = cloneStat({
-        id: type, name: label, type, default: literalDefault, guidance: '',
-        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
-    });
-    const literalValue = typeof value === 'object' && !Array.isArray(value) ? literalDefault : value;
+    const referencedStat = reference && statsByType[reference.targetType].find(stat => stat.id === reference.statId);
+    const ownerName = reference && (reference.targetType === 'global' ? 'Global' : entitiesByType[reference.targetType].find(entity => entity.id === reference.targetId)?.name || reference.targetId);
     return (
         <div style={{ display: 'grid', gap: 6 }}>
             <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>{label}</label>
-            <select style={selectStyle} aria-label={`${label} source`} value={reference?.targetType || 'value'}
-                onChange={event => {
-                    if (event.target.value === 'value') {
-                        onChange(literalDefault);
-                    } else {
-                        const targetType = event.target.value as StatUpdate['targetType'];
-                        onChange({ targetType, targetId: entitiesByType[targetType][0]?.id || '', statId: matchingStats(targetType)[0]?.id || '' });
-                    }
-                }}>
-                <option value="value">Value or function</option>
-                <option value="global">Global stat</option>
-                {CONTENT_TYPES.map(contentType => <option key={contentType} value={contentType}>{CONTENT_TYPE_LABELS[contentType]} stat</option>)}
-            </select>
             {reference ? <>
-                {reference.targetType !== 'global' && (
-                    <SearchableOptionPicker value={reference.targetId} options={entitiesByType[reference.targetType].map(entity => ({ key: entity.id, label: entity.name }))}
-                        title={`Choose ${label.toLowerCase()} stat owner`} allowClear={false}
-                        onChange={next => onChange({ ...reference, targetId: (Array.isArray(next) ? next[0] : next) || '' })} />
-                )}
-                <select style={selectStyle} aria-label={`${label} stat`} value={reference.statId}
-                    onChange={event => onChange({ ...reference, statId: event.target.value })}>
-                    <option value="">Select a {type === 'text' ? 'text' : type === 'actorList' ? 'participant list' : 'location'} stat...</option>
-                    {reference.statId && !matchingStats(reference.targetType).some(stat => stat.id === reference.statId)
-                        && <option value={reference.statId}>Missing or incompatible stat</option>}
-                    {matchingStats(reference.targetType).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
-                </select>
-            </> : (
-                <StatValueInput stat={inputStat} value={literalValue} onChange={onChange} actors={actors} items={items} locations={locations} stage={stage} />
+                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                    Existing stat binding: {ownerName} / {referencedStat?.name || reference.statId}
+                    {(!referencedStat || referencedStat.type !== type || referencedStat.perActor) && ' (missing or incompatible stat)'}
+                </span>
+                <Button onClick={() => onChange(literalDefault)} aria-label={`Replace ${label} stat binding`}>Replace</Button>
+            </> : type === 'location' ? (
+                <LocationSelect value={typeof value === 'string' ? value : ''} onChange={onChange} locations={locations} stage={stage} />
+            ) : type === 'actorList' ? (
+                <ReferenceMultiSelect kind="actor" values={Array.isArray(value) ? value : isFunctionReference(value) ? [value] : []}
+                    onChange={onChange} actors={actors} stage={stage} />
+            ) : (
+                <TextInput fullWidth aria-label={label} value={typeof value === 'string' ? value : ''} onChange={event => onChange(event.target.value)} />
             )}
         </div>
     );
@@ -338,7 +319,8 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, glo
                                                     ))}
                                                     <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                                         Starts after all post-skit actions finish, ahead of mandatory events. Only the first triggered skit runs.
-                                                        Leave guidance empty to generate it automatically. Participants are used regardless of their schedules.
+                                                        Leave guidance empty to generate it automatically, or enter a text-returning function name to use its result.
+                                                        Function names are matched ignoring case and surrounding spaces. Participants are used regardless of their schedules.
                                                     </span>
                                                 </>
                                             ) : update.kind !== 'function' ? (

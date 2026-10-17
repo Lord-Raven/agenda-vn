@@ -301,6 +301,37 @@ test('invalid skit sources fail explicitly rather than silently starting a diffe
     assert.deepEqual(save.timeline, []);
 });
 
+test('skit guidance resolves text function names at trigger time while preserving ordinary text', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.functions = [
+        { ...typedFunction('directions', 'text', 'return `Score: ${get("Score")}`;'), name: 'Scene guidance' },
+        { ...typedFunction('number', 'number', 'return 1;'), name: 'Not text' },
+    ];
+    save.globalStatValues!.Score = 7;
+    for (const guidance of ['Scene guidance', '  SCENE GUIDANCE  ', functionReference('directions')]) {
+        const action = skitAction({ guidance });
+        assert.equal(stage['createStatUpdateSkit'](save, action).guidance, 'Score: 7');
+        assert.equal(action.guidance, guidance);
+    }
+    save.globalStatValues!.Score = 8;
+    assert.equal(stage['createStatUpdateSkit'](save, skitAction({ guidance: 'Scene guidance' })).guidance, 'Score: 8');
+    for (const guidance of ['', '  ', 'Ordinary scene directions', 'Not text', 'Mention Scene guidance in the scene']) {
+        assert.equal(stage['createStatUpdateSkit'](save, skitAction({ guidance })).guidance, guidance);
+    }
+});
+
+test('named guidance functions surface invalid returns, script errors, and attempted writes', () => {
+    const { stage, save, configuration } = fixture();
+    const fn = { ...typedFunction('directions', 'text', ''), name: 'Scene guidance' };
+    configuration.functions = [fn];
+    for (const script of ['return 42;', 'throw new Error("Guidance failed");', 'set("Score", 9); return "Changed";']) {
+        fn.script = script;
+        assert.throws(() => stage['createStatUpdateSkit'](save, skitAction({ guidance: 'Scene guidance' })));
+    }
+    assert.equal(save.globalStatValues?.Score, 2);
+    assert.deepEqual(save.timeline, []);
+});
+
 const endingSkitFixture = (eventsEnabled = true) => {
     const result = fixture();
     const { stage, save, configuration } = result;
