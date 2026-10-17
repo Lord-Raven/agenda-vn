@@ -1,5 +1,5 @@
 import { CSSProperties, FC } from 'react';
-import { findStatOptionByValue, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, Stat, StatUpdate, StatValue, isNumericDisplayType } from '../content/Stat';
+import { findStatOptionByValue, isListStatType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, Stat, StatUpdate, StatValue, isNumericDisplayType } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
@@ -28,7 +28,8 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     }
 
     const functions = functionPickerOptions(stageInstance?.getConfiguration().functions, stat.type);
-    const functionSelector = functions.length > 0 || isFunctionReference(value) ? (
+    const isList = isListStatType(stat.type);
+    const functionSelector = !isList && (functions.length > 0 || isFunctionReference(value)) ? (
         <select className="input-base" aria-label="Value source" value={isFunctionReference(value) ? value : ''}
             onChange={event => onChange(event.target.value || normalizeStatValue(undefined, { ...stat, default: listElementType(stat.type) ? [] : stat.type === 'number' ? 0 : stat.type === 'checkbox' ? false : '' }))}>
             <option value="">Literal value</option>
@@ -36,7 +37,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
             {functions.map(fn => <option key={fn.key} value={fn.key}>{fn.label}</option>)}
         </select>
     ) : null;
-    if (isFunctionReference(value)) {
+    if (isFunctionReference(value) && !isList) {
         return functionSelector;
     }
     return (
@@ -74,7 +75,9 @@ const LiteralStatValueInput: FC<StatValueInputProps & { stat: Stat }> = ({ stat,
     }
 
     if (isOptionListStatType(stat.type)) {
-        const selectedIds = Array.isArray(value) ? (normalizeStatValue(value, stat) as string[]) : [];
+        const selectedIds = Array.isArray(value)
+            ? (normalizeStatValue(value, stat) as string[])
+            : isFunctionReference(value) ? [value] : [];
         const pool = resolveStatOptionPool(stat);
         if (functionPickerOptions(stageInstance?.getConfiguration().functions, 'option').length || functionPickerOptions(stageInstance?.getConfiguration().functions, 'optionList').length || selectedIds.some(isFunctionReference)) {
             return <SearchableOptionPicker multiple values={selectedIds} onChange={next => onChange(Array.isArray(next) ? next : [])}
@@ -112,7 +115,7 @@ const LiteralStatValueInput: FC<StatValueInputProps & { stat: Stat }> = ({ stat,
             return (
                 <ReferenceMultiSelect
                     kind={referenceKind}
-                    values={Array.isArray(value) ? value : []}
+                    values={Array.isArray(value) ? value : isFunctionReference(value) ? [value] : []}
                     onChange={(ids) => onChange(ids)}
                     actors={actors}
                     items={items}

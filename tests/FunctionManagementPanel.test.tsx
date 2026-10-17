@@ -192,6 +192,22 @@ test('every stat input offers matching typed functions and preserves the selecte
     }
 });
 
+test('list stat values use their picker for function selection instead of a separate source selector', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = [
+        { id: 'members', name: 'Members', description: '', returnType: 'actorList', script: 'return ["a"];' },
+        { id: 'options', name: 'Options', description: '', returnType: 'optionList', script: 'return ["first"];' },
+    ];
+
+    const actorList = renderToStaticMarkup(<StatValueInput stat={valueStat('actorList')} value={functionReference('members')} onChange={() => {}} stage={stage} />);
+    assert.doesNotMatch(actorList, /aria-label="Value source"/);
+    assert.match(actorList, /aria-label="Selected options: Members\(\)"/);
+
+    const optionList = renderToStaticMarkup(<StatValueInput stat={valueStat('optionList')} value={functionReference('options')} onChange={() => {}} stage={stage} />);
+    assert.doesNotMatch(optionList, /aria-label="Value source"/);
+    assert.match(optionList, /aria-label="Selected options: Options\(\)"/);
+});
+
 test('content pickers show named scalar and list functions, and identify incompatible selections', () => {
     const { stage, configuration } = fixture();
     configuration.functions = [

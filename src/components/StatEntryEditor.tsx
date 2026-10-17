@@ -175,25 +175,50 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     const variableContentType = category === 'actor' ? 'actor' : undefined;
     const conditionStats = category === 'global' ? [...selfStats, ...actorStats] : [...selfStats, ...globalStats];
 
-    const guidanceVisible = category === 'actor'
-        ? (stat.llmSees.value === true || stat.llmSees.conditions.length > 0)
-        : true;
+    const guidanceVisible = stat.llmSees.value === true || stat.llmSees.conditions.length > 0;
 
     const valueRulesConfig: ValueRulesConfig | undefined = category === 'global'
         ? {
             fieldKey: 'defaultValueRules',
             title: 'Default Value Rules',
-            description: "Evaluated in order when a new game starts. The first matching rule wins and seeds this stat's starting value; falls back to the Default above if none match.",
+            description: "Evaluated in order when a new game starts. The first matching rule wins and seeds this stat's starting value. The final Default Value rule is used if no earlier rule matches.",
             visible: true,
         }
         : category === 'actor'
             ? {
                 fieldKey: 'perActorDefaultRules',
                 title: 'Default Value Rules',
-                description: "Evaluated in order for the target actor being considered (use \"Variable\" actor targets to inspect the target's own stats). The first matching rule wins; falls back to Default above if none match. An actor's own rules (configured on its detail page) take precedence over these.",
+                description: "Evaluated in order for the target actor being considered (use \"Variable\" actor targets to inspect the target's own stats). The first matching rule wins. The final Default Value rule is used if no earlier rule matches. An actor's own rules (configured on its detail page) take precedence over these.",
                 visible: stat.perActor === true,
             }
             : undefined;
+    const defaultRuleId = valueRulesConfig ? `default:${stat.id}` : undefined;
+    const configuredValueRules = valueRulesConfig?.visible ? stat[valueRulesConfig.fieldKey] || [] : [];
+    const storedDefaultRule = defaultRuleId
+        ? configuredValueRules.find(rule => rule.id === defaultRuleId)
+        : undefined;
+    const defaultRule: StatValueRule | undefined = defaultRuleId
+        ? { ...storedDefaultRule, id: defaultRuleId, value: normalizedStat.default, conditions: [] }
+        : undefined;
+    const valueRules = defaultRule
+        ? storedDefaultRule
+            ? configuredValueRules.map(rule => rule.id === defaultRuleId ? defaultRule : rule)
+            : [...configuredValueRules, defaultRule]
+        : [];
+
+    const patchStat = (patch: Partial<Stat>) => {
+        const defaultValue = patch.default;
+        if (!valueRulesConfig?.visible || defaultValue === undefined) {
+            onPatch(patch);
+            return;
+        }
+        onPatch({
+            ...patch,
+            [valueRulesConfig.fieldKey]: valueRules.map(rule => rule.id === defaultRuleId
+                ? { ...rule, value: defaultValue }
+                : rule),
+        } as Partial<Stat>);
+    };
 
     const updateOption = (optionIndex: number, patch: { name?: string; description?: string }) => {
         const currentOptions = [...(stat.options || [])];
@@ -209,7 +234,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
             return;
         }
         const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
-        onPatch({ options, default: defaultValue });
+        patchStat({ options, default: defaultValue });
     };
 
     const addOption = () => {
@@ -222,10 +247,10 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                 return;
             }
             const activeIds = Array.isArray(stat.default) ? normalizeReferenceListValue(stat.default) : [];
-            onPatch({ options, default: [...activeIds, options[options.length - 1].id!] });
+            patchStat({ options, default: [...activeIds, options[options.length - 1].id!] });
             return;
         }
-        onPatch({
+        patchStat({
             options,
             default: typeof stat.default === 'string' && stat.default.trim() ? stat.default : getStatOptionValue(options[options.length - 1], options.length - 1),
         });
@@ -234,19 +259,31 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     const addValueRule = () => {
         if (!valueRulesConfig) return;
         const rule: StatValueRule = { id: generateUuid(), value: resolveStatDefaultValue(stat), conditions: [] };
-        onPatch({ [valueRulesConfig.fieldKey]: [...(stat[valueRulesConfig.fieldKey] || []), rule] } as Partial<Stat>);
+        onPatch({ [valueRulesConfig.fieldKey]: [rule, ...valueRules] } as Partial<Stat>);
     };
 
     const removeValueRule = (ruleId: string) => {
-        if (!valueRulesConfig) return;
-        onPatch({ [valueRulesConfig.fieldKey]: (stat[valueRulesConfig.fieldKey] || []).filter(rule => rule.id !== ruleId) } as Partial<Stat>);
+        if (!valueRulesConfig || ruleId === defaultRuleId) return;
+        onPatch({ [valueRulesConfig.fieldKey]: valueRules.filter(rule => rule.id !== ruleId) } as Partial<Stat>);
     };
 
     const updateValueRule = (ruleId: string, patch: Partial<StatValueRule>) => {
         if (!valueRulesConfig) return;
+        const isDefaultRule = ruleId === defaultRuleId;
         onPatch({
-            [valueRulesConfig.fieldKey]: (stat[valueRulesConfig.fieldKey] || []).map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule),
+            ...(isDefaultRule && patch.value !== undefined ? { default: patch.value } : {}),
+            [valueRulesConfig.fieldKey]: valueRules.map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule),
         } as Partial<Stat>);
+    };
+
+    const moveValueRule = (ruleId: string, direction: -1 | 1) => {
+        if (!valueRulesConfig) return;
+        const index = valueRules.findIndex(rule => rule.id === ruleId);
+        const nextIndex = index + direction;
+        if (index < 0 || nextIndex < 0 || nextIndex >= valueRules.length) return;
+        const nextRules = [...valueRules];
+        [nextRules[index], nextRules[nextIndex]] = [nextRules[nextIndex], nextRules[index]];
+        onPatch({ [valueRulesConfig.fieldKey]: nextRules } as Partial<Stat>);
     };
 
     const renderValueInput = (value: StatValue, onChange: (value: StatValue) => void) => (
@@ -290,7 +327,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             <select
                                 className="input-base"
                                 value={normalizedStat.type}
-                                onChange={(e) => onPatch(normalizeStatShape({ ...stat, type: e.target.value as Stat['type'] }))}
+                                onChange={(e) => patchStat(normalizeStatShape({ ...stat, type: e.target.value as Stat['type'] }))}
                             >
                                 {renderStatTypeOptions()}
                             </select>
@@ -390,7 +427,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 <select
                                     className="input-base"
                                     value={normalizedStat.optionSourceStatId || ''}
-                                    onChange={(e) => onPatch({ optionSourceStatId: e.target.value || undefined, default: '' })}
+                                    onChange={(e) => patchStat({ optionSourceStatId: e.target.value || undefined, default: '' })}
                                 >
                                     <option value="">Own options</option>
                                     {optionListSources.map(source => (
@@ -405,7 +442,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </div>
                         )}
 
-                        {isSourcedOption && (
+                        {isSourcedOption && !valueRulesConfig?.visible && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Option</label>
                                 {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
@@ -414,7 +451,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
                         {((normalizedStat.type === 'option' && !isSourcedOption) || isOptionListStatType(normalizedStat.type)) && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
-                                {isOptionListStatType(normalizedStat.type) ? (
+                                {valueRulesConfig?.visible ? null : isOptionListStatType(normalizedStat.type) ? (
                                     <div style={{ ...inlineFieldTopStyle, marginBottom: 4 }}>
                                         <label style={fieldLabelStyle}>Initially Active</label>
                                         {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
@@ -460,28 +497,28 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </div>
                         )}
 
-                        {normalizedStat.type === 'text' && (
+                        {normalizedStat.type === 'text' && !valueRulesConfig?.visible && (
                             <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Value</label>
                                 {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
-                        {isReferenceDisplayType(normalizedStat.type) && (
+                        {isReferenceDisplayType(normalizedStat.type) && !valueRulesConfig?.visible && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Reference</label>
                                 {renderValueInput(normalizedStat.default, (defaultValue) => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
-                        {isReferenceListDisplayType(normalizedStat.type) && (
+                        {isReferenceListDisplayType(normalizedStat.type) && !valueRulesConfig?.visible && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default References</label>
                                 {renderValueInput(normalizedStat.default, (defaultValue) => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
-                        {normalizedStat.type === 'checkbox' && (
+                        {normalizedStat.type === 'checkbox' && !valueRulesConfig?.visible && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Value</label>
                                 {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
@@ -492,10 +529,12 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                 <label style={fieldLabelStyle}>Properties</label>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-                                    <div>
-                                        <div style={compactChipLabelStyle}>Default</div>
-                                        {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
-                                    </div>
+                                    {!valueRulesConfig?.visible && (
+                                        <div>
+                                            <div style={compactChipLabelStyle}>Default</div>
+                                            {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
+                                        </div>
+                                    )}
                                     <div>
                                         <div style={compactChipLabelStyle}>Min</div>
                                         <TextInput
@@ -521,16 +560,20 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
                     {valueRulesConfig && valueRulesConfig.visible && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 10 }}>
-                            <label style={fieldLabelStyle}>{valueRulesConfig.title}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <label style={fieldLabelStyle}>{valueRulesConfig.title}</label>
+                                <Button
+                                    variant="secondary"
+                                    onClick={addValueRule}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                    <Add fontSize="small" /> Add rule
+                                </Button>
+                            </div>
                             <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
                                 {valueRulesConfig.description}
                             </span>
-                            {(stat[valueRulesConfig.fieldKey] || []).length === 0 && (
-                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                    No rules. The Default value above is used for every {category === 'global' ? 'new game' : 'target'}.
-                                </span>
-                            )}
-                            {(stat[valueRulesConfig.fieldKey] || []).map((rule) => (
+                            {valueRules.map((rule, ruleIndex) => (
                                 <div
                                     key={rule.id}
                                     style={{
@@ -543,41 +586,57 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                     }}
                                 >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Value</span>
+                                        <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>
+                                            {rule.id === defaultRuleId ? 'Default Value' : 'Value'}
+                                        </span>
                                         {renderValueInput(rule.value, (value) => updateValueRule(rule.id, { value }))}
+                                        <Button
+                                            variant="secondary"
+                                            disabled={ruleIndex === 0}
+                                            onClick={() => moveValueRule(rule.id, -1)}
+                                            style={{ padding: '4px 8px', minWidth: 0 }}
+                                            aria-label="Move rule up"
+                                        >
+                                            <KeyboardArrowUp fontSize="small" />
+                                        </Button>
+                                        <Button
+                                            variant="secondary"
+                                            disabled={ruleIndex === valueRules.length - 1}
+                                            onClick={() => moveValueRule(rule.id, 1)}
+                                            style={{ padding: '4px 8px', minWidth: 0 }}
+                                            aria-label="Move rule down"
+                                        >
+                                            <KeyboardArrowDown fontSize="small" />
+                                        </Button>
                                         <Button
                                             variant="danger"
                                             onClick={() => removeValueRule(rule.id)}
                                             style={{ marginLeft: 'auto' }}
+                                            disabled={rule.id === defaultRuleId}
                                         >
                                             Delete
                                         </Button>
                                     </div>
-                                    <ConditionEditor
-                                        conditionCollections={rule.conditions}
-                                        globalStats={conditionStats}
-                                        actorStats={actorStats}
-                                        actors={conditionActors}
-                                        stage={stage}
-                                        items={items}
-                                        locations={locations}
-                                        variableContentType={variableContentType}
-                                        onChange={(conditions) => updateValueRule(rule.id, { conditions })}
-                                    />
-                                    {rule.conditions.length === 0 && (
+                                    {rule.id !== defaultRuleId && (
+                                        <ConditionEditor
+                                            conditionCollections={rule.conditions}
+                                            globalStats={conditionStats}
+                                            actorStats={actorStats}
+                                            actors={conditionActors}
+                                            stage={stage}
+                                            items={items}
+                                            locations={locations}
+                                            variableContentType={variableContentType}
+                                            onChange={(conditions) => updateValueRule(rule.id, { conditions })}
+                                        />
+                                    )}
+                                    {rule.id !== defaultRuleId && rule.conditions.length === 0 && (
                                         <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                            Always matches (should typically be the last rule).
+                                            Always matches; place below rules that should take precedence.
                                         </span>
                                     )}
                                 </div>
                             ))}
-                            <Button
-                                variant="secondary"
-                                onClick={addValueRule}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifySelf: 'start' }}
-                            >
-                                <Add fontSize="small" /> Add rule
-                            </Button>
                         </div>
                     )}
 

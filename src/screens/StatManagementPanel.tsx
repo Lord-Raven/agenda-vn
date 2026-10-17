@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatValue, StatUpdateRule, cloneStatValueRules, cloneStatUpdateRules, includeNewOptionListOptions, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, cloneStat } from '../content/Stat';
+import { Stat, StatValue, StatUpdateRule, cloneStatUpdateRules, includeNewOptionListOptions, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, cloneStat } from '../content/Stat';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
@@ -15,39 +15,46 @@ interface StatManagementPanelProps {
     isCreatorMode: boolean;
 }
 
-const defaultGlobalStat = (): Stat => ({
-    id: generateUuid(),
-    name: 'New Setting',
-    description: 'Describe what this player setting controls.',
-    guidance: 'How this setting should influence generated narrative and behavior.',
-    default: 'Default',
-    type: 'option',
-    options: [{
-        id: generateUuid(),
-        name: 'Default',
-        description: 'Default option behavior for this setting.',
-    }],
-    setByPlayer: true,
-    llmSees: { value: true, conditions: [] },
-    llmMaintained: { value: true, conditions: [] },
-});
+const defaultGlobalStat = (): Stat => {
+    const id = generateUuid();
+    return {
+        id,
+        name: 'New Setting',
+        description: 'Describe what this player setting controls.',
+        guidance: 'How this setting should influence generated narrative and behavior.',
+        default: 'Default',
+        type: 'option',
+        options: [{
+            id: generateUuid(),
+            name: 'Default',
+            description: 'Default option behavior for this setting.',
+        }],
+        defaultValueRules: [{ id: `default:${id}`, value: 'Default', conditions: [] }],
+        setByPlayer: true,
+        llmSees: { value: true, conditions: [] },
+        llmMaintained: { value: true, conditions: [] },
+    };
+};
 
-const defaultTypedStat = (): Stat => ({
-    id: generateUuid(),
-    name: 'Name',
-    description: 'A user-facing description of this stat.',
-    perActor: false,
-    perActorDefaultRules: [],
-    guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
-    default: 50,
-    type: 'number',
-    min: 0,
-    max: 100,
-    options: [],
-    setByPlayer: false,
-    llmSees: { value: true, conditions: [] },
-    llmMaintained: { value: true, conditions: [] },
-});
+const defaultTypedStat = (): Stat => {
+    const id = generateUuid();
+    return {
+        id,
+        name: 'Name',
+        description: 'A user-facing description of this stat.',
+        perActor: false,
+        perActorDefaultRules: [{ id: `default:${id}`, value: 50, conditions: [] }],
+        guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
+        default: 50,
+        type: 'number',
+        min: 0,
+        max: 100,
+        options: [],
+        setByPlayer: false,
+        llmSees: { value: true, conditions: [] },
+        llmMaintained: { value: true, conditions: [] },
+    };
+};
 
 const swapArrayItems = <T,>(items: T[], indexA: number, indexB: number): T[] => {
     const next = [...items];
