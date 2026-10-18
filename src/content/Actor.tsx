@@ -392,22 +392,14 @@ function clampActorStatValue(value: number, stat: Stat): number {
 export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatInitial | undefined, context: ConditionContext): StatValue {
     const storedValue = normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
     const modifiers = (initial?.modifiers || []).filter(modifier => evaluateConditionCollections(modifier.conditions, context));
-    if (isValueReference(storedValue) && modifiers.length === 0) {
-        return storedValue;
-    }
     if (!isNumericDisplayType(stat.type) && stat.type !== 'checkbox') {
-        return modifiers.reduce((_, modifier) =>
+        const value = modifiers.reduce((_, modifier) =>
             normalizeStatValue(modifier.amount, stat, { evaluateDiceNotation: true }), storedValue);
+        return resolveStatValue(value, stat, context);
     }
 
     if (stat.type === 'checkbox') {
-        if (isValueReference(storedValue)) return storedValue;
-        const baseValue = typeof initial?.value === 'boolean'
-            ? initial.value
-            : typeof stat.default === 'boolean'
-                ? stat.default
-                : false;
-        return baseValue;
+        return resolveStatValue(storedValue, stat, context);
     }
 
     const normalizedBaseValue = resolveStatValue(storedValue, stat, context);

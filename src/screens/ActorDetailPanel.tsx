@@ -576,7 +576,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             const statMapValue = isCreatorMode
                 ? cloneActorStatInitial(nextEditedStatInitialMap[stat.id], stat).value
                 : nextEditedStatMap[stat.id];
-            persistedActor.statMap[stat.id] = normalizeStatValue(statMapValue, stat);
+            persistedActor.statMap[stat.id] = isCreatorMode
+                ? normalizeStatValue(statMapValue, stat)
+                : stage().readStatValue(statMapValue, stat);
         });
 
         Object.keys(persistedActor.statMap).forEach((statId) => {

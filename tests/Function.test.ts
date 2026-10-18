@@ -593,8 +593,9 @@ test('function substitution reaches world lore, actor lore, locations, and gener
     assert.equal(save.atlas.place.description, 'Location {{Value}}');
 });
 
-test('every declared value type resolves its primitive or ID result and survives portable JSON', () => {
-    const { stage, configuration } = fixture();
+test('every declared value type resolves and snapshots its primitive or ID result and survives portable JSON', () => {
+    const { stage, configuration, save } = fixture();
+    stage.saveGame = () => {};
     const cases: [StatType, StatValue][] = [
         ['number', 7], ['text', 'A label'], ['checkbox', false], ['option', 'first'],
         ['actor', 'a'], ['item', 'item'], ['location', 'place'], ['optionList', ['first']],
@@ -608,6 +609,11 @@ test('every declared value type resolves its primitive or ID result and survives
         assert.equal(normalizeStatValue(undefined, dynamicStat), functionReference(fn.id), type);
         assert.equal(cloneStat(dynamicStat).default, functionReference(fn.id), type);
         assert.deepEqual(stage.readStatValue(undefined, dynamicStat), value, type);
+        configuration.globalStats.push(dynamicStat);
+        stage.setGlobalStatValue(dynamicStat.id, functionReference(fn.id));
+        assert.deepEqual(save.globalStatValues![dynamicStat.id], value, type);
+        assert.deepEqual(buildInitialGlobalStatValues([dynamicStat], {}, stage.getScheduleContext(save))[dynamicStat.id], value, type);
+        assert.deepEqual(resolveInitialActorStatValue(dynamicStat, undefined, stage.getScheduleContext(save)), value, type);
     }
     assert.deepEqual(JSON.parse(JSON.stringify(buildPortableGameConfiguration(configuration))).functions, configuration.functions);
 });
@@ -624,7 +630,7 @@ test('mixed lists expand scalar and list functions in order without changing the
     assert.deepEqual(stage.resolveValue([], 'actorList'), []);
 });
 
-test('stat reads reevaluate against current state, including entity stats and object lists', () => {
+test('raw value expressions can be evaluated against current state without modifying their definitions', () => {
     const { stage, save, configuration } = fixture();
     const score = configuration.globalStats.find(stat => stat.id === 'Score')!;
     configuration.functions = [
@@ -710,7 +716,7 @@ test('missing functions, mismatched types, invalid results, and cyclic stat read
     assert.equal(stage.testFunction(typedFunction('bad', 'number', 'throw new Error("Broken");')).errors.length, 1);
 });
 
-test('literal writes preserve references and adjustments resolve operands without evaluating unused defaults', () => {
+test('writes snapshot references and adjustments resolve operands without evaluating unused defaults', () => {
     const { stage, configuration, save } = fixture();
     configuration.functions = [
         typedFunction('score', 'number', 'return 4;'),
@@ -724,13 +730,13 @@ test('literal writes preserve references and adjustments resolve operands withou
     const update = (statId: string, operation: 'set' | 'adjust' | 'remove', value: StatValue) =>
         stage.runControlActions(new Control({ actions: [{ id: 'update', targetType: 'global', targetId: 'any', statId, operation, value }] }));
     update('Score', 'set', functionReference('score'));
-    assert.equal(save.globalStatValues!.Score, functionReference('score'));
+    assert.equal(save.globalStatValues!.Score, 4);
     update('Score', 'adjust', functionReference('amount'));
     assert.equal(save.globalStatValues!.Score, 6);
     update('Score', 'set', '1d1+2');
     assert.equal(save.globalStatValues!.Score, 3);
     update('Choices', 'set', functionReference('options'));
-    assert.equal(save.globalStatValues!.Choices, functionReference('options'));
+    assert.deepEqual(save.globalStatValues!.Choices, ['first']);
     update('Choices', 'remove', functionReference('option'));
     assert.deepEqual(save.globalStatValues!.Choices, []);
     update('Choices', 'adjust', [functionReference('option')]);
@@ -739,12 +745,17 @@ test('literal writes preserve references and adjustments resolve operands withou
     assert.deepEqual(save.globalStatValues!.Choices, ['first']);
 });
 
-test('function-backed defaults survive initialization and literal values do not evaluate unused defaults', () => {
-    const { stage, save } = fixture();
+test('function-backed defaults are evaluated at initialization and unused defaults are not evaluated', () => {
+    const { stage, save, configuration } = fixture();
     for (const type of ['number', 'checkbox', 'locationList', 'optionList'] as const) {
-        const dynamic = stat(type, type, { default: functionReference('missing') });
-        assert.equal(buildInitialGlobalStatValues([dynamic])[type], functionReference('missing'));
-        assert.equal(resolveInitialActorStatValue(dynamic, undefined, stage.getScheduleContext(save)), functionReference('missing'));
+        const value = type === 'number' ? 3 : type === 'checkbox' ? true : [];
+        configuration.functions = [typedFunction('default', type, `return ${JSON.stringify(value)};`)];
+        const dynamic = stat(type, type, { default: functionReference('default') });
+        assert.deepEqual(buildInitialGlobalStatValues([dynamic], {}, stage.getScheduleContext(save))[type], value);
+        assert.deepEqual(resolveInitialActorStatValue(dynamic, undefined, stage.getScheduleContext(save)), value);
+        dynamic.default = functionReference('missing');
+        assert.throws(() => buildInitialGlobalStatValues([dynamic], {}, stage.getScheduleContext(save)), /Unknown function reference/);
+        assert.throws(() => resolveInitialActorStatValue(dynamic, undefined, stage.getScheduleContext(save)), /Unknown function reference/);
     }
     assert.equal(stage.readStatValue(3, stat('number', 'number', { default: functionReference('missing') })), 3);
 });
@@ -763,7 +774,7 @@ test('initial value rules can read previously initialized function-backed global
     save.globalStatValues = {};
     const initialized = buildInitialGlobalStatValues(configuration.globalStats, {}, stage.getScheduleContext(save), save.globalStatValues);
     assert.equal(initialized.Result, 'match');
-    assert.equal(initialized.Dynamic, functionReference('value'));
+    assert.equal(initialized.Dynamic, 5);
 });
 
 test('initial numeric modifiers resolve only matching function values', () => {
@@ -780,6 +791,17 @@ test('initial numeric modifiers resolve only matching function values', () => {
         ],
     };
     assert.equal(resolveInitialActorStatValue(score, initial, stage.getScheduleContext(save)), 5);
+});
+
+test('initial list overrides snapshot the last matching value without evaluating replaced sources', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [typedFunction('cast', 'actorList', 'return ["a"];')];
+    const definition = stat('list', 'actorList', { default: [functionReference('missing-default')] });
+    const initial = { value: definition.default, modifiers: [
+        { id: 'replaced', amount: [functionReference('missing-override')], conditions: [] },
+        { id: 'selected', amount: ['literal', functionReference('cast')], conditions: [] },
+    ] };
+    assert.deepEqual(resolveInitialActorStatValue(definition, initial, stage.getScheduleContext(save)), ['literal', 'a']);
 });
 
 test('conditions resolve actual values, comparison values, identity, and content targets', () => {
@@ -964,23 +986,130 @@ test('missing, incompatible, and cyclic global stat references fail explicitly',
     assert.throws(() => stage.resolveValue(globalStatReference('chain-0'), 'actor'), /Maximum value reference depth exceeded/);
 });
 
-test('global references survive writes and initialization and resolve through script reads', () => {
+test('global references are snapshotted by writes and initialization', () => {
     const { stage, configuration, save } = fixture();
     configuration.globalStats.push(stat('base', 'number', { default: 3 }));
     const source = globalStatReference('base');
     const target = stat('target', 'number', { default: source });
-    assert.equal(buildInitialGlobalStatValues([target], {}, stage.getScheduleContext(save)).target, source);
-    assert.equal(resolveInitialActorStatValue(target, { value: source, modifiers: [] }, stage.getScheduleContext(save)), source);
+    assert.equal(buildInitialGlobalStatValues([target], {}, stage.getScheduleContext(save)).target, 3);
+    assert.equal(resolveInitialActorStatValue(target, { value: source, modifiers: [] }, stage.getScheduleContext(save)), 3);
     stage.saveGame = () => {};
     stage.runControlActions(new Control({ actions: [{
         id: 'write', targetType: 'global', targetId: '', statId: 'Score', operation: 'set', value: source,
     }] }));
-    assert.equal(save.globalStatValues!.Score, source);
+    assert.equal(save.globalStatValues!.Score, 3);
     assert.deepEqual(stage.testFunction(gameFunction('return get("Score");')), { value: 3, errors: [] });
     stage.runControlActions(new Control({ actions: [{
         id: 'adjust', targetType: 'global', targetId: '', statId: 'Score', operation: 'adjust', value: source,
     }] }));
     assert.equal(save.globalStatValues!.Score, 6);
+});
+
+test('recurring set rules snapshot mixed lists for every owner and reevaluate on the next trigger', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [typedFunction('cast', 'actorList', 'return get("Score") > 1 ? ["a"] : ["b"];')];
+    configuration.globalStats.push(stat('source', 'actorList', { default: [] }));
+    save.globalStatValues!.source = ['b'];
+    let calls = 0;
+    const resolveValue = stage.resolveValue.bind(stage);
+    stage.resolveValue = (...args) => {
+        if (args[0] === functionReference('cast')) calls++;
+        return resolveValue(...args);
+    };
+    const value = ['literal', globalStatReference('source'), functionReference('cast'), 'last'];
+    configuration.statUpdateRules = [{
+        id: 'snapshot', conditions: [], updates: (['global', 'actor', 'location', 'item'] as const).map(targetType => ({
+            id: targetType, targetType, targetId: 'any', statId: 'Party', operation: 'set', value,
+        })),
+    }];
+    save.currentDate = '2026-10-08';
+    save.currentTimeOfDay = 'afternoon';
+    stage['applyStatUpdateRules'](save, save.currentDate, 'morning');
+    assert.equal(calls, 5);
+    const expected = ['literal', 'b', 'a', 'last'];
+    const owners = [save.globalStatValues!, save.actors.a.statMap, save.actors.b.statMap,
+        save.atlas.place.statMap, save.inventory[0].statMap];
+    owners.forEach(values => assert.deepEqual(values.Party, expected));
+    save.globalStatValues!.source = ['a'];
+    save.globalStatValues!.Score = 1;
+    const party = configuration.globalStats.find(stat => stat.id === 'Party')!;
+    owners.forEach(values => assert.deepEqual(stage.readStatValue(values.Party, party), expected));
+    assert.equal(calls, 5);
+    save.currentTimeOfDay = 'evening';
+    stage['applyStatUpdateRules'](save, save.currentDate, 'afternoon');
+    assert.equal(calls, 10);
+    owners.forEach(values => assert.deepEqual(values.Party, ['literal', 'a', 'b', 'last']));
+    assert.deepEqual(value, ['literal', 'globalStat:source', 'function:cast', 'last']);
+    save.globalStatValues!.source.push('new');
+    assert.deepEqual(save.globalStatValues!.Party, ['literal', 'a', 'b', 'last']);
+});
+
+test('default, selected, and conditional initial values are evaluated once and persisted as snapshots', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [typedFunction('cast', 'actorList', 'return get("Party");')];
+    const source = functionReference('cast');
+    const definitions = [
+        stat('defaulted', 'actorList', { default: ['literal', source] }),
+        stat('selected', 'actorList'),
+        stat('conditional', 'actorList', { defaultValueRules: [{ id: 'rule', value: [source], conditions: [] }] }),
+    ];
+    let calls = 0;
+    const resolveValue = stage.resolveValue.bind(stage);
+    stage.resolveValue = (...args) => {
+        if (args[0] === source) calls++;
+        return resolveValue(...args);
+    };
+    const initialized = buildInitialGlobalStatValues(definitions, { selected: [source] }, stage.getScheduleContext(save));
+    assert.equal(calls, 3);
+    const initialParty = [...save.globalStatValues!.Party as string[]];
+    save.globalStatValues!.Party = ['changed'];
+    for (const definition of definitions) {
+        const expected = definition.id === 'defaulted' ? ['literal', ...initialParty] : initialParty;
+        assert.deepEqual(stage.readStatValue(initialized[definition.id], definition), expected);
+        assert.deepEqual(stage.readStatValue(initialized[definition.id], definition), expected);
+    }
+    assert.equal(calls, 3);
+    assert.deepEqual(definitions[0].default, ['literal', source]);
+});
+
+test('direct and script assignments snapshot sources and reject invalid sources before writing', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [typedFunction('cast', 'actorList', 'return get("Party");')];
+    configuration.globalStats.push(stat('copy', 'actorList'));
+    configuration.actorStats.push(stat('copy', 'actorList'));
+    stage.saveGame = () => {};
+    stage.setGlobalStatValue('copy', [functionReference('cast')]);
+    const originalParty = [...save.globalStatValues!.Party as string[]];
+    save.globalStatValues!.Party = ['a'];
+    assert.deepEqual(save.globalStatValues!.copy, originalParty);
+    const result = stage.testFunction(gameFunction(`
+        set("copy", ["literal", "globalStat:Party", "function:cast"]);
+        getActor("Same name").set("copy", ["globalStat:Party"]);
+        set("Party", ["b"]);
+        return [get("copy"), getActor("Same name").get("copy")];
+    `));
+    assert.deepEqual(result, { value: [['literal', 'a', 'a'], ['a']], errors: [] });
+    assert.throws(() => stage.setGlobalStatValue('copy', [functionReference('missing')]), /Unknown function reference/);
+    assert.deepEqual(save.globalStatValues!.copy, originalParty);
+});
+
+test('synchronizing legacy saves materializes references once for global and entity stats', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [typedFunction('cast', 'actorList', 'return get("Score") > 1 ? ["a"] : ["b"];')];
+    const source = [functionReference('cast')];
+    const owners = [save.globalStatValues!, save.actors.a.statMap, save.atlas.place.statMap, save.inventory[0].statMap];
+    owners.forEach(values => { values.Party = [...source]; });
+    for (const sync of ['syncGlobalStats', 'syncActorStats', 'syncLocationStats', 'syncItemStats'] as const) {
+        stage[sync](save);
+    }
+    save.globalStatValues!.Score = 1;
+    for (const sync of ['syncGlobalStats', 'syncActorStats', 'syncLocationStats', 'syncItemStats'] as const) {
+        stage[sync](save);
+    }
+    assert.deepEqual(save.globalStatValues!.Party, ['a']);
+    assert.deepEqual(save.actors.a.statMap.Party, ['a']);
+    assert.deepEqual(save.atlas.place.statMap.Party, ['a']);
+    assert.deepEqual(save.inventory[0].statMap.Party, ['a']);
 });
 
 test('conditions, schedules, skits, and calendar events read global references at use time', () => {

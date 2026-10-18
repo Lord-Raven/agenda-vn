@@ -55,7 +55,9 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                     Global JavaScript functions can be invoked by recurring rules, button controls, or other functions.
                     {' '}
                     Return IDs for content references, option IDs for options, and arrays of IDs for lists.
-                    Typed functions can be selected as dynamic values. Reading a value is read-only, including nested calls.
+                    Typed functions can be selected as value sources. Stat assignments evaluate functions and referenced
+                    Stats once and store the result; triggering a rule again evaluates its sources again.
+                    Value evaluation is read-only, including nested calls.
                     Tests run against a copy of the current game and do not save their changes.
                 </p>
                 <p style={{ color: 'var(--agenda-text-muted)', margin: 0 }}>

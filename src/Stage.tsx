@@ -607,7 +607,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
         const save = this.getSave();
         save.globalStatValues = save.globalStatValues || {};
-        save.globalStatValues[stat.id] = normalizeStatValue(value, stat);
+        save.globalStatValues[stat.id] = this.readStatValue(value, stat, save);
         this.saveGame();
     }
 
@@ -643,10 +643,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 ...(this.saveData.configuration.globalStatValues || {}),
                 ...(currentSave.globalStatValues || {}),
             };
+            this.syncGlobalStats(currentSave);
             this.syncActorStats(currentSave);
             this.syncLocationStats(currentSave);
             this.syncItemStats(currentSave);
-            this.syncGlobalStats(currentSave);
         }
         setActiveTimeMode(this.saveData.configuration.timeMode);
         this.syncUniversalSchedule();
@@ -853,6 +853,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const globalStatValues = buildInitialGlobalStatValues(configuration.globalStats || [], selectedGlobalStatValues,
             this.getScheduleContext(draftSaveContext), draftSaveContext.globalStatValues);
 
+        this.syncActorStats(draftSaveContext);
+        this.syncLocationStats(draftSaveContext);
+        this.syncItemStats(draftSaveContext);
+
         return {playerId: this.primaryUser.anonymizedId,
             actors,
             atlas,
@@ -911,10 +915,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             newSave.uiSettings = cloneUiSettings(persistedConfiguration.uiSettings || DEFAULT_UI_SETTINGS);
         }
 
+        this.syncGlobalStats(newSave);
         this.syncActorStats(newSave);
         this.syncLocationStats(newSave);
         this.syncItemStats(newSave);
-        this.syncGlobalStats(newSave);
 
         if (!newSave.currentDate && persistedConfiguration.startingDate) {
             newSave.currentDate = persistedConfiguration.startingDate;
@@ -1776,7 +1780,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     return;
                 }
                 save.globalStatValues = save.globalStatValues || {};
-                save.globalStatValues[stat.id] = normalizeStatValue(value, stat);
+                save.globalStatValues[stat.id] = this.readStatValue(value, stat, save, context.stack);
             },
         };
     }
@@ -1841,7 +1845,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 if (!stat) {
                     return;
                 }
-                statMap[stat.id] = normalizeStatValue(value, stat);
+                statMap[stat.id] = this.readStatValue(value, stat, save, context.stack);
             },
         };
         if (fieldAllowlist) {
@@ -1984,7 +1988,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private applyResolvedStatUpdate(current: StatValue | undefined, update: StatUpdate, stat: Stat, save: SaveType): StatValue {
         if (update.operation === 'set' || (stat.type !== 'number' && stat.type !== 'optionList')) {
-            return applyStatUpdateValue(current, update, stat);
+            return this.readStatValue(applyStatUpdateValue(current, {
+                ...update, value: this.resolveValue(update.value, stat.type, save),
+            }, stat), stat, save);
         }
         const currentValue = this.readStatValue(current, stat, save);
         const operand = stat.type === 'optionList' && !Array.isArray(update.value)
@@ -2256,9 +2262,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             ...(save.globalStatValues || {}),
         };
 
+        this.syncGlobalStats(save);
         this.syncActorStats(save);
         this.syncLocationStats(save);
-        this.syncGlobalStats(save);
+        this.syncItemStats(save);
 
         if (!save.uiSettings) {
             save.uiSettings = {...DEFAULT_UI_SETTINGS};
@@ -2288,7 +2295,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             scalarStats.forEach(stat => {
                 const existingValue = actor.statMap[stat.id];
-                actor.statMap[stat.id] = normalizeStatValue(existingValue, stat);
+                actor.statMap[stat.id] = this.readStatValue(existingValue, stat, save);
             });
 
             Object.keys(actor.statMap).forEach(statId => {
@@ -2333,7 +2340,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             configuredStats.forEach(stat => {
                 const existingValue = location.statMap[stat.id];
-                location.statMap[stat.id] = normalizeStatValue(existingValue, stat);
+                location.statMap[stat.id] = this.readStatValue(existingValue, stat, save);
             });
 
             Object.keys(location.statMap).forEach(statId => {
@@ -2357,7 +2364,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             configuredStats.forEach(stat => {
                 const existingValue = item.statMap[stat.id];
-                item.statMap[stat.id] = normalizeStatValue(existingValue, stat);
+                item.statMap[stat.id] = this.readStatValue(existingValue, stat, save);
             });
 
             Object.keys(item.statMap).forEach(statId => {
@@ -2376,7 +2383,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         const normalizedValues: { [key: string]: StatValue } = {};
         configuredStats.forEach((stat) => {
-            normalizedValues[stat.id] = normalizeStatValue(currentValues[stat.id], stat);
+            const value = this.readStatValue(currentValues[stat.id], stat, save);
+            currentValues[stat.id] = value;
+            normalizedValues[stat.id] = value;
         });
 
         save.globalStatValues = normalizedValues;
@@ -2614,7 +2623,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                                 || configuredStats.find(configured => configured.name.toLowerCase() === incomingStatName.toLowerCase());
                             if (incomingStatName && resolvedStat && !resolvedStat.perActor) {
                                 actor.statMap = actor.statMap || {};
-                                actor.statMap[resolvedStat.id] = normalizeStatValue(outcome.details.absoluteValue, resolvedStat);
+                                actor.statMap[resolvedStat.id] = this.readStatValue(outcome.details.absoluteValue, resolvedStat, save);
                             }
                             this.saveGame();
                             break;
@@ -2660,7 +2669,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     if (incomingGlobalStatName && resolvedGlobalStat) {
                         save.globalStatValues = save.globalStatValues || {};
                         if (outcome.details?.absoluteValue !== undefined) {
-                            save.globalStatValues[resolvedGlobalStat.id] = normalizeStatValue(outcome.details.absoluteValue, resolvedGlobalStat);
+                            save.globalStatValues[resolvedGlobalStat.id] = this.readStatValue(outcome.details.absoluteValue, resolvedGlobalStat, save);
                         } else {
                             const changeValue = Number(outcome.details?.changeValue ?? 0);
                             if (Number.isFinite(changeValue) && changeValue !== 0) {

@@ -559,9 +559,10 @@ export const buildInitialGlobalStatValues = (
     const initialContext = { ...context, globalStats: stats, globalStatValues: values };
     stats.filter(stat => stat?.id && stat.name?.trim()).forEach(stat => {
         const selectedValue = selectedValues[stat.id];
-        values[stat.id] = selectedValue !== undefined
+        const value = selectedValue !== undefined
             ? normalizeStatValue(selectedValue, stat)
             : resolveStatValueRule(stat.defaultValueRules, stat, initialContext) ?? normalizeStatValue(undefined, stat);
+        values[stat.id] = resolveStatValue(value, stat, initialContext);
     });
     return values;
 };
@@ -671,7 +672,7 @@ export const cloneStatUpdateRules = (rules: unknown): StatUpdateRule[] => (Array
 
 // Resolves the value a stat update writes, given the target's current value. Numeric stats evaluate the
 // update's value as a dice/relative expression, so 'adjust' adds the rolled amount while 'set' replaces with
-// it; non-numeric stats always write a literal value.
+// it; value references must be resolved by the caller before applying the update.
 export const applyStatUpdateValue = (currentValue: StatValue | undefined, update: StatUpdate, stat: Stat): StatValue => {
     if (update.operation === 'set' && isValueReference(update.value)) {
         return update.value;

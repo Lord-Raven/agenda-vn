@@ -102,7 +102,9 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         const activeStatIds = new Set<string>();
         itemStats.forEach((stat) => {
             activeStatIds.add(stat.id);
-            persistedItem.statMap[stat.id] = normalizeStatValue(nextStatMap[stat.id], stat);
+            persistedItem.statMap[stat.id] = isCreatorMode
+                ? normalizeStatValue(nextStatMap[stat.id], stat)
+                : stage().readStatValue(nextStatMap[stat.id], stat);
         });
 
         Object.keys(persistedItem.statMap).forEach((statId) => {

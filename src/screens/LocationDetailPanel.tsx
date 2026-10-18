@@ -228,7 +228,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         const activeStatIds = new Set<string>();
         locationStats.forEach((stat) => {
             activeStatIds.add(stat.id);
-            persistedLocation.statMap[stat.id] = normalizeStatValue(nextStatMap[stat.id], stat);
+            persistedLocation.statMap[stat.id] = isCreatorMode
+                ? normalizeStatValue(nextStatMap[stat.id], stat)
+                : stage().readStatValue(nextStatMap[stat.id], stat);
         });
 
         Object.keys(persistedLocation.statMap).forEach((statId) => {
