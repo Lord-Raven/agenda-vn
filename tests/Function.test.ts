@@ -6,7 +6,7 @@ import { Item } from '../src/content/Item';
 import { Location } from '../src/content/Location';
 import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveAvailableStatOptions, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateSkitScript, Skit } from '../src/content/Skit';
-import { cloneGameFunction, functionPickerOptions, functionReference, GameFunction } from '../src/content/Function';
+import { cloneGameFunction, functionPickerOptions, functionReference, globalStatReference, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { evaluateCondition } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
@@ -717,4 +717,168 @@ test('sourced option choices use evaluated active lists and pickers include only
     assert.deepEqual(choices.map(option => option.id), ['first']);
     assert.deepEqual(functionPickerOptions(configuration.functions, 'location').map(option => option.key), [functionReference('place')]);
     assert.deepEqual(functionPickerOptions(configuration.functions, 'actor'), []);
+});
+
+test('global stat picker sources match exact types and remain distinct from functions and literal IDs', () => {
+    const { configuration } = fixture();
+    configuration.globalStats.push(stat('destination', 'location', { default: 'place', guidance: 'Where to meet' }));
+    configuration.functions = [typedFunction('destination', 'location', 'return "place";')];
+    assert.deepEqual(valuePickerOptions(configuration, 'location'), [
+        { key: functionReference('destination'), label: 'destination()', category: 'Functions', description: '' },
+        { key: globalStatReference('destination'), label: 'destination', category: 'Global Stats', description: 'Where to meet' },
+    ]);
+    assert.deepEqual(valuePickerOptions(configuration, 'actor'), []);
+    assert.deepEqual(valuePickerOptions(undefined, 'text'), []);
+});
+
+test('all global stat source types preserve references and resolve save, configured, and stat defaults', () => {
+    const { stage, configuration, save } = fixture();
+    const cases: [StatType, StatValue, StatValue][] = [
+        ['number', 3, 4], ['text', 'star', 'favorite'], ['checkbox', false, true],
+        ['option', 'first', 'second'], ['optionList', ['first'], ['second']],
+        ['actor', 'a', 'b'], ['actorList', ['a'], ['b']],
+        ['item', 'item', 'other-item'], ['itemList', ['item'], ['other-item']],
+        ['location', 'place', 'other-place'], ['locationList', ['place'], ['other-place']],
+    ];
+    for (const [type, initial, current] of cases) {
+        const source = stat(`source-${type}`, type, { default: initial, options: [
+            { id: 'first', name: 'First', description: '' }, { id: 'second', name: 'Second', description: '' },
+        ] });
+        configuration.globalStats.push(source);
+        const reference = globalStatReference(source.id);
+        const target = stat(`target-${type}`, type, { default: reference, options: source.options });
+        configuration.globalStats.push(target);
+        configuration.globalStatValues[target.id] = reference;
+        assert.equal(cloneStat(target).default, reference, type);
+        assert.equal(normalizeStatValue(undefined, target), reference, type);
+        assert.equal(normalizeStatValue(reference, target), reference, type);
+        assert.deepEqual(stage.readStatValue(undefined, target), initial, type);
+        configuration.globalStatValues[source.id] = current;
+        assert.deepEqual(stage.resolveValue(reference, type), current, type);
+        save.globalStatValues![source.id] = initial;
+        assert.deepEqual(stage.resolveValue(reference, type), initial, type);
+        save.globalStatValues![source.id] = current;
+        assert.deepEqual(stage.readStatValue(reference, target), current, type);
+        assert.equal(target.default, reference, type);
+    }
+    const portable = JSON.parse(JSON.stringify(buildPortableGameConfiguration(configuration)));
+    assert.deepEqual(portable.globalStatValues, configuration.globalStatValues);
+});
+
+test('global sources expand scalar and list values alongside functions and literals without mutating storage', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [typedFunction('actor', 'actor', 'return "b";')];
+    configuration.globalStats.push(stat('leader', 'actor', { default: functionReference('actor') }));
+    save.globalStatValues!.Party = ['a', globalStatReference('leader')];
+    const stored = ['literal', globalStatReference('Party'), functionReference('actor'), globalStatReference('leader'), 'last'];
+    const before = JSON.stringify(stored);
+    assert.deepEqual(stage.resolveValue(stored, 'actorList'), ['literal', 'a', 'b', 'b', 'b', 'last']);
+    assert.equal(JSON.stringify(stored), before);
+    assert.deepEqual(save.globalStatValues!.Party, ['a', globalStatReference('leader')]);
+    configuration.functions[0].script = 'return "a";';
+    assert.deepEqual(stage.resolveValue(globalStatReference('Party'), 'actorList'), ['a', 'a']);
+    const alternateSave = { ...save, globalStatValues: { Party: ['b'] } };
+    assert.deepEqual(stage.resolveValue(globalStatReference('Party'), 'actorList', alternateSave), ['b']);
+    assert.deepEqual(stage.resolveValue([], 'actorList'), []);
+    configuration.functions[0].script = 'set("Score", 9); return "b";';
+    assert.throws(() => stage.resolveValue(globalStatReference('leader'), 'actor'), /read-only/);
+    assert.equal(save.globalStatValues!.Score, 2);
+});
+
+test('option lists preserve global references and use their evaluated IDs as active choices', () => {
+    const { stage, configuration, save } = fixture();
+    const choices = configuration.globalStats.find(stat => stat.id === 'Choices')!;
+    configuration.globalStats.push(
+        stat('active', 'optionList', { default: ['second-2'], options: choices.options }),
+        stat('selected', 'option', { default: 'first', options: choices.options }),
+    );
+    const stored = [globalStatReference('active'), globalStatReference('selected')];
+    save.globalStatValues!.Choices = stored;
+    assert.deepEqual(normalizeStatValue(stored, choices), stored);
+    const option = stat('selection', 'option', { optionSourceStatId: 'Choices' });
+    const resolveChoices = () => resolveAvailableStatOptions(option, undefined, {
+        sourceStats: configuration.globalStats, globalStatValues: save.globalStatValues,
+        resolveValue: (value, type) => stage.resolveValue(value, type),
+    }).map(option => option.id);
+    assert.deepEqual(stage.readStatValue(stored, choices), ['second-2', 'first']);
+    assert.deepEqual(resolveChoices(), ['first', 'second-2']);
+    save.globalStatValues!.active = [];
+    assert.deepEqual(resolveChoices(), ['first']);
+    assert.deepEqual(save.globalStatValues!.Choices, stored);
+});
+
+test('missing, incompatible, and cyclic global stat references fail explicitly', () => {
+    const { stage, configuration, save } = fixture();
+    assert.throws(() => stage.resolveValue(globalStatReference('missing'), 'actor'), /Unknown global stat reference/);
+    assert.throws(() => stage.resolveValue(globalStatReference('Party'), 'location'), /has type actorList, not location/);
+    assert.throws(() => stage.resolveValue([globalStatReference('Score')], 'actorList'), /has type number, not actor/);
+    save.globalStatValues!.Score = globalStatReference('Score');
+    assert.throws(() => stage.resolveValue(globalStatReference('Score'), 'number'), /cyclic global stat reference/);
+    configuration.globalStats.push(stat('other', 'number', { default: globalStatReference('Score') }));
+    save.globalStatValues!.Score = globalStatReference('other');
+    assert.throws(() => stage.resolveValue(globalStatReference('Score'), 'number'), /cyclic global stat reference/);
+    save.globalStatValues!.Party = ['a', globalStatReference('Party')];
+    assert.throws(() => stage.resolveValue(globalStatReference('Party'), 'actorList'), /cyclic global stat reference/);
+    configuration.functions = [typedFunction('cycle', 'number', 'return get("Score");')];
+    save.globalStatValues!.Score = functionReference('cycle');
+    assert.throws(() => stage.resolveValue(globalStatReference('Score'), 'number'), /cyclic function reference/);
+    save.globalStatValues!.Score = globalStatReference('other');
+    assert.throws(() => stage.resolveValue(functionReference('cycle'), 'number'), /cyclic global stat reference/);
+    configuration.functions.push(typedFunction('bad-result', 'actor', 'return "globalStat:Party";'));
+    assert.throws(() => stage.resolveValue(functionReference('bad-result'), 'actor'), /Expected a actor function result/);
+    for (let index = 0; index < 9; index++) {
+        configuration.globalStats.push(stat(`chain-${index}`, 'actor', { default: index < 8 ? globalStatReference(`chain-${index + 1}`) : 'a' }));
+    }
+    assert.throws(() => stage.resolveValue(globalStatReference('chain-0'), 'actor'), /Maximum value reference depth exceeded/);
+});
+
+test('global references survive writes and initialization and resolve through script reads', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.globalStats.push(stat('base', 'number', { default: 3 }));
+    const source = globalStatReference('base');
+    const target = stat('target', 'number', { default: source });
+    assert.equal(buildInitialGlobalStatValues([target], {}, stage.getScheduleContext(save)).target, source);
+    assert.equal(resolveInitialActorStatValue(target, { value: source, modifiers: [] }, stage.getScheduleContext(save)), source);
+    stage.saveGame = () => {};
+    stage.runControlActions(new Control({ actions: [{
+        id: 'write', targetType: 'global', targetId: '', statId: 'Score', operation: 'set', value: source,
+    }] }));
+    assert.equal(save.globalStatValues!.Score, source);
+    assert.deepEqual(stage.testFunction(gameFunction('return get("Score");')), { value: 3, errors: [] });
+    stage.runControlActions(new Control({ actions: [{
+        id: 'adjust', targetType: 'global', targetId: '', statId: 'Score', operation: 'adjust', value: source,
+    }] }));
+    assert.equal(save.globalStatValues!.Score, 6);
+});
+
+test('conditions, schedules, skits, and calendar events read global references at use time', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.globalStats.push(
+        stat('destination', 'location', { default: 'place' }),
+        stat('leader', 'actor', { default: 'a' }),
+        stat('cast', 'actorList', { default: ['b'] }),
+        stat('directions', 'text', { default: 'Meet at dusk' }),
+    );
+    const context = { ...stage.getScheduleContext(save), currentActor: save.actors.a };
+    assert.equal(evaluateCondition({ type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: globalStatReference('leader') }, context), true);
+    const actor = new Actor({ id: 'scheduled', schedule: { [globalStatReference('destination')]: [] } });
+    assert.equal(resolveActorSchedule(actor, context), 'place');
+    const skit = stage['createStatUpdateSkit'](save, skitAction({
+        locationId: globalStatReference('destination'), actorIds: [globalStatReference('cast')], guidance: globalStatReference('directions'),
+    }));
+    assert.equal(skit.initialLocationId, 'place');
+    assert.deepEqual(skit.initialActors, ['b']);
+    assert.equal(skit.guidance, 'Meet at dusk');
+    const event: CalendarEvent = {
+        id: 'event', name: 'Event', date: '2026-10-08', duration: ['morning'],
+        locationId: globalStatReference('destination'), actorIds: [globalStatReference('leader'), globalStatReference('cast')],
+        description: 'Description', guidance: 'Guidance', mandatory: false,
+    };
+    const stored = stage['normalizeCalendarEventForSave'](event, save);
+    assert.equal(stored.locationId, event.locationId);
+    assert.deepEqual(stored.actorIds, event.actorIds);
+    assert.deepEqual(stage.resolveCalendarEvent(stored).actorIds, ['a', 'b']);
+    save.globalStatValues!.leader = 'b';
+    assert.deepEqual(stage.resolveCalendarEvent(stored).actorIds, ['b', 'b']);
+    assert.equal(stage.resolveCalendarEvent(stored).locationId, 'place');
 });

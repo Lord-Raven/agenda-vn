@@ -4,7 +4,7 @@ import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
-import { functionPickerOptions, isFunctionReference, listElementType } from '../content/Function';
+import { valuePickerOptions, isValueReference, listElementType } from '../content/Function';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 
 interface StatValueInputProps {
@@ -27,22 +27,22 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
         return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
     }
 
-    const functions = functionPickerOptions(stageInstance?.getConfiguration().functions, stat.type);
+    const sources = valuePickerOptions(stageInstance?.getConfiguration(), stat.type);
     const isList = isListStatType(stat.type);
-    const functionSelector = !isList && (functions.length > 0 || isFunctionReference(value)) ? (
-        <select className="input-base" aria-label="Value source" value={isFunctionReference(value) ? value : ''}
+    const sourceSelector = !isList && (sources.length > 0 || isValueReference(value)) ? (
+        <select className="input-base" aria-label="Value source" value={isValueReference(value) ? value : ''}
             onChange={event => onChange(event.target.value || normalizeStatValue(undefined, { ...stat, default: listElementType(stat.type) ? [] : stat.type === 'number' ? 0 : stat.type === 'checkbox' ? false : '' }))}>
             <option value="">Literal value</option>
-            {isFunctionReference(value) && !functions.some(fn => fn.key === value) && <option value={value}>Missing or incompatible function</option>}
-            {functions.map(fn => <option key={fn.key} value={fn.key}>{fn.label}</option>)}
+            {isValueReference(value) && !sources.some(source => source.key === value) && <option value={value}>Missing or incompatible value source</option>}
+            {sources.map(source => <option key={source.key} value={source.key}>{source.category === 'Global Stats' ? `Global Stat: ${source.label}` : source.label}</option>)}
         </select>
     ) : null;
-    if (isFunctionReference(value) && !isList) {
-        return functionSelector;
+    if (isValueReference(value) && !isList) {
+        return sourceSelector;
     }
     return (
         <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
-            {functionSelector}
+            {sourceSelector}
             <LiteralStatValueInput stat={stat} value={value} onChange={onChange} actors={actors} items={items} locations={locations} stage={stage} allowExpression={allowExpression} optionContext={optionContext} />
         </div>
     );
@@ -77,9 +77,9 @@ const LiteralStatValueInput: FC<StatValueInputProps & { stat: Stat }> = ({ stat,
     if (isOptionListStatType(stat.type)) {
         const selectedIds = Array.isArray(value)
             ? (normalizeStatValue(value, stat) as string[])
-            : isFunctionReference(value) ? [value] : [];
+            : isValueReference(value) ? [value] : [];
         const pool = resolveStatOptionPool(stat);
-        if (functionPickerOptions(stageInstance?.getConfiguration().functions, 'option').length || functionPickerOptions(stageInstance?.getConfiguration().functions, 'optionList').length || selectedIds.some(isFunctionReference)) {
+        if (valuePickerOptions(stageInstance?.getConfiguration(), 'option').length || valuePickerOptions(stageInstance?.getConfiguration(), 'optionList').length || selectedIds.some(isValueReference)) {
             return <SearchableOptionPicker multiple values={selectedIds} onChange={next => onChange(Array.isArray(next) ? next : [])}
                 options={pool.map(option => ({ key: option.id!, label: option.name, description: option.description }))}
                 functionType="option" stage={stage} title="Choose active options" />;
@@ -115,7 +115,7 @@ const LiteralStatValueInput: FC<StatValueInputProps & { stat: Stat }> = ({ stat,
             return (
                 <ReferenceMultiSelect
                     kind={referenceKind}
-                    values={Array.isArray(value) ? value : isFunctionReference(value) ? [value] : []}
+                    values={Array.isArray(value) ? value : isValueReference(value) ? [value] : []}
                     onChange={(ids) => onChange(ids)}
                     actors={actors}
                     items={items}

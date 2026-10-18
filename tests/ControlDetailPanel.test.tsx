@@ -6,7 +6,12 @@ import { Control, ControlType } from '../src/content/Control';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
 import { ControlRenderer } from '../src/components/ControlRenderer';
-import { cloneStat } from '../src/content/Stat';
+import { cloneStat, StatType } from '../src/content/Stat';
+import { globalStatReference } from '../src/content/Function';
+import { SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
+import { StatValueInput } from '../src/components/StatValueInput';
+import { normalizeStatShape } from '../src/components/StatEntryEditor';
+import { IconPicker, resolveIcon } from '../src/components/StatRating';
 
 const createStage = (control: Control) => {
     const configuration: GameConfiguration = {
@@ -32,6 +37,72 @@ const renderPanel = (type: ControlType, iconName: string, widthWeight = 1) => {
     const stage = createStage(control);
     return renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
 };
+
+const sourceStat = (id: string, type: StatType, value: string | string[] = '') => cloneStat({
+    id, name: `Global ${id}`, type, default: value, guidance: '',
+    llmSees: { value: true, conditions: [] }, llmMaintained: { value: true, conditions: [] },
+});
+
+for (const kind of ['actor', 'item', 'location'] as const) {
+    test(`${kind} pickers label global scalar and list selections rather than treating them as literal IDs`, () => {
+        const stage = createStage(new Control());
+        const configuration = stage.getConfiguration();
+        configuration.globalStats = [sourceStat('single', kind), sourceStat('many', `${kind}List`)];
+        const scalar = renderToStaticMarkup(<SearchableOptionPicker
+            options={[]} value={globalStatReference('single')} functionType={kind} stage={stage} onChange={() => {}} />);
+        assert.match(scalar, /Global single/);
+        assert.doesNotMatch(scalar, /Missing or incompatible/);
+        const list = renderToStaticMarkup(<SearchableOptionPicker
+            multiple options={[]} values={['literal', globalStatReference('single'), globalStatReference('many')]}
+            functionType={kind} stage={() => stage} onChange={() => {}} />);
+        assert.match(list, /Global single/);
+        assert.match(list, /Global many/);
+        const wrongType = renderToStaticMarkup(<SearchableOptionPicker
+            options={[]} value={globalStatReference('many')} functionType={kind} stage={stage} onChange={() => {}} />);
+        assert.match(wrongType, /Missing or incompatible global stat/);
+        configuration.globalStats = [];
+        const missing = renderToStaticMarkup(<SearchableOptionPicker
+            options={[]} value={globalStatReference('single')} functionType={kind} stage={stage} onChange={() => {}} />);
+        assert.match(missing, /Missing or incompatible global stat/);
+    });
+}
+
+test('value source editors list matching global stats and preserve reference-backed stat shapes', () => {
+    const stage = createStage(new Control());
+    stage.getConfiguration().globalStats = [sourceStat('icon', 'text', 'favorite'), sourceStat('destination', 'location', 'place')];
+    const target = sourceStat('target', 'text');
+    const html = renderToStaticMarkup(<StatValueInput stat={target} value="" onChange={() => {}} stage={stage} />);
+    assert.match(html, /value="globalStat:icon"/);
+    assert.match(html, /Global Stat: Global icon/);
+    assert.doesNotMatch(html, /globalStat:destination/);
+    const selected = renderToStaticMarkup(<StatValueInput stat={target} value={globalStatReference('icon')} onChange={() => {}} stage={stage} />);
+    assert.match(selected, /value="globalStat:icon" selected=""/);
+    assert.doesNotMatch(selected, /<input/);
+    for (const type of ['number', 'checkbox', 'option', 'optionList', 'actorList', 'locationList', 'itemList'] as const) {
+        const stat = sourceStat('target', type, globalStatReference('source'));
+        assert.equal(normalizeStatShape(stat).default, globalStatReference('source'));
+    }
+});
+
+test('text global stats provide icon sources and controls reevaluate their current values', () => {
+    const stage = createStage(new Control());
+    stage.getConfiguration().globalStats = [sourceStat('icon', 'text', 'favorite')];
+    const reference = globalStatReference('icon');
+    assert.equal(resolveIcon(reference, stage), resolveIcon('favorite'));
+    const picker = renderToStaticMarkup(<IconPicker value={reference} stage={stage} onChange={() => {}} />);
+    assert.match(picker, /data-testid="BuildIcon"/);
+    assert.throws(() => resolveIcon(reference), /A stage is required/);
+    const control = new Control({ type: 'button', iconName: reference });
+    const render = () => renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />);
+    assert.match(render(), /data-testid="FavoriteBorderIcon"/);
+    const save = stage.getSave();
+    save.globalStatValues = { icon: 'star' };
+    stage.getSave = () => save;
+    assert.match(render(), /data-testid="StarIcon"/);
+    assert.equal(control.iconName, reference);
+    stage.getConfiguration().globalStats = [];
+    assert.throws(() => resolveIcon(reference, stage), /Unknown global stat reference/);
+});
 
 for (const placement of ['top', 'bottom'] as const) {
     for (const type of ['button', 'statDisplay', 'statEditor'] as const) {

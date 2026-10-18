@@ -15,7 +15,7 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections, ha
 import { formatCurrentDate } from './Skit';
 import { ACTOR_VOICES, DEFAULT_VOICE_MODULATION, formatActorVoiceLabel, normalizeVoiceModulation, VoiceModulation } from './ActorVoice';
 import { resolveStatValue } from './Stat';
-import { isFunctionReference } from './Function';
+import { GLOBAL_STAT_REFERENCE_PREFIX, isValueReference } from './Function';
 
 // A single conditional modifier to an actor's initial stat value; numeric stats are adjusted, while text/location stats are replaced.
 export type ActorStatModifier = {
@@ -123,7 +123,7 @@ export const ACTOR_SCHEDULE_AVAILABLE = 'available';
 export const ACTOR_SCHEDULE_UNAVAILABLE = 'unavailable';
 // Destination prefixes for schedule entries that resolve to a location dynamically via an ActorStat of type
 // 'location', rather than a fixed location id; the suffix is the referenced ActorStat's id.
-export const ACTOR_SCHEDULE_PLAYER_STAT_PREFIX = 'globalStat:';
+export const ACTOR_SCHEDULE_PLAYER_STAT_PREFIX = GLOBAL_STAT_REFERENCE_PREFIX;
 export const ACTOR_SCHEDULE_ACTOR_STAT_PREFIX = 'actorStat:';
 export type ActorSchedule = Record<string, ConditionCollection[]>;
 
@@ -392,7 +392,7 @@ function clampActorStatValue(value: number, stat: Stat): number {
 export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatInitial | undefined, context: ConditionContext): StatValue {
     const storedValue = normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
     const modifiers = (initial?.modifiers || []).filter(modifier => evaluateConditionCollections(modifier.conditions, context));
-    if (isFunctionReference(storedValue) && modifiers.length === 0) {
+    if (isValueReference(storedValue) && modifiers.length === 0) {
         return storedValue;
     }
     if (!isNumericDisplayType(stat.type) && stat.type !== 'checkbox') {
@@ -401,7 +401,7 @@ export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatIniti
     }
 
     if (stat.type === 'checkbox') {
-        if (isFunctionReference(storedValue)) return storedValue;
+        if (isValueReference(storedValue)) return storedValue;
         const baseValue = typeof initial?.value === 'boolean'
             ? initial.value
             : typeof stat.default === 'boolean'
@@ -571,7 +571,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
         actor.statMap = actor.statMap && typeof actor.statMap === 'object' ? { ...actor.statMap } : {};
 
         actorStats.forEach((stat, index) => {
-            if (isFunctionReference(actor.statMap[stat.id])) return;
+            if (isValueReference(actor.statMap[stat.id])) return;
             const parsedValue = Number(parsedData[`stat_${index}`]);
             const currentValue = Number(actor.statMap[stat.id]);
             const fallbackValue = Number.isFinite(currentValue) ? currentValue : (Number.isFinite(stat.default) ? Number(stat.default) : 0);

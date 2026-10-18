@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { DoNotDisturb } from '@mui/icons-material';
 import type { Stage } from '../Stage';
 import type { StatType } from '../content/Stat';
-import { functionPickerOptions, isFunctionReference } from '../content/Function';
+import { valuePickerOptions, isFunctionReference, isValueReference } from '../content/Function';
 
 const MAX_SELECTED_PREVIEW = 6;
 
@@ -55,15 +55,16 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     if (functionType) {
         const listType = functionType === 'actor' ? 'actorList' : functionType === 'item' ? 'itemList' : functionType === 'location' ? 'locationList' : functionType === 'option' ? 'optionList' : undefined;
-        const functionOptions = [
-            ...functionPickerOptions(stageInstance?.getConfiguration().functions, functionType),
-            ...(multiple && listType ? functionPickerOptions(stageInstance?.getConfiguration().functions, listType) : []),
+        const sourceOptions = [
+            ...valuePickerOptions(stageInstance?.getConfiguration(), functionType),
+            ...(multiple && listType ? valuePickerOptions(stageInstance?.getConfiguration(), listType) : []),
         ];
-        options = [...options.filter(option => !isFunctionReference(option.key)), ...functionOptions];
+        options = [...options.filter(option => !isFunctionReference(option.key) && !sourceOptions.some(source => source.key === option.key)), ...sourceOptions];
         const selected = multiple ? values || [] : value ? [value] : [];
-        for (const key of selected.filter(isFunctionReference)) {
+        for (const key of selected.filter(isValueReference)) {
             if (!options.some(option => option.key === key)) {
-                options.push({ key, label: 'Missing or incompatible function', category: 'Functions' });
+                const isFunction = isFunctionReference(key);
+                options.push({ key, label: `Missing or incompatible ${isFunction ? 'function' : 'global stat'}`, category: isFunction ? 'Functions' : 'Global Stats' });
             }
         }
     }

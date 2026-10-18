@@ -1,7 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { ContentTarget, ContentType, CONTENT_TYPES, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import type { FunctionInvocation, FunctionValueResolver } from './Function';
-import { isFunctionReference } from './Function';
+import { isValueReference } from './Function';
 
 // A boolean field whose effective value can be gated by conditions instead of always being fixed. With no
 // conditions, `value` always applies. With conditions, `value` applies only while at least one collection is
@@ -364,7 +364,7 @@ export const cloneStat = (stat: Stat): Stat => ({
     llmSees: cloneConditionalFlag(stat.llmSees, true),
     llmMaintained: cloneConditionalFlag(stat.llmMaintained, true),
     guidance: stat.guidance,
-    default: isFunctionReference(stat.default) ? stat.default : isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type)
+    default: isValueReference(stat.default) ? stat.default : isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type)
         ? normalizeReferenceListValue(stat.default)
         : (typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0))),
     type: stat.type,
@@ -384,7 +384,7 @@ export const isStatLlmMaintained = (stat: Stat, context: ConditionContext): bool
 );
 
 export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): StatValue => {
-    if (isFunctionReference(stat.default)) {
+    if (isValueReference(stat.default)) {
         return stat.default;
     }
     if (stat.type === 'option') {
@@ -423,10 +423,10 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
 };
 
 export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValueOptions = {}): StatValue => {
-    if (value == null && isFunctionReference(stat.default)) {
+    if (value == null && isValueReference(stat.default)) {
         return stat.default;
     }
-    if (isFunctionReference(value)) {
+    if (isValueReference(value)) {
         return value;
     }
     if (stat.type === 'option') {
@@ -500,7 +500,7 @@ export const resolveStatValue = (value: unknown, stat: Stat, context: { resolveV
 // Maps option ids/names to canonical ids of an optionList's pool, dropping unknown entries and duplicates.
 const normalizeOptionListIds = (values: unknown[], stat: Stat): string[] => {
     const ids = values
-        .map((entry) => isFunctionReference(entry) ? entry : findStatOptionByValue(stat, entry)?.value)
+        .map((entry) => isValueReference(entry) ? entry : findStatOptionByValue(stat, entry)?.value)
         .filter((id): id is string => !!id);
     return Array.from(new Set(ids));
 };
@@ -673,7 +673,7 @@ export const cloneStatUpdateRules = (rules: unknown): StatUpdateRule[] => (Array
 // update's value as a dice/relative expression, so 'adjust' adds the rolled amount while 'set' replaces with
 // it; non-numeric stats always write a literal value.
 export const applyStatUpdateValue = (currentValue: StatValue | undefined, update: StatUpdate, stat: Stat): StatValue => {
-    if (update.operation === 'set' && isFunctionReference(update.value)) {
+    if (update.operation === 'set' && isValueReference(update.value)) {
         return update.value;
     }
     if (isOptionListStatType(stat.type)) {

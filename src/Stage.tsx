@@ -5,7 +5,7 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, GameAction, applyStatUpdateValue, cloneStat, cloneGameAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, listElementType, validateFunctionResult } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
@@ -527,6 +527,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = []): StatValue {
+        if (isGlobalStatReference(value)) {
+            const id = globalStatReferenceId(value);
+            const configuration = this.getConfiguration();
+            const stat = configuration.globalStats.find(candidate => candidate.id === id);
+            if (!stat) {
+                throw new Error(`Unknown global stat reference: ${id}`);
+            }
+            if (stat.type !== type) {
+                throw new Error(`Global stat "${stat.name}" has type ${stat.type}, not ${type}.`);
+            }
+            if (stack.includes(value) || stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
+                throw new Error(`Maximum value reference depth exceeded or cyclic global stat reference: ${stat.name}`);
+            }
+            return this.readStatValue(save.globalStatValues?.[id] ?? configuration.globalStatValues?.[id], stat, save, [...stack, value]);
+        }
         if (isFunctionReference(value)) {
             const id = functionReferenceId(value);
             const fn = this.getConfiguration().functions.find(candidate => candidate.id === id);
@@ -547,11 +562,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const elementType = listElementType(type);
         if (elementType && Array.isArray(value)) {
             return value.flatMap(entry => {
-                if (!isFunctionReference(entry)) {
+                if (!isValueReference(entry)) {
                     return typeof entry === 'string' ? [entry] : [];
                 }
-                const fn = this.getConfiguration().functions.find(candidate => candidate.id === functionReferenceId(entry));
-                const resolved = this.resolveValue(entry, fn?.returnType === type ? type : elementType, save, stack);
+                const configuration = this.getConfiguration();
+                const sourceType = isGlobalStatReference(entry)
+                    ? configuration.globalStats.find(candidate => candidate.id === globalStatReferenceId(entry))?.type
+                    : configuration.functions.find(candidate => candidate.id === functionReferenceId(entry))?.returnType;
+                const resolved = this.resolveValue(entry, sourceType === type ? type : elementType, save, stack);
                 return Array.isArray(resolved) ? resolved : [String(resolved)];
             });
         }
@@ -1614,7 +1632,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (typeof source !== 'object' || Array.isArray(source)) {
             if (type === 'text' && typeof source === 'string' && source.trim()) {
                 const name = source.trim().toLowerCase();
-                const fn = !isFunctionReference(source) && this.getConfiguration().functions.find(candidate => candidate.returnType === 'text' && candidate.name.trim().toLowerCase() === name);
+                const fn = !isValueReference(source) && this.getConfiguration().functions.find(candidate => candidate.returnType === 'text' && candidate.name.trim().toLowerCase() === name);
                 if (fn) {
                     source = functionReference(fn.id);
                 }
@@ -1909,10 +1927,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private runGameFunction(save: SaveType, fn: GameFunction, depth: number, onError?: (message: string) => void, context: ScriptContext = { readOnly: false, stack: [] }): unknown {
-        if (context.stack.includes(fn.id) || context.stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
+        const reference = functionReference(fn.id);
+        if (context.stack.includes(reference) || context.stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
             throw new Error(`Maximum function invocation depth exceeded or cyclic function reference: ${fn.name}`);
         }
-        const nextContext = { ...context, stack: [...context.stack, fn.id] };
+        const nextContext = { ...context, stack: [...context.stack, reference] };
         let failed = false;
         const reportError = (message: string) => {
             failed = true;
@@ -1989,14 +2008,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             ? configuration.actors || []
             : Object.values(save.actors || {});
         const fallbackLocationId = allLocations[0]?.id || '';
-        const locationId = isFunctionReference(event.locationId) || allLocations.some(location => location.id === event.locationId)
+        const locationId = isValueReference(event.locationId) || allLocations.some(location => location.id === event.locationId)
             ? event.locationId
             : fallbackLocationId;
         const name = `${event.name || ''}`.trim() || 'Untitled Event';
         const date = `${event.date || ''}`.trim() || (save.currentDate || this.getStartingDate(save));
         const actorIds = Array.from(new Set(
             (event.actorIds || event.participantActorIds || [])
-                .filter(actorId => isFunctionReference(actorId) || allActors.some(actor => actor.id === actorId && actor.active !== false))
+                .filter(actorId => isValueReference(actorId) || allActors.some(actor => actor.id === actorId && actor.active !== false))
                 .map(actorId => `${actorId}`),
         ));
         const locationName = allLocations.find(location => location.id === locationId)?.name || 'an unknown location';

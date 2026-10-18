@@ -2,7 +2,7 @@ import { FC, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { Stat, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, SkitActionValue, cloneStatUpdateAction, formatStatOptionValueText, isNumericDisplayType, isOptionListStatType } from '../content/Stat';
-import { GameFunction, isFunctionReference } from '../content/Function';
+import { GameFunction, isValueReference } from '../content/Function';
 import { ContentType, CONTENT_TYPES, Condition, ConditionCollection } from '../content/Condition';
 import { formatTimeSlot } from '../content/CalendarEvent';
 import { Stage } from '../Stage';
@@ -133,7 +133,7 @@ export const SkitActionInput: FC<SkitActionInputProps> = ({ label, type, value, 
             </> : type === 'location' ? (
                 <LocationSelect value={typeof value === 'string' ? value : ''} onChange={onChange} locations={locations} stage={stage} />
             ) : type === 'actorList' ? (
-                <ReferenceMultiSelect kind="actor" values={Array.isArray(value) ? value : isFunctionReference(value) ? [value] : []}
+                <ReferenceMultiSelect kind="actor" values={Array.isArray(value) ? value : isValueReference(value) ? [value] : []}
                     onChange={onChange} actors={actors} stage={stage} />
             ) : (
                 <TextInput fullWidth aria-label={label} value={typeof value === 'string' ? value : ''} onChange={event => onChange(event.target.value)} />

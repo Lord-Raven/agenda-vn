@@ -103,9 +103,11 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         Declare a return type to offer this function in matching value pickers. Return a primitive,
-                        content ID, option ID, or array of IDs matching that type. Lists can mix literal IDs with
-                        functions; list-returning entries are expanded in order. Function-backed values are evaluated
-                        on every read and cannot use set or setField, including through nested calls.
+                        content ID, option ID, or array of IDs matching that type. Matching global stats are also
+                        available in value pickers, including text stats in icon pickers. Lists can mix literal IDs
+                        with functions and global stats; list-valued entries are expanded in order. References
+                        read the current save value (or configured default) each time, and cycles raise an error.
+                        Function-backed values cannot use set or setField, including through nested calls.
                         Explicit action invocations can still write to the game.
                     </Typography>
                 </Box>

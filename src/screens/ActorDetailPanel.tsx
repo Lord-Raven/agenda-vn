@@ -18,7 +18,7 @@ import { ConditionEditor } from '../components/ConditionEditor';
 import { CachedImage } from '../components/CachedImage';
 import { OutfitPositioningModal } from '../components/OutfitPositioningModal';
 import { StatValueInput } from '../components/StatValueInput';
-import { isFunctionReference, functionPickerOptions } from '../content/Function';
+import { isValueReference, valuePickerOptions } from '../content/Function';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -132,7 +132,7 @@ const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: st
 };
 
 const normalizeActorStatModifierAmount = (stat: Stat, amount: unknown): StatValue => {
-    if (isFunctionReference(amount)) return amount;
+    if (isValueReference(amount)) return amount;
     if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
         return typeof amount === 'string' ? amount : String(resolveStatDefault(stat));
     }
@@ -899,7 +899,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     };
 
     const handleActorStatInitialValueChange = (stat: Stat, value: StatValue) => {
-        if (isFunctionReference(value)) {
+        if (isValueReference(value)) {
             setEditedStatInitialMap(prev => ({ ...prev, [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value } }));
             return;
         }
@@ -932,7 +932,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     };
 
     const handleActorStatEditorValueChange = (stat: Stat, value: StatValue) => {
-        if (isFunctionReference(value) && !isCreatorMode) {
+        if (isValueReference(value) && !isCreatorMode) {
             setEditedStatMap(prev => ({ ...prev, [stat.id]: value }));
             return;
         }
@@ -1060,7 +1060,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         : editedStatMap;
 
     const renderPerActorValueInput = (stat: Stat, value: StatValue, onChange: (value: StatValue) => void) => {
-        if (isFunctionReference(value) || functionPickerOptions(stage().getConfiguration().functions, stat.type).length) {
+        if (isValueReference(value) || valuePickerOptions(stage().getConfiguration(), stat.type).length) {
             return <StatValueInput stat={stat} value={value} onChange={onChange} stage={stage} actors={actorOptions} items={itemOptions} locations={locationOptions} />;
         }
         if (stat.type === 'checkbox') {
@@ -2180,7 +2180,7 @@ ${indent}}`;
                                             {actorStats.map((stat) => {
                                                 const statInitial = cloneActorStatInitial(editedStatInitialMap[stat.id], stat);
                                                 const editorValue = isCreatorMode ? statInitial.value : editedStatMap[stat.id];
-                                                const hasFunctionSource = isFunctionReference(editorValue) || functionPickerOptions(stage().getConfiguration().functions, stat.type).length > 0;
+                                                const hasValueSource = isValueReference(editorValue) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
                                                 const value = Number(editorValue);
                                                 const displayValue = Number.isFinite(value)
                                                     ? value
@@ -2227,7 +2227,7 @@ ${indent}}`;
                                                                 </span>
                                                             </Button>
 
-                                                            {hasFunctionSource ? <StatValueInput stat={stat} value={editorValue} onChange={value => handleActorStatEditorValueChange(stat, value)}
+                                                            {hasValueSource ? <StatValueInput stat={stat} value={editorValue} onChange={value => handleActorStatEditorValueChange(stat, value)}
                                                                 stage={stage} actors={actorOptions} items={itemOptions} locations={locationOptions} optionContext={{ entityStatValues: entityOptionValues }} /> : <>
                                                             {stat.type === 'checkbox' && (
                                                                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>

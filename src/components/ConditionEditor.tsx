@@ -9,7 +9,7 @@ import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 import { Stage } from '../Stage';
-import { functionPickerOptions, isFunctionReference, listElementType } from '../content/Function';
+import { valuePickerOptions, isValueReference, listElementType } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
 
 interface ConditionEditorProps {
@@ -273,16 +273,16 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (condition.type === 'calendar') {
             const type = condition.field === 'timeOfDay' || condition.field === 'dayOfWeek' ? 'text' : 'number';
             const stageInstance = typeof stage === 'function' ? stage() : stage;
-            const functions = functionPickerOptions(stageInstance?.getConfiguration().functions, type);
-            if (functions.length || isFunctionReference(condition.value)) {
+            const sources = valuePickerOptions(stageInstance?.getConfiguration(), type);
+            if (sources.length || isValueReference(condition.value)) {
                 return <div style={{ display: 'grid', gap: 6 }}>
-                    <select style={selectStyle} aria-label="Value source" value={isFunctionReference(condition.value) ? condition.value : ''}
+                    <select style={selectStyle} aria-label="Value source" value={isValueReference(condition.value) ? condition.value : ''}
                         onChange={event => updateValue(event.target.value || (type === 'number' ? 1 : condition.field === 'timeOfDay' ? 'morning' : 'monday'))}>
                         <option value="">Literal value</option>
-                        {isFunctionReference(condition.value) && !functions.some(fn => fn.key === condition.value) && <option value={condition.value}>Missing or incompatible function</option>}
-                        {functions.map(fn => <option key={fn.key} value={fn.key}>{fn.label}</option>)}
+                        {isValueReference(condition.value) && !sources.some(source => source.key === condition.value) && <option value={condition.value}>Missing or incompatible value source</option>}
+                        {sources.map(source => <option key={source.key} value={source.key}>{source.category === 'Global Stats' ? `Global Stat: ${source.label}` : source.label}</option>)}
                     </select>
-                    {!isFunctionReference(condition.value) && (type === 'number'
+                    {!isValueReference(condition.value) && (type === 'number'
                         ? <TextInput type="text" value={String(condition.value)} onChange={event => updateValue(event.target.value)} />
                         : <select style={selectStyle} value={String(condition.value)} onChange={event => updateValue(event.target.value)}>
                             {(condition.field === 'timeOfDay' ? CALENDAR_TIME_OF_DAY_ORDER : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']).map(value =>

@@ -20,7 +20,7 @@ import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
 import { StatValueInput } from '../components/StatValueInput';
-import { isFunctionReference, functionPickerOptions } from '../content/Function';
+import { isValueReference, valuePickerOptions } from '../content/Function';
 
 type LocationAvailabilityState = 'unavailable' | 'disabled';
 
@@ -782,7 +782,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                         padding: '12px',
                                     }}>
                                         {locationStats.map((stat) => {
-                                            const hasFunctionSource = isFunctionReference(editedStatMap[stat.id]) || functionPickerOptions(stage().getConfiguration().functions, stat.type).length > 0;
+                                            const hasValueSource = isValueReference(editedStatMap[stat.id]) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
                                             const value = Number(editedStatMap[stat.id]);
                                             const displayValue = Number.isFinite(value)
                                                 ? value
@@ -829,7 +829,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                             </span>
                                                         </Button>
 
-                                                        {hasFunctionSource ? <StatValueInput stat={stat} value={editedStatMap[stat.id]} onChange={value => handleLocationStatReferenceChange(stat, value)}
+                                                        {hasValueSource ? <StatValueInput stat={stat} value={editedStatMap[stat.id]} onChange={value => handleLocationStatReferenceChange(stat, value)}
                                                             stage={stage} actors={actorOptions} items={itemOptions} locations={locationOptions} /> : <>
                                                         {stat.type === 'checkbox' && (
                                                             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>

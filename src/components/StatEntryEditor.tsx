@@ -12,7 +12,7 @@ import { Button, TextArea, TextInput } from './UiComponents';
 import { ConditionEditor } from './ConditionEditor';
 import { ConditionalFlagEditor } from './ConditionalFlagEditor';
 import { StatValueInput } from './StatValueInput';
-import { isFunctionReference } from '../content/Function';
+import { isValueReference } from '../content/Function';
 import { ActorLike } from './UiComponents';
 import { ItemLike } from './ItemPortrait';
 import { LocationLike } from './LocationPortrait';
@@ -25,7 +25,7 @@ export const resolveStatDefaultValue = (stat: Stat): StatValue => resolveStatDef
 // cleared/defaulted consistently, regardless of whether the stat is a global/actor/location/item stat.
 export const normalizeStatShape = (stat: Stat): Stat => {
     const normalized = normalizeStatShapeForType(stat);
-    if (isFunctionReference(stat.default)) {
+    if (isValueReference(stat.default)) {
         normalized.default = stat.default;
     }
     return normalized.type === 'option' ? normalized : { ...normalized, optionSourceStatId: undefined };
@@ -52,7 +52,7 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
                 ...stat,
                 options,
                 default: Array.isArray(stat.default)
-                    ? normalizeReferenceListValue(stat.default).filter(id => isFunctionReference(id) || optionIds.has(id))
+                    ? normalizeReferenceListValue(stat.default).filter(id => isValueReference(id) || optionIds.has(id))
                     : options.map(option => option.id),
                 min: undefined,
                 max: undefined,
@@ -229,7 +229,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
     const removeOption = (optionIndex: number) => {
         const options = (stat.options || []).filter((_, idx) => idx !== optionIndex);
-        if (isOptionListStatType(stat.type) || isFunctionReference(stat.default)) {
+        if (isOptionListStatType(stat.type) || isValueReference(stat.default)) {
             onPatch({ options });
             return;
         }
@@ -242,7 +242,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
         const nextLabel = `Option ${options.length + 1}`;
         options.push({ id: generateUuid(), name: nextLabel, description: '' });
         if (isOptionListStatType(stat.type)) {
-            if (isFunctionReference(stat.default)) {
+            if (isValueReference(stat.default)) {
                 onPatch({ options });
                 return;
             }

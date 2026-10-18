@@ -1,7 +1,7 @@
-import { FC, useMemo, useState } from 'react';
+import { FC, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Stage } from '../Stage';
-import { functionPickerOptions, isFunctionReference } from '../content/Function';
+import { valuePickerOptions, isValueReference } from '../content/Function';
 import {
     AttachMoney,
     Favorite,
@@ -608,9 +608,9 @@ const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [
 type RatingIconKey = (typeof RATING_ICON_OPTIONS)[number]['key'];
 
 const resolveIcon = (iconName?: string, stage?: Stage) => {
-    if (isFunctionReference(iconName)) {
+    if (isValueReference(iconName)) {
         if (!stage) {
-            throw new globalThis.Error('A stage is required to evaluate a function-backed icon.');
+            throw new globalThis.Error('A stage is required to evaluate a reference-backed icon.');
         }
         iconName = String(stage.resolveValue(iconName, 'text'));
     }
@@ -630,21 +630,17 @@ export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = 
     const [search, setSearch] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const stageInstance = typeof stage === 'function' ? stage() : stage;
-    const functionOptions = functionPickerOptions(stageInstance?.getConfiguration().functions, 'text');
-
-    const filteredOptions = useMemo(() => {
-        const query = search.trim().toLowerCase();
-        return [...RATING_ICON_OPTIONS, ...functionOptions.map(fn => ({ key: fn.key, labels: [fn.label, fn.description], icon: Build }))].filter((option) => {
-            if (!query) {
-                return true;
-            }
-            return option.labels.join(' ').toLowerCase().includes(query) || option.key.toLowerCase().includes(query);
-        });
-    }, [search, stageInstance?.getConfiguration().functions]);
+    const sourceOptions = valuePickerOptions(stageInstance?.getConfiguration(), 'text');
+    const query = search.trim().toLowerCase();
+    const filteredOptions = [...RATING_ICON_OPTIONS, ...sourceOptions.map(source => ({
+        key: source.key,
+        labels: [source.category === 'Global Stats' ? `Global Stat: ${source.label}` : source.label, source.description],
+        icon: Build,
+    }))].filter(option => !query || option.labels.join(' ').toLowerCase().includes(query) || option.key.toLowerCase().includes(query));
 
     const selectedValue = value ?? (allowClear ? undefined : 'star');
     const previewIconName = value ?? (allowClear ? undefined : 'star');
-    const PreviewIcon = isFunctionReference(previewIconName) ? Build : previewIconName ? resolveIcon(previewIconName) : DoNotDisturb;
+    const PreviewIcon = isValueReference(previewIconName) ? Build : previewIconName ? resolveIcon(previewIconName) : DoNotDisturb;
 
     const handleSelect = (nextValue?: string) => {
         onChange(nextValue);

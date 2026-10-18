@@ -1,6 +1,6 @@
 import { v4 as generateUuid } from 'uuid';
 import type { ContentType } from './Condition';
-import type { StatOption, StatType, StatValue } from './Stat';
+import type { Stat, StatOption, StatType, StatValue } from './Stat';
 
 export type FunctionReturnType = StatType | 'void';
 
@@ -16,6 +16,13 @@ export const isFunctionReference = (value: unknown): value is string =>
     typeof value === 'string' && value.startsWith(FUNCTION_REFERENCE_PREFIX);
 export const functionReferenceId = (value: string): string => value.slice(FUNCTION_REFERENCE_PREFIX.length);
 
+export const GLOBAL_STAT_REFERENCE_PREFIX = 'globalStat:';
+export const globalStatReference = (id: string): string => `${GLOBAL_STAT_REFERENCE_PREFIX}${id}`;
+export const isGlobalStatReference = (value: unknown): value is string =>
+    typeof value === 'string' && value.startsWith(GLOBAL_STAT_REFERENCE_PREFIX);
+export const globalStatReferenceId = (value: string): string => value.slice(GLOBAL_STAT_REFERENCE_PREFIX.length);
+export const isValueReference = (value: unknown): value is string => isFunctionReference(value) || isGlobalStatReference(value);
+
 export type FunctionValueResolver = (value: unknown, type: StatType) => StatValue;
 
 export const listElementType = (type: StatType): StatType | undefined => ({
@@ -29,14 +36,21 @@ export const functionPickerOptions = (functions: GameFunction[] | undefined, typ
         key: functionReference(fn.id), label: `${fn.name}()`, category: 'Functions', description: fn.description,
     }));
 
+export const valuePickerOptions = (configuration: { functions?: GameFunction[]; globalStats?: Stat[] } | undefined, type: StatType) => [
+    ...functionPickerOptions(configuration?.functions, type),
+    ...(configuration?.globalStats || []).filter(stat => stat.type === type).map(stat => ({
+        key: globalStatReference(stat.id), label: stat.name, category: 'Global Stats', description: stat.guidance,
+    })),
+];
+
 export const validateFunctionResult = (value: unknown, type: FunctionReturnType): void => {
     if (type === 'void') {
         return;
     }
     const valid = type === 'number' ? typeof value === 'number' && Number.isFinite(value)
         : type === 'checkbox' ? typeof value === 'boolean'
-            : listElementType(type) ? Array.isArray(value) && value.every(entry => typeof entry === 'string' && !isFunctionReference(entry))
-                : typeof value === 'string' && !isFunctionReference(value);
+            : listElementType(type) ? Array.isArray(value) && value.every(entry => typeof entry === 'string' && !isValueReference(entry))
+                : typeof value === 'string' && !isValueReference(value);
     if (!valid) {
         throw new Error(`Expected a ${type} function result, received ${value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value}.`);
     }

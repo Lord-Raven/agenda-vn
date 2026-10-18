@@ -8,7 +8,7 @@ import { StatValueDisplay } from './StatDisplay';
 import { StatValueInput } from './StatValueInput';
 import { Button } from './UiComponents';
 import { ContentListControl } from './ContentListControl';
-import { isFunctionReference } from '../content/Function';
+import { isValueReference } from '../content/Function';
 
 interface ControlRendererProps {
     control: Control;
@@ -109,7 +109,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
             </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, minHeight: 32, containerType: 'inline-size' }}>
-            {referenceKind && isReferenceListDisplayType(stat.type) && !(control.type === 'statEditor' && isFunctionReference(rawValue)) ? (
+            {referenceKind && isReferenceListDisplayType(stat.type) && !(control.type === 'statEditor' && isValueReference(rawValue)) ? (
                 <ContentListControl
                     kind={referenceKind}
                     values={normalizeReferenceListValue(control.type === 'statEditor' ? rawValue : normalizedValue)}
