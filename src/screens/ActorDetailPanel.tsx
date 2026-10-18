@@ -1907,7 +1907,7 @@ ${indent}}`;
                             flexDirection: 'column',
                             alignItems: 'flex-start',
                             justifyContent: 'flex-start',
-                            marginBottom: '20px',
+                            marginBottom: '8px',
                             position: 'static',
                             top: 'auto',
                             background: 'transparent',

@@ -368,23 +368,25 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
 
     return (
         <div style={{ padding: '20px', display: 'grid', gap: '16px', flex: 'none', minHeight: '100%', boxSizing: 'border-box' }}>
-            <div>
-                <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
-                    Map Details: {draft.name}
-                </Title>
-                <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
-                    ID: {map.id}
+            <div style={{ display: 'grid', gap: '8px' }}>
+                <div>
+                    <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
+                        Map Details: {draft.name}
+                    </Title>
+                    <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
+                        ID: {map.id}
+                    </div>
                 </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px', gap: '12px' }}>
-                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
-                    Name
-                    <TextInput fullWidth value={draft.name} onChange={event => updateDraft('name', event.target.value)} />
-                </label>
-                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
-                    Priority
-                    <TextInput fullWidth type="number" value={draft.priority} onChange={event => updateDraft('priority', Number(event.target.value))} />
-                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px', gap: '12px' }}>
+                    <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
+                        Name
+                        <TextInput fullWidth value={draft.name} onChange={event => updateDraft('name', event.target.value)} />
+                    </label>
+                    <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
+                        Priority
+                        <TextInput fullWidth type="number" value={draft.priority} onChange={event => updateDraft('priority', Number(event.target.value))} />
+                    </label>
+                </div>
             </div>
             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
                 Category

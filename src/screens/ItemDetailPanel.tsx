@@ -343,7 +343,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                 style={{ position: 'relative', width: '100%', minHeight: 0 }}
             >
                 <GlassPanel variant="default" style={{ overflow: 'visible', position: 'relative', padding: '20px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                    <div style={{ marginBottom: '20px' }}>
+                    <div style={{ marginBottom: '8px' }}>
                         <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                             Item Details: {editedItem.name}
                         </Title>
