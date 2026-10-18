@@ -1,6 +1,6 @@
 import React, { FC } from 'react';
 import { v4 as generateUuid } from 'uuid';
-import { Add, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-material';
+import { Add, Delete, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import {
     Stat, StatValue, StatValueRule,
@@ -440,6 +440,19 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
                                 {editableOptionEntries.map((option, optionIndex) => (
                                     <div key={option.id || `option-${optionIndex}`} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: 8, padding: 8 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                                            <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', overflowWrap: 'anywhere' }}>
+                                                ID: {option.id}
+                                            </div>
+                                            <Button
+                                                variant="danger"
+                                                onClick={() => removeOption(optionIndex)}
+                                                aria-label="Remove option"
+                                                style={{ minWidth: 34, padding: 6, flexShrink: 0 }}
+                                            >
+                                                <Delete fontSize="small" />
+                                            </Button>
+                                        </div>
                                         <div style={inlineFieldStyle}>
                                             <label style={fieldLabelStyle}>Option Name</label>
                                             <TextInput
@@ -457,11 +470,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                                 rows={2}
                                                 style={{ width: '100%', resize: 'vertical' }}
                                             />
-                                        </div>
-                                        <div style={{ marginTop: 8 }}>
-                                            <Button variant="danger" onClick={() => removeOption(optionIndex)}>
-                                                Remove Option
-                                            </Button>
                                         </div>
                                     </div>
                                 ))}

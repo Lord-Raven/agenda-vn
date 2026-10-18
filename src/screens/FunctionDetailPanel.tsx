@@ -9,7 +9,7 @@ import { Stage } from '../Stage';
 export const FUNCTION_RETURN_TYPE_LABELS: Record<FunctionReturnType, string> = {
     void: 'Void (action only)',
     number: 'Number',
-    text: 'String (text)',
+    text: 'String',
     checkbox: 'Checkbox',
     option: 'Option',
     optionList: 'Option List',

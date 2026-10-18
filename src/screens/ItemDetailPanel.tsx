@@ -361,6 +361,9 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                         onChange={(e) => handleInputChange('name', e.target.value)}
                                         placeholder="Item name"
                                     />
+                                    <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
+                                        ID: {item.id}
+                                    </div>
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Category</label>

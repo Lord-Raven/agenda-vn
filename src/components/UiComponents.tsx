@@ -71,6 +71,7 @@ interface ButtonProps {
 	className?: string;
 	onMouseEnter?: () => void;
 	onMouseLeave?: () => void;
+	'aria-label'?: string;
 }
 
 export const Button: FC<ButtonProps> = ({ 
@@ -82,6 +83,7 @@ export const Button: FC<ButtonProps> = ({
 	style,
 	onMouseEnter,
 	onMouseLeave,
+	'aria-label': ariaLabel,
 }) => {
 	const buttonClass = `btn-${variant}`;
 	
@@ -92,6 +94,7 @@ export const Button: FC<ButtonProps> = ({
 			onClick={onClick}
 			onMouseEnter={onMouseEnter}
 			onMouseLeave={onMouseLeave}
+			aria-label={ariaLabel}
 			whileHover={!disabled ? { scale: variant === 'menu' ? 1 : 1.03 } : {}}
 			whileTap={!disabled ? { scale: 0.98 } : {}}
 			style={{

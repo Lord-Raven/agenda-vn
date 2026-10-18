@@ -1955,6 +1955,9 @@ ${indent}}`;
                                             onChange={(e) => handleInputChange('name', e.target.value)}
                                             placeholder="Character name"
                                         />
+                                        <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
+                                            ID: {actor.id}
+                                        </div>
                                     </div>
 
                                     {/* Display Name */}
