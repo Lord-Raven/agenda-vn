@@ -1904,7 +1904,8 @@ ${indent}}`;
                         {/* Header */}
                         <div style={{
                             display: 'flex',
-                            alignItems: 'center',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
                             justifyContent: 'flex-start',
                             marginBottom: '20px',
                             position: 'static',
@@ -1917,6 +1918,9 @@ ${indent}}`;
                             <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                                 Actor Details: {editedActor.name}
                             </Title>
+                            <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
+                                ID: {actor.id}
+                            </div>
                         </div>
 
                         {/* Form Content */}
@@ -1955,9 +1959,6 @@ ${indent}}`;
                                             onChange={(e) => handleInputChange('name', e.target.value)}
                                             placeholder="Character name"
                                         />
-                                        <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
-                                            ID: {actor.id}
-                                        </div>
                                     </div>
 
                                     {/* Display Name */}

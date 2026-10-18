@@ -3,7 +3,7 @@ import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, ArrowDownward, ArrowUpward, AutoAwesome, CenterFocusStrong, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place } from '@mui/icons-material';
 import { generateMapAlternativeImage, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
-import { Button, TextArea, TextInput, TextInputWithOptions } from '../components/UiComponents';
+import { Button, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -368,16 +368,19 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
 
     return (
         <div style={{ padding: '20px', display: 'grid', gap: '16px', flex: 'none', minHeight: '100%', boxSizing: 'border-box' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px', gap: '12px' }}>
-                <div>
-                    <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
-                        Name
-                        <TextInput fullWidth value={draft.name} onChange={event => updateDraft('name', event.target.value)} />
-                    </label>
-                    <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
-                        ID: {map.id}
-                    </div>
+            <div>
+                <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
+                    Map Details: {draft.name}
+                </Title>
+                <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
+                    ID: {map.id}
                 </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px', gap: '12px' }}>
+                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
+                    Name
+                    <TextInput fullWidth value={draft.name} onChange={event => updateDraft('name', event.target.value)} />
+                </label>
                 <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
                     Priority
                     <TextInput fullWidth type="number" value={draft.priority} onChange={event => updateDraft('priority', Number(event.target.value))} />

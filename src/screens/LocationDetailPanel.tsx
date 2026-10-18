@@ -699,7 +699,8 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                         {/* Header */}
                         <div style={{
                             display: 'flex',
-                            alignItems: 'center',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
                             justifyContent: 'flex-start',
                             marginBottom: '20px',
                             position: 'static',
@@ -712,6 +713,9 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                             <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                                 Location Details: {editedLocation.name}
                             </Title>
+                            <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
+                                ID: {location.id}
+                            </div>
                         </div>
 
                         {/* Form */}
@@ -729,9 +733,6 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                             onChange={(e) => handleInputChange('name', e.target.value)}
                                             placeholder="Location name"
                                         />
-                                        <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
-                                            ID: {location.id}
-                                        </div>
                                     </div>
                                     <div>
                                         <label style={labelStyle}>Category</label>

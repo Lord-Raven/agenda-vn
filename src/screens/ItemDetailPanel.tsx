@@ -347,6 +347,9 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                         <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                             Item Details: {editedItem.name}
                         </Title>
+                        <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
+                            ID: {item.id}
+                        </div>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', flex: 1 }}>
@@ -361,9 +364,6 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                         onChange={(e) => handleInputChange('name', e.target.value)}
                                         placeholder="Item name"
                                     />
-                                    <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
-                                        ID: {item.id}
-                                    </div>
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Category</label>
