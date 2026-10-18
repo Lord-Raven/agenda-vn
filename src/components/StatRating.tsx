@@ -894,7 +894,7 @@ const renderStatIcon = (
             <IconComponent
                 style={{
                     ...iconStyleBase,
-                    opacity: filled || highlight ? 1 : 0.35,
+                    opacity: filled || highlight ? 1 : 0.6,
                     color: fillColor,
                     filter: shadow,
                     transform: highlight === 'increase' ? 'scale(1.2)' : (filled ? 'none' : 'translateY(1px)'),
