@@ -1,11 +1,12 @@
-import { CSSProperties, FC } from 'react';
-import { findStatOptionByValue, isListStatType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, Stat, StatUpdate, StatValue, isNumericDisplayType } from '../content/Stat';
+import { CSSProperties, FC, useEffect, useState } from 'react';
+import { findStatOptionByValue, isNumericDisplayType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, Stat, StatUpdate, StatValue, getStatOptionValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
-import { valuePickerOptions, isValueReference, listElementType } from '../content/Function';
+import { valuePickerOptions, isValueReference } from '../content/Function';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
+import { validateValueExpression } from '../content/ValueExpression';
 
 interface StatValueInputProps {
     stat?: Stat;
@@ -15,7 +16,7 @@ interface StatValueInputProps {
     items?: ItemLike[];
     locations?: LocationLike[];
     stage?: Stage | (() => Stage);
-    // When true, numeric stats accept dice/relative expressions (e.g. "1d6+1", "-2") instead of a plain number.
+    // Adds dice/relative-expression guidance for stat update inputs. All numeric inputs support formulas.
     allowExpression?: boolean;
     // The owning entity's statMap etc., so a sourced option stat only offers that entity's active options.
     optionContext?: OptionListSourceContext;
@@ -24,36 +25,22 @@ interface StatValueInputProps {
 export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, optionContext }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     if (!stat) {
-        return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
+        return <FormulaValueInput value={value} onChange={onChange} />;
     }
-
-    const sources = valuePickerOptions(stageInstance?.getConfiguration(), stat.type);
-    const isList = isListStatType(stat.type);
-    const sourceSelector = !isList && (sources.length > 0 || isValueReference(value)) ? (
-        <select className="input-base" aria-label="Value source" value={isValueReference(value) ? value : ''}
-            onChange={event => onChange(event.target.value || normalizeStatValue(undefined, { ...stat, default: listElementType(stat.type) ? [] : stat.type === 'number' ? 0 : stat.type === 'checkbox' ? false : '' }))}>
-            <option value="">Literal value</option>
-            {isValueReference(value) && !sources.some(source => source.key === value) && <option value={value}>Missing or incompatible value source</option>}
-            {sources.map(source => <option key={source.key} value={source.key}>{source.category === 'Global Stats' ? `Global Stat: ${source.label}` : source.label}</option>)}
-        </select>
-    ) : null;
-    if (isValueReference(value) && !isList) {
-        return sourceSelector;
-    }
-    return (
-        <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
-            {sourceSelector}
-            <LiteralStatValueInput stat={stat} value={value} onChange={onChange} actors={actors} items={items} locations={locations} stage={stage} allowExpression={allowExpression} optionContext={optionContext} />
-        </div>
-    );
-};
-
-const LiteralStatValueInput: FC<StatValueInputProps & { stat: Stat }> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, optionContext }) => {
-    const stageInstance = typeof stage === 'function' ? stage() : stage;
     if (stageInstance) {
         optionContext = { ...optionContext, resolveValue: (source, type) => stageInstance.resolveValue(source, type) };
     }
     if (stat.type === 'checkbox') {
+        if (valuePickerOptions(stageInstance?.getConfiguration(), stat.type).length || isValueReference(value)) {
+            return <SearchableOptionPicker
+                value={String(value)}
+                onChange={next => {
+                    if (typeof next === 'string') onChange(next === 'true' ? true : next === 'false' ? false : next);
+                }}
+                options={[{ key: 'true', label: 'True' }, { key: 'false', label: 'False' }]}
+                functionType="checkbox" stage={stage} title="Choose value"
+            />;
+        }
         return (
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
                 <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
@@ -64,13 +51,13 @@ const LiteralStatValueInput: FC<StatValueInputProps & { stat: Stat }> = ({ stat,
 
     if (stat.type === 'option') {
         const selectedOption = findStatOptionByValue(stat, value);
+        const options = resolveAvailableStatOptions(stat, value, optionContext);
         return (
-            <select className="input-base" value={selectedOption?.value || ''} onChange={(e) => onChange(e.target.value)}>
-                {!selectedOption && <option value="" disabled>Select an option...</option>}
-                {resolveAvailableStatOptions(stat, value, optionContext).map((option) => (
-                    <option key={option.id} value={option.id}>{option.name}</option>
-                ))}
-            </select>
+            <SearchableOptionPicker value={isValueReference(value) ? value : selectedOption?.value || ''}
+                onChange={next => { if (typeof next === 'string') onChange(next); }}
+                options={options.map((option, index) => ({ key: getStatOptionValue(option, index), label: option.name, description: option.description }))}
+                functionType="option" stage={stage} title="Choose option" emptyLabel="Select an option..."
+            />
         );
     }
 
@@ -106,7 +93,7 @@ const LiteralStatValueInput: FC<StatValueInputProps & { stat: Stat }> = ({ stat,
     }
 
     if (stat.type === 'text') {
-        return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
+        return <FormulaValueInput value={value} onChange={onChange} />;
     }
 
     const referenceKind = resolveReferenceKind(stat.type);
@@ -137,29 +124,39 @@ const LiteralStatValueInput: FC<StatValueInputProps & { stat: Stat }> = ({ stat,
         );
     }
 
-    if (isNumericDisplayType(stat.type) && allowExpression) {
-        return (
-            <TextInput
-                fullWidth
-                value={typeof value === 'number' ? String(value) : (typeof value === 'string' ? value : '')}
-                placeholder="e.g. 5, -2, or 1d6+1"
-                onChange={(e) => {
-                    const raw = e.target.value;
-                    const numeric = Number(raw);
-                    onChange(raw.trim() !== '' && Number.isFinite(numeric) ? numeric : raw);
-                }}
-            />
-        );
-    }
+    return <FormulaValueInput numeric value={value} onChange={onChange} allowExpression={allowExpression} />;
+};
 
-    return (
-        <TextInput
-            fullWidth
-            type="number"
-            value={String(Number.isFinite(value) ? Number(value) : 0)}
-            onChange={(e) => onChange(Number(e.target.value) || 0)}
-        />
-    );
+const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'allowExpression'> & { numeric?: boolean }> = ({ value, onChange, numeric = false, allowExpression }) => {
+    const [draft, setDraft] = useState(String(value ?? ''));
+    const [error, setError] = useState('');
+    useEffect(() => {
+        setDraft(String(value ?? ''));
+        setError('');
+    }, [value]);
+    const commit = () => {
+        if (draft === String(value ?? '')) return;
+        try {
+            const number = Number(draft);
+            if (numeric && draft.trim() && !isValueReference(draft)) validateValueExpression(draft);
+            onChange(numeric && Number.isFinite(number) ? number : draft);
+            setError('');
+        } catch (cause) {
+            const message = cause instanceof Error ? cause.message : String(cause);
+            console.error(message);
+            setError(message);
+        }
+    };
+    return <div style={{ display: 'grid', gap: 4, minWidth: 0 }}><TextInput fullWidth value={draft}
+        aria-invalid={error ? true : undefined}
+        placeholder={numeric ? (allowExpression ? 'e.g. 5, -2, 1d6+1, or Score() * 2' : 'e.g. 5 or Score() * 2') : 'Text, Greeting(), or {{Greeting}}'}
+        title={numeric ? 'Arithmetic: +, -, *, /, %, parentheses, dice, Function name(), call("Function name"), get("Global Stat").' : 'Use Function name() or {{Function name}} for text functions. References: function:<id>, globalStat:<id>.'}
+        onChange={event => { setDraft(event.target.value); setError(''); }}
+        onBlur={commit}
+        onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+    />
+        {error && <span role="alert" style={{ color: 'var(--agenda-text-primary)', fontSize: 12 }}>{error}</span>}
+    </div>;
 };
 
 // Operation picker for a stat update action; only numeric and optionList stats have more than "Set to".

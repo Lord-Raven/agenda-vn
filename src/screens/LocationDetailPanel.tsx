@@ -788,7 +788,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                         padding: '12px',
                                     }}>
                                         {locationStats.map((stat) => {
-                                            const hasValueSource = isValueReference(editedStatMap[stat.id]) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
+                                            const hasValueSource = stat.type === 'number' || stat.type === 'text' || isValueReference(editedStatMap[stat.id]) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
                                             const value = Number(editedStatMap[stat.id]);
                                             const displayValue = Number.isFinite(value)
                                                 ? value

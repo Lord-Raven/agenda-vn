@@ -52,6 +52,13 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                     </select>
                 </label>
                 <p style={{ color: 'var(--agenda-text-muted)', margin: 0 }}>
+                    In numeric values, defaults, and value rules, use {'Score() * 2 + 1'}, {'call("Function name")'},
+                    {' '}or {'get("Global Stat")'}. Formulas support +, -, *, /, %, parentheses, and dice (1d6).
+                    In text values use {'Greeting()'} or embed {'{{Greeting}}'} in other text.
+                    Names are case-insensitive; duplicate names are ambiguous and must use ID references instead.
+                    Inputs apply on blur or Enter so unfinished formulas are not evaluated while typing.
+                </p>
+                <p style={{ color: 'var(--agenda-text-muted)', margin: 0 }}>
                     Global JavaScript functions can be invoked by recurring rules, button controls, or other functions.
                     {' '}
                     Return IDs for content references, option IDs for options, and arrays of IDs for lists.

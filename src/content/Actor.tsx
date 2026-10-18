@@ -390,7 +390,11 @@ function clampActorStatValue(value: number, stat: Stat): number {
 
 // Computes an actor's initial stat value from its configured initial value and any modifiers whose conditions currently evaluate true.
 export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatInitial | undefined, context: ConditionContext): StatValue {
-    const storedValue = normalizeStatValue(initial?.value ?? stat.default, stat, { evaluateDiceNotation: true });
+    const sourceValue = initial?.value ?? stat.default;
+    const storedValue = normalizeStatValue(
+        stat.type === 'number' ? context.resolveValue?.(sourceValue, stat.type) ?? sourceValue : sourceValue,
+        stat, { evaluateDiceNotation: true },
+    );
     const modifiers = (initial?.modifiers || []).filter(modifier => evaluateConditionCollections(modifier.conditions, context));
     if (!isNumericDisplayType(stat.type) && stat.type !== 'checkbox') {
         const value = modifiers.reduce((_, modifier) =>

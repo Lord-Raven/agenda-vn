@@ -19,6 +19,7 @@ import { CachedImage } from '../components/CachedImage';
 import { OutfitPositioningModal } from '../components/OutfitPositioningModal';
 import { StatValueInput } from '../components/StatValueInput';
 import { isValueReference, valuePickerOptions } from '../content/Function';
+import { isNumericValueExpression } from '../content/ValueExpression';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -132,7 +133,7 @@ const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: st
 };
 
 const normalizeActorStatModifierAmount = (stat: Stat, amount: unknown): StatValue => {
-    if (isValueReference(amount)) return amount;
+    if (isValueReference(amount) || (stat.type === 'number' && isNumericValueExpression(amount))) return amount;
     if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
         return typeof amount === 'string' ? amount : String(resolveStatDefault(stat));
     }
@@ -901,7 +902,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     };
 
     const handleActorStatInitialValueChange = (stat: Stat, value: StatValue) => {
-        if (isValueReference(value)) {
+        if (isValueReference(value) || (stat.type === 'number' && isNumericValueExpression(value))) {
             setEditedStatInitialMap(prev => ({ ...prev, [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value } }));
             return;
         }
@@ -934,7 +935,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     };
 
     const handleActorStatEditorValueChange = (stat: Stat, value: StatValue) => {
-        if (isValueReference(value) && !isCreatorMode) {
+        if ((isValueReference(value) || (stat.type === 'number' && isNumericValueExpression(value))) && !isCreatorMode) {
             setEditedStatMap(prev => ({ ...prev, [stat.id]: value }));
             return;
         }
@@ -1061,52 +1062,10 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         ? Object.fromEntries(Object.entries(editedStatInitialMap).map(([statId, initial]) => [statId, initial?.value]))
         : editedStatMap;
 
-    const renderPerActorValueInput = (stat: Stat, value: StatValue, onChange: (value: StatValue) => void) => {
-        if (isValueReference(value) || valuePickerOptions(stage().getConfiguration(), stat.type).length) {
-            return <StatValueInput stat={stat} value={value} onChange={onChange} stage={stage} actors={actorOptions} items={itemOptions} locations={locationOptions} />;
-        }
-        if (stat.type === 'checkbox') {
-            return <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
-        }
-        if (stat.type === 'option') {
-            const selectedOption = findStatOptionByValue(stat, value);
-            return (
-                <select className="input-base" value={selectedOption?.value || ''} onChange={(e) => onChange(e.target.value)}>
-                    {resolveAvailableStatOptions(stat, value).map((option) => (
-                        <option key={option.id} value={option.id}>{option.name}</option>
-                    ))}
-                </select>
-            );
-        }
-        if (stat.type === 'text') {
-            return <TextInput fullWidth value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />;
-        }
-        if (isReferenceDisplayType(stat.type) || isListStatType(stat.type)) {
-            return (
-                <StatValueInput
-                    stat={stat}
-                    value={value}
-                    onChange={onChange}
-                    actors={actorOptions}
-                    items={itemOptions}
-                    locations={locationOptions}
-                    stage={stage}
-                />
-            );
-        }
-        const range = resolveActorStatRange(stat);
-        return (
-            <input
-                type="range"
-                min={range.min}
-                max={range.max}
-                step={range.step}
-                value={Math.min(range.max, Math.max(range.min, Number.isFinite(value) ? Number(value) : range.min))}
-                onChange={(e) => onChange(Number(e.target.value))}
-                style={{ width: '100%' }}
-            />
-        );
-    };
+    const renderPerActorValueInput = (stat: Stat, value: StatValue, onChange: (value: StatValue) => void) => (
+        <StatValueInput stat={stat} value={value} onChange={onChange} stage={stage}
+            actors={actorOptions} items={itemOptions} locations={locationOptions} />
+    );
 
     const actorThemeColorSwatches = useMemo(() => {
         const otherActorThemeColors = Object.values(stage().getSave().actors || {})
@@ -2186,7 +2145,7 @@ ${indent}}`;
                                             {actorStats.map((stat) => {
                                                 const statInitial = cloneActorStatInitial(editedStatInitialMap[stat.id], stat);
                                                 const editorValue = isCreatorMode ? statInitial.value : editedStatMap[stat.id];
-                                                const hasValueSource = isValueReference(editorValue) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
+                                                const hasValueSource = stat.type === 'number' || stat.type === 'text' || isValueReference(editorValue) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
                                                 const value = Number(editorValue);
                                                 const displayValue = Number.isFinite(value)
                                                     ? value

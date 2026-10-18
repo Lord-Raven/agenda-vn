@@ -2,6 +2,7 @@ import { v4 as generateUuid } from 'uuid';
 import { ContentTarget, ContentType, CONTENT_TYPES, ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import type { FunctionInvocation, FunctionValueResolver } from './Function';
 import { isValueReference } from './Function';
+import { isNumericValueExpression } from './ValueExpression';
 
 // A boolean field whose effective value can be gated by conditions instead of always being fixed. With no
 // conditions, `value` always applies. With conditions, `value` applies only while at least one collection is
@@ -384,7 +385,7 @@ export const isStatLlmMaintained = (stat: Stat, context: ConditionContext): bool
 );
 
 export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): StatValue => {
-    if (isValueReference(stat.default)) {
+    if (isValueReference(stat.default) || (stat.type === 'number' && isNumericValueExpression(stat.default) && !options.evaluateDiceNotation)) {
         return stat.default;
     }
     if (stat.type === 'option') {
@@ -423,10 +424,13 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
 };
 
 export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValueOptions = {}): StatValue => {
-    if (value == null && isValueReference(stat.default)) {
+    if (value == null && (isValueReference(stat.default) || (stat.type === 'number' && isNumericValueExpression(stat.default) && !options.evaluateDiceNotation))) {
         return stat.default;
     }
     if (isValueReference(value)) {
+        return value;
+    }
+    if (stat.type === 'number' && isNumericValueExpression(value) && !options.evaluateDiceNotation) {
         return value;
     }
     if (stat.type === 'option') {

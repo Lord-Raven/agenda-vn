@@ -7,6 +7,7 @@ import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, GameAction, applyStatUpdateValue, cloneStat, cloneGameAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
 import { resolveStatValue } from './content/Stat';
+import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
@@ -527,6 +528,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = []): StatValue {
+        const namedSource = (name: string, kind: 'function' | 'stat', expectedType: StatType): StatValue => {
+            const normalizedName = name.trim().toLowerCase();
+            const configuration = this.getConfiguration();
+            const matches = kind === 'function'
+                ? configuration.functions.filter(fn => fn.name.trim().toLowerCase() === normalizedName)
+                : configuration.globalStats.filter(stat => stat.name.trim().toLowerCase() === normalizedName);
+            if (matches.length !== 1) {
+                throw new Error(`${matches.length ? 'Ambiguous' : 'Unknown'} ${kind} name: ${name}`);
+            }
+            const reference = kind === 'function' ? functionReference(matches[0].id) : `globalStat:${matches[0].id}`;
+            return this.resolveValue(reference, expectedType, save, stack);
+        };
         if (isGlobalStatReference(value)) {
             const id = globalStatReferenceId(value);
             const configuration = this.getConfiguration();
@@ -558,6 +571,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
             validateFunctionResult(result, type);
             return result as StatValue;
+        }
+        if (typeof value === 'string' && type === 'number' && value.trim()) {
+            return evaluateValueExpression(value, {
+                call: name => Number(namedSource(name, 'function', 'number')),
+                get: name => Number(namedSource(name, 'stat', 'number')),
+            });
+        }
+        if (typeof value === 'string' && type === 'text') {
+            const call = /^\s*([a-z_][a-z0-9_ ]*)\(\s*\)\s*$/i.exec(value);
+            if (call) return namedSource(call[1], 'function', 'text');
+            return value.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, name: string) => {
+                if (['user', 'char'].includes(name.trim().toLowerCase())) return match;
+                if (!this.getConfiguration().functions.some(fn => fn.name.trim().toLowerCase() === name.trim().toLowerCase())) return match;
+                return String(namedSource(name, 'function', 'text'));
+            });
         }
         const elementType = listElementType(type);
         if (elementType && Array.isArray(value)) {

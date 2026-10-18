@@ -13,6 +13,7 @@ import { ConditionEditor } from './ConditionEditor';
 import { ConditionalFlagEditor } from './ConditionalFlagEditor';
 import { StatValueInput } from './StatValueInput';
 import { isValueReference } from '../content/Function';
+import { isNumericValueExpression } from '../content/ValueExpression';
 import { ActorLike } from './UiComponents';
 import { ItemLike } from './ItemPortrait';
 import { LocationLike } from './LocationPortrait';
@@ -25,7 +26,7 @@ export const resolveStatDefaultValue = (stat: Stat): StatValue => resolveStatDef
 // cleared/defaulted consistently, regardless of whether the stat is a global/actor/location/item stat.
 export const normalizeStatShape = (stat: Stat): Stat => {
     const normalized = normalizeStatShapeForType(stat);
-    if (isValueReference(stat.default)) {
+    if (isValueReference(stat.default) || (stat.type === 'number' && isNumericValueExpression(stat.default))) {
         normalized.default = stat.default;
     }
     return normalized.type === 'option' ? normalized : { ...normalized, optionSourceStatId: undefined };

@@ -192,7 +192,7 @@ const resolveConditionValue = (condition: Condition, context: ConditionContext):
     const type = condition.type === 'contentIdentity' ? condition.contentType
         : stat ? listElementType(stat.type) || stat.type
             : condition.type === 'calendar' && condition.field !== 'dayOfWeek' && condition.field !== 'timeOfDay' ? 'number' : 'text';
-    const resolved = context.resolveValue?.(value, type) ?? value;
+    const resolved = isDiceNotation(value) ? value : context.resolveValue?.(value, type) ?? value;
     if (Array.isArray(resolved)) {
         throw new Error('A condition comparison requires a scalar function result.');
     }

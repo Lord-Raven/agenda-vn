@@ -13,6 +13,8 @@ import { Control } from '../src/content/Control';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { createLoreEntry, formatLoreEntriesAsContext, processLoreText } from '../src/content/Lore';
 import { buildPrompt } from '../src/utils/PromptBuilder';
+import { evaluateValueExpression, validateValueExpression } from '../src/content/ValueExpression';
+import { normalizeStatShape } from '../src/components/StatEntryEditor';
 
 const stat = (name: string, type: StatType, extra: Partial<Stat> = {}): Stat => cloneStat({
     id: name, name, type, guidance: '', default: [],
@@ -68,6 +70,102 @@ const fixture = () => {
 
 const gameFunction = (script: string): GameFunction => ({
     id: 'test-function', name: 'Test function', description: '', script, returnType: 'void',
+});
+
+test('numeric formulas share precedence, parentheses, decimals, dice, and named lookups', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [
+        { id: 'bonus', name: 'Daily Bonus', description: '', returnType: 'number', script: 'return 4;' },
+    ];
+    assert.equal(stage.resolveValue('2 + Daily Bonus() * (3 - .5)', 'number'), 12);
+    assert.equal(stage.resolveValue('= call(" daily bonus ") / 2 + get("Score")', 'number'), 4);
+    assert.equal(stage.resolveValue('{{Daily Bonus}} % 3 + 2d1', 'number'), 3);
+    assert.equal(stage.resolveValue('-Daily Bonus() + +2', 'number'), -2);
+    assert.equal(stage.resolveValue('1e2 / 4', 'number'), 25);
+    assert.equal(stage.resolveValue('- 2', 'number'), -2);
+    assert.equal(normalizeStatValue('- 2', stat('Unary', 'number')), '- 2');
+    assert.doesNotThrow(() => validateValueExpression('1 / (Bonus() - 1)'));
+    assert.throws(() => validateValueExpression('Bonus(3)'), /functions take no arguments/);
+    assert.equal(save.globalStatValues.Score, 2);
+    for (const formula of ['Missing()', '2 +', '4 / 0', '1; globalThis.bad = true', '0d6', '101d6', '1d10001', '2 ** 3']) {
+        assert.throws(() => stage.resolveValue(formula, 'number'), undefined, formula);
+    }
+    configuration.functions.push({ ...configuration.functions[0], id: 'duplicate', name: 'daily bonus' });
+    assert.throws(() => stage.resolveValue('Daily Bonus()', 'number'), /Ambiguous function name/);
+    assert.equal(stage.resolveValue(functionReference('bonus'), 'number'), 4);
+});
+
+test('formula syntax validation does not roll dice or evaluate functions', context => {
+    const random = context.mock.method(Math, 'random', () => { throw new Error('Must not roll while editing'); });
+    assert.doesNotThrow(() => validateValueExpression('1d6 + Bonus()'));
+    assert.equal(random.mock.callCount(), 0);
+});
+
+test('formula defaults and value rules survive normalization and evaluate at use time', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [
+        { id: 'bonus', name: 'Bonus', description: '', returnType: 'number', script: 'return get("Score") + 1;' },
+    ];
+    const formulaStat = stat('Formula', 'number', { default: 'Bonus() * 2', max: 10 });
+    assert.equal(normalizeStatShape(formulaStat).default, 'Bonus() * 2');
+    assert.equal(normalizeStatValue(undefined, formulaStat), 'Bonus() * 2');
+    assert.equal(normalizeStatValue('Bonus() * 2', formulaStat), 'Bonus() * 2');
+    assert.equal(stage.readStatValue(undefined, formulaStat), 6);
+    const context = { resolveValue: (value: unknown, type: StatType) => stage.resolveValue(value, type) };
+    assert.deepEqual(buildInitialGlobalStatValues([formulaStat], {}, context), { Formula: 6 });
+    formulaStat.defaultValueRules = [{ id: 'default', value: 'Bonus() + 2', conditions: [] }];
+    assert.deepEqual(buildInitialGlobalStatValues([formulaStat], {}, context), { Formula: 5 });
+    assert.equal(resolveInitialActorStatValue(formulaStat, undefined, context), 6);
+    assert.equal(resolveInitialActorStatValue(formulaStat, {
+        value: 'Bonus() * 2', modifiers: [{ id: 'modifier', amount: 'Bonus() - 1', conditions: [] }],
+    }, context), 8);
+    save.globalStatValues.Score = 8;
+    assert.equal(stage.readStatValue(undefined, formulaStat), 10);
+    assert.equal(formulaStat.default, 'Bonus() * 2');
+    stage.saveGame = () => {};
+    stage.setGlobalStatValue('Score', 'Bonus() / 3');
+    assert.equal(save.globalStatValues.Score, 3);
+});
+
+test('formula rules and conditions resolve the same named sources read-only', () => {
+    const { stage, configuration, save } = fixture();
+    stage.saveGame = () => {};
+    configuration.functions = [
+        { id: 'bonus', name: 'Bonus', description: '', returnType: 'number', script: 'set("Score", 9); return 3;' },
+    ];
+    const control = new Control({ actions: [{
+        id: 'adjust', targetType: 'global', targetId: 'any', statId: 'Score', operation: 'adjust', value: 'Bonus() * 2',
+    }] });
+    assert.throws(() => stage.runControlActions(control), /read-only/);
+    assert.equal(save.globalStatValues.Score, 2);
+    configuration.functions[0].script = 'return 3;';
+    stage.runControlActions(control);
+    assert.equal(save.globalStatValues.Score, 8);
+    assert.equal(evaluateCondition({
+        type: 'globalStat', statId: 'Score', comparison: 'equals', value: 'Bonus() + 5',
+    }, { globalStats: configuration.globalStats, globalStatValues: save.globalStatValues,
+        resolveValue: (value, type) => stage.resolveValue(value, type) }), true);
+});
+
+test('text inputs support named functions and interpolation without changing unrelated placeholders', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = [
+        { id: 'greeting', name: 'Greeting', description: '', returnType: 'text', script: 'return "Hello";' },
+    ];
+    assert.equal(stage.resolveValue(' greeting() ', 'text'), 'Hello');
+    assert.equal(stage.resolveValue('{{Greeting}}, {{user}}!', 'text'), 'Hello, {{user}}!');
+    assert.throws(() => stage.resolveValue('Missing()', 'text'), /Unknown function name/);
+});
+
+test('formula lookups enforce return types and report cyclic global stat formulas', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [
+        { id: 'text', name: 'Text', description: '', returnType: 'text', script: 'return "4";' },
+    ];
+    assert.throws(() => stage.resolveValue('Text() + 1', 'number'), /returns text, not number/);
+    save.globalStatValues.Score = 'get("Score") + 1';
+    assert.throws(() => stage.resolveValue('get("Score")', 'number'), /cyclic global stat reference/);
+    assert.throws(() => evaluateValueExpression('('.repeat(101) + '1' + ')'.repeat(101), { call: () => 1, get: () => 1 }), /deeply nested/);
 });
 
 test('global content lists resolve IDs in order, skip missing/inactive entries, and preserve get()', () => {

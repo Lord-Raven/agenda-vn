@@ -67,17 +67,17 @@ for (const kind of ['actor', 'item', 'location'] as const) {
     });
 }
 
-test('value source editors list matching global stats and preserve reference-backed stat shapes', () => {
+test('text value editors accept global stat references directly and preserve reference-backed stat shapes', () => {
     const stage = createStage(new Control());
     stage.getConfiguration().globalStats = [sourceStat('icon', 'text', 'favorite'), sourceStat('destination', 'location', 'place')];
     const target = sourceStat('target', 'text');
     const html = renderToStaticMarkup(<StatValueInput stat={target} value="" onChange={() => {}} stage={stage} />);
-    assert.match(html, /value="globalStat:icon"/);
-    assert.match(html, /Global Stat: Global icon/);
+    assert.match(html, /<input/);
+    assert.doesNotMatch(html, /<select|Value source/);
     assert.doesNotMatch(html, /globalStat:destination/);
     const selected = renderToStaticMarkup(<StatValueInput stat={target} value={globalStatReference('icon')} onChange={() => {}} stage={stage} />);
-    assert.match(selected, /value="globalStat:icon" selected=""/);
-    assert.doesNotMatch(selected, /<input/);
+    assert.match(selected, /<input[^>]*value="globalStat:icon"/);
+    assert.doesNotMatch(selected, /<select|Value source/);
     for (const type of ['number', 'checkbox', 'option', 'optionList', 'actorList', 'locationList', 'itemList'] as const) {
         const stat = sourceStat('target', type, globalStatReference('source'));
         assert.equal(normalizeStatShape(stat).default, globalStatReference('source'));

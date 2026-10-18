@@ -8,6 +8,7 @@ import { FunctionEditor } from '../src/components/FunctionEditor';
 import { renderStatTypeOptions } from '../src/components/StatEntryEditor';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
 import { FunctionManagementPanel } from '../src/screens/FunctionManagementPanel';
+import { GlobalStatManagementPanel } from '../src/screens/GlobalStatManagementPanel';
 import { FunctionDetailPanel, FUNCTION_RETURN_TYPE_LABELS } from '../src/screens/FunctionDetailPanel';
 import { SkitActionInput, StatUpdateRuleEditor } from '../src/components/StatUpdateRuleEditor';
 import { StatValueInput } from '../src/components/StatValueInput';
@@ -16,6 +17,7 @@ import { IconPicker, resolveIcon } from '../src/components/StatRating';
 import { cloneStat, StatType } from '../src/content/Stat';
 import { functionReference, FUNCTION_RETURN_TYPES, GameFunction } from '../src/content/Function';
 import { ControlRenderer } from '../src/components/ControlRenderer';
+import { ConditionEditor } from '../src/components/ConditionEditor';
 
 const fixture = () => {
     const configuration: GameConfiguration = {
@@ -211,7 +213,7 @@ const valueStat = (type: StatType) => cloneStat({
     llmSees: { value: true, conditions: [] }, llmMaintained: { value: true, conditions: [] },
 });
 
-test('every stat input offers matching typed functions and preserves the selected reference without evaluating it', () => {
+test('every stat input uses a single input or picker and preserves references without evaluating them', () => {
     const { stage, configuration } = fixture();
     configuration.functions = FUNCTION_RETURN_TYPES.map(returnType => ({
         id: returnType, name: `${returnType} function`, description: '', returnType, script: 'throw new Error("Do not evaluate while editing");',
@@ -219,10 +221,13 @@ test('every stat input offers matching typed functions and preserves the selecte
     for (const returnType of FUNCTION_RETURN_TYPES) {
         if (returnType === 'void') continue;
         const html = renderToStaticMarkup(<StatValueInput stat={valueStat(returnType)} value={functionReference(returnType)} onChange={() => {}} stage={stage} />);
-        assert.match(html, /aria-label="Value source"/, returnType);
-        assert.ok(html.includes(`value="function:${returnType}" selected=""`), returnType);
-        assert.doesNotMatch(html, /value="function:void"/);
-        assert.equal((html.match(/selected=""/g) || []).length, 1, returnType);
+        assert.doesNotMatch(html, /aria-label="Value source"|<select/, returnType);
+        if (returnType === 'number' || returnType === 'text') {
+            assert.ok(html.includes(`value="function:${returnType}"`), returnType);
+            assert.doesNotMatch(html, /type="number"/);
+        } else {
+            assert.match(html, new RegExp(`${returnType} function\\(\\)`), returnType);
+        }
     }
 });
 
@@ -240,6 +245,60 @@ test('list stat values use their picker for function selection instead of a sepa
     const optionList = renderToStaticMarkup(<StatValueInput stat={valueStat('optionList')} value={functionReference('options')} onChange={() => {}} stage={stage} />);
     assert.doesNotMatch(optionList, /aria-label="Value source"/);
     assert.match(optionList, /aria-label="Selected options: Options\(\)"/);
+});
+
+test('checkbox and option inputs combine literals and sources in one picker', () => {
+    const { stage, configuration } = fixture();
+    configuration.globalStats = [valueStat('checkbox'), valueStat('option')];
+    configuration.functions = [
+        { id: 'choice', name: 'Choice', description: '', returnType: 'option', script: 'throw new Error("No preview");' },
+    ];
+    const yes = renderToStaticMarkup(<StatValueInput stat={valueStat('checkbox')} value={true} onChange={() => {}} stage={stage} />);
+    const no = renderToStaticMarkup(<StatValueInput stat={valueStat('checkbox')} value={false} onChange={() => {}} stage={stage} />);
+    assert.match(yes, />True</);
+    assert.match(no, />False</);
+    assert.doesNotMatch(yes, /<select|type="checkbox"|Value source/);
+    const sourced = renderToStaticMarkup(<StatValueInput stat={valueStat('checkbox')} value="globalStat:checkbox" onChange={() => {}} stage={stage} />);
+    assert.match(sourced, />checkbox</);
+    const choice = renderToStaticMarkup(<StatValueInput stat={valueStat('option')} value="function:choice" onChange={() => {}} stage={stage} />);
+    assert.match(choice, /Choice\(\)/);
+    assert.doesNotMatch(choice, /<select|Value source/);
+    const missing = renderToStaticMarkup(<StatValueInput stat={valueStat('option')} value="function:missing" onChange={() => {}} stage={stage} />);
+    assert.match(missing, /Missing or incompatible function/);
+});
+
+test('numeric and text formula inputs retain formulas without evaluating them on render', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = [
+        { id: 'score', name: 'Score', description: '', returnType: 'number', script: 'throw new Error("No preview");' },
+    ];
+    for (const type of ['number', 'text'] as const) {
+        const formula = type === 'number' ? 'Score() * 2 + get("Bonus")' : '{{Greeting}}, world';
+        const html = renderToStaticMarkup(<StatValueInput stat={valueStat(type)} value={formula} onChange={() => {}} stage={stage} />);
+        assert.match(html, /<input/);
+        assert.doesNotMatch(html, /<select|Value source|type="number"/);
+        assert.ok(html.includes(type === 'number' ? 'Score() * 2 + get(&quot;Bonus&quot;)' : '{{Greeting}}, world'));
+    }
+});
+
+test('global stat management and conditions use the shared formula input', () => {
+    const { stage, configuration } = fixture();
+    configuration.globalStats = [valueStat('number')];
+    configuration.globalStatValues = { number: 'Score() * 2' };
+    configuration.functions = [
+        { id: 'score', name: 'Score', description: '', returnType: 'number', script: 'throw new Error("No editor evaluation");' },
+    ];
+    const globalPanel = renderToStaticMarkup(<GlobalStatManagementPanel stage={() => stage} />);
+    assert.match(globalPanel, /value="Score\(\) \* 2"/);
+    assert.doesNotMatch(globalPanel, /Value source|type="number"/);
+    const conditions = renderToStaticMarkup(<ConditionEditor globalStats={configuration.globalStats} stage={stage}
+        conditionCollections={[[
+            { type: 'globalStat', statId: 'number', comparison: 'equals', value: 'Score() + 1' },
+            { type: 'calendar', field: 'day', comparison: 'equals', value: 'Score() + 2' },
+        ]]} onChange={() => {}} />);
+    assert.match(conditions, /value="Score\(\) \+ 1"/);
+    assert.match(conditions, /value="Score\(\) \+ 2"/);
+    assert.doesNotMatch(conditions, /Value source/);
 });
 
 test('content pickers show named scalar and list functions, and identify incompatible selections', () => {
@@ -285,8 +344,8 @@ test('stat controls display evaluated values while editors keep their function b
     assert.match(display, />7</);
     const editor = renderToStaticMarkup(<ControlRenderer control={new Control({ type: 'statEditor', statId: stat.id })}
         stage={() => stage} onActivate={() => {}} />);
-    assert.match(editor, /value="function:value" selected=""/);
-    assert.match(editor, /Dynamic score\(\)/);
+    assert.match(editor, /value="function:value"/);
+    assert.doesNotMatch(editor, /aria-label="Value source"/);
     assert.equal(configuration.globalStatValues.number, functionReference('value'));
     configuration.functions[0].script = 'throw new Error("An editor must not snapshot the value");';
     assert.doesNotThrow(() => renderToStaticMarkup(<ControlRenderer control={new Control({ type: 'statEditor', statId: stat.id })}
