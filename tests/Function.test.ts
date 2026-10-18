@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } from '../src/Stage';
-import { Actor, resolveActorSchedule, resolveInitialActorStatValue } from '../src/content/Actor';
+import { Actor, getActorLore, resolveActorSchedule, resolveInitialActorStatValue } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
-import { Location } from '../src/content/Location';
+import { getLocationDescription, Location } from '../src/content/Location';
 import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveAvailableStatOptions, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
-import { generateSkitScript, Skit } from '../src/content/Skit';
+import { generateContext, generateSkitScript, Skit } from '../src/content/Skit';
 import { cloneGameFunction, functionPickerOptions, functionReference, globalStatReference, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { evaluateCondition } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
+import { createLoreEntry, formatLoreEntriesAsContext, processLoreText } from '../src/content/Lore';
+import { buildPrompt } from '../src/utils/PromptBuilder';
 
 const stat = (name: string, type: StatType, extra: Partial<Stat> = {}): Stat => cloneStat({
     id: name, name, type, guidance: '', default: [],
@@ -459,6 +461,136 @@ test('configuration updates retain functions independently of stat changes', () 
 
 const typedFunction = (id: string, returnType: StatType, script: string): GameFunction => ({
     id, name: id, description: '', returnType, script,
+});
+
+test('function placeholders evaluate each occurrence by name against current state without changing source text', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.functions = [
+        { ...typedFunction('score-summary', 'text', 'return `Score: ${call("Current score")}`;'), name: 'Score summary' },
+        { ...typedFunction('score', 'number', 'return get("Score");'), name: 'Current score' },
+    ];
+    const entry = createLoreEntry({ content: '{{Score summary}} / {{  sCoRe SuMmArY  }}' });
+    assert.equal(processLoreText(entry.content, stage), 'Score: 2 / Score: 2');
+    save.globalStatValues!.Score = 8;
+    assert.equal(processLoreText(entry.content, stage), 'Score: 8 / Score: 8');
+    assert.equal(entry.content, '{{Score summary}} / {{  sCoRe SuMmArY  }}');
+
+    let evaluations = 0;
+    const resolveValue = stage.resolveValue.bind(stage);
+    stage.resolveValue = (...args) => {
+        if (args[0] === functionReference('score-summary')) evaluations += 1;
+        return resolveValue(...args);
+    };
+    processLoreText(entry.content, stage);
+    assert.equal(evaluations, 2);
+});
+
+test('function placeholders format every non-void return type without normalizing away the result', () => {
+    const { stage, configuration } = fixture();
+    const cases: [StatType, StatValue, string][] = [
+        ['text', 'A label', 'A label'], ['text', '', ''],
+        ['number', 0, '0'], ['number', -7.5, '-7.5'],
+        ['checkbox', true, 'yes'], ['checkbox', false, 'no'],
+        ['actor', 'a', 'Same name'], ['item', 'item', 'Sword'], ['location', 'place', 'Town'],
+        ['actorList', ['b', 'a'], 'Same name, Same name'],
+        ['itemList', ['item', 'item'], 'Sword, Sword'],
+        ['locationList', ['place'], 'Town'], ['actorList', [], ''],
+        ['actor', 'missing', 'unknown actor'],
+        ['item', 'missing', 'unknown item'], ['location', 'missing', 'unknown location'],
+        ['option', 'first', 'first'], ['optionList', ['first', 'second-2'], 'first, second-2'],
+        ['optionList', [], ''],
+    ];
+    for (const [type, value, expected] of cases) {
+        configuration.functions = [typedFunction('Value', type, `return ${JSON.stringify(value)};`)];
+        assert.equal(processLoreText('Before {{Value}} after', stage), `Before ${expected} after`, `${type}: ${JSON.stringify(value)}`);
+    }
+});
+
+test('function substitution preserves existing stat and actor tags, unknown tags, and literal returned text', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.actorStats.push(stat('Relationships', 'number', { perActor: true }));
+    save.actors.a.displayName = 'Player display';
+    save.actors.b.displayName = 'Friend';
+    configuration.functions = [
+        typedFunction('user', 'text', 'throw new Error("Reserved tag");'),
+        typedFunction('char', 'text', 'throw new Error("Reserved tag");'),
+        typedFunction('global:Score', 'text', 'throw new Error("Reserved tag");'),
+        typedFunction('Literal', 'text', 'return "{{global:Score}} {{Unknown}} $&";'),
+        gameFunction('set("Score", 9);'),
+    ];
+    const source = '{{user}} / {{char}} / {{global:Score}} / {{ user:score }} / {{CHAR:Choices}} / {{Literal}}';
+    assert.equal(processLoreText(source, stage, save.actors.b),
+        'Same name / Friend / 2 / 2 / Second, First / {{global:Score}} {{Unknown}} $&');
+    const unchanged = '{{Unknown}} {{Test function}} {{global}} {{global:missing}} {{char:Relationships}} {{}} {{  }}';
+    assert.equal(processLoreText(unchanged, stage, save.actors.b), unchanged);
+    assert.equal(processLoreText('{{char}} {{char:Score}}', stage), '{{char}} {{char:Score}}');
+    assert.equal(processLoreText(undefined, stage), '');
+    assert.equal(save.globalStatValues!.Score, 2);
+});
+
+test('function placeholders propagate invalid results, script errors, and cycles', () => {
+    const { stage, save, configuration } = fixture();
+    const fn = typedFunction('Value', 'text', '');
+    configuration.functions = [fn];
+    for (const script of [
+        'return 42;',
+        'return undefined;',
+        'throw new Error("Substitution failed");',
+        'return call("Value");',
+        'return get("Score");',
+    ]) {
+        fn.script = script;
+        assert.throws(() => processLoreText('{{Value}}', stage));
+    }
+    fn.returnType = 'number';
+    fn.script = 'return get("Score");';
+    save.globalStatValues!.Score = functionReference(fn.id);
+    assert.throws(() => processLoreText('{{Value}}', stage), /cyclic/);
+});
+
+test('function placeholders forbid global/entity writes and metadata writes even through nested calls', () => {
+    const { stage, save, configuration } = fixture();
+    const before = structuredClone(save);
+    const writes = [
+        'set("Score", 9);',
+        'getActor("Same name").set("Score", 9);',
+        'getLocation("Town").set("Score", 9);',
+        'getItem("Sword").set("Score", 9);',
+        'getActor("Same name").setField("name", "Changed");',
+        'getLocation("Town").setField("description", "Changed");',
+        'getItem("Sword").setField("description", "Changed");',
+    ];
+    for (const write of writes) {
+        configuration.functions = [
+            typedFunction('Value', 'text', 'call("Write"); return "Done";'),
+            { ...gameFunction(write), id: 'write', name: 'Write' },
+        ];
+        assert.throws(() => processLoreText('{{Value}}', stage), /read-only/);
+        assert.deepEqual(structuredClone(save), before);
+    }
+});
+
+test('function substitution reaches world lore, actor lore, locations, and generated scene context', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.functions = [typedFunction('Value', 'text', 'return `Current score: ${get("Score")}`;')];
+    const world = createLoreEntry({ title: 'World', content: 'World {{Value}}', constant: true });
+    const actorLore = createLoreEntry({ type: 'character', title: 'Same name', content: 'Actor {{Value}} / {{char:Score}}' });
+    save.actors.b.loreId = actorLore.id;
+    save.atlas.place.description = 'Location {{Value}}';
+    save.lorebook = [world, actorLore];
+    assert.equal(formatLoreEntriesAsContext([world], stage), 'World:\nWorld Current score: 2');
+    assert.equal(getActorLore('b', stage), 'Actor Current score: 2 / 2');
+    assert.equal(getLocationDescription('place', stage), 'Location Current score: 2');
+
+    const skit = new Skit({ initialLocationId: 'place', initialActors: ['b'] });
+    const prompt = buildPrompt().addBlock('Context', generateContext(skit, stage, 5)).format();
+    assert.match(prompt, /World Current score: 2/);
+    assert.match(prompt, /Actor Current score: 2 \/ 2/);
+    assert.match(prompt, /Location Current score: 2/);
+    assert.doesNotMatch(prompt, /\{\{Value\}\}/);
+    assert.equal(world.content, 'World {{Value}}');
+    assert.equal(actorLore.content, 'Actor {{Value}} / {{char:Score}}');
+    assert.equal(save.atlas.place.description, 'Location {{Value}}');
 });
 
 test('every declared value type resolves its primitive or ID result and survives portable JSON', () => {

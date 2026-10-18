@@ -58,6 +58,15 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                     Typed functions can be selected as dynamic values. Reading a value is read-only, including nested calls.
                     Tests run against a copy of the current game and do not save their changes.
                 </p>
+                <p style={{ color: 'var(--agenda-text-muted)', margin: 0 }}>
+                    Use {'{{Function name}}'} in lore, actor lore, or location descriptions to insert a non-void
+                    function's current result. Names are case-insensitive and surrounding whitespace is ignored.
+                    Each occurrence is evaluated read-only, including nested calls; errors stop substitution.
+                    Checkboxes become yes/no, content IDs become names, and lists are comma-separated.
+                    Option results use IDs because functions have no option pool.
+                    Unknown names and void functions remain unchanged. Existing user/char/global tags take precedence.
+                    Returned text is not expanded again.
+                </p>
                 <label style={{ color: 'var(--agenda-text-muted)' }}>
                     Description
                     <TextArea value={fn.description} onChange={event => onChange({ description: event.target.value })} rows={3} style={{ width: '100%' }} />

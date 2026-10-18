@@ -83,6 +83,8 @@ test('selected function details include all editable fields, script testing, reo
     assert.match(html, /value="void" selected=""/);
     assert.match(html, /Give gold/);
     assert.match(html, /set\(&quot;Gold&quot;, 10\);/);
+    assert.match(html, /\{\{Function name\}\}/);
+    assert.match(html, /Each occurrence is evaluated read-only/);
     assert.match(html, /Test/);
     assert.match(html, /<button(?=[^>]*aria-label="Move function up")(?=[^>]*disabled="")[^>]*>/);
     assert.match(html, /<button(?=[^>]*aria-label="Move function down")(?=[^>]*disabled="")[^>]*>/);

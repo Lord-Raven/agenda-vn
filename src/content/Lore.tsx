@@ -5,7 +5,8 @@ import { Stage } from '../Stage';
 import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
-import { Stat, StatValue, formatReferenceStatText, formatStatOptionValueText, resolveReferenceKind } from './Stat';
+import { Stat, StatType, StatValue, formatReferenceStatText, formatStatOptionValueText, resolveReferenceKind } from './Stat';
+import { functionReference } from './Function';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -87,41 +88,53 @@ export const selectConstantLoreEntries = (lorebook: Lore[] = [], context: Condit
 // Duck-typed so this module doesn't need to import the Actor class.
 export type LoreTextActor = { name: string; displayName?: string; statMap?: { [statId: string]: StatValue } };
 
-// {{user}}, {{char}}, {{global:Stat}}, {{user:Stat}}, {{char:Stat}}; stats match by id or (case-insensitive) name.
-const LORE_TAG_PATTERN = /\{\{\s*(user|char|global)\s*(?::\s*([^}]*?)\s*)?\}\}/gi;
+// Reserved user/char/global tags take precedence over {{Function name}}.
+const LORE_TAG_PATTERN = /\{\{\s*(user|char|global)\s*(?::\s*([^}]*?)\s*)?\}\}|\{\{\s*([^{}]*?)\s*\}\}/gi;
 
 const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined => {
     const lowerKey = key.toLowerCase();
     return (stats || []).find((stat) => stat.id === key || (stat.name || '').trim().toLowerCase() === lowerKey);
 };
 
-// Resolves template tags in lore text for LLM/display use. Unresolvable tags (unknown stat, no target actor,
-// perActor stats) are left untouched. Don't use on text that will be written back to the lore entry.
+// Resolves template tags in lore text for LLM/display use. Unresolvable tags (unknown stat/function, no target
+// actor, perActor stats, void functions) are left untouched. Don't use on text written back to the lore entry.
 export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor): string {
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
     const player = stage.getPlayerActor();
     const lookup = { actors: save.actors, items: save.inventory, locations: save.atlas };
 
-    const formatValue = (stat: Stat, rawValue: unknown): string => {
-        const value = stage.readStatValue(rawValue, stat, save);
-        if (stat.type === 'checkbox') {
+    const formatValue = (type: StatType, value: StatValue): string => {
+        if (type === 'checkbox') {
             return value === true ? 'yes' : 'no';
         }
-        if (resolveReferenceKind(stat.type)) {
-            return formatReferenceStatText(stat, value, lookup, (kind) => `unknown ${kind}`);
+        if (resolveReferenceKind(type)) {
+            return formatReferenceStatText({ type }, value, lookup, (kind) => `unknown ${kind}`);
         }
-        return formatStatOptionValueText(stat, value) ?? String(value ?? '');
+        return Array.isArray(value) ? value.join(', ') : String(value ?? '');
     };
 
-    return String(text || '').replace(LORE_TAG_PATTERN, (match, tag: string, statKey: string | undefined) => {
-        const tagName = tag.toLowerCase();
+    const formatStatValue = (stat: Stat, rawValue: unknown): string => {
+        const value = stage.readStatValue(rawValue, stat, save);
+        return formatStatOptionValueText(stat, value) ?? formatValue(stat.type, value);
+    };
+
+    return String(text || '').replace(LORE_TAG_PATTERN, (match, tag: string | undefined, statKey: string | undefined, functionKey: string | undefined) => {
+        if (functionKey !== undefined) {
+            const name = functionKey.trim().toLowerCase();
+            const fn = (configuration.functions || []).find(candidate => candidate.name.trim().toLowerCase() === name);
+            if (!fn || !fn.returnType || fn.returnType === 'void') {
+                return match;
+            }
+            return formatValue(fn.returnType, stage.resolveValue(functionReference(fn.id), fn.returnType, save));
+        }
+        const tagName = tag?.toLowerCase();
         if (tagName === 'global') {
             const stat = statKey ? findStatByKey(configuration.globalStats, statKey) : undefined;
             if (!stat) {
                 return match;
             }
-            return formatValue(stat, save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id]);
+            return formatStatValue(stat, save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id]);
         }
 
         const actor: LoreTextActor | undefined = tagName === 'user' ? player : targetActor;
@@ -136,7 +149,7 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
         if (!actor || !stat || stat.perActor) {
             return match;
         }
-        return formatValue(stat, actor.statMap?.[stat.id]);
+        return formatStatValue(stat, actor.statMap?.[stat.id]);
     });
 }
 
