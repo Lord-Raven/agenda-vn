@@ -1,11 +1,11 @@
 import { v4 as generateUuid } from 'uuid';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
-import { cloneGameAction, GameAction } from './Stat';
+import { cloneStatUpdateAction, StatUpdateAction } from './Stat';
 
 // Settings controls render in SettingsScreen; actor stat displays render on actor cards.
 export type ControlPlacement = 'top' | 'bottom' | 'actorCard' | 'outcome' | 'settings';
 
-// 'button' fires stat updates; 'statDisplay'/'statEditor' show/edit a global stat.
+// 'button' runs outcomes; 'statDisplay'/'statEditor' show/edit a global stat.
 // 'actorStatDisplay' shows a read-only stat belonging to the actor whose card is displayed;
 // 'settings' exposes a global stat as a player-editable setting.
 export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'actorStatDisplay' | 'statOutcome' | 'settings';
@@ -37,7 +37,7 @@ export class Control {
     label: string = '';
     iconName: string = '';
     description: string = '';
-    actions: GameAction[] = [];
+    actions: StatUpdateAction[] = [];
 
     // The global stat shown/edited, or the actor stat shown by 'actorStatDisplay'.
     statId: string = '';
@@ -61,7 +61,7 @@ export class Control {
         this.label = `${this.label || ''}`;
         this.iconName = `${this.iconName || ''}`;
         this.description = `${this.description || ''}`;
-        this.actions = Array.isArray(this.actions) ? this.actions.map(cloneGameAction) : [];
+        this.actions = Array.isArray(this.actions) ? this.actions.map(cloneStatUpdateAction) : [];
         this.statId = `${this.statId || ''}`;
         this.contentListDisplay = this.contentListDisplay === 'abbreviated' ? 'abbreviated' : 'carousel';
         this.displayType = STAT_DISPLAY_TYPES.includes(this.displayType) ? this.displayType : 'straight';

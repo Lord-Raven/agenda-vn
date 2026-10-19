@@ -2,6 +2,7 @@ import { v4 as generateUuid } from 'uuid';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import type { Stage } from '../Stage';
 import { AlternativeImage, createAlternativeImage, getMatchingAlternativeImage } from './AlternativeImage';
+import { cloneStatUpdateAction, ReferenceKind, StatUpdateAction } from './Stat';
 import { buildPrompt } from '../utils/PromptBuilder.js';
 import {
     buildStructuredExampleResponse,
@@ -132,7 +133,7 @@ export async function generateMapAlternativeImage(map: Map, alternative: Alterna
     return request;
 }
 
-// A map is a collection of links to other Maps or Locations.
+// A map contains navigation links and action buttons.
 export class Map {
     id: string = generateUuid();
     active: boolean = true; // Soft-delete flag. Inactive maps are hidden from management UIs.
@@ -145,7 +146,7 @@ export class Map {
     alternativeImages: AlternativeImage[] = [];
     focalPoint: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Focus within the editor's 16:9 preview space, used when the runtime viewport crops the image
     availabilityConditions: ConditionCollection[] = [];
-    links: MapLink[] = []; // Links to other maps or locations
+    links: MapLink[] = [];
 
     constructor(data?: Partial<Map>) {
         Object.assign(this, data || {});
@@ -157,13 +158,20 @@ export class Map {
             parentId: data?.id || this.id,
             coordinates: { ...link.coordinates },
             conditionCollections: (link.conditionCollections || []).map((collection) => [...collection]),
+            ...(link.actions ? { actions: link.actions.map(cloneStatUpdateAction) } : {}),
+            ...(link.contentList ? { contentList: { ...link.contentList, values: [...link.contentList.values] } } : {}),
         }));
     }
 }
 
 export interface MapLink {
+    type?: 'target' | 'button'; // Omitted on legacy navigation links.
     parentId: string; // The ID of the parent Map
-    childId: string; // The ID of the child map or location
+    childId: string; // The ID of the child map or location; unused by buttons.
     coordinates: { x: number; y: number }; // Coordinates for the link on the parent Map (x and y are between 0 and 1, representing a percentage of the map's width and height)
     conditionCollections?: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
+    name?: string;
+    iconName?: string;
+    actions?: StatUpdateAction[];
+    contentList?: { kind: ReferenceKind; values: string[] };
 }

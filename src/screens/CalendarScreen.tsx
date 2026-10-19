@@ -306,6 +306,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                 <Box sx={{ flexShrink: 0, mb: 1.25 }}>
                     <GlobalStatBar
                         stage={stage}
+                        onActivate={skit => { if (skit) setScreenType(ScreenType.SKIT); }}
                         buttons={
                             <>
                                 <Button

@@ -9,13 +9,14 @@ import { StatValueInput } from './StatValueInput';
 import { Button } from './UiComponents';
 import { ContentListControl } from './ContentListControl';
 import { isValueReference } from '../content/Function';
+import { Skit } from '../content/Skit';
 
 interface ControlRendererProps {
     control: Control;
     stage: () => Stage;
     // Called after a button fires or a stat editor's value changes, so the caller can force a re-render to
     // reflect the resulting save/config state (this component otherwise has no reactive subscription to it).
-    onActivate: () => void;
+    onActivate: (skit?: Skit | null) => void;
 }
 
 const boxStyle = {
@@ -68,8 +69,16 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
             <Button
                 variant="secondary"
                 onClick={() => {
-                    stageInstance.runControlActions(control);
-                    onActivate();
+                    let skit: Skit | null;
+                    try {
+                        skit = stageInstance.runControlActions(control);
+                    } catch (error) {
+                        console.error('Failed to run control actions:', error);
+                        stageInstance.showPriorityMessage(`Failed to run button actions: ${error instanceof Error ? error.message : String(error)}`);
+                        onActivate();
+                        return;
+                    }
+                    onActivate(skit);
                 }}
                 style={{ ...sizingStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 14px', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
             >

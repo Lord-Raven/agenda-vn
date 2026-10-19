@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { isValidElement } from 'react';
 import { GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { Control } from '../src/content/Control';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
@@ -18,6 +19,14 @@ import { cloneStat, StatType } from '../src/content/Stat';
 import { functionReference, FUNCTION_RETURN_TYPES, GameFunction } from '../src/content/Function';
 import { ControlRenderer } from '../src/components/ControlRenderer';
 import { ConditionEditor } from '../src/components/ConditionEditor';
+import { OutcomeEditor } from '../src/components/OutcomeEditor';
+import { Map as GameMap } from '../src/content/Map';
+import { MapDetailPanel } from '../src/screens/MapDetailPanel';
+import { DefinedMapView } from '../src/screens/DefinedMapView';
+import { TooltipProvider } from '../src/components/TooltipContext';
+import { Location } from '../src/content/Location';
+import { globalStatReference } from '../src/content/Function';
+import { Skit } from '../src/content/Skit';
 
 const fixture = () => {
     const configuration: GameConfiguration = {
@@ -39,6 +48,81 @@ const fixture = () => {
     stage.getSave = () => save;
     return { stage, configuration };
 };
+
+test('shared outcomes expose stat, function and skit actions with context-specific timing', () => {
+    const { stage } = fixture();
+    const context = { stage, globalStats: [], actorStats: [], actors: [], locations: [] };
+    const actions = [
+        { id: 'stat', targetType: 'global' as const, targetId: 'any', statId: '', operation: 'adjust' as const, value: 0 },
+        { id: 'fn', kind: 'function' as const, functionId: 'reward' },
+        { id: 'skit', kind: 'skit' as const, locationId: '', actorIds: [] },
+    ];
+    const html = renderToStaticMarkup(<OutcomeEditor {...context} actions={actions} onChange={() => {}} />);
+    assert.match(html, /Update a stat/);
+    assert.match(html, /Invoke a function/);
+    assert.match(html, /Start a skit/);
+    assert.match(html, /Reward player/);
+    assert.match(html, /Participants/);
+    assert.match(html, /Guidance \(optional\)/);
+    assert.match(html, /Starts after all stat and function actions finish/);
+    const eventHtml = renderToStaticMarkup(<OutcomeEditor {...context} actions={actions} onChange={() => {}} skitTiming="afterPeriod" />);
+    assert.match(eventHtml, /Starts after all post-skit actions finish, ahead of mandatory events/);
+    const control = new Control({ actions });
+    const controlHtml = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
+    assert.match(controlHtml, /Start a skit/);
+    assert.match(controlHtml, /Participants/);
+    assert.match(controlHtml, /Starts after all stat and function actions finish/);
+});
+
+test('control clicks forward the newly started skit to their screen callback', () => {
+    const { stage } = fixture();
+    stage.getSave().atlas.place = new Location({ id: 'place', name: 'Town' });
+    stage.getSave().currentDate = '2026-10-19';
+    stage.saveGame = () => {};
+    const control = new Control({ actions: [{ id: 'skit', kind: 'skit', locationId: 'place', actorIds: [] }] });
+    let started: Skit | null | undefined;
+    const button = ControlRenderer({ control, stage: () => stage, onActivate: skit => { started = skit; } });
+    assert.ok(isValidElement<{ onClick: () => void }>(button));
+    button.props.onClick();
+    assert.ok(started);
+    assert.equal(started, stage.getSave().timeline[0].skit);
+});
+
+test('maps can offer action buttons even without another map or location', () => {
+    const { stage } = fixture();
+    const map = new GameMap({ links: [{
+        type: 'button', parentId: '', childId: '', name: 'Rest', iconName: 'hotel', coordinates: { x: .5, y: .5 }, actions: [],
+    }] });
+    const html = renderToStaticMarkup(<MapDetailPanel map={map} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />);
+    assert.match(html, /Add Button/);
+    assert.match(html, /Drag Rest marker/);
+    assert.match(html, /data-testid="HotelIcon"/);
+    assert.doesNotMatch(html, /Drag Missing target marker/);
+});
+
+test('defined maps show named action icons, fallback icons, disabled conditions and resolved content portraits', () => {
+    const { stage, configuration } = fixture();
+    configuration.useEvents = false;
+    configuration.globalStats = [cloneStat({ id: 'places', name: 'Places', type: 'locationList', default: ['place'] })];
+    stage.getSave().atlas.place = new Location({ id: 'place', name: 'Town' });
+    const map = new GameMap({ id: 'map', name: 'World', links: [
+        { type: 'button', parentId: 'map', childId: 'function:missing', name: 'Rest', iconName: 'hotel', coordinates: { x: .5, y: .5 },
+            contentList: { kind: 'location', values: [globalStatReference('places')] } },
+        { type: 'button', parentId: 'map', childId: '', name: 'Unavailable', coordinates: { x: .3, y: .3 },
+            conditionCollections: [[{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'night' }]] },
+    ] });
+    const render = () => renderToStaticMarkup(<TooltipProvider><DefinedMapView stage={() => stage} maps={[map]} setScreenType={() => {}} isVerticalLayout={false} /></TooltipProvider>);
+    const html = render();
+    assert.match(html, /aria-label="Rest"/);
+    assert.match(html, /data-testid="HotelIcon"/);
+    assert.match(html, /data-testid="TouchAppIcon"/);
+    assert.match(html, /aria-label="Unavailable" disabled=""/);
+    assert.match(html, /aria-label="Rest contents"/);
+    assert.match(html, /aria-label="Town"/);
+    assert.doesNotMatch(html, /data-testid="ArrowOutwardIcon"|data-testid="PlayArrowIcon"/);
+    stage.getSave().globalStatValues!.places = [];
+    assert.doesNotMatch(render(), /aria-label="Rest contents"/);
+});
 
 test('function management shows a return-type sidebar and a selection prompt instead of inline editors', () => {
     const { stage } = fixture();

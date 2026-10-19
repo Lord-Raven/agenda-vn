@@ -218,6 +218,12 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                 }}>
                     <GlobalStatBar
                         stage={stage}
+                        onActivate={nextSkit => {
+                            if (nextSkit) {
+                                setSkit(nextSkit);
+                                setAccumulatedOutcomes([]);
+                            }
+                        }}
                         buttons={
                             <>
                                 {isTextToSpeechEnabled && (

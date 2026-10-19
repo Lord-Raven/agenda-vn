@@ -4,7 +4,7 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
-import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, GameAction, applyStatUpdateValue, cloneStat, cloneGameAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
+import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
@@ -216,7 +216,7 @@ const cloneItem = (item: Item, stripImagePrompts: boolean = false): Item => new 
 const cloneControl = (control: Control): Control => new Control({
     ...control,
     availabilityConditions: (control.availabilityConditions || []).map((collection) => [...collection]),
-    actions: (control.actions || []).map(cloneGameAction),
+    actions: (control.actions || []).map(cloneStatUpdateAction),
 });
 
 const cloneMap = (map: GameMap): GameMap => new GameMap({
@@ -619,12 +619,26 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .sort(compareControlPriority);
     }
 
-    // Applies a button control's actions and saves.
-    runControlActions(control: Control) {
+    runControlActions(control: Control): Skit | null {
+        return this.runButtonActions(control.actions || []);
+    }
+
+    // Resolve the first skit only after every stat/function action has finished.
+    runButtonActions(actions: StatUpdateAction[]): Skit | null {
         const save = this.getSave();
         const context = this.getScheduleContext(save);
-        (control.actions || []).forEach((update) => this.applyStatUpdateAction(save, update, context));
+        for (const action of actions) {
+            if (action.kind !== 'skit') {
+                this.applyStatUpdateAction(save, action, context);
+            }
+        }
+        const skitAction = actions.find((action): action is StartSkitAction => action.kind === 'skit');
+        const skit = skitAction ? this.createStatUpdateSkit(save, skitAction) : null;
+        if (skit) {
+            save.timeline.push({ date: save.currentDate || this.getStartingDate(save), skit });
+        }
         this.saveGame();
+        return skit;
     }
 
     // Directly sets a global stat's value (used by 'statEditor' controls) and saves.

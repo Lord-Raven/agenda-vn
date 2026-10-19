@@ -144,6 +144,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                 <Box sx={{ flexShrink: 0 }}>
                     <GlobalStatBar
                         stage={stage}
+                        onActivate={skit => { if (skit) setScreenType(ScreenType.SKIT); }}
                         buttons={
                             <>
                                 {stageInstance.areEventsEnabled() && (
@@ -437,7 +438,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                     </Box>
                 </GlassPanel>
 
-                <ControlDock stage={stage} />
+                <ControlDock stage={stage} onActivate={skit => { if (skit) setScreenType(ScreenType.SKIT); }} />
             </Box>
 
             {showContentManagement && (

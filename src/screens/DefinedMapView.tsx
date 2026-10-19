@@ -1,10 +1,10 @@
 import { CSSProperties, FC, Fragment, ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings } from '@mui/icons-material';
+import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings, TouchApp } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getMapImageUrl, isMapAvailable, Map as GameMap } from '../content/Map';
 import { getLocationImageUrl, getLocationName } from '../content/Location';
-import { getCurrentLocation } from '../content/Skit';
+import { getCurrentLocation, Skit } from '../content/Skit';
 import { Stage } from '../Stage';
 import { ScreenType } from './BaseScreen';
 import { ContentManagementScreen } from './ContentManagementScreen';
@@ -16,6 +16,9 @@ import { GlobalStatBar } from '../components/GlobalStatBar';
 import { ControlDock } from '../components/ControlDock';
 import { useCachedImageUrl } from '../utils/ImageCache';
 import { CachedBackgroundUrl } from '../components/CachedImage';
+import { resolveIcon } from '../components/StatRating';
+import { ContentListPortraits } from '../components/ContentListControl';
+import { normalizeReferenceListValue } from '../content/Stat';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -100,13 +103,14 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
     const [hoveredLink, setHoveredLink] = useState<string | null>(null);
+    const [revision, setRevision] = useState(0);
     const mapViewportRef = useRef<HTMLDivElement>(null);
     const [mapViewportSize, setMapViewportSize] = useState({ width: 0, height: 0 });
     const [mapImageSize, setMapImageSize] = useState({ width: 0, height: 0 });
     const save = stage().getSave();
     const sortedMaps = useMemo(() => [...maps]
         .filter(map => isMapAvailable(map, stage().getScheduleContext(save)))
-        .sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name)), [maps, save]);
+        .sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name)), [maps, save, revision]);
 
     const latestLocationId = useMemo(() => {
         for (let index = save.timeline.length - 1; index >= 0; index -= 1) {
@@ -116,11 +120,11 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
             }
         }
         return '';
-    }, [save.timeline]);
+    }, [save.timeline, revision]);
 
     const preferredMap = useMemo(() => {
         if (latestLocationId) {
-            const linkedMap = sortedMaps.find(map => map.links.some(link => stage().resolveValue(link.childId, 'location') === latestLocationId));
+            const linkedMap = sortedMaps.find(map => map.links.some(link => link.type !== 'button' && stage().resolveValue(link.childId, 'location') === latestLocationId));
             if (linkedMap) {
                 return linkedMap;
             }
@@ -137,6 +141,10 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
     }, [displayedMapId, preferredMap, sortedMaps]);
 
     const displayedMap = sortedMaps.find(map => map.id === displayedMapId) || preferredMap;
+    const handleAction = (skit?: Skit | null) => {
+        setRevision(current => current + 1);
+        if (skit) setScreenType(ScreenType.SKIT);
+    };
     const configuredBackgroundImageUrl = stage().getConfiguration().backgroundImageUrl?.trim();
     const cachedBackgroundImageUrl = useCachedImageUrl(configuredBackgroundImageUrl);
     const screenBackgroundImage = cachedBackgroundImageUrl
@@ -200,7 +208,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
         : { x: 0.5, y: 0.5 };
     const focalPoint = { x: clampUnit(rawFocalPoint.x), y: clampUnit(rawFocalPoint.y) };
 
-    const getMarkerPosition = (x: number, y: number, markerSize: number): { style: { left: string; top: string }; expansionDirection: MapMarkerButtonProps['expansionDirection'] } => {
+    const getMarkerPosition = (x: number, y: number, markerSize: number, contentHeight = 0): { style: { left: string; top: string }; expansionDirection: MapMarkerButtonProps['expansionDirection'] } => {
         let left = x;
         let top = y;
 
@@ -220,8 +228,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
         if (viewportWidth && viewportHeight) {
             const marginX = (markerSize / 2 + 10) / viewportWidth;
             const marginY = (markerSize) / viewportHeight;
+            const bottomMargin = (markerSize / 2 + contentHeight + 10) / viewportHeight;
             left = marginX * 2 >= 1 ? 0.5 : Math.min(1 - marginX, Math.max(marginX, left));
-            top = marginY * 2 >= 1 ? 0.5 : Math.min(1 - marginY, Math.max(marginY, top));
+            top = marginY + Math.max(marginY, bottomMargin) >= 1 ? 0.5 : Math.min(1 - Math.max(marginY, bottomMargin), Math.max(marginY, top));
         }
 
         const expansionDirection: MapMarkerButtonProps['expansionDirection'] = left < 0.25 ? 'right' : left > 0.75 ? 'left' : 'center';
@@ -235,6 +244,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                 <Box sx={{ flexShrink: 0 }}>
                     <GlobalStatBar
                         stage={stage}
+                        onActivate={handleAction}
                         buttons={
                             <>
                                 {stage().areEventsEnabled() && (
@@ -296,29 +306,48 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                 style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`, backgroundRepeat: 'no-repeat' }}
                             >
                                 {displayedMap.links.map((link, index) => {
-                                    const childId = String(stage().resolveValue(link.childId, 'location', save));
-                                    const linkedLocation = save.atlas?.[childId];
-                                    const linkedMap = sortedMaps.find(map => map.id === childId);
-                                    if (!linkedLocation && !linkedMap) {
+                                    const isButton = link.type === 'button';
+                                    const childId = isButton ? '' : String(stage().resolveValue(link.childId, 'location', save));
+                                    const linkedLocation = isButton ? undefined : save.atlas?.[childId];
+                                    const linkedMap = isButton ? undefined : sortedMaps.find(map => map.id === childId);
+                                    if (!isButton && !linkedLocation && !linkedMap) {
                                         return null;
                                     }
                                     if (linkedLocation && !stage().isLocationVisible(linkedLocation.id)) {
                                         return null;
                                     }
-                                    const markerKey = `${link.childId}-${index}`;
+                                    const markerKey = `${displayedMap.id}-${index}`;
                                     const isHovered = hoveredLink === markerKey;
                                     const locationImageUrl = getLocationImageUrl(linkedLocation, stage());
                                     const linkedMapImageUrl = getMapImageUrl(linkedMap, stage());
                                     const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
-                                    const markerName = currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
+                                    const markerName = isButton ? link.name?.trim() || 'Button' : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
+                                    const ButtonIcon = isButton && link.iconName ? resolveIcon(link.iconName, stage()) : TouchApp;
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
-                                    const configuration = stage().getConfiguration();
                                     const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, stage().getScheduleContext(save));
-                                    const isInteractive = isLinkAvailable && Boolean(linkedMap || canVisitLocation);
-                                    const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize);
+                                    const isInteractive = isLinkAvailable && Boolean(isButton || linkedMap || canVisitLocation);
+                                    const contentValues = isButton && link.contentList
+                                        ? normalizeReferenceListValue(stage().resolveValue(link.contentList.values, `${link.contentList.kind}List`, save))
+                                        : [];
+                                    const contentWidth = Math.min(200, Math.max(0, mapViewportSize.width - 16) || 200);
+                                    const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize, contentValues.length ? actorPortraitSize + 72 : 0);
                                     const handleMarkerClick = () => {
+                                        if (!isInteractive) return;
+                                        if (isButton) {
+                                            let skit: Skit | null;
+                                            try {
+                                                skit = stage().runButtonActions(link.actions || []);
+                                            } catch (error) {
+                                                console.error('Failed to run map button actions:', error);
+                                                stage().showPriorityMessage(`Failed to run button actions: ${error instanceof Error ? error.message : String(error)}`);
+                                                handleAction();
+                                                return;
+                                            }
+                                            handleAction(skit);
+                                            return;
+                                        }
                                         if (linkedMap) {
                                             setDisplayedMapId(linkedMap.id);
                                             return;
@@ -353,14 +382,14 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                     >
                                                         <span style={{ display: 'flex', flexDirection: markerPosition.expansionDirection === 'left' ? 'row-reverse' : 'row', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
                                                         <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: markerImageUrl ? `url(${markerImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                                                            {!markerImageUrl && <MapRounded fontSize="small" />}
+                                                            {!markerImageUrl && (isButton ? <ButtonIcon sx={{ fontSize: markerSize / 2 }} /> : <MapRounded fontSize="small" />)}
                                                         </span>
                                                             <span style={{ padding: markerPosition.expansionDirection === 'left' ? '0 6px 0 12px' : '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700, flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textAlign: markerPosition.expansionDirection === 'left' ? 'right' : 'left' }}>
                                                                 {markerName}
                                                                 {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 400 }}>{linkedLocation?.name}</span>}
                                                             </span>
                                                         </span>
-                                                        {isInteractive && (
+                                                        {isInteractive && !isButton && (
                                                             <span style={{ position: 'absolute', top: -2, left: markerPosition.expansionDirection === 'left' ? 'auto' : -2, right: markerPosition.expansionDirection === 'left' ? -2 : 'auto', display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
                                                                 {linkedMap ? <ArrowOutward sx={{ fontSize: 11 }} /> : <PlayArrow sx={{ fontSize: 11 }} />}
                                                             </span>
@@ -379,6 +408,11 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                                                 />
                                             </div>
                                         )}
+                                        {isButton && link.contentList && contentValues.length > 0 && (
+                                            <div style={{ position: 'absolute', ...markerPosition.style, left: `clamp(${contentWidth / 2 + 8}px, ${markerPosition.style.left}, calc(100% - ${contentWidth / 2 + 8}px))`, transform: `translate(-50%, ${markerSize / 2 + actorPortraitSize}px)`, width: contentWidth, containerType: 'inline-size', zIndex: isHovered ? 5 : 3 }}>
+                                                <ContentListPortraits kind={link.contentList.kind} values={contentValues} stage={stage()} label={`${markerName} contents`} />
+                                            </div>
+                                        )}
                                         </Fragment>
                                     );
                                 })}
@@ -386,7 +420,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
                         </AnimatePresence>
                 </Box>
 
-                <ControlDock stage={stage} />
+                <ControlDock stage={stage} onActivate={handleAction} />
             </Box>
             {showContentManagement && <ContentManagementScreen stage={stage} onClose={() => { stage().saveGame(); setShowContentManagement(false); }} />}
         </>

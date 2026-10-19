@@ -1,14 +1,11 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
-import { Add, Delete } from '@mui/icons-material';
-import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ContentListDisplay, Control, ControlPlacement, ControlType, StatDisplayType } from '../content/Control';
-import { ConditionCollection, CONTENT_TYPES, ContentType } from '../content/Condition';
-import { isReferenceListDisplayType, Stat, StatUpdate, GameAction, cloneGameAction } from '../content/Stat';
+import { ConditionCollection } from '../content/Condition';
+import { isReferenceListDisplayType, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
 import { Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
-import { CONTENT_TYPE_LABELS, ConditionEditor, buildContentTargetOptions } from '../components/ConditionEditor';
-import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
-import { StatUpdateOperationSelect, StatValueInput } from '../components/StatValueInput';
+import { ConditionEditor } from '../components/ConditionEditor';
+import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker } from '../components/StatRating';
 
 interface ControlDetailPanelProps {
@@ -34,7 +31,7 @@ type ControlDraft = {
     ratingIconName: string;
     outcomeStatTarget: Control['outcomeStatTarget'];
     availabilityConditions: ConditionCollection[];
-    actions: GameAction[];
+    actions: StatUpdateAction[];
 };
 
 const createDraft = (control: Control): ControlDraft => ({
@@ -53,7 +50,7 @@ const createDraft = (control: Control): ControlDraft => ({
     ratingIconName: control.ratingIconName,
     outcomeStatTarget: control.outcomeStatTarget,
     availabilityConditions: (control.availabilityConditions || []).map((collection) => [...collection]),
-    actions: (control.actions || []).map((update) => ({ ...update })),
+    actions: (control.actions || []).map(cloneStatUpdateAction),
 });
 
 const selectStyle: React.CSSProperties = {
@@ -84,14 +81,6 @@ const sectionHeadingStyle: React.CSSProperties = {
     paddingBottom: '5px',
 };
 
-const iconButtonStyle: React.CSSProperties = {
-    display: 'grid',
-    placeItems: 'center',
-    minWidth: 30,
-    minHeight: 30,
-    padding: 0,
-};
-
 export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage, onUpdate, onDeactivate }) => {
     const stageInstance = stage();
     const globalStats = useMemo(() => stageInstance.getConfiguration().globalStats || [], [stageInstance]);
@@ -100,15 +89,9 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const updatableActorStats = useMemo(() => actorStats.filter((stat) => !stat.perActor), [actorStats]);
     const updatableLocationStats = useMemo(() => stageInstance.getConfiguration().locationStats || [], [stageInstance]);
     const updatableItemStats = useMemo(() => stageInstance.getConfiguration().itemStats || [], [stageInstance]);
-    const functions = stageInstance.getConfiguration().functions || [];
     const actors = useMemo(() => stageInstance.getConfiguration().actors || [], [stageInstance]);
     const items = useMemo(() => stageInstance.getConfiguration().items || [], [stageInstance]);
     const locations = useMemo(() => stageInstance.getConfiguration().locations || [], [stageInstance]);
-    const targetOptionsByContentType = useMemo<Record<ContentType, ReturnType<typeof buildContentTargetOptions>>>(() => ({
-        actor: buildContentTargetOptions('actor', actors.filter((actor) => actor.active !== false), { allowNone: false }),
-        location: buildContentTargetOptions('location', locations.filter((location) => location.active !== false), { allowNone: false }),
-        item: buildContentTargetOptions('item', items.filter((item) => item.active !== false), { allowNone: false }),
-    }), [actors, locations, items]);
 
     const [draft, setDraft] = useState<ControlDraft>(() => createDraft(control));
     const draftRef = useRef(draft);
@@ -134,7 +117,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             ratingIconName: nextDraft.ratingIconName,
             outcomeStatTarget: nextDraft.outcomeStatTarget,
             availabilityConditions: nextDraft.availabilityConditions.map((collection) => [...collection]),
-            actions: nextDraft.actions.map((update) => ({ ...update })),
+            actions: nextDraft.actions.map(cloneStatUpdateAction),
         });
         stageInstance.updateConfiguration({
             controls: configuredControls.map((candidate) => candidate.id === control.id ? persistedControl : candidate),
@@ -185,40 +168,6 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             controls: configuredControls.map((candidate) => candidate.id === control.id ? persistedControl : candidate),
         });
         onDeactivate?.(control.id);
-    };
-
-    const statsForTargetType = (targetType: StatUpdate['targetType']): Stat[] => {
-        switch (targetType) {
-            case 'global': return updatableGlobalStats;
-            case 'location': return updatableLocationStats;
-            case 'item': return updatableItemStats;
-            default: return updatableActorStats;
-        }
-    };
-    const statsForUpdate = (update: StatUpdate): Stat[] => statsForTargetType(update.targetType);
-    const resolveUpdateStat = (update: StatUpdate): Stat | undefined => statsForUpdate(update).find((stat) => stat.id === update.statId);
-
-    const addAction = () => {
-        const newUpdate: StatUpdate = {
-            id: generateUuid(),
-            targetType: 'global',
-            targetId: 'any',
-            statId: updatableGlobalStats[0]?.id || '',
-            operation: 'adjust',
-            value: 0,
-        };
-        setDraft((current) => ({ ...current, actions: [...current.actions, newUpdate] }));
-    };
-
-    const updateAction = (updateId: string, patch: Partial<GameAction>) => {
-        setDraft((current) => ({
-            ...current,
-            actions: current.actions.map((update) => update.id === updateId ? cloneGameAction({ ...update, ...patch }) : update),
-        }));
-    };
-
-    const removeAction = (updateId: string) => {
-        setDraft((current) => ({ ...current, actions: current.actions.filter((update) => update.id !== updateId) }));
     };
 
     const usesActorStat = draft.type === 'actorStatDisplay' || (draft.type === 'statOutcome' && draft.outcomeStatTarget === 'actor');
@@ -391,94 +340,18 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
 
                         <section>
                             <h2 style={sectionHeadingStyle}>Actions (fired on click)</h2>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {draft.actions.map((update) => {
-                                    const stat = update.kind === 'function' ? undefined : resolveUpdateStat(update);
-                                    const availableStats = update.kind === 'function' ? [] : statsForUpdate(update);
-                                    return (
-                                        <div
-                                            key={update.id}
-                                            style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                                                gap: 8,
-                                                alignItems: 'center',
-                                                minWidth: 0,
-                                            }}
-                                        >
-                                            <select style={selectStyle} aria-label="Action kind" value={update.kind || 'stat'}
-                                                onChange={event => updateAction(update.id, event.target.value === 'function'
-                                                    ? { kind: 'function', functionId: functions[0]?.id || '' }
-                                                    : { kind: 'stat', targetType: 'global', targetId: 'any', statId: updatableGlobalStats[0]?.id || '', operation: 'adjust', value: 0 })}>
-                                                <option value="stat">Update a stat</option>
-                                                <option value="function">Invoke a function</option>
-                                            </select>
-                                            {update.kind === 'function' ? (
-                                                <select style={selectStyle} aria-label="Function" value={update.functionId}
-                                                    onChange={event => updateAction(update.id, { functionId: event.target.value })}>
-                                                    <option value="">Select a function...</option>
-                                                    {functions.map(fn => <option key={fn.id} value={fn.id}>{fn.name}</option>)}
-                                                </select>
-                                            ) : <>
-                                            <select
-                                                style={selectStyle}
-                                                value={update.targetType}
-                                                onChange={(e) => {
-                                                    const targetType = e.target.value as StatUpdate['targetType'];
-                                                    const nextStats = statsForTargetType(targetType);
-                                                    updateAction(update.id, { targetType, targetId: 'any', statId: nextStats[0]?.id || '', value: 0 });
-                                                }}
-                                            >
-                                                <option value="global">Global</option>
-                                                {CONTENT_TYPES.map((contentType) => <option key={contentType} value={contentType}>{CONTENT_TYPE_LABELS[contentType]}</option>)}
-                                            </select>
-                                            {update.targetType !== 'global' ? (
-                                                <SearchableOptionPicker
-                                                    value={update.targetId}
-                                                    onChange={(nextValue) => updateAction(update.id, { targetId: (Array.isArray(nextValue) ? nextValue[0] : nextValue) || 'any' })}
-                                                    options={targetOptionsByContentType[update.targetType]}
-                                                    defaultOptionKeys={['any']}
-                                                    allowClear={false}
-                                                    title={`Choose ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()} target`}
-                                                    placeholder={`Search ${CONTENT_TYPE_LABELS[update.targetType].toLowerCase()}s`}
-                                                    functionType={update.targetType}
-                                                    stage={stage}
-                                                />
-                                            ) : <div />}
-                                            <select
-                                                style={selectStyle}
-                                                value={update.statId}
-                                                onChange={(e) => updateAction(update.id, { statId: e.target.value, value: 0 })}
-                                            >
-                                                {availableStats.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
-                                            </select>
-                                            <StatUpdateOperationSelect
-                                                stat={stat}
-                                                style={selectStyle}
-                                                operation={update.operation}
-                                                onChange={(operation) => updateAction(update.id, { operation })}
-                                            />
-                                            <StatValueInput
-                                                stat={stat}
-                                                value={update.value}
-                                                onChange={(value) => updateAction(update.id, { value })}
-                                                actors={actors}
-                                                items={items}
-                                                locations={locations}
-                                                stage={stage}
-                                                allowExpression
-                                            />
-                                            </>}
-                                            <Button variant="danger" onClick={() => removeAction(update.id)} aria-label="Delete action" style={iconButtonStyle}>
-                                                <Delete fontSize="small" />
-                                            </Button>
-                                        </div>
-                                    );
-                                })}
-                                <Button variant="secondary" onClick={addAction} style={{ display: 'flex', alignItems: 'center', gap: 6, justifySelf: 'start' }}>
-                                    <Add fontSize="small" /> Add Action
-                                </Button>
-                            </div>
+                            <OutcomeEditor
+                                actions={draft.actions}
+                                onChange={actions => setDraft(current => ({ ...current, actions }))}
+                                globalStats={globalStats}
+                                actorStats={actorStats}
+                                locationStats={updatableLocationStats}
+                                itemStats={updatableItemStats}
+                                actors={actors.filter(actor => actor.active !== false)}
+                                items={items.filter(item => item.active !== false)}
+                                locations={locations.filter(location => location.active !== false)}
+                                stage={stage}
+                            />
                         </section>
                     </>
                 ) : (

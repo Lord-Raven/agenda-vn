@@ -2,13 +2,14 @@ import { FC, ReactNode, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import { Bed, Bedtime, EventAvailable, HourglassBottom, HourglassTop, WbSunny, WbTwilight } from "@mui/icons-material";
 import { Stage } from "../Stage";
-import { formatCurrentDate, formatDateLabel } from "../content/Skit";
+import { formatCurrentDate, formatDateLabel, Skit } from "../content/Skit";
 import { CALENDAR_TIME_OF_DAY_ORDER, CalendarTimeOfDay } from "../content/CalendarEvent";
 import { ControlRenderer } from "./ControlRenderer";
 
 interface GlobalStatBarProps {
     stage: () => Stage;
     buttons?: ReactNode;
+    onActivate?: (skit?: Skit | null) => void;
 }
 
 const getDateTimeIcon = (timeOfDay?: string) => {
@@ -27,7 +28,7 @@ const getDateTimeIcon = (timeOfDay?: string) => {
     return EventAvailable;
 };
 
-export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
+export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActivate }) => {
     // Bumped after a top Control fires/edits a stat, forcing this bar to re-render with the resulting state.
     const [revision, setRevision] = useState(0);
     const stageInstance = stage();
@@ -115,7 +116,10 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons }) => {
                         key={`top-control-${control.id}`}
                         control={control}
                         stage={stage}
-                        onActivate={() => setRevision((current) => current + 1)}
+                        onActivate={skit => {
+                            setRevision(current => current + 1);
+                            onActivate?.(skit);
+                        }}
                     />
                 ))}
             </Box>

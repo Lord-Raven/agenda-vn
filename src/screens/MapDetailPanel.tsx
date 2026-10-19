@@ -1,15 +1,18 @@
 import { FC, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
-import { Add, ArrowDownward, ArrowUpward, AutoAwesome, CenterFocusStrong, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place } from '@mui/icons-material';
+import { Add, ArrowDownward, ArrowUpward, AutoAwesome, CenterFocusStrong, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place, TouchApp } from '@mui/icons-material';
 import { generateMapAlternativeImage, Map as GameMap, MapLink } from '../content/Map';
 import { Stage } from '../Stage';
-import { Button, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
+import { Button, ReferenceMultiSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 import { ConditionCollection } from '../content/Condition';
 import { getLocationName } from '../content/Location';
+import { OutcomeEditor } from '../components/OutcomeEditor';
+import { IconPicker, resolveIcon } from '../components/StatRating';
+import { CONTENT_TYPES } from '../content/Condition';
 
 interface MapDetailPanelProps {
     map: GameMap;
@@ -20,6 +23,16 @@ interface MapDetailPanelProps {
 }
 
 const clampCoordinate = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+
+const selectStyle = {
+    minHeight: 38,
+    width: '100%',
+    background: 'var(--agenda-surface-base)',
+    color: 'var(--agenda-text-primary)',
+    border: '1px solid var(--agenda-line-subtle)',
+    borderRadius: 6,
+    padding: '0 8px',
+};
 
 type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages'> & { focalX: number; focalY: number; availabilityConditions: ConditionCollection[] };
 
@@ -107,7 +120,9 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
     };
 
     const persistDraft = (nextDraft: MapDraft) => {
-        const persistedMap = new GameMap(map);
+        const latestMaps = isCreatorMode ? stageInstance.getConfiguration().maps || [] : stageInstance.getSave().maps || [];
+        const currentMap = latestMaps.find(candidate => candidate.id === map.id) || map;
+        const persistedMap = new GameMap(currentMap);
         persistedMap.name = nextDraft.name;
         persistedMap.description = nextDraft.description;
         persistedMap.category = nextDraft.category.trim();
@@ -118,16 +133,17 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         persistedMap.focalPoint = { x: clampCoordinate(nextDraft.focalX), y: clampCoordinate(nextDraft.focalY) };
 
         const nextPriority = Number.isFinite(nextDraft.priority) ? nextDraft.priority : 0;
-        const conflict = sourceMaps.find(candidate => candidate.id !== persistedMap.id && candidate.active !== false && candidate.priority === nextPriority);
+        const conflict = latestMaps.find(candidate => candidate.id !== persistedMap.id && candidate.active !== false && candidate.priority === nextPriority);
         if (conflict) {
             conflict.priority = persistedMap.priority;
         }
         persistedMap.priority = nextPriority;
         if (isCreatorMode) {
             stageInstance.updateConfiguration({
-                maps: sourceMaps.map((candidate) => candidate.id === persistedMap.id ? persistedMap : candidate),
+                maps: latestMaps.map((candidate) => candidate.id === persistedMap.id ? persistedMap : candidate),
             });
         } else {
+            Object.assign(currentMap, persistedMap);
             stageInstance.saveGame();
         }
         onChange();
@@ -178,15 +194,20 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         setDraft(current => ({ ...current, [field]: value }));
     };
 
-    const addLink = () => {
+    const addLink = (type: MapLink['type'] = 'target') => {
         const firstTarget = activeLocations[0]?.id || activeMaps[0]?.id;
-        if (!firstTarget) {
+        if (type !== 'button' && !firstTarget) {
             stageInstance.showPriorityMessage('Create another map or location before adding a link.');
             return;
         }
         persist(() => {
-            map.links.push({ parentId: map.id, childId: firstTarget, coordinates: { x: 0.5, y: 0.5 }, conditionCollections: [] });
+            map.links.push({
+                type, parentId: map.id, childId: type === 'button' ? '' : firstTarget || '',
+                coordinates: { x: 0.5, y: 0.5 }, conditionCollections: [],
+                ...(type === 'button' ? { name: 'New Button', actions: [] } : {}),
+            });
         });
+        setIsLinksCollapsed(false);
     };
 
     const updateLink = (index: number, patch: Partial<MapLink>) => {
@@ -426,14 +447,27 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                         <ExpandMore style={{ transform: isLinksCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
                         <strong>Links</strong>
                     </button>
-                    <Button variant="secondary" onClick={addLink} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add</Button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <Button variant="secondary" onClick={() => addLink()} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add Link</Button>
+                        <Button variant="secondary" onClick={() => addLink('button')} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add Button</Button>
+                    </div>
                 </div>
                 {!isLinksCollapsed && (
                     <div style={{ display: 'grid', gap: 8 }}>
                         {map.links.map((link, index) => (
-                            <div key={`${link.childId}-${index}`} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
+                            <div key={index} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
+                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
+                                    Link Type
+                                    <select aria-label="Link type" style={selectStyle} value={link.type || 'target'}
+                                        onChange={event => updateLink(index, { type: event.target.value === 'button' ? 'button' : 'target' })}>
+                                        <option value="target">Map / location</option>
+                                        <option value="button">Button</option>
+                                    </select>
+                                </label>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto', gap: 8, alignItems: 'center' }}>
-                                    <SearchableOptionPicker
+                                    {link.type === 'button' ? (
+                                        <TextInput fullWidth aria-label="Button name" placeholder="Button name" value={link.name || ''} onChange={event => updateLink(index, { name: event.target.value })} />
+                                    ) : <SearchableOptionPicker
                                         value={link.childId}
                                         onChange={nextValue => updateLink(index, { childId: (nextValue as string) || link.childId })}
                                         options={[
@@ -444,11 +478,52 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                         placeholder="Search locations and maps"
                                         functionType="location"
                                         stage={stage}
-                                    />
+                                    />}
                                     <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
                                     <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
                                     <Button variant="danger" onClick={() => persist(() => map.links.splice(index, 1))} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
                                 </div>
+                                {link.type === 'button' && <>
+                                    <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Button Icon (optional)</label>
+                                    <IconPicker stage={stage} value={link.iconName || undefined} allowClear onChange={iconName => updateLink(index, { iconName: iconName || '' })} />
+                                    <strong style={{ color: 'var(--agenda-text-primary)' }}>Outcomes (on click)</strong>
+                                    <OutcomeEditor actions={link.actions || []} onChange={actions => updateLink(index, { actions })}
+                                        globalStats={stageInstance.getConfiguration().globalStats || []}
+                                        actorStats={stageInstance.getConfiguration().actorStats || []}
+                                        locationStats={stageInstance.getConfiguration().locationStats || []}
+                                        itemStats={stageInstance.getConfiguration().itemStats || []}
+                                        actors={(isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})).filter(actor => actor.active !== false)}
+                                        locations={activeLocations}
+                                        items={(isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []).filter(item => item.active !== false)}
+                                        stage={stage}
+                                    />
+                                    <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
+                                        Content below button (optional)
+                                        <select aria-label="Button content type" style={selectStyle} value={link.contentList?.kind || ''}
+                                            onChange={event => {
+                                                const kind = CONTENT_TYPES.find(type => type === event.target.value);
+                                                updateLink(index, { contentList: kind ? { kind, values: [] } : undefined });
+                                            }}>
+                                            <option value="">None</option>
+                                            <option value="actor">Actors</option>
+                                            <option value="item">Items</option>
+                                            <option value="location">Locations</option>
+                                        </select>
+                                    </label>
+                                    {link.contentList && <ReferenceMultiSelect
+                                        kind={link.contentList.kind} values={link.contentList.values}
+                                        onChange={values => {
+                                            if (link.contentList) updateLink(index, { contentList: { ...link.contentList, values } });
+                                        }}
+                                        actors={isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})}
+                                        items={isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []}
+                                        locations={activeLocations} stage={stage}
+                                    />}
+                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                        Choose literal content, a function, or a global stat of the selected content type.
+                                        The list is reevaluated after button actions and displayed beneath the marker.
+                                    </span>
+                                </>}
                                 <ConditionEditor
                                     conditionCollections={link.conditionCollections || []}
                                     globalStats={stageInstance.getConfiguration().globalStats || []}
@@ -491,14 +566,16 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                         <CenterFocusStrong style={{ fontSize: 18 }} />
                     </div>
                     {map.links.map((link, index) => {
-                        const locationImageUrl = activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl;
+                        const locationImageUrl = link.type !== 'button' ? activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl : undefined;
+                        const markerName = link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);
+                        const MarkerIcon = link.type === 'button' ? (link.iconName ? resolveIcon(link.iconName, stageInstance) : TouchApp) : Place;
                         return (
                             <div
                                 key={`${link.childId}-marker-${index}`}
                                 role="button"
                                 tabIndex={0}
-                                aria-label={`Drag ${resolveTargetName(link.childId)} marker`}
-                                title={`Drag to position ${resolveTargetName(link.childId)}`}
+                                aria-label={`Drag ${markerName} marker`}
+                                title={`Drag to position ${markerName}`}
                                 onPointerDown={event => {
                                     event.currentTarget.setPointerCapture(event.pointerId);
                                     updateLinkFromPointer(index, event);
@@ -510,7 +587,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                 }}
                                 style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: '50%', color: 'var(--agenda-text-primary)', backgroundColor: 'var(--agenda-active)', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '2px solid var(--agenda-text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,.65)', cursor: 'grab', userSelect: 'none' }}
                             >
-                                {!locationImageUrl && <Place style={{ fontSize: 18 }} />}
+                                {!locationImageUrl && <MarkerIcon style={{ fontSize: 18 }} />}
                             </div>
                         );
                     })}

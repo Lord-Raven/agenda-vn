@@ -2,14 +2,16 @@ import { FC, useState } from 'react';
 import { Box } from '@mui/material';
 import { Stage } from '../Stage';
 import { ControlRenderer } from './ControlRenderer';
+import { Skit } from '../content/Skit';
 
 interface ControlDockProps {
     stage: () => Stage;
+    onActivate?: (skit?: Skit | null) => void;
 }
 
 // Renders every available 'bottom' placement Control (buttons, stat displays, stat editors) in a row below
 // the main map content. Renders nothing when there are no available bottom controls.
-export const ControlDock: FC<ControlDockProps> = ({ stage }) => {
+export const ControlDock: FC<ControlDockProps> = ({ stage, onActivate }) => {
     // Bumped after a control fires/edits a stat, forcing this dock to re-render with the resulting state.
     const [revision, setRevision] = useState(0);
     const stageInstance = stage();
@@ -34,7 +36,10 @@ export const ControlDock: FC<ControlDockProps> = ({ stage }) => {
                     key={`bottom-control-${control.id}`}
                     control={control}
                     stage={stage}
-                    onActivate={() => setRevision((current) => current + 1)}
+                    onActivate={skit => {
+                        setRevision(current => current + 1);
+                        onActivate?.(skit);
+                    }}
                 />
             ))}
         </Box>

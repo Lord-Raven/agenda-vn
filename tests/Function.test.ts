@@ -10,6 +10,7 @@ import { cloneGameFunction, functionPickerOptions, functionReference, globalStat
 import { evaluateCondition } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
+import { Map as GameMap } from '../src/content/Map';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { createLoreEntry, formatLoreEntriesAsContext, processLoreText } from '../src/content/Lore';
 import { buildPrompt } from '../src/utils/PromptBuilder';
@@ -70,6 +71,121 @@ const fixture = () => {
 
 const gameFunction = (script: string): GameFunction => ({
     id: 'test-function', name: 'Test function', description: '', script, returnType: 'void',
+});
+
+test('map and control buttons apply all writes before resolving only the first requested skit', () => {
+    for (const source of ['map', 'control'] as const) {
+        const { stage, save, configuration } = fixture();
+        save.currentDate = '2026-10-19';
+        configuration.globalStats.push(stat('Scene guidance', 'text', { default: '' }));
+        configuration.functions = [
+            { id: 'write', name: 'Write', description: '', returnType: 'void', script: 'set("Score", 7);' },
+            { id: 'guidance', name: 'Guidance', description: '', returnType: 'text', script: 'return "Final score: " + get("Score");' },
+        ];
+        let saves = 0;
+        stage.saveGame = () => { saves++; };
+        const actions = [
+            { id: 'first', kind: 'skit' as const, locationId: 'place', actorIds: ['b'], guidance: functionReference('guidance') },
+            { id: 'invoke', kind: 'function' as const, functionId: 'write' },
+            { id: 'second', kind: 'skit' as const, locationId: 'missing', actorIds: ['missing'] },
+            { id: 'adjust', kind: 'stat' as const, targetType: 'global' as const, targetId: 'any', statId: 'Score', operation: 'adjust' as const, value: 1 },
+        ];
+        const control = new Control({ actions });
+        const map = new GameMap({ links: [{ type: 'button', parentId: '', childId: '', coordinates: { x: .5, y: .5 }, actions }] });
+        const skit = source === 'control' ? stage.runControlActions(control) : stage.runButtonActions(map.links[0].actions || []);
+        assert.ok(skit);
+        assert.equal(skit.guidance, 'Final score: 8');
+        assert.deepEqual(skit.initialActors, ['b']);
+        assert.equal(save.timeline.length, 1);
+        assert.equal(save.timeline[0].date, '2026-10-19');
+        assert.equal(save.timeline[0].skit, skit);
+        assert.equal(saves, 1);
+    }
+});
+
+test('button actions without a skit save once without changing the timeline', () => {
+    const { stage, save } = fixture();
+    let saves = 0;
+    stage.saveGame = () => { saves++; };
+    assert.equal(stage.runButtonActions([
+        { id: 'adjust', targetType: 'global', targetId: 'any', statId: 'Score', operation: 'adjust', value: 1 },
+    ]), null);
+    assert.equal(save.globalStatValues!.Score, 3);
+    assert.equal(save.timeline.length, 0);
+    assert.equal(saves, 1);
+});
+
+test('invalid button skits report an error instead of appending or saving a broken scene', () => {
+    const { stage, save } = fixture();
+    let saves = 0;
+    stage.saveGame = () => { saves++; };
+    assert.throws(() => stage.runButtonActions([
+        { id: 'scene', kind: 'skit', locationId: 'missing', actorIds: [] },
+    ]), /Unknown skit action location/);
+    assert.equal(save.timeline.length, 0);
+    assert.equal(saves, 0);
+});
+
+test('map button lists resolve literal, scalar and list sources dynamically for every content kind', () => {
+    for (const kind of ['actor', 'item', 'location'] as const) {
+        const { stage, configuration, save } = fixture();
+        const type = `${kind}List` as const;
+        configuration.globalStats.push(stat('Content', type), stat('Single', kind));
+        save.globalStatValues!.Content = ['first'];
+        save.globalStatValues!.Single = 'single';
+        configuration.functions = [{ id: 'list', name: 'List', description: '', returnType: type, script: 'return get("Content");' }];
+        const map = new GameMap({ links: [{
+            type: 'button', parentId: '', childId: '', coordinates: { x: .5, y: .5 },
+            contentList: { kind, values: ['literal', globalStatReference('Single'), functionReference('list'), globalStatReference('Content')] },
+        }] });
+        const list = map.links[0].contentList!;
+        assert.deepEqual(stage.resolveValue(list.values, type), ['literal', 'single', 'first', 'first']);
+        save.globalStatValues!.Content = ['updated', 'another'];
+        assert.deepEqual(stage.resolveValue(list.values, type), ['literal', 'single', 'updated', 'another', 'updated', 'another']);
+        assert.deepEqual(list.values, ['literal', globalStatReference('Single'), functionReference('list'), globalStatReference('Content')]);
+    }
+});
+
+test('map buttons and control skits retain independent outcomes through cloning and portable export', () => {
+    const { configuration } = fixture();
+    const map = new GameMap({
+        id: 'map',
+        links: [
+            { parentId: 'map', childId: 'place', coordinates: { x: .2, y: .3 } },
+            { type: 'button', parentId: 'map', childId: '', name: 'Rest', iconName: 'hotel', coordinates: { x: .7, y: .8 },
+                actions: [
+                    { id: 'stat', targetType: 'global', targetId: 'any', statId: 'Party', operation: 'set', value: ['b'] },
+                    { id: 'invoke', kind: 'function', functionId: 'rest' },
+                    { id: 'skit', kind: 'skit', locationId: 'place', actorIds: ['b'], guidance: { targetType: 'global', targetId: 'any', statId: 'Guidance' } },
+                ], contentList: { kind: 'actor', values: [globalStatReference('Party')] },
+                conditionCollections: [[{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'night' }]] },
+        ],
+    });
+    configuration.maps = [map];
+    configuration.controls = [new Control({ actions: map.links[1].actions })];
+    const exported = buildPortableGameConfiguration(configuration);
+    for (const copy of [new GameMap(map), new GameMap(JSON.parse(JSON.stringify(map))), exported.maps[0]]) {
+        assert.equal(copy.links[0].type, undefined);
+        assert.equal(copy.links[0].childId, 'place');
+        const link = copy.links[1];
+        assert.equal(link.type, 'button');
+        assert.equal(link.name, 'Rest');
+        assert.equal(link.iconName, 'hotel');
+        assert.equal(link.parentId, 'map');
+        assert.deepEqual(link.contentList, map.links[1].contentList);
+        assert.notEqual(link.contentList!.values, map.links[1].contentList!.values);
+        assert.notEqual(link.actions, map.links[1].actions);
+        assert.notEqual(link.coordinates, map.links[1].coordinates);
+        const skit = link.actions![2];
+        assert.equal(skit.kind, 'skit');
+        if (skit.kind !== 'skit') assert.fail('Expected a skit action');
+        assert.notEqual(skit.actorIds, (map.links[1].actions![2] as StartSkitAction).actorIds);
+        assert.deepEqual(skit.guidance, { targetType: 'global', targetId: 'any', statId: 'Guidance' });
+    }
+    assert.equal(exported.controls[0].actions[2].kind, 'skit');
+    assert.equal(new Control(JSON.parse(JSON.stringify(exported.controls[0]))).actions[2].kind, 'skit');
+    exported.maps[0].links[1].contentList!.values.push('other');
+    assert.deepEqual(map.links[1].contentList!.values, [globalStatReference('Party')]);
 });
 
 test('numeric formulas share precedence, parentheses, decimals, dice, and named lookups', () => {
