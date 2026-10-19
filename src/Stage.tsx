@@ -774,18 +774,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             console.log(response);
             if (response.errors && response.errors.length) {
                 console.log(`Failed sensitive storage access for ${this.primaryCharacter.anonymizedId}: ${response.errors}`);
+                await this.readStageConfiguration();
             } else {
                 console.log(`Successfully accessed sensitive storage for ${this.primaryCharacter.anonymizedId}`);
                 this.isOwner = true;
             }
         } catch (error) {
             console.log(`Error accessing sensitive storage for ${this.primaryCharacter.anonymizedId}: ${error}`);
-        }
-
-        // If no gameconfiguration is available, check if one is in storage and pull it:
-        if (!this.getConfiguration()) {
-            console.log('No configuration found, attempting to read from storage...');
-            await this.readStageConfiguration();
         }
 
         return {
