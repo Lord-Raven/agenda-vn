@@ -782,6 +782,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             console.log(`Error accessing sensitive storage for ${this.primaryCharacter.anonymizedId}: ${error}`);
         }
 
+        // If no gameconfiguration is available, check if one is in storage and pull it:
+        if (!this.getConfiguration()) {
+            console.log('No configuration found, attempting to read from storage...');
+            await this.readStageConfiguration();
+        }
+
         return {
             success: true,
             error: null,
@@ -3285,6 +3291,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Storage functionality
     async readStageConfiguration(speakerIds: string[] = []): Promise<void> {
+        console.log('Attempting to read stage configuration');
         const characterIds = speakerIds.length ? speakerIds : [this.primaryCharacter.anonymizedId];
         const storedContent = (await this.storage.get('agenda_configuration').forCharacters(characterIds)).data;
 

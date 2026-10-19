@@ -68,6 +68,7 @@ const buildGlobalStatValues = (
 export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onConfirm, isNewGame = false, setScreenType }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const stageInstance = stage();
+    const isCalendarMode = stageInstance.getDateMode() === 'calendar';
 
     // Common languages for autocomplete
     const commonLanguages = [
@@ -353,28 +354,30 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                     />
                                 </div>
 
-                                <div style={{ flex: '0 1 220px', minWidth: '180px' }}>
-                                    <label
-                                        htmlFor="player-birth-date"
-                                        style={{
-                                            display: 'block',
-                                            color: 'var(--agenda-text-muted)',
-                                            fontSize: '14px',
-                                            fontWeight: 'bold',
-                                            marginBottom: '8px',
-                                        }}
-                                    >
-                                        {birthDateLabel}
-                                    </label>
-                                    <TextInput
-                                        id="player-birth-date"
-                                        fullWidth
-                                        value={settings.birthDate}
-                                        onChange={(e) => handleInputChange('birthDate', e.target.value)}
-                                        placeholder="YYYY-MM-DD"
-                                        style={{ fontSize: '16px' }}
-                                    />
-                                </div>
+                                {isCalendarMode && (
+                                    <div style={{ flex: '0 1 220px', minWidth: '180px' }}>
+                                        <label
+                                            htmlFor="player-birth-date"
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-text-muted)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            {birthDateLabel}
+                                        </label>
+                                        <TextInput
+                                            id="player-birth-date"
+                                            fullWidth
+                                            value={settings.birthDate}
+                                            onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                                            placeholder="YYYY-MM-DD"
+                                            style={{ fontSize: '16px' }}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Player Color + Font */}

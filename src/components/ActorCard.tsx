@@ -59,6 +59,7 @@ const StatValueContainer: FC<{ stat: Stat; control: Control; value: StatValue; s
 
 export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className = '' }) => {
     const stageInstance = stage();
+    const isCalendarMode = stageInstance.getDateMode() === 'calendar';
     const configuredStats = stageInstance.getConfiguration().actorStats || [];
     const statControls = actor ? stageInstance.getVisibleControls('actorCard', actor).flatMap(control => {
         const stat = configuredStats.find(candidate => candidate.id === control.statId);
@@ -69,7 +70,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
 
     const actorAge = useMemo(() => {
         const birthDate = (actor?.birthDate || '').trim();
-        if (!birthDate) {
+        if (!isCalendarMode || !birthDate) {
             return '';
         }
 
@@ -90,7 +91,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
         }
 
         return age >= 0 ? `${age}` : '';
-    }, [actor?.birthDate, stage, actor?.id]);
+    }, [actor?.birthDate, stage, actor?.id, isCalendarMode]);
 
     if (!actor) {
         return null;

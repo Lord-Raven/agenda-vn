@@ -7,6 +7,8 @@ import { Actor } from '../src/content/Actor';
 import { Control } from '../src/content/Control';
 import { cloneStat, Stat } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
+import { SettingsScreen } from '../src/screens/SettingsScreen';
+import { TooltipProvider } from '../src/components/TooltipContext';
 
 const makeStat = (id: string, extra: Partial<Stat> = {}): Stat => cloneStat({
     id, name: id, type: 'number', default: 10, guidance: '',
@@ -35,6 +37,43 @@ const fixture = () => {
     const render = () => renderToStaticMarkup(<ActorCard actor={actor} stage={() => stage} />);
     return { actor, configuration, save, stage, render };
 };
+
+test('actor cards show age only in calendar mode and retain other metadata in day mode', () => {
+    const { actor, configuration, render } = fixture();
+    actor.birthDate = '2000-10-09';
+    actor.role = 'Friend';
+    assert.match(render(), /Friend • Age 25/);
+
+    configuration.dateMode = 'turnBased';
+    const html = render();
+    assert.doesNotMatch(html, /Age/);
+    assert.match(html, /Friend/);
+    assert.equal(actor.birthDate, '2000-10-09');
+});
+
+for (const isNewGame of [false, true]) {
+    for (const birthDate of ['', '2000-10-09']) {
+        test(`settings show the birth-date field only in calendar mode (new game: ${isNewGame}, birth date: ${birthDate})`, () => {
+            const { actor, configuration, stage } = fixture();
+            actor.birthDate = birthDate;
+            const renderSettings = () => renderToStaticMarkup(
+                <TooltipProvider>
+                    <SettingsScreen stage={() => stage} isNewGame={isNewGame}
+                        onCancel={() => {}} onConfirm={() => {}} setScreenType={() => {}} />
+                </TooltipProvider>,
+            );
+            const calendarHtml = renderSettings();
+            assert.match(calendarHtml, /id="player-birth-date"/);
+            assert.match(calendarHtml, birthDate ? /Birth Date \(25 years old\)/ : /Birth Date/);
+
+            configuration.dateMode = 'turnBased';
+            const dayHtml = renderSettings();
+            assert.doesNotMatch(dayHtml, /player-birth-date|Birth Date|YYYY-MM-DD/);
+            assert.match(dayHtml, /id="player-name"/);
+            assert.equal(actor.birthDate, birthDate);
+        });
+    }
+}
 
 test('actor cards show only configured controls in priority order with actor values and defaults', () => {
     const { configuration, render } = fixture();
