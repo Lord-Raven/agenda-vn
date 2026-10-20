@@ -14,6 +14,8 @@ import { GlobalStatBar } from "../components/GlobalStatBar";
 import { ControlDock } from "../components/ControlDock";
 import { useCachedImageUrl } from "../utils/ImageCache";
 import { CachedBackgroundUrl } from "../components/CachedImage";
+import { isMapAvailable } from "../content/Map";
+import { Skit } from "../content/Skit";
 
 interface MapScreenProps {
     stage: () => Stage;
@@ -35,6 +37,11 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
     const { setTooltip, clearTooltip } = useTooltip();
     const reduceMotion = useReducedMotion();
     const [showContentManagement, setShowContentManagement] = useState(false);
+    const [revision, setRevision] = useState(0);
+    const handleAction = (skit?: Skit | null) => {
+        setRevision(current => current + 1);
+        if (skit) setScreenType(ScreenType.SKIT);
+    };
 
     const stageInstance = stage();
     const configuredBackgroundImageUrl = (stageInstance.getConfiguration().backgroundImageUrl || "").trim();
@@ -44,10 +51,8 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
         : "radial-gradient(900px 560px at 18% 12%, color-mix(in srgb, var(--agenda-accent-primary) 22%, transparent), transparent 62%), radial-gradient(840px 520px at 82% 88%, color-mix(in srgb, var(--agenda-highlight) 18%, transparent), transparent 64%), linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%)";
     const save = stageInstance.getSave();
     const currentTimeOfDay = save.currentTimeOfDay || "morning";
-    const activeMaps = useMemo(
-        () => (save.maps || []).filter(map => map.active !== false),
-        [save.maps],
-    );
+    const scheduleContext = stageInstance.getScheduleContext(save);
+    const availableMaps = (save.maps || []).filter(map => isMapAvailable(map, scheduleContext));
 
     const activeLocations = useMemo(
         () => Object.values(save.atlas || {})
@@ -59,7 +64,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                 }
                 return sortLocationsByName(left, right);
             }),
-        [save.atlas, stageInstance],
+        [save.atlas, stageInstance, revision],
     );
 
     const categories = useMemo(
@@ -111,11 +116,12 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
         [activeLocations, selectedCategory],
     );
 
-    if (activeMaps.length > 0) {
+    if (availableMaps.length > 0) {
         return (
             <DefinedMapView
                 stage={stage}
-                maps={activeMaps}
+                maps={availableMaps}
+                onAction={handleAction}
                 setScreenType={setScreenType}
                 isVerticalLayout={isVerticalLayout}
             />
@@ -144,7 +150,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                 <Box sx={{ flexShrink: 0 }}>
                     <GlobalStatBar
                         stage={stage}
-                        onActivate={skit => { if (skit) setScreenType(ScreenType.SKIT); }}
+                        onActivate={handleAction}
                         buttons={
                             <>
                                 {stageInstance.areEventsEnabled() && (
@@ -438,13 +444,13 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                     </Box>
                 </GlassPanel>
 
-                <ControlDock stage={stage} onActivate={skit => { if (skit) setScreenType(ScreenType.SKIT); }} />
+                <ControlDock stage={stage} onActivate={handleAction} />
             </Box>
 
             {showContentManagement && (
                 <ContentManagementScreen
                     stage={stage}
-                    onClose={() => {stage().saveGame(); setShowContentManagement(false);}}
+                    onClose={() => {stage().saveGame(); setShowContentManagement(false); handleAction();}}
                 />
             )}
         </>

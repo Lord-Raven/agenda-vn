@@ -3,7 +3,6 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { getFontSizeMultiplier } from '@lord-raven/novel-visualizer';
 import { Stage } from '../Stage';
 import { Actor } from '../content/Actor';
-import { Button } from '../components/UiComponents';
 import { ActorPortrait } from '../components/ActorPortrait';
 import { ActorDetailPanel } from './ActorDetailPanel';
 import {

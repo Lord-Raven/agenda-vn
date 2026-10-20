@@ -2,7 +2,7 @@ import { CSSProperties, FC, Fragment, ReactNode, useEffect, useLayoutEffect, use
 import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings, TouchApp } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
-import { getMapImageUrl, isMapAvailable, Map as GameMap } from '../content/Map';
+import { getMapImageUrl, Map as GameMap } from '../content/Map';
 import { getLocationImageUrl, getLocationName } from '../content/Location';
 import { getCurrentLocation, Skit } from '../content/Skit';
 import { Stage } from '../Stage';
@@ -23,6 +23,7 @@ import { normalizeReferenceListValue } from '../content/Stat';
 interface DefinedMapViewProps {
     stage: () => Stage;
     maps: GameMap[];
+    onAction: (skit?: Skit | null) => void;
     setScreenType: (type: ScreenType) => void;
     isVerticalLayout: boolean;
 }
@@ -99,28 +100,25 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
     );
 };
 
-export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreenType, isVerticalLayout }) => {
+export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction: handleAction, setScreenType, isVerticalLayout }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
     const [hoveredLink, setHoveredLink] = useState<string | null>(null);
-    const [revision, setRevision] = useState(0);
     const mapViewportRef = useRef<HTMLDivElement>(null);
     const [mapViewportSize, setMapViewportSize] = useState({ width: 0, height: 0 });
     const [mapImageSize, setMapImageSize] = useState({ width: 0, height: 0 });
     const save = stage().getSave();
     const sortedMaps = useMemo(() => [...maps]
-        .filter(map => isMapAvailable(map, stage().getScheduleContext(save)))
-        .sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name)), [maps, save, revision]);
+        .sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name)), [maps]);
 
-    const latestLocationId = useMemo(() => {
-        for (let index = save.timeline.length - 1; index >= 0; index -= 1) {
-            const skit = save.timeline[index]?.skit;
-            if (skit) {
-                return getCurrentLocation(skit, Math.max(-1, (skit.script?.length || 0) - 1));
-            }
+    let latestLocationId = '';
+    for (let index = save.timeline.length - 1; index >= 0; index -= 1) {
+        const skit = save.timeline[index]?.skit;
+        if (skit) {
+            latestLocationId = getCurrentLocation(skit, Math.max(-1, (skit.script?.length || 0) - 1));
+            break;
         }
-        return '';
-    }, [save.timeline, revision]);
+    }
 
     const preferredMap = useMemo(() => {
         if (latestLocationId) {
@@ -141,10 +139,6 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
     }, [displayedMapId, preferredMap, sortedMaps]);
 
     const displayedMap = sortedMaps.find(map => map.id === displayedMapId) || preferredMap;
-    const handleAction = (skit?: Skit | null) => {
-        setRevision(current => current + 1);
-        if (skit) setScreenType(ScreenType.SKIT);
-    };
     const configuredBackgroundImageUrl = stage().getConfiguration().backgroundImageUrl?.trim();
     const cachedBackgroundImageUrl = useCachedImageUrl(configuredBackgroundImageUrl);
     const screenBackgroundImage = cachedBackgroundImageUrl
@@ -422,7 +416,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, setScreen
 
                 <ControlDock stage={stage} onActivate={handleAction} />
             </Box>
-            {showContentManagement && <ContentManagementScreen stage={stage} onClose={() => { stage().saveGame(); setShowContentManagement(false); }} />}
+            {showContentManagement && <ContentManagementScreen stage={stage} onClose={() => { stage().saveGame(); setShowContentManagement(false); handleAction(); }} />}
         </>
     );
 };
