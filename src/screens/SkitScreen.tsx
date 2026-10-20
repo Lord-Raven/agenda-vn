@@ -218,6 +218,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                 }}>
                     <GlobalStatBar
                         stage={stage}
+                        isVerticalLayout={isVerticalLayout}
                         onActivate={nextSkit => {
                             if (nextSkit) {
                                 setSkit(nextSkit);

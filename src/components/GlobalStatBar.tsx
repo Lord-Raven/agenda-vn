@@ -8,6 +8,7 @@ import { ControlRenderer } from "./ControlRenderer";
 
 interface GlobalStatBarProps {
     stage: () => Stage;
+    isVerticalLayout?: boolean;
     buttons?: ReactNode;
     onActivate?: (skit?: Skit | null) => void;
 }
@@ -28,7 +29,7 @@ const getDateTimeIcon = (timeOfDay?: string) => {
     return EventAvailable;
 };
 
-export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActivate }) => {
+export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActivate, isVerticalLayout = false }) => {
     // Bumped after a top Control fires/edits a stat, forcing this bar to re-render with the resulting state.
     const [revision, setRevision] = useState(0);
     const stageInstance = stage();
@@ -48,7 +49,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
             sx={{
                 display: "flex",
                 alignItems: "flex-start",
-                gap: 1,
+                gap: isVerticalLayout ? 0.5 : 1,
                 width: "100%",
             }}
         >
@@ -56,7 +57,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                 sx={{
                     display: "flex",
                     flexWrap: "wrap",
-                    gap: 1,
+                    gap: isVerticalLayout ? 0.5 : 1,
                     flex: 1,
                     minWidth: 0,
                     alignItems: "stretch",
@@ -70,9 +71,9 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: 0.8,
-                        padding: "8px 10px",
-                        borderRadius: "12px",
+                        gap: isVerticalLayout ? 0.4 : 0.8,
+                        padding: isVerticalLayout ? "4px 6px" : "8px 10px",
+                        borderRadius: isVerticalLayout ? "8px" : "12px",
                         border: "1px solid var(--agenda-panel-border)",
                         background: "color-mix(in srgb, var(--agenda-panel-surface) 88%, transparent)",
                         boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--agenda-text-primary) 4%, transparent)",
@@ -83,7 +84,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                             color: "var(--agenda-text-primary)",
                             fontFamily: "var(--agenda-font-flavor)",
                             fontWeight: 700,
-                            fontSize: { xs: '1.25rem', md: '1.8rem' },
+                            fontSize: isVerticalLayout ? '0.85rem' : { xs: '1.25rem', md: '1.8rem' },
                             whiteSpace: "nowrap",
                         }}
                     >
@@ -116,6 +117,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                         key={`top-control-${control.id}`}
                         control={control}
                         stage={stage}
+                        isVerticalLayout={isVerticalLayout}
                         onActivate={skit => {
                             setRevision(current => current + 1);
                             onActivate?.(skit);

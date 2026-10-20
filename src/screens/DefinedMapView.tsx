@@ -238,6 +238,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                 <Box sx={{ flexShrink: 0 }}>
                     <GlobalStatBar
                         stage={stage}
+                        isVerticalLayout={isVerticalLayout}
                         onActivate={handleAction}
                         buttons={
                             <>
@@ -414,7 +415,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                         </AnimatePresence>
                 </Box>
 
-                <ControlDock stage={stage} onActivate={handleAction} />
+                <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleAction} />
             </Box>
             {showContentManagement && <ContentManagementScreen stage={stage} onClose={() => { stage().saveGame(); setShowContentManagement(false); handleAction(); }} />}
         </>

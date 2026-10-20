@@ -6,12 +6,13 @@ import { Skit } from '../content/Skit';
 
 interface ControlDockProps {
     stage: () => Stage;
+    isVerticalLayout?: boolean;
     onActivate?: (skit?: Skit | null) => void;
 }
 
 // Renders every available 'bottom' placement Control (buttons, stat displays, stat editors) in a row below
 // the main map content. Renders nothing when there are no available bottom controls.
-export const ControlDock: FC<ControlDockProps> = ({ stage, onActivate }) => {
+export const ControlDock: FC<ControlDockProps> = ({ stage, onActivate, isVerticalLayout = false }) => {
     // Bumped after a control fires/edits a stat, forcing this dock to re-render with the resulting state.
     const [revision, setRevision] = useState(0);
     const stageInstance = stage();
@@ -28,7 +29,7 @@ export const ControlDock: FC<ControlDockProps> = ({ stage, onActivate }) => {
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'stretch',
-                gap: 1,
+                gap: isVerticalLayout ? 0.5 : 1,
             }}
         >
             {bottomControls.map((control) => (
@@ -36,6 +37,7 @@ export const ControlDock: FC<ControlDockProps> = ({ stage, onActivate }) => {
                     key={`bottom-control-${control.id}`}
                     control={control}
                     stage={stage}
+                    isVerticalLayout={isVerticalLayout}
                     onActivate={skit => {
                         setRevision(current => current + 1);
                         onActivate?.(skit);

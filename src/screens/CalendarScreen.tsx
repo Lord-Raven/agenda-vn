@@ -167,7 +167,7 @@ const groupEventsByDate = (events: CalendarEvent[]) => events.reduce((grouped, e
     return grouped;
 }, new Map<string, CalendarEvent[]>());
 
-export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }) => {
+export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, isVerticalLayout }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
 
@@ -306,6 +306,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType }
                 <Box sx={{ flexShrink: 0, mb: 1.25 }}>
                     <GlobalStatBar
                         stage={stage}
+                        isVerticalLayout={isVerticalLayout}
                         onActivate={skit => { if (skit) setScreenType(ScreenType.SKIT); }}
                         buttons={
                             <>

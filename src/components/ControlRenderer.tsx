@@ -14,6 +14,7 @@ import { Skit } from '../content/Skit';
 interface ControlRendererProps {
     control: Control;
     stage: () => Stage;
+    isVerticalLayout?: boolean;
     // Called after a button fires or a stat editor's value changes, so the caller can force a re-render to
     // reflect the resulting save/config state (this component otherwise has no reactive subscription to it).
     onActivate: (skit?: Skit | null) => void;
@@ -49,8 +50,9 @@ const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]
 // Renders a single Control per its type: 'button' as a clickable action, 'statDisplay'/'statEditor' as the
 // same labeled box the Global Stat Bar used to render directly from globalStats. Used by both GlobalStatBar
 // (placement 'top') and the bottom control dock (placement 'bottom').
-export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onActivate }) => {
+export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onActivate, isVerticalLayout = false }) => {
     const stageInstance = stage();
+    const fontSize = isVerticalLayout ? 'clamp(0.8rem, 10cqi, 1rem)' : valueFontSize;
 
     if (control.type === 'actorStatDisplay' || control.type === 'statOutcome') {
         return null;
@@ -58,7 +60,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
 
     const widthWeight = control.widthWeight ?? 1;
     const sizingStyle = {
-        flex: `${widthWeight} 1 calc(150px * ${widthWeight})`,
+        flex: `${widthWeight} 1 calc(${isVerticalLayout ? 96 : 150}px * ${widthWeight})`,
         minWidth: 0,
         boxSizing: 'border-box' as const,
     };
@@ -80,7 +82,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                     }
                     onActivate(skit);
                 }}
-                style={{ ...sizingStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 14px', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
+                style={{ ...sizingStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isVerticalLayout ? 4 : 6, padding: isVerticalLayout ? '4px 6px' : '8px 14px', ...(isVerticalLayout ? { fontSize: '0.8rem', minHeight: 32 } : {}), whiteSpace: 'normal', overflowWrap: 'anywhere' }}
             >
                 {Icon && <Icon fontSize="small" />}
                 {control.label?.trim() || control.name?.trim() || 'Button'}
@@ -109,15 +111,15 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     const referenceKind = resolveReferenceKind(stat.type);
 
     return (
-        <Box title={tooltipText || undefined} sx={{ ...boxStyle, ...sizingStyle }}>
+        <Box title={tooltipText || undefined} sx={{ ...boxStyle, ...sizingStyle, ...(isVerticalLayout ? { gap: 0.25, padding: '4px 6px', borderRadius: '8px' } : {}) }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', lineHeight: 1.2 }}>
                 {StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)' }} />}
-                <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.66rem', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: isVerticalLayout ? '0.6rem' : '0.66rem', letterSpacing: isVerticalLayout ? '0.05em' : '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
                     {label}
                 </Typography>
             </Box>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, minHeight: 32, containerType: 'inline-size' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, minHeight: isVerticalLayout ? 20 : 32, containerType: 'inline-size' }}>
             {referenceKind && isReferenceListDisplayType(stat.type) && !(control.type === 'statEditor' && isValueReference(rawValue)) ? (
                 <ContentListControl
                     kind={referenceKind}
@@ -148,10 +150,10 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                     stat={stat}
                     display={{ ...control, ratingIconName: control.displayType === 'rating' ? String(stageInstance.resolveValue(control.ratingIconName, 'text')) : control.ratingIconName }}
                     value={Number(normalizedValue)}
-                    style={{ minHeight: 20, ...(control.displayType === 'rating' ? { justifyContent: 'flex-start' } : { fontSize: valueFontSize }) }}
+                    style={{ minHeight: isVerticalLayout ? 16 : 20, ...(control.displayType === 'rating' ? { justifyContent: 'flex-start', ...(isVerticalLayout ? { height: 20 } : {}) } : { fontSize }) }}
                 />
             ) : (
-                <Typography sx={{ color: control.displayColor || 'var(--agenda-text-primary)', fontSize: valueFontSize, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
+                <Typography sx={{ color: control.displayColor || 'var(--agenda-text-primary)', fontSize, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
                     {resolveDisplayValue(stat, normalizedValue, stageInstance.getSave()?.atlas)}
                 </Typography>
             )}

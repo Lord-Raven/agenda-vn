@@ -150,6 +150,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                 <Box sx={{ flexShrink: 0 }}>
                     <GlobalStatBar
                         stage={stage}
+                        isVerticalLayout={isVerticalLayout}
                         onActivate={handleAction}
                         buttons={
                             <>
@@ -444,7 +445,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                     </Box>
                 </GlassPanel>
 
-                <ControlDock stage={stage} onActivate={handleAction} />
+                <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleAction} />
             </Box>
 
             {showContentManagement && (
