@@ -3302,13 +3302,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     async readStageConfiguration(speakerIds: string[] = []): Promise<void> {
         console.log('Attempting to read stage configuration');
         const characterIds = speakerIds.length ? speakerIds : [this.primaryCharacter.anonymizedId];
-        const storedContent = (await this.storage.get('agenda_configuration').forCharacters(characterIds)).data;
+        const response = await this.storage.get('agenda_configuration').forCharacters(characterIds);
+        // response.data is a list of StorageDatum entries; the stored configuration lives in an entry's `value`.
+        const entries = Array.isArray(response?.data) ? response.data : [];
+        const storedContent = entries.find((entry: any) => entry?.key === 'agenda_configuration' && entry.value)?.value;
 
         console.log('Stored stage configuration:');
         console.log(storedContent);
 
         // If there was content, load it as the game's configuration so new games use the latest saved content.
         if (storedContent && typeof storedContent === 'object') {
+            console.log('Should load configuration');
             this.updateConfiguration(storedContent as Partial<GameConfiguration>);
         }
     }
