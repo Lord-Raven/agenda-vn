@@ -760,10 +760,15 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
 
                             <section>
                                 <h2 style={sectionHeadingStyle}>Availability</h2>
+                                <p style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
+                                    Choose Location Stat and the Variable target to compare this location's own stats.
+                                </p>
                                 <ConditionEditor
                                     conditionCollections={editedLocation.availabilityCollections}
                                     globalStats={stage().getConfiguration().globalStats || []}
                                     actorStats={stage().getConfiguration().actorStats || []}
+                                    locationStats={locationStats}
+                                    variableContentType="location"
                                     actors={Object.values(stage().getSave().actors || {})}
                                     stage={stage}
                                     items={itemOptions}

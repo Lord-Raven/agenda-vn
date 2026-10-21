@@ -58,12 +58,12 @@ export const normalizeLocationOpenTimes = (openTimes: unknown): Partial<Record<C
 
 // A disabled location is hidden entirely from maps (e.g. a business that doesn't exist yet).
 export const isLocationDisabled = (location: Location, context: ConditionContext): boolean => {
-	return evaluateConditionCollections(location.availabilityConditions?.disabled, context, false);
+	return evaluateConditionCollections(location.availabilityConditions?.disabled, { ...context, currentLocation: location }, false);
 };
 
 // An inactive location still appears (grayed out) but cannot be visited (e.g. a business closed for the day).
 export const isLocationInactive = (location: Location, context: ConditionContext): boolean => {
-	return !evaluateConditionCollections(location.availabilityConditions?.unavailable, context);
+	return !evaluateConditionCollections(location.availabilityConditions?.unavailable, { ...context, currentLocation: location });
 };
 
 export const isLocationAvailable = (location: Location, context: ConditionContext): boolean => {
