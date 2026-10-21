@@ -1,7 +1,7 @@
 import React, { FC, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
-import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2, Code } from '@mui/icons-material';
+import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2, Code, Rule } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorManagementPanel } from './ActorManagementPanel';
 import { LocationManagementPanel } from './LocationManagementPanel';
@@ -11,6 +11,7 @@ import { GameManagementPanel } from './GameManagementPanel';
 import { CalendarEventManagementPanel } from './CalendarEventManagementPanel';
 import { MapManagementPanel } from './MapManagementPanel';
 import { StatManagementPanel } from './StatManagementPanel';
+import { RulesManagementPanel } from './RulesManagementPanel';
 import { ItemManagementPanel } from './ItemManagementPanel';
 import { ControlManagementPanel } from './ControlManagementPanel';
 import { FunctionManagementPanel } from './FunctionManagementPanel';
@@ -20,10 +21,10 @@ interface ContentManagementScreenProps {
     onClose: () => void;
 }
 
-type TabType = 'game' | 'style' | 'stats' | 'functions' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
+type TabType = 'game' | 'style' | 'stats' | 'rules' | 'functions' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
 const tabStorageKey = 'contentManagement.activeTab';
-const tabs: TabType[] = ['game', 'style', 'stats', 'functions', 'controls', 'lorebook', 'actors', 'locations', 'items', 'maps', 'calendarEvents'];
-const creatorTabs: TabType[] = ['game', 'style', 'functions', 'controls'];
+const tabs: TabType[] = ['game', 'style', 'stats', 'rules', 'functions', 'controls', 'lorebook', 'actors', 'locations', 'items', 'maps', 'calendarEvents'];
+const creatorTabs: TabType[] = ['game', 'style', 'rules', 'functions', 'controls'];
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
@@ -210,6 +211,15 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     Stats
                                 </Button>
                                 {isCreatorMode && (
+                                    <Button
+                                        onClick={() => setActiveTab('rules')}
+                                        variant={activeTab === 'rules' ? 'primary' : 'secondary'}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: activeTab === 'rules' ? 1 : 0.6 }}
+                                    >
+                                        <Rule /> Rules
+                                    </Button>
+                                )}
+                                {isCreatorMode && (
                                     <Button onClick={() => setActiveTab('functions')} variant={activeTab === 'functions' ? 'primary' : 'secondary'}
                                         style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: activeTab === 'functions' ? 1 : 0.6 }}>
                                         <Code /> Functions ({stage().getConfiguration().functions.length})
@@ -364,6 +374,10 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 {/* Stats Tab */}
                                 {activeTab === 'stats' && (
                                     <StatManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
+                                )}
+
+                                {isCreatorMode && activeTab === 'rules' && (
+                                    <RulesManagementPanel stage={stage} />
                                 )}
 
                                 {/* Controls Tab */}

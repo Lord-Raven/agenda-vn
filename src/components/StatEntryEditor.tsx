@@ -129,7 +129,7 @@ interface StatEntryEditorProps {
     typeLabel: string;
     category: StatEntryCategory;
     collapsed: boolean;
-    onToggleCollapse: () => void;
+    onToggleCollapse?: () => void;
     onMove: (direction: -1 | 1) => void;
     onRemove: () => void;
     onPatch: (patch: Partial<Stat>) => void;
@@ -148,7 +148,7 @@ interface StatEntryEditorProps {
     compactChipLabelStyle: React.CSSProperties;
 }
 
-// Single stat editor card shared by the Global/Actor/Location/Item stat sections of StatManagementPanel.
+// Single stat editor shared by the Global/Actor/Location/Item stat detail views.
 // Default-value rules, guidance visibility, and allowed condition targets are driven by `category`.
 export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     stat, index, total, typeLabel, category,
@@ -275,15 +275,17 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                     {stat.name?.trim() || `${typeLabel} ${index + 1}`}
                 </div>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <Button variant="secondary" disabled={index === 0} onClick={() => onMove(-1)} style={{ padding: '4px 8px', minWidth: 0 }}>
+                    <Button variant="secondary" aria-label="Move stat up" disabled={index === 0} onClick={() => onMove(-1)} style={{ padding: '4px 8px', minWidth: 0 }}>
                         <KeyboardArrowUp fontSize="small" />
                     </Button>
-                    <Button variant="secondary" disabled={index === total - 1} onClick={() => onMove(1)} style={{ padding: '4px 8px', minWidth: 0 }}>
+                    <Button variant="secondary" aria-label="Move stat down" disabled={index === total - 1} onClick={() => onMove(1)} style={{ padding: '4px 8px', minWidth: 0 }}>
                         <KeyboardArrowDown fontSize="small" />
                     </Button>
-                    <Button variant="secondary" onClick={onToggleCollapse}>
-                        {collapsed ? 'Expand' : 'Collapse'}
-                    </Button>
+                    {onToggleCollapse && (
+                        <Button variant="secondary" onClick={onToggleCollapse}>
+                            {collapsed ? 'Expand' : 'Collapse'}
+                        </Button>
+                    )}
                 </div>
             </div>
 

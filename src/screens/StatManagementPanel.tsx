@@ -1,19 +1,29 @@
-import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { FC, useCallback, useMemo, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
-import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatValue, StatUpdateRule, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, cloneStat } from '../content/Stat';
-import { Button, GlassPanel, Title } from '../components/UiComponents';
-import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
-import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
-import { StatEntryEditor } from '../components/StatEntryEditor';
-import { Add } from '@mui/icons-material';
+import { Stat, StatValue, cloneStat, includeNewOptionListOptions, normalizeStatValue } from '../content/Stat';
+import { StatEntryCategory } from '../components/StatEntryEditor';
+import {
+    CategorizedEntrySidebar,
+    toggleSidebarCollapseState,
+    useCachedSidebarCollapseState,
+} from '../components/CategorizedEntrySidebar';
+import { useDebouncedSave } from '../components/useDebouncedSave';
 import { GlobalStatManagementPanel } from './GlobalStatManagementPanel';
+import { StatsDetailPanel } from './StatsDetailPanel';
 
 interface StatManagementPanelProps {
     stage: () => Stage;
     isCreatorMode: boolean;
 }
+
+const STAT_CATEGORIES: { id: StatEntryCategory; title: string }[] = [
+    { id: 'global', title: 'Global' },
+    { id: 'actor', title: 'Actor' },
+    { id: 'location', title: 'Location' },
+    { id: 'item', title: 'Item' },
+];
 
 const defaultGlobalStat = (): Stat => {
     const id = generateUuid();
@@ -34,38 +44,18 @@ const defaultGlobalStat = (): Stat => {
     };
 };
 
-const defaultTypedStat = (): Stat => {
-    const id = generateUuid();
-    return {
-        id,
-        name: 'Name',
-        guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
-        default: 50,
-        type: 'number',
-        min: 0,
-        max: 100,
-        options: [],
-        llmSees: { value: false, conditions: [] },
-        llmMaintained: { value: false, conditions: [] },
-    };
-};
-
-const swapArrayItems = <T,>(items: T[], indexA: number, indexB: number): T[] => {
-    const next = [...items];
-    [next[indexA], next[indexB]] = [next[indexB], next[indexA]];
-    return next;
-};
-
-const clampStatValue = (value: number, stat: Stat): number => {
-    let resolved = Number.isFinite(value) ? Number(value) : Number(stat.default) || 0;
-    if (typeof stat.min === 'number') {
-        resolved = Math.max(stat.min, resolved);
-    }
-    if (typeof stat.max === 'number') {
-        resolved = Math.min(stat.max, resolved);
-    }
-    return resolved;
-};
+const defaultTypedStat = (): Stat => ({
+    id: generateUuid(),
+    name: 'Name',
+    guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
+    default: 50,
+    type: 'number',
+    min: 0,
+    max: 100,
+    options: [],
+    llmSees: { value: false, conditions: [] },
+    llmMaintained: { value: false, conditions: [] },
+});
 
 export const StatManagementPanel: FC<StatManagementPanelProps> = ({ stage, isCreatorMode }) => (
     isCreatorMode
@@ -77,500 +67,181 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const configuration = stageInstance.getConfiguration();
-
-    const [loadedGlobalStats] = useState<Stat[]>(() => configuration.globalStats || []);
-    const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
-        (configuration.globalStats || []).map(cloneStat),
-    );
-    const locationOptions = useMemo(
-        () => Object.values(save.atlas || {})
-            .filter(location => location.active !== false),
-        [save.atlas],
-    );
-    const actorOptions = useMemo(
-        () => Object.values(save.actors || {})
-            .filter(actor => actor.id !== save.playerId && actor.active !== false),
-        [save.actors, save.playerId],
-    );
-    const itemOptions = useMemo(
-        () => (save.inventory || [])
-            .filter(item => item.active !== false),
-        [save.inventory],
-    );
-    const [collapsedGlobalStats, setCollapsedGlobalStats] = useState<boolean[]>(() =>
-        (configuration.globalStats || []).map(() => true),
-    );
-    const [collapsedActorStats, setCollapsedActorStats] = useState<boolean[]>(() =>
-        (configuration.actorStats || []).map(() => true),
-    );
-    const [actorStats, setActorStats] = useState<Stat[]>(() =>
-        (configuration.actorStats || []).map(cloneStat),
-    );
-    const [collapsedLocationStats, setCollapsedLocationStats] = useState<boolean[]>(() =>
-        (configuration.locationStats || []).map(() => true),
-    );
-    const [locationStats, setLocationStats] = useState<Stat[]>(() =>
-        (configuration.locationStats || []).map(cloneStat),
-    );
-    const [collapsedItemStats, setCollapsedItemStats] = useState<boolean[]>(() =>
-        (configuration.itemStats || []).map(() => true),
-    );
-    const [itemStats, setItemStats] = useState<Stat[]>(() =>
-        (configuration.itemStats || []).map(cloneStat),
-    );
-    const [globalStatValues, setGlobalStatValues] = useState<{ [key: string]: StatValue }>(() => ({
+    const [loadedGlobalStats] = useState(() => (configuration.globalStats || []).map(cloneStat));
+    const [stats, setStats] = useState<Record<StatEntryCategory, Stat[]>>(() => ({
+        global: (configuration.globalStats || []).map(cloneStat),
+        actor: (configuration.actorStats || []).map(cloneStat),
+        location: (configuration.locationStats || []).map(cloneStat),
+        item: (configuration.itemStats || []).map(cloneStat),
+    }));
+    const [globalStatValues, setGlobalStatValues] = useState<Record<string, StatValue>>(() => ({
         ...configuration.globalStatValues,
         ...save.globalStatValues,
     }));
-    const [universalSchedule, setUniversalSchedule] = useState<ActorSchedule>(() =>
-        cloneActorSchedule(configuration.universalSchedule),
-    );
-    const [statUpdateRules, setStatUpdateRules] = useState<StatUpdateRule[]>(() =>
-        cloneStatUpdateRules(configuration.statUpdateRules),
-    );
-    const autoSaveTimeoutRef = useRef<number | null>(null);
-    const didMountRef = useRef(false);
-
-    const fieldLabelStyle: React.CSSProperties = {
-        display: 'block',
-        color: 'var(--agenda-text-muted)',
-        marginBottom: 0,
-        fontSize: '13px',
-        lineHeight: 1.1,
-    };
-
-    const inlineFieldStyle: React.CSSProperties = {
-        display: 'grid',
-        gridTemplateColumns: '120px minmax(0, 1fr)',
-        gap: '10px',
-        alignItems: 'center',
-        marginBottom: 8,
-    };
-
-    const inlineFieldTopStyle: React.CSSProperties = {
-        ...inlineFieldStyle,
-        alignItems: 'start',
-    };
-
-    const compactChipLabelStyle: React.CSSProperties = {
-        color: 'var(--agenda-text-muted)',
-        fontSize: '12px',
-        marginBottom: 4,
-    };
+    const [selectedStatId, setSelectedStatId] = useState<string | null>(null);
+    const [collapsedSections, setCollapsedSections] = useCachedSidebarCollapseState('stat-management');
+    const shouldReduceMotion = useReducedMotion();
 
     const validGlobalStatValues = useMemo(() => {
-        const nextValues: { [key: string]: StatValue } = {};
-
-        globalStats.forEach((stat) => {
-            if (!stat.id || !(stat.name || '').trim()) {
+        const nextValues: Record<string, StatValue> = {};
+        stats.global.forEach(stat => {
+            if (!stat.id || !stat.name.trim()) {
                 return;
             }
-
-            // Baseline is the stat as loaded, so options added during this session stay included across autosaves.
-            const loadedStat = loadedGlobalStats.find((candidate) => candidate.id === stat.id);
+            // Keep the loaded baseline so newly added options survive successive autosaves.
+            const loadedStat = loadedGlobalStats.find(candidate => candidate.id === stat.id);
             nextValues[stat.id] = normalizeStatValue(includeNewOptionListOptions(globalStatValues[stat.id], loadedStat, stat), stat);
         });
-
         return nextValues;
-    }, [globalStatValues, globalStats, loadedGlobalStats]);
+    }, [globalStatValues, stats.global, loadedGlobalStats]);
 
     const saveGameConfiguration = useCallback(() => {
         stageInstance.updateConfiguration({
-            actorStats,
-            locationStats,
-            itemStats,
-            globalStats: globalStats,
+            globalStats: stats.global,
+            actorStats: stats.actor,
+            locationStats: stats.location,
+            itemStats: stats.item,
             globalStatValues: validGlobalStatValues,
-            universalSchedule,
-            statUpdateRules,
         });
-    }, [actorStats, globalStats, itemStats, locationStats, stageInstance, statUpdateRules, universalSchedule, validGlobalStatValues]);
+    }, [stageInstance, stats, validGlobalStatValues]);
+    useDebouncedSave(saveGameConfiguration);
 
-    useEffect(() => {
-        if (!didMountRef.current) {
-            didMountRef.current = true;
-            return;
-        }
-
-        if (autoSaveTimeoutRef.current) {
-            clearTimeout(autoSaveTimeoutRef.current);
-        }
-
-        autoSaveTimeoutRef.current = window.setTimeout(() => {
-            saveGameConfiguration();
-        }, 300);
-
-        return () => {
-            if (autoSaveTimeoutRef.current) {
-                clearTimeout(autoSaveTimeoutRef.current);
-            }
-        };
-    }, [saveGameConfiguration]);
-
-    useEffect(() => {
-        return () => {
-            if (autoSaveTimeoutRef.current) {
-                saveGameConfiguration();
-            }
-        };
-    }, [saveGameConfiguration]);
-
-    const updateGlobalStat = (index: number, patch: Partial<Stat>) => {
-        setGlobalStats(prev => prev.map((stat, idx) => (
-            idx === index ? { ...stat, ...patch } : stat
-        )));
-    };
-
-    const setGlobalStatName = (index: number, rawName: string) => {
-        const previousName = (globalStats[index]?.name || '').trim();
-
-        updateGlobalStat(index, { name: rawName });
-
-        const trimmedNextName = rawName.trim();
-        if (!previousName || !trimmedNextName || previousName === trimmedNextName) {
-            return;
-        }
-
-        setGlobalStatValues((prev) => {
-            const nextValues = { ...prev };
-            const existingValue = nextValues[previousName];
-            delete nextValues[previousName];
-            if (existingValue !== undefined) {
-                nextValues[trimmedNextName] = existingValue;
-            }
-            return nextValues;
-        });
-    };
-
-    const removeGlobalStat = (index: number) => {
-        const removedName = (globalStats[index]?.name || '').trim();
-
-        setGlobalStats(prev => prev.filter((_, idx) => idx !== index));
-        setCollapsedGlobalStats(prev => prev.filter((_, idx) => idx !== index));
-
-        if (removedName) {
-            setGlobalStatValues((prev) => {
-                const nextValues = { ...prev };
-                delete nextValues[removedName];
-                return nextValues;
-            });
-        }
-    };
-
-    const toggleGlobalStat = (index: number) => {
-        setCollapsedGlobalStats(prev => prev.map((isCollapsed, idx) => (
-            idx === index ? !isCollapsed : isCollapsed
-        )));
-    };
-
-    const moveGlobalStat = (index: number, direction: -1 | 1) => {
-        const targetIndex = index + direction;
-        if (targetIndex < 0 || targetIndex >= globalStats.length) {
-            return;
-        }
-        setGlobalStats(prev => swapArrayItems(prev, index, targetIndex));
-        setCollapsedGlobalStats(prev => swapArrayItems(prev, index, targetIndex));
-    };
-
-    const updateActorStat = (index: number, patch: Partial<Stat>) => {
-        setActorStats(prev => prev.map((stat, idx) => (
-            idx === index ? { ...stat, ...patch } : stat
-        )));
-    };
-
-    const removeActorStat = (index: number) => {
-        setActorStats(prev => prev.filter((_, idx) => idx !== index));
-        setCollapsedActorStats(prev => prev.filter((_, idx) => idx !== index));
-    };
-
-    const toggleActorStat = (index: number) => {
-        setCollapsedActorStats(prev => prev.map((isCollapsed, idx) => (
-            idx === index ? !isCollapsed : isCollapsed
-        )));
-    };
-
-    const moveActorStat = (index: number, direction: -1 | 1) => {
-        const targetIndex = index + direction;
-        if (targetIndex < 0 || targetIndex >= actorStats.length) {
-            return;
-        }
-        setActorStats(prev => swapArrayItems(prev, index, targetIndex));
-        setCollapsedActorStats(prev => swapArrayItems(prev, index, targetIndex));
-    };
-
-    const updateLocationStat = (index: number, patch: Partial<Stat>) => {
-        setLocationStats(prev => prev.map((stat, idx) => (
-            idx === index ? { ...stat, ...patch } : stat
-        )));
-    };
-
-    const removeLocationStat = (index: number) => {
-        setLocationStats(prev => prev.filter((_, idx) => idx !== index));
-        setCollapsedLocationStats(prev => prev.filter((_, idx) => idx !== index));
-    };
-
-    const toggleLocationStat = (index: number) => {
-        setCollapsedLocationStats(prev => prev.map((isCollapsed, idx) => (
-            idx === index ? !isCollapsed : isCollapsed
-        )));
-    };
-
-    const moveLocationStat = (index: number, direction: -1 | 1) => {
-        const targetIndex = index + direction;
-        if (targetIndex < 0 || targetIndex >= locationStats.length) {
-            return;
-        }
-        setLocationStats(prev => swapArrayItems(prev, index, targetIndex));
-        setCollapsedLocationStats(prev => swapArrayItems(prev, index, targetIndex));
-    };
-
-    const updateItemStat = (index: number, patch: Partial<Stat>) => {
-        setItemStats(prev => prev.map((stat, idx) => (
-            idx === index ? { ...stat, ...patch } : stat
-        )));
-    };
-
-    const removeItemStat = (index: number) => {
-        setItemStats(prev => prev.filter((_, idx) => idx !== index));
-        setCollapsedItemStats(prev => prev.filter((_, idx) => idx !== index));
-    };
-
-    const toggleItemStat = (index: number) => {
-        setCollapsedItemStats(prev => prev.map((isCollapsed, idx) => (
-            idx === index ? !isCollapsed : isCollapsed
-        )));
-    };
-
-    const moveItemStat = (index: number, direction: -1 | 1) => {
-        const targetIndex = index + direction;
-        if (targetIndex < 0 || targetIndex >= itemStats.length) {
-            return;
-        }
-        setItemStats(prev => swapArrayItems(prev, index, targetIndex));
-        setCollapsedItemStats(prev => swapArrayItems(prev, index, targetIndex));
-    };
-
+    const sections = STAT_CATEGORIES.map(category => ({ ...category, entries: stats[category.id] }));
+    const selectedSection = sections.find(section => section.entries.some(stat => stat.id === selectedStatId));
+    const selectedIndex = selectedSection?.entries.findIndex(stat => stat.id === selectedStatId) ?? -1;
+    const selectedStat = selectedSection?.entries[selectedIndex];
     const conditionActors = Object.values(save.actors || {}).filter(actor => actor.id !== save.playerId);
+    const actorOptions = conditionActors.filter(actor => actor.active !== false);
+    const locationOptions = Object.values(save.atlas || {}).filter(location => location.active !== false);
+    const itemOptions = (save.inventory || []).filter(item => item.active !== false);
+
+    const updateStat = (category: StatEntryCategory, id: string, patch: Partial<Stat>) => {
+        setStats(current => ({
+            ...current,
+            [category]: current[category].map(stat => stat.id === id ? { ...stat, ...patch } : stat),
+        }));
+    };
+
+    const handleCreateStat = (sectionId: string) => {
+        const section = sections.find(candidate => candidate.id === sectionId);
+        if (!section) {
+            throw new Error(`Unknown stat category: ${sectionId}`);
+        }
+        const stat = section.id === 'global' ? defaultGlobalStat() : defaultTypedStat();
+        setStats(current => ({ ...current, [section.id]: [...current[section.id], stat] }));
+        setCollapsedSections(current => ({ ...current, [section.id]: false }));
+        setSelectedStatId(stat.id);
+    };
+
+    const moveSelectedStat = (direction: -1 | 1) => {
+        if (!selectedSection || !selectedStat) {
+            return;
+        }
+        const category = selectedSection.id;
+        const targetIndex = selectedIndex + direction;
+        if (targetIndex < 0 || targetIndex >= stats[category].length) {
+            return;
+        }
+        setStats(current => {
+            const entries = [...current[category]];
+            [entries[selectedIndex], entries[targetIndex]] = [entries[targetIndex], entries[selectedIndex]];
+            return { ...current, [category]: entries };
+        });
+    };
+
+    const removeSelectedStat = () => {
+        if (!selectedSection || !selectedStat) {
+            return;
+        }
+        setStats(current => ({
+            ...current,
+            [selectedSection.id]: current[selectedSection.id].filter(stat => stat.id !== selectedStat.id),
+        }));
+        setSelectedStatId(null);
+    };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-                    <Title variant="glow" style={{ fontSize: '20px', margin: 0 }}>Global Stats</Title>
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            setGlobalStats(prev => [...prev, defaultGlobalStat()]);
-                            setCollapsedGlobalStats(prev => [...prev, false]);
+        <div style={{
+            display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) minmax(0, 1fr)',
+            gap: '20px', flex: 1, minHeight: 0, height: '100%',
+        }}>
+            <CategorizedEntrySidebar
+                sections={sections}
+                collapsedSections={collapsedSections}
+                onToggleSection={sectionId => setCollapsedSections(current => toggleSidebarCollapseState(current, sectionId, false))}
+                renderEntry={stat => (
+                    <button
+                        type="button"
+                        aria-pressed={stat.id === selectedStatId}
+                        onClick={() => setSelectedStatId(stat.id)}
+                        style={{
+                            width: '100%', textAlign: 'left', borderRadius: '8px', padding: '10px',
+                            background: stat.id === selectedStatId
+                                ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)'
+                                : 'color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)',
+                            border: `1px solid ${stat.id === selectedStatId ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)'}`,
+                            color: 'var(--agenda-text-primary)', cursor: 'pointer',
+                            display: 'flex', flexDirection: 'column', gap: '2px',
                         }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                     >
-                        <Add fontSize="small" /> Add
-                    </Button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {globalStats.map((stat, statIndex) => (
-                        <StatEntryEditor
-                            key={`player-stat-${statIndex}`}
-                            stat={stat}
-                            index={statIndex}
-                            total={globalStats.length}
-                            typeLabel="Global Stat"
-                            category="global"
-                            collapsed={collapsedGlobalStats[statIndex]}
-                            onToggleCollapse={() => toggleGlobalStat(statIndex)}
-                            onMove={(direction) => moveGlobalStat(statIndex, direction)}
-                            onRemove={() => removeGlobalStat(statIndex)}
-                            onPatch={(patch) => updateGlobalStat(statIndex, patch)}
-                            onNameChange={(name) => setGlobalStatName(statIndex, name)}
-                            selfStats={globalStats}
-                            globalStats={globalStats}
-                            actorStats={actorStats}
-                            conditionActors={conditionActors}
-                            valueActors={actorOptions}
-                            items={itemOptions}
-                            locations={locationOptions}
-                            stage={stage}
-                            fieldLabelStyle={fieldLabelStyle}
-                            inlineFieldStyle={inlineFieldStyle}
-                            inlineFieldTopStyle={inlineFieldTopStyle}
-                            compactChipLabelStyle={compactChipLabelStyle}
-                        />
-                    ))}
-                </div>
-            </GlassPanel>
-
-            <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-                    <Title variant="glow" style={{ fontSize: '20px', margin: 0 }}>Actor Stats</Title>
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            setActorStats(prev => [...prev, defaultTypedStat()]);
-                            setCollapsedActorStats(prev => [...prev, false]);
+                        <span style={{ color: 'var(--agenda-highlight)', fontSize: '14px', fontWeight: 700 }}>
+                            {stat.name.trim() || '(Unnamed Stat)'}
+                        </span>
+                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: '12px' }}>{stat.type}</span>
+                    </button>
+                )}
+                getEntryKey={stat => stat.id}
+                shouldReduceMotion={Boolean(shouldReduceMotion)}
+                emptyListMessage="No stats have been defined yet."
+                sectionEmptyMessage="No stats."
+                defaultCollapsed={false}
+                renderSectionAction={section => handleCreateStat(section.id)}
+            />
+            <div style={{
+                background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
+                border: '1px solid var(--agenda-line-subtle)', borderRadius: '12px',
+                overflowY: 'auto', overflowX: 'hidden', minHeight: 0, maxHeight: '100%',
+            }}>
+                {selectedStat && selectedSection ? (
+                    <StatsDetailPanel
+                        key={selectedStat.id}
+                        stat={selectedStat}
+                        index={selectedIndex}
+                        total={selectedSection.entries.length}
+                        typeLabel={`${selectedSection.title} Stat`}
+                        category={selectedSection.id}
+                        onMove={moveSelectedStat}
+                        onRemove={removeSelectedStat}
+                        onPatch={patch => updateStat(selectedSection.id, selectedStat.id, patch)}
+                        onNameChange={name => {
+                            updateStat(selectedSection.id, selectedStat.id, { name });
+                            const previousName = selectedStat.name.trim();
+                            const nextName = name.trim();
+                            if (selectedSection.id === 'global' && previousName && nextName && previousName !== nextName) {
+                                setGlobalStatValues(current => {
+                                    const next = { ...current };
+                                    const value = next[previousName];
+                                    delete next[previousName];
+                                    if (value !== undefined) next[nextName] = value;
+                                    return next;
+                                });
+                            }
                         }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                    >
-                        <Add fontSize="small" /> Add
-                    </Button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {actorStats.map((stat, statIndex) => (
-                        <StatEntryEditor
-                            key={`actor-stat-${statIndex}`}
-                            stat={stat}
-                            index={statIndex}
-                            total={actorStats.length}
-                            typeLabel="Actor Stat"
-                            category="actor"
-                            collapsed={collapsedActorStats[statIndex]}
-                            onToggleCollapse={() => toggleActorStat(statIndex)}
-                            onMove={(direction) => moveActorStat(statIndex, direction)}
-                            onRemove={() => removeActorStat(statIndex)}
-                            onPatch={(patch) => updateActorStat(statIndex, patch)}
-                            selfStats={actorStats}
-                            globalStats={globalStats}
-                            actorStats={actorStats}
-                            conditionActors={conditionActors}
-                            valueActors={actorOptions}
-                            items={itemOptions}
-                            locations={locationOptions}
-                            stage={stage}
-                            fieldLabelStyle={fieldLabelStyle}
-                            inlineFieldStyle={inlineFieldStyle}
-                            inlineFieldTopStyle={inlineFieldTopStyle}
-                            compactChipLabelStyle={compactChipLabelStyle}
-                        />
-                    ))}
-                </div>
-            </GlassPanel>
-
-            <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-                    <Title variant="glow" style={{ fontSize: '20px', margin: 0 }}>Location Stats</Title>
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            setLocationStats(prev => [...prev, defaultTypedStat()]);
-                            setCollapsedLocationStats(prev => [...prev, false]);
-                        }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                    >
-                        <Add fontSize="small" /> Add
-                    </Button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {locationStats.map((stat, statIndex) => (
-                        <StatEntryEditor
-                            key={`location-stat-${statIndex}`}
-                            stat={stat}
-                            index={statIndex}
-                            total={locationStats.length}
-                            typeLabel="Location Stat"
-                            category="location"
-                            collapsed={collapsedLocationStats[statIndex]}
-                            onToggleCollapse={() => toggleLocationStat(statIndex)}
-                            onMove={(direction) => moveLocationStat(statIndex, direction)}
-                            onRemove={() => removeLocationStat(statIndex)}
-                            onPatch={(patch) => updateLocationStat(statIndex, patch)}
-                            selfStats={locationStats}
-                            globalStats={globalStats}
-                            actorStats={actorStats}
-                            conditionActors={conditionActors}
-                            valueActors={actorOptions}
-                            items={itemOptions}
-                            locations={locationOptions}
-                            stage={stage}
-                            fieldLabelStyle={fieldLabelStyle}
-                            inlineFieldStyle={inlineFieldStyle}
-                            inlineFieldTopStyle={inlineFieldTopStyle}
-                            compactChipLabelStyle={compactChipLabelStyle}
-                        />
-                    ))}
-                </div>
-            </GlassPanel>
-
-            <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-                    <Title variant="glow" style={{ fontSize: '20px', margin: 0 }}>Item Stats</Title>
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            setItemStats(prev => [...prev, defaultTypedStat()]);
-                            setCollapsedItemStats(prev => [...prev, false]);
-                        }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                    >
-                        <Add fontSize="small" /> Add
-                    </Button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {itemStats.map((stat, statIndex) => (
-                        <StatEntryEditor
-                            key={`item-stat-${statIndex}`}
-                            stat={stat}
-                            index={statIndex}
-                            total={itemStats.length}
-                            typeLabel="Item Stat"
-                            category="item"
-                            collapsed={collapsedItemStats[statIndex]}
-                            onToggleCollapse={() => toggleItemStat(statIndex)}
-                            onMove={(direction) => moveItemStat(statIndex, direction)}
-                            onRemove={() => removeItemStat(statIndex)}
-                            onPatch={(patch) => updateItemStat(statIndex, patch)}
-                            selfStats={itemStats}
-                            globalStats={globalStats}
-                            actorStats={actorStats}
-                            conditionActors={conditionActors}
-                            valueActors={actorOptions}
-                            items={itemOptions}
-                            locations={locationOptions}
-                            stage={stage}
-                            fieldLabelStyle={fieldLabelStyle}
-                            inlineFieldStyle={inlineFieldStyle}
-                            inlineFieldTopStyle={inlineFieldTopStyle}
-                            compactChipLabelStyle={compactChipLabelStyle}
-                        />
-                    ))}
-                </div>
-            </GlassPanel>
-
-            <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Universal Schedule</Title>
-
-                <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '11px', marginBottom: 10 }}>
-                    Applies to every actor and is evaluated after that actor's own schedule. The first destination to match wins, but any matching "Unavailable" entry supersedes a matched location.
-                </span>
-                <ActorScheduleEditor
-                    schedule={universalSchedule}
-                    locations={locationOptions}
-                    globalStats={globalStats}
-                    actorStats={actorStats}
-                    actors={conditionActors}
-                    stage={stage}
-                    emptyLabel="No universal schedule entries. Every actor falls back to their own schedule."
-                    onChange={setUniversalSchedule}
-                />
-            </GlassPanel>
-
-            <GlassPanel variant="default" style={{ padding: '18px' }}>
-                <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Stat Update Events</Title>
-                <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '11px', marginBottom: 10 }}>
-                    Recurring stat changes or global function calls applied at the start of every in-game time period whose conditions match. Define scripts in Functions. Numeric stats accept dice or relative notation (e.g. "1d6+1" or "-2").
-                </span>
-                <StatUpdateRuleEditor
-                    rules={statUpdateRules}
-                    globalStats={globalStats}
-                    actorStats={actorStats}
-                    locationStats={locationStats}
-                    itemStats={itemStats}
-                    actors={conditionActors}
-                    items={itemOptions}
-                    locations={locationOptions}
-                    stage={stage}
-                    onChange={setStatUpdateRules}
-                />
-            </GlassPanel>
+                        selfStats={selectedSection.entries}
+                        globalStats={stats.global}
+                        actorStats={stats.actor}
+                        conditionActors={conditionActors}
+                        valueActors={actorOptions}
+                        items={itemOptions}
+                        locations={locationOptions}
+                        stage={stage}
+                    />
+                ) : (
+                    <div style={{ color: 'var(--agenda-text-muted)', fontSize: '15px', textAlign: 'center', padding: '30px' }}>
+                        Select a stat to view and edit details.
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
