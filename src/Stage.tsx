@@ -1,9 +1,9 @@
 import {ReactElement} from "react";
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
-import { ConditionCollection, ConditionContext, evaluateConditionCollections } from "./content/Condition";
+import { ConditionContext, evaluateConditionCollections } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
-import { DEFAULT_VOICE_MODULATION } from "./content/ActorVoice";
+import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
 import { resolveStatValue } from './content/Stat';
@@ -17,7 +17,7 @@ import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location }
 import { Map as GameMap } from "./content/Map";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
-import { createLoreEntry, Lore, updateLoreEntry } from "./content/Lore";
+import { Lore, updateLoreEntry } from "./content/Lore";
 import { DEFAULT_PLAYER_THEME_COLOR } from "./screens/SettingsScreen";
 import {buildPrompt} from "./utils/PromptBuilder.js";
 import {

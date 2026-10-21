@@ -13,7 +13,7 @@ import {
 } from "../utils/StructuredResponse.js";
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget, pickSeededItem } from './Condition';
 import { formatCurrentDate } from './Skit';
-import { ACTOR_VOICES, DEFAULT_VOICE_MODULATION, formatActorVoiceLabel, normalizeVoiceModulation, VoiceModulation } from './ActorVoice';
+import { ACTOR_VOICES, DEFAULT_VOICE_MODULATION, formatActorVoiceLabel, normalizeVoiceModulation, VoiceModulation } from '@lord-raven/novel-visualizer';
 import { resolveStatValue } from './Stat';
 import { GLOBAL_STAT_REFERENCE_PREFIX, isValueReference } from './Function';
 
