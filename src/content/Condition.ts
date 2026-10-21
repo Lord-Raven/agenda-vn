@@ -36,7 +36,7 @@ export type ContentStatCondition = {
 
 // Checks the identity of the context-specific ('variable') entity of `contentType` against a specific entity
 // chosen in the UI. Only meaningful where such a variable entity is bound (e.g. context.currentActor during
-// perActor stat rules), so it has no target of its own.
+// actor schedule conditions), so it has no target of its own.
 export type ContentIdentityCondition = {
     type: 'contentIdentity';
     contentType: ContentType;

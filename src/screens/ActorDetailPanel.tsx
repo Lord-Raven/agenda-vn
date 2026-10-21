@@ -2,13 +2,12 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { isListStatType, isNumericDisplayType, isReferenceDisplayType, Stat, StatValue, StatValueRule, normalizeReferenceListValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
+import { isListStatType, isNumericDisplayType, isReferenceDisplayType, Stat, StatValue, normalizeReferenceListValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, PerActorStatValueMap, PerActorValueRuleMap, clonePerActorStatValueMap, clonePerActorValueRuleMap, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, resolvePerActorStatValue, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
+import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ACTOR_VOICES, ACTOR_VOICE_GENDER_LABELS, ActorVoice, formatActorVoiceLabel, getActorVoice, getActorVoiceVolume, normalizeVoiceModulation, VoiceModulation } from '@lord-raven/novel-visualizer';
 import type { NovelVoiceModulation } from '@lord-raven/novel-visualizer';
 import { playVoiceAudio, VoiceAudioPlayback } from '@lord-raven/novel-visualizer';
-import { ConditionContext } from '../content/Condition';
 import { Emotion } from '../content/Emotion';
 import { Image as ImageIcon, ArrowBackIosNew, ArrowForwardIos, PlayArrow, ExpandMore, ExpandLess, Add, Female, Male, Transgender, RecordVoiceOver } from '@mui/icons-material';
 import { PickerOption, SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -175,7 +174,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const actorStats = useMemo(() => {
         const configured = stage().getConfiguration().actorStats || [];
         const uniqueStatMap: { [name: string]: Stat } = {};
-        configured.filter((stat) => !stat.perActor).forEach((stat) => {
+        configured.forEach((stat) => {
             const name = stat?.name?.trim();
             if (!name || uniqueStatMap[name]) {
                 return;
@@ -195,19 +194,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         .filter((candidate) => candidate.active !== false), [stage, isCreatorMode]);
     const itemOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().items || [] : stage().getSave().inventory || [])
         .filter((candidate) => candidate.active !== false), [stage, isCreatorMode]);
-
-    const perActorStats = useMemo(() => {
-        const configured = stage().getConfiguration().actorStats || [];
-        const uniqueStatMap: { [name: string]: Stat } = {};
-        configured.filter((stat) => stat.perActor === true).forEach((stat) => {
-            const name = stat?.name?.trim();
-            if (!name || uniqueStatMap[name]) {
-                return;
-            }
-            uniqueStatMap[name] = { ...stat, name };
-        });
-        return Object.values(uniqueStatMap);
-    }, [stage]);
 
     const otherActiveActors = useMemo(() => {
         return (isCreatorMode ? stage().getConfiguration().actors || [] : Object.values(stage().getSave().actors || {}))
@@ -335,13 +321,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const [editedStatInitialMap, setEditedStatInitialMap] = useState<{ [key: string]: ActorStatInitial }>(() =>
         createInitialActorStatInitialMap(actor, actorStats),
     );
-    const [editedPerActorStatMap, setEditedPerActorStatMap] = useState<PerActorStatValueMap>(() =>
-        clonePerActorStatValueMap(actor.perActorStatMap),
-    );
-    const [editedPerActorValueRules, setEditedPerActorValueRules] = useState<PerActorValueRuleMap>(() =>
-        clonePerActorValueRuleMap(actor.perActorValueRules),
-    );
-    const [expandedPerActorStatNames, setExpandedPerActorStatNames] = useState<Set<string>>(new Set());
     const [expandedStatNames, setExpandedStatNames] = useState<Set<string>>(new Set());
     const [selectedOutfitId, setSelectedOutfitId] = useState<string>(() => {
         if (actor.outfitId && editedOutfits.some((outfit) => outfit.id === actor.outfitId)) {
@@ -385,8 +364,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const editedOutfitsRef = useRef(editedOutfits);
     const editedStatMapRef = useRef(editedStatMap);
     const editedStatInitialMapRef = useRef(editedStatInitialMap);
-    const editedPerActorStatMapRef = useRef(editedPerActorStatMap);
-    const editedPerActorValueRulesRef = useRef(editedPerActorValueRules);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const isDeactivatingRef = useRef(false);
     const didMountRef = useRef(false);
@@ -524,8 +501,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         nextEditedOutfits: Outfit[],
         nextEditedStatMap: { [key: string]: StatValue },
         nextEditedStatInitialMap: { [key: string]: ActorStatInitial },
-        nextEditedPerActorStatMap: PerActorStatValueMap = editedPerActorStatMapRef.current,
-        nextEditedPerActorValueRules: PerActorValueRuleMap = editedPerActorValueRulesRef.current,
     ) => {
 
         if (autoSaveTimeoutRef.current) {
@@ -593,20 +568,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             persistedActor.statInitialMap[stat.id] = cloneActorStatInitial(nextEditedStatInitialMap[stat.id], stat);
         });
 
-        const activePerActorStatNames = new Set(perActorStats.map((stat) => stat.id));
-        persistedActor.perActorStatMap = clonePerActorStatValueMap(nextEditedPerActorStatMap);
-        persistedActor.perActorValueRules = clonePerActorValueRuleMap(nextEditedPerActorValueRules);
-        Object.keys(persistedActor.perActorStatMap).forEach((statName) => {
-            if (!activePerActorStatNames.has(statName)) {
-                delete persistedActor.perActorStatMap[statName];
-            }
-        });
-        Object.keys(persistedActor.perActorValueRules).forEach((statName) => {
-            if (!activePerActorStatNames.has(statName)) {
-                delete persistedActor.perActorValueRules[statName];
-            }
-        });
-
         if (isProfileBackedByLore) {
             updateActorLore(persistedActor.id, nextEditedActor.lore, stage(), isCreatorMode);
         }
@@ -646,14 +607,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     }, [editedStatInitialMap]);
 
     useEffect(() => {
-        editedPerActorStatMapRef.current = editedPerActorStatMap;
-    }, [editedPerActorStatMap]);
-
-    useEffect(() => {
-        editedPerActorValueRulesRef.current = editedPerActorValueRules;
-    }, [editedPerActorValueRules]);
-
-    useEffect(() => {
         setEditedStatMap((prev) => {
             const next = createInitialActorStatMap(actor, actorStats);
             actorStats.forEach((stat) => {
@@ -687,27 +640,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     }, [actor, actorStats]);
 
     useEffect(() => {
-        setEditedPerActorStatMap((prev) => {
-            const next = clonePerActorStatValueMap(actor.perActorStatMap);
-            perActorStats.forEach((stat) => {
-                if (prev[stat.id]) {
-                    next[stat.id] = { ...next[stat.id], ...prev[stat.id] };
-                }
-            });
-            return next;
-        });
-        setEditedPerActorValueRules((prev) => {
-            const next = clonePerActorValueRuleMap(actor.perActorValueRules);
-            perActorStats.forEach((stat) => {
-                if (prev[stat.id]) {
-                    next[stat.id] = prev[stat.id];
-                }
-            });
-            return next;
-        });
-    }, [actor, perActorStats]);
-
-    useEffect(() => {
         if (!didMountRef.current) {
             didMountRef.current = true;
             return;
@@ -718,7 +650,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         }
 
         autoSaveTimeoutRef.current = window.setTimeout(() => {
-            persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current, editedPerActorStatMapRef.current, editedPerActorValueRulesRef.current);
+            persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current);
         }, 300);
 
         return () => {
@@ -726,13 +658,13 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
                 clearTimeout(autoSaveTimeoutRef.current);
             }
         };
-    }, [editedActor, editedOutfits, editedStatMap, editedStatInitialMap, editedPerActorStatMap, editedPerActorValueRules]);
+    }, [editedActor, editedOutfits, editedStatMap, editedStatInitialMap]);
 
     useEffect(() => {
         return () => {
             isMountedRef.current = false;
             if (autoSaveTimeoutRef.current && !isDeactivatingRef.current) {
-                persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current, editedPerActorStatMapRef.current, editedPerActorValueRulesRef.current);
+                persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current);
             }
         };
     }, []);
@@ -765,8 +697,6 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         });
         setEditedStatMap(createInitialActorStatMap(actor, actorStats));
         setEditedStatInitialMap(createInitialActorStatInitialMap(actor, actorStats));
-        setEditedPerActorStatMap(clonePerActorStatValueMap(actor.perActorStatMap));
-        setEditedPerActorValueRules(clonePerActorValueRuleMap(actor.perActorValueRules));
         const nextOutfits = cloneOutfits(actor.outfits);
         setEditedOutfits(nextOutfits);
         setSelectedOutfitId(() => {
@@ -990,82 +920,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         });
     };
 
-    const togglePerActorStatExpanded = (statName: string) => {
-        setExpandedPerActorStatNames((prev) => {
-            const next = new Set(prev);
-            if (next.has(statName)) {
-                next.delete(statName);
-            } else {
-                next.add(statName);
-            }
-            return next;
-        });
-    };
-
-    const buildPerActorConditionContext = (targetActor: Actor): ConditionContext => {
-        const save = stage().getSave();
-        return {
-            ...stage().getScheduleContext(save),
-            currentActor: { id: targetActor.id, name: targetActor.name, statMap: targetActor.statMap },
-        };
-    };
-
-    const resolveDisplayedPerActorValue = (stat: Stat, targetActor: Actor): StatValue => {
-        return resolvePerActorStatValue(
-            { perActorStatMap: editedPerActorStatMap, perActorValueRules: editedPerActorValueRules },
-            stat,
-            targetActor.id,
-            buildPerActorConditionContext(targetActor),
-        );
-    };
-
-    const hasExplicitPerActorOverride = (stat: Stat, targetActorId: string): boolean =>
-        editedPerActorStatMap[stat.id]?.[targetActorId] !== undefined;
-
-    const handlePerActorStatValueChange = (stat: Stat, targetActorId: string, value: StatValue) => {
-        setEditedPerActorStatMap((prev) => ({
-            ...prev,
-            [stat.id]: { ...(prev[stat.id] || {}), [targetActorId]: value },
-        }));
-    };
-
-    const handleResetPerActorStatValue = (stat: Stat, targetActorId: string) => {
-        setEditedPerActorStatMap((prev) => {
-            const current = { ...(prev[stat.id] || {}) };
-            delete current[targetActorId];
-            return { ...prev, [stat.id]: current };
-        });
-    };
-
-    const addPerActorValueRule = (stat: Stat) => {
-        setEditedPerActorValueRules((prev) => {
-            const rule: StatValueRule = { id: generateUuid(), value: resolveStatDefault(stat), conditions: [] };
-            return { ...prev, [stat.id]: [...(prev[stat.id] || []), rule] };
-        });
-    };
-
-    const removePerActorValueRule = (stat: Stat, ruleId: string) => {
-        setEditedPerActorValueRules((prev) => ({
-            ...prev,
-            [stat.id]: (prev[stat.id] || []).filter((rule) => rule.id !== ruleId),
-        }));
-    };
-
-    const updatePerActorValueRule = (stat: Stat, ruleId: string, patch: Partial<StatValueRule>) => {
-        setEditedPerActorValueRules((prev) => ({
-            ...prev,
-            [stat.id]: (prev[stat.id] || []).map((rule) => rule.id === ruleId ? { ...rule, ...patch } : rule),
-        }));
-    };
-
     const entityOptionValues: { [statId: string]: StatValue } = isCreatorMode
         ? Object.fromEntries(Object.entries(editedStatInitialMap).map(([statId, initial]) => [statId, initial?.value]))
         : editedStatMap;
-
-    const renderPerActorValueInput = (stat: Stat, value: StatValue, onChange: (value: StatValue) => void) => (
-        <StatValueInput stat={stat} value={value} onChange={onChange} stage={stage}
-            actors={actorOptions} items={itemOptions} locations={locationOptions} />
-    );
 
     const actorThemeColorSwatches = useMemo(() => {
         const otherActorThemeColors = Object.values(stage().getSave().actors || {})
@@ -1397,7 +1254,7 @@ ${indent}}`;
 
     const handleDeactivateActor = () => {
         isDeactivatingRef.current = true;
-        persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current, editedPerActorStatMapRef.current, editedPerActorValueRulesRef.current);
+        persistActor(editedActorRef.current, editedOutfitsRef.current, editedStatMapRef.current, editedStatInitialMapRef.current);
 
         const linkedLore = getLinkedActorLore(actor, stage(), isCreatorMode);
 
@@ -2346,178 +2203,6 @@ ${indent}}`;
                                     )}
                                 </div>
                             </section>
-
-                            {/* Per-Actor Stats Section */}
-                            {isCreatorMode && perActorStats.length > 0 && (
-                                <section>
-                                    <h2 style={{
-                                        color: 'var(--agenda-highlight)',
-                                        fontSize: '18px',
-                                        fontWeight: 'bold',
-                                        marginBottom: '15px',
-                                        borderBottom: '2px solid color-mix(in srgb, var(--agenda-highlight) 30%, transparent)',
-                                        paddingBottom: '5px'
-                                    }}>
-                                        Per-Actor Stats
-                                    </h2>
-
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                        {perActorStats.map((stat) => {
-                                            const isExpanded = expandedPerActorStatNames.has(stat.id);
-                                            const rules = editedPerActorValueRules[stat.id] || [];
-
-                                            return (
-                                                <div
-                                                    key={stat.id}
-                                                    style={{
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        gap: '8px',
-                                                        border: '1px solid color-mix(in srgb, var(--agenda-highlight) 18%, transparent)',
-                                                        borderRadius: '6px',
-                                                        padding: '10px',
-                                                        backgroundColor: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)',
-                                                    }}
-                                                >
-                                                    <Button
-                                                        variant="secondary"
-                                                        onClick={() => togglePerActorStatExpanded(stat.id)}
-                                                        aria-label={isExpanded ? `Collapse ${stat.name} details` : `Expand ${stat.name} details`}
-                                                        style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px',
-                                                            padding: 0,
-                                                            minWidth: 0,
-                                                            background: 'transparent',
-                                                            border: 'none',
-                                                            borderRadius: 0,
-                                                            boxShadow: 'none',
-                                                            textTransform: 'none',
-                                                            letterSpacing: 'normal',
-                                                            justifyContent: 'flex-start',
-                                                        }}
-                                                    >
-                                                        {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                                                        <span style={{ color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
-                                                            {stat.name} (toward each other actor)
-                                                        </span>
-                                                    </Button>
-
-                                                    {isExpanded && (
-                                                        <>
-
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
-                                                                <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
-                                                                    This Actor's Default Value Rules
-                                                                </label>
-                                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                                    Evaluated in order for the target actor being considered; use "Variable" actor targets to inspect the target's own stats. These take precedence over the stat's global default rules.
-                                                                </span>
-                                                                {rules.length === 0 && (
-                                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                                        No rules. Falls through to the stat's global default rules, then its default value.
-                                                                    </span>
-                                                                )}
-                                                                {rules.map((rule) => (
-                                                                    <div
-                                                                        key={rule.id}
-                                                                        style={{
-                                                                            display: 'flex',
-                                                                            flexDirection: 'column',
-                                                                            gap: '6px',
-                                                                            padding: '8px',
-                                                                            border: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)',
-                                                                            borderRadius: '5px',
-                                                                        }}
-                                                                    >
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                            <span style={{ color: 'var(--agenda-text-primary)', fontSize: '12px' }}>Value</span>
-                                                                            {renderPerActorValueInput(stat, rule.value, (value) => updatePerActorValueRule(stat, rule.id, { value }))}
-                                                                            <Button
-                                                                                variant="danger"
-                                                                                onClick={() => removePerActorValueRule(stat, rule.id)}
-                                                                                aria-label="Delete rule"
-                                                                                style={{ marginLeft: 'auto' }}
-                                                                            >
-                                                                                Delete
-                                                                            </Button>
-                                                                        </div>
-                                                                        <ConditionEditor
-                                                                            conditionCollections={rule.conditions}
-                                                                            globalStats={[...actorStats, ...(stage().getConfiguration().globalStats || [])]}
-                                                                            actorStats={actorStats}
-                                                                            actors={Object.values(stage().getSave().actors || {})}
-                                                                            stage={stage}
-                                                                            items={itemOptions}
-                                                                            locations={locationOptions}
-                                                                            variableContentType="actor"
-                                                                            onChange={(conditions) => updatePerActorValueRule(stat, rule.id, { conditions })}
-                                                                        />
-                                                                        {rule.conditions.length === 0 && (
-                                                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                                                Always applies (should typically be the last rule).
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                ))}
-                                                                <Button
-                                                                    variant="secondary"
-                                                                    onClick={() => addPerActorValueRule(stat)}
-                                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifySelf: 'start' }}
-                                                                >
-                                                                    <Add fontSize="small" /> Add rule
-                                                                </Button>
-                                                            </div>
-
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '6px', borderTop: '1px solid color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' }}>
-                                                                <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
-                                                                    Values Toward Other Actors
-                                                                </label>
-                                                                {otherActiveActors.length === 0 && (
-                                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                                                        No other active actors to track a value for yet.
-                                                                    </span>
-                                                                )}
-                                                                {otherActiveActors.map((targetActor) => {
-                                                                    const hasOverride = hasExplicitPerActorOverride(stat, targetActor.id);
-                                                                    const displayedValue = editedPerActorStatMap[stat.id]?.[targetActor.id] ?? resolveDisplayedPerActorValue(stat, targetActor);
-                                                                    return (
-                                                                        <div
-                                                                            key={targetActor.id}
-                                                                            style={{
-                                                                                display: 'grid',
-                                                                                gridTemplateColumns: '1fr minmax(120px, 220px) auto',
-                                                                                gap: '8px',
-                                                                                alignItems: 'center',
-                                                                            }}
-                                                                        >
-                                                                            <span style={{ color: 'var(--agenda-text-primary)', fontSize: '13px' }}>
-                                                                                {targetActor.name || '(Unnamed Actor)'}
-                                                                                {!hasOverride && (
-                                                                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}> (rule/default)</span>
-                                                                                )}
-                                                                            </span>
-                                                                            {renderPerActorValueInput(stat, displayedValue, (value) => handlePerActorStatValueChange(stat, targetActor.id, value))}
-                                                                            <Button
-                                                                                variant="secondary"
-                                                                                disabled={!hasOverride}
-                                                                                onClick={() => handleResetPerActorStatValue(stat, targetActor.id)}
-                                                                            >
-                                                                                Reset
-                                                                            </Button>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </section>
-                            )}
 
                             {/* Theme & Voice Section */}
                             <section>

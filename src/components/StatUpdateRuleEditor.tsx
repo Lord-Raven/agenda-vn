@@ -77,7 +77,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, onC
     const [collapsedRules, setCollapsedRules] = useState<Record<string, boolean>>({});
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const conditionActors = actors.filter(actor => actor.id !== stageInstance?.getSave().playerId);
-    const statsByType = { global: globalStats, actor: actorStats.filter(stat => !stat.perActor), location: locationStats, item: itemStats };
+    const statsByType = { global: globalStats, actor: actorStats, location: locationStats, item: itemStats };
     const resolveUpdateStat = (update: StatUpdateAction): Stat | GameFunction | undefined => (
         update.kind === 'skit' ? undefined : update.kind === 'function'
             ? stageInstance?.getConfiguration().functions?.find(fn => fn.id === update.functionId)

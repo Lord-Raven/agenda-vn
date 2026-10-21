@@ -97,7 +97,7 @@ const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined
 };
 
 // Resolves template tags in lore text for LLM/display use. Unresolvable tags (unknown stat/function, no target
-// actor, perActor stats, void functions) are left untouched. Don't use on text written back to the lore entry.
+// actor, void functions) are left untouched. Don't use on text written back to the lore entry.
 export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor): string {
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
@@ -146,7 +146,7 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
         }
 
         const stat = findStatByKey(configuration.actorStats, statKey);
-        if (!actor || !stat || stat.perActor) {
+        if (!actor || !stat) {
             return match;
         }
         return formatStatValue(stat, actor.statMap?.[stat.id]);

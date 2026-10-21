@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
 import { ActorSchedule, cloneActorSchedule } from '../content/Actor';
-import { Stat, StatValue, StatUpdateRule, cloneStatUpdateRules, includeNewOptionListOptions, isNumericDisplayType, isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, cloneStat } from '../content/Stat';
+import { Stat, StatValue, StatUpdateRule, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, cloneStat } from '../content/Stat';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { ActorScheduleEditor } from '../components/ActorScheduleEditor';
 import { StatUpdateRuleEditor } from '../components/StatUpdateRuleEditor';
@@ -39,8 +39,6 @@ const defaultTypedStat = (): Stat => {
     return {
         id,
         name: 'Name',
-        perActor: false,
-        perActorDefaultRules: [{ id: `default:${id}`, value: 50, conditions: [] }],
         guidance: 'Guidance for the LLM on how this stat is applied or what a high or low score is or represents.',
         default: 50,
         type: 'number',
@@ -185,77 +183,6 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
             globalStatValues: validGlobalStatValues,
             universalSchedule,
             statUpdateRules,
-        });
-
-        const currentSave = stageInstance.getSave();
-        const statIds = new Set(
-            actorStats
-                .filter(stat => !stat.perActor)
-                .map(stat => stat.id),
-        );
-
-        Object.values(currentSave.actors || {}).forEach(actor => {
-            if (!actor.statMap || typeof actor.statMap !== 'object') {
-                actor.statMap = {};
-            }
-
-            actorStats.filter(stat => (isNumericDisplayType(stat.type) || isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) && !stat.perActor).forEach(stat => {
-                if (!stat.id || !stat.name.trim()) {
-                    return;
-                }
-
-                actor.statMap[stat.id] = normalizeStatValue(actor.statMap[stat.id], stat);
-            });
-
-            Object.keys(actor.statMap).forEach(statId => {
-                if (!statIds.has(statId)) {
-                    delete actor.statMap[statId];
-                }
-            });
-        });
-
-        const locationStatIds = new Set(locationStats.map(stat => stat.id));
-
-        Object.values(currentSave.atlas || {}).forEach(location => {
-            if (!location.statMap || typeof location.statMap !== 'object') {
-                location.statMap = {};
-            }
-
-            locationStats.filter(stat => isNumericDisplayType(stat.type) || isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)).forEach(stat => {
-                if (!stat.id || !stat.name.trim()) {
-                    return;
-                }
-
-                location.statMap[stat.id] = normalizeStatValue(location.statMap[stat.id], stat);
-            });
-
-            Object.keys(location.statMap).forEach(statId => {
-                if (!locationStatIds.has(statId)) {
-                    delete location.statMap[statId];
-                }
-            });
-        });
-
-        const itemStatIds = new Set(itemStats.map(stat => stat.id));
-
-        (currentSave.inventory || []).forEach(item => {
-            if (!item.statMap || typeof item.statMap !== 'object') {
-                item.statMap = {};
-            }
-
-            itemStats.filter(stat => isNumericDisplayType(stat.type) || isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)).forEach(stat => {
-                if (!stat.id || !stat.name.trim()) {
-                    return;
-                }
-
-                item.statMap[stat.id] = normalizeStatValue(item.statMap[stat.id], stat);
-            });
-
-            Object.keys(item.statMap).forEach(statId => {
-                if (!itemStatIds.has(statId)) {
-                    delete item.statMap[statId];
-                }
-            });
         });
     }, [actorStats, globalStats, itemStats, locationStats, stageInstance, statUpdateRules, universalSchedule, validGlobalStatValues]);
 

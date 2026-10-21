@@ -34,7 +34,7 @@ const fixture = () => {
     const stage: Stage = Object.create(Stage.prototype);
     stage.getConfiguration = () => configuration;
     stage.getSave = () => save;
-    const render = () => renderToStaticMarkup(<ActorCard actor={actor} stage={() => stage} />);
+    const render = () => renderToStaticMarkup(<TooltipProvider><ActorCard actor={actor} stage={() => stage} /></TooltipProvider>);
     return { actor, configuration, save, stage, render };
 };
 
@@ -117,13 +117,13 @@ test('actor-card rules react to stat changes, global state, actor identity, and 
     assert.doesNotMatch(render(), /Health/);
 });
 
-test('actor stat displays support option labels, checkboxes, references, and reject per-actor stats', () => {
+test('actor stat displays support option labels, checkboxes, references, and numbers', () => {
     const { actor, configuration, render } = fixture();
     configuration.actorStats = [
         makeStat('Mood', { type: 'option', default: 'happy', options: [{ id: 'happy', name: 'Happy', description: '' }] }),
         makeStat('Ready', { type: 'checkbox', default: true }),
         makeStat('Friends', { type: 'actorList', default: [actor.id] }),
-        makeStat('Relationship', { perActor: true }),
+        makeStat('Relationship', { default: 7 }),
     ];
     configuration.controls = configuration.actorStats.map(stat => new Control({ type: 'actorStatDisplay', statId: stat.id }));
     const html = render();
@@ -131,7 +131,8 @@ test('actor stat displays support option labels, checkboxes, references, and rej
     assert.match(html, /True/);
     assert.match(html, /Friends/);
     assert.match(html, /Alice/);
-    assert.doesNotMatch(html, /Relationship/);
+    assert.match(html, /Relationship/);
+    assert.match(html, />7</);
 });
 
 test('cloning legacy stats drops exposure without creating controls', () => {

@@ -310,25 +310,17 @@ export const evaluateNumericStatExpression = (value: unknown): number | undefine
     return total;
 };
 
-// A single rule used to resolve a per-actor stat's value for a given target actor; rules are evaluated in
-// order and the first whose conditions are satisfied wins (conditions may reference the target via the
-// 'variable' actor target so they can inspect the target actor's own stats).
+// An ordered default-value rule; the first rule whose conditions are satisfied wins.
 export type StatValueRule = {
     id: string;
     value: StatValue;
     conditions: ConditionCollection[];
 };
 
-// Represents a custom stat that applies to all actors in the game.
+// A custom stat definition shared by global, actor, location, and item stats.
 export type Stat = {
     id: string;
     name: string;
-    // When true, this stat's value on a given actor is a mapping of target actorId to a value of `type`
-    // (e.g. the host actor's affinity toward each other actor), rather than a single scalar value.
-    perActor?: boolean;
-    // Rules used to resolve a default value for a given target actor when perActor is true and neither the
-    // host actor's own perActorValueRules nor an explicit override provide a value. Evaluated in order.
-    perActorDefaultRules?: StatValueRule[];
     // For global stats: rules used to resolve this stat's initial value when a new game starts, evaluated in
     // order (first matching wins); falls back to `default` if none match. See buildInitialGlobalStatValues.
     defaultValueRules?: StatValueRule[];
@@ -371,8 +363,6 @@ export const cloneStatValueRules = (rules: StatValueRule[] | undefined): StatVal
 export const cloneStat = (stat: Stat): Stat => ({
     id: stat.id || generateUuid(),
     name: stat.name,
-    perActor: stat.perActor === true,
-    perActorDefaultRules: cloneStatValueRules(stat.perActorDefaultRules),
     defaultValueRules: cloneStatValueRules(stat.defaultValueRules),
     llmSees: cloneConditionalFlag(stat.llmSees, true),
     llmMaintained: cloneConditionalFlag(stat.llmMaintained, true),
@@ -553,10 +543,8 @@ export const includeNewOptionListOptions = (value: StatValue | undefined, previo
     return addedIds.length ? [...value, ...addedIds] : value;
 };
 
-// Finds the first rule in an ordered list whose conditions are satisfied by the given context (e.g. with
-// context.currentActor set to the target actor so 'variable' actor-stat conditions inspect the target).
-// Returns undefined if no rule matches, so callers can continue to the next fallback tier.
-export const resolvePerActorValueRule = (
+// Returns the first matching rule's value, or undefined so the caller can use the stat's default.
+export const resolveStatValueRule = (
     rules: StatValueRule[] | undefined,
     stat: Stat,
     context: ConditionContext,
@@ -564,10 +552,6 @@ export const resolvePerActorValueRule = (
     const matchedRule = (rules || []).find((rule) => evaluateConditionCollections(rule.conditions, context));
     return matchedRule ? normalizeStatValue(matchedRule.value, stat) : undefined;
 };
-
-// Generic alias for resolvePerActorValueRule; used wherever an ordered StatValueRule list needs to be
-// resolved but there is no per-actor target involved (e.g. a global stat's defaultValueRules at game start).
-export const resolveStatValueRule = resolvePerActorValueRule;
 
 export const buildInitialGlobalStatValues = (
     stats: Stat[],
@@ -626,7 +610,7 @@ export type StartSkitAction = {
 export type StatUpdateAction = GameAction | StartSkitAction;
 
 // A recurring "every <calendar condition> do these things" rule; conditions are the same ConditionCollections
-// used by schedules and per-actor default rules, and are re-evaluated for each in-game period entered.
+// used by schedules and default-value rules, and are re-evaluated for each in-game period entered.
 export type StatUpdateRule = {
     id: string;
     conditions: ConditionCollection[];

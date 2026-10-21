@@ -844,8 +844,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     outfitId: '',
                     statMap: {},
                     statInitialMap: {},
-                    perActorStatMap: {},
-                    perActorValueRules: {},
                     schedule: {},
                     themeColor: playerData.themeColor || DEFAULT_PLAYER_THEME_COLOR,
                     themeFontFamily: playerData.themeFontFamily || '',
@@ -1693,7 +1691,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             : source.targetType === 'actor' ? configuration.actorStats
                 : source.targetType === 'location' ? configuration.locationStats : configuration.itemStats;
         const stat = stats.find(candidate => candidate.id === source.statId);
-        if (!stat || stat.type !== type || stat.perActor) {
+        if (!stat || stat.type !== type) {
             throw new Error(`Skit action requires a ${type} stat: ${source.statId}`);
         }
         if (source.targetType === 'global') {
@@ -2018,10 +2016,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return;
         }
 
-        // perActor stats have no single target value, so they cannot be written by a rule.
-        if (update.targetType === 'actor' && stat.perActor) {
-            return;
-        }
 
         this.resolveUpdateTargetEntities(save, update, context).forEach(entity => {
             entity.statMap = entity.statMap || {};
@@ -2318,101 +2312,35 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private syncActorStats(save: SaveType) {
-        const configuredStats = (this.getConfiguration().actorStats || [])
-            .filter(stat => stat?.name?.trim());
-        const scalarStats = configuredStats.filter(stat => !stat.perActor);
-        const perActorStats = configuredStats.filter(stat => stat.perActor);
-        const statIds = new Set(scalarStats.map(stat => stat.id));
-        const perActorStatNames = new Set(perActorStats.map(stat => stat.name.trim()));
-
-        Object.values(save.actors || {}).forEach(actor => {
-            if (!actor.statMap || typeof actor.statMap !== 'object') {
-                actor.statMap = {};
-            }
-            if (!actor.perActorStatMap || typeof actor.perActorStatMap !== 'object') {
-                actor.perActorStatMap = {};
-            }
-            if (!actor.perActorValueRules || typeof actor.perActorValueRules !== 'object') {
-                actor.perActorValueRules = {};
-            }
-
-            scalarStats.forEach(stat => {
-                const existingValue = actor.statMap[stat.id];
-                actor.statMap[stat.id] = this.readStatValue(existingValue, stat, save);
-            });
-
-            Object.keys(actor.statMap).forEach(statId => {
-                if (!statIds.has(statId)) {
-                    delete actor.statMap[statId];
-                }
-            });
-
-            perActorStats.forEach(stat => {
-                const statName = stat.name.trim();
-                if (!actor.perActorStatMap[statName] || typeof actor.perActorStatMap[statName] !== 'object') {
-                    actor.perActorStatMap[statName] = {};
-                }
-                if (!Array.isArray(actor.perActorValueRules[statName])) {
-                    actor.perActorValueRules[statName] = [];
-                }
-            });
-
-            Object.keys(actor.perActorStatMap).forEach(statName => {
-                if (!perActorStatNames.has(statName)) {
-                    delete actor.perActorStatMap[statName];
-                }
-            });
-
-            Object.keys(actor.perActorValueRules).forEach(statName => {
-                if (!perActorStatNames.has(statName)) {
-                    delete actor.perActorValueRules[statName];
-                }
-            });
-        });
+        this.syncEntityStats(Object.values(save.actors || {}), this.getConfiguration().actorStats, save);
     }
 
     private syncLocationStats(save: SaveType) {
-        const configuredStats = (this.getConfiguration().locationStats || [])
-            .filter(stat => stat?.name?.trim());
-        const statIds = new Set(configuredStats.map(stat => stat.id));
-
-        Object.values(save.atlas || {}).forEach(location => {
-            if (!location.statMap || typeof location.statMap !== 'object') {
-                location.statMap = {};
-            }
-
-            configuredStats.forEach(stat => {
-                const existingValue = location.statMap[stat.id];
-                location.statMap[stat.id] = this.readStatValue(existingValue, stat, save);
-            });
-
-            Object.keys(location.statMap).forEach(statId => {
-                if (!statIds.has(statId)) {
-                    delete location.statMap[statId];
-                }
-            });
-        });
+        this.syncEntityStats(Object.values(save.atlas || {}), this.getConfiguration().locationStats, save);
     }
 
     private syncItemStats(save: SaveType) {
-        const configuredStats = (this.getConfiguration().itemStats || [])
-            .filter(stat => stat?.name?.trim());
+        save.inventory = (save.inventory || []).map(item => item instanceof Item ? item : cloneItem(item));
+        this.syncEntityStats(save.inventory, this.getConfiguration().itemStats, save);
+    }
+
+    private syncEntityStats(entities: { statMap: Record<string, StatValue> }[], stats: Stat[] | undefined, save: SaveType) {
+        const configuredStats = (stats || []).filter(stat => stat?.name?.trim());
         const statIds = new Set(configuredStats.map(stat => stat.id));
 
-        save.inventory = (save.inventory || []).map(item => item instanceof Item ? item : cloneItem(item));
-        save.inventory.forEach(item => {
-            if (!item.statMap || typeof item.statMap !== 'object') {
-                item.statMap = {};
+        entities.forEach(entity => {
+            if (!entity.statMap || typeof entity.statMap !== 'object') {
+                entity.statMap = {};
             }
 
             configuredStats.forEach(stat => {
-                const existingValue = item.statMap[stat.id];
-                item.statMap[stat.id] = this.readStatValue(existingValue, stat, save);
+                const existingValue = entity.statMap[stat.id];
+                entity.statMap[stat.id] = this.readStatValue(existingValue, stat, save);
             });
 
-            Object.keys(item.statMap).forEach(statId => {
+            Object.keys(entity.statMap).forEach(statId => {
                 if (!statIds.has(statId)) {
-                    delete item.statMap[statId];
+                    delete entity.statMap[statId];
                 }
             });
         });
@@ -2664,7 +2592,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                             const incomingStatName = `${outcome.details?.statName || ''}`.trim();
                             const resolvedStat = configuredStatByName.get(incomingStatName)
                                 || configuredStats.find(configured => configured.name.toLowerCase() === incomingStatName.toLowerCase());
-                            if (incomingStatName && resolvedStat && !resolvedStat.perActor) {
+                            if (incomingStatName && resolvedStat) {
                                 actor.statMap = actor.statMap || {};
                                 actor.statMap[resolvedStat.id] = this.readStatValue(outcome.details.absoluteValue, resolvedStat, save);
                             }
@@ -2681,10 +2609,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
                             const resolvedStat = configuredStatByName.get(incomingStatName)
                                 || configuredStats.find(configured => configured.name.toLowerCase() === incomingStatName.toLowerCase());
-                            if (resolvedStat?.perActor) {
-                                // Per-actor stats require a target actor and aren't supported by this narrative outcome yet.
-                                continue;
-                            }
                             const targetStatId = resolvedStat?.id || incomingStatName;
                             actor.statMap = actor.statMap || {};
                             const existingValue = Number(resolvedStat ? this.readStatValue(actor.statMap[targetStatId], resolvedStat, save) : actor.statMap[targetStatId]);

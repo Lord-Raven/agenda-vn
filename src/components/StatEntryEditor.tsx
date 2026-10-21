@@ -40,7 +40,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             default: stat.type === 'optionList' ? normalizeReferenceListValue(stat.default) : typeof stat.default === 'string' ? stat.default : '',
             min: undefined,
             max: undefined,
-            ...(stat.type === 'optionList' ? { perActor: false, perActorDefaultRules: [] } : {}),
         };
     }
 
@@ -58,8 +57,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
                     : options.map(option => option.id),
                 min: undefined,
                 max: undefined,
-                perActor: false,
-                perActorDefaultRules: [],
             };
         }
         const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
@@ -125,13 +122,6 @@ export const renderStatTypeOptions = () => (
     </>
 );
 
-interface ValueRulesConfig {
-    fieldKey: 'defaultValueRules' | 'perActorDefaultRules';
-    title: string;
-    description: string;
-    visible: boolean;
-}
-
 interface StatEntryEditorProps {
     stat: Stat;
     index: number;
@@ -159,8 +149,7 @@ interface StatEntryEditorProps {
 }
 
 // Single stat editor card shared by the Global/Actor/Location/Item stat sections of StatManagementPanel.
-// Most fields behave identically across categories; the handful of differences (perActor,
-// default-value rules, description/guidance visibility, allowed condition targets) are driven by `category`.
+// Default-value rules, guidance visibility, and allowed condition targets are driven by `category`.
 export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     stat, index, total, typeLabel, category,
     collapsed, onToggleCollapse, onMove, onRemove, onPatch, onNameChange,
@@ -179,23 +168,9 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
     const guidanceVisible = stat.llmSees.value === true || stat.llmSees.conditions.length > 0;
 
-    const valueRulesConfig: ValueRulesConfig | undefined = category === 'global'
-        ? {
-            fieldKey: 'defaultValueRules',
-            title: 'Default Value Rules',
-            description: "Evaluated in order when a new game starts. The first matching rule wins and seeds this stat's starting value. The final Default Value rule is used if no earlier rule matches.",
-            visible: true,
-        }
-        : category === 'actor'
-            ? {
-                fieldKey: 'perActorDefaultRules',
-                title: 'Default Value Rules',
-                description: "Evaluated in order for the target actor being considered (use \"Variable\" actor targets to inspect the target's own stats). The first matching rule wins. The final Default Value rule is used if no earlier rule matches. An actor's own rules (configured on its detail page) take precedence over these.",
-                visible: stat.perActor === true,
-            }
-            : undefined;
-    const defaultRuleId = valueRulesConfig ? `default:${stat.id}` : undefined;
-    const configuredValueRules = valueRulesConfig?.visible ? stat[valueRulesConfig.fieldKey] || [] : [];
+    const hasDefaultValueRules = category === 'global';
+    const defaultRuleId = hasDefaultValueRules ? `default:${stat.id}` : undefined;
+    const configuredValueRules = hasDefaultValueRules ? stat.defaultValueRules || [] : [];
     const storedDefaultRule = defaultRuleId
         ? configuredValueRules.find(rule => rule.id === defaultRuleId)
         : undefined;
@@ -210,16 +185,16 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
     const patchStat = (patch: Partial<Stat>) => {
         const defaultValue = patch.default;
-        if (!valueRulesConfig?.visible || defaultValue === undefined) {
+        if (!hasDefaultValueRules || defaultValue === undefined) {
             onPatch(patch);
             return;
         }
         onPatch({
             ...patch,
-            [valueRulesConfig.fieldKey]: valueRules.map(rule => rule.id === defaultRuleId
+            defaultValueRules: valueRules.map(rule => rule.id === defaultRuleId
                 ? { ...rule, value: defaultValue }
                 : rule),
-        } as Partial<Stat>);
+        });
     };
 
     const updateOption = (optionIndex: number, patch: { name?: string; description?: string }) => {
@@ -259,33 +234,33 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     };
 
     const addValueRule = () => {
-        if (!valueRulesConfig) return;
+        if (!hasDefaultValueRules) return;
         const rule: StatValueRule = { id: generateUuid(), value: resolveStatDefaultValue(stat), conditions: [] };
-        onPatch({ [valueRulesConfig.fieldKey]: [rule, ...valueRules] } as Partial<Stat>);
+        onPatch({ defaultValueRules: [rule, ...valueRules] });
     };
 
     const removeValueRule = (ruleId: string) => {
-        if (!valueRulesConfig || ruleId === defaultRuleId) return;
-        onPatch({ [valueRulesConfig.fieldKey]: valueRules.filter(rule => rule.id !== ruleId) } as Partial<Stat>);
+        if (!hasDefaultValueRules || ruleId === defaultRuleId) return;
+        onPatch({ defaultValueRules: valueRules.filter(rule => rule.id !== ruleId) });
     };
 
     const updateValueRule = (ruleId: string, patch: Partial<StatValueRule>) => {
-        if (!valueRulesConfig) return;
+        if (!hasDefaultValueRules) return;
         const isDefaultRule = ruleId === defaultRuleId;
         onPatch({
             ...(isDefaultRule && patch.value !== undefined ? { default: patch.value } : {}),
-            [valueRulesConfig.fieldKey]: valueRules.map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule),
-        } as Partial<Stat>);
+            defaultValueRules: valueRules.map(rule => rule.id === ruleId ? { ...rule, ...patch } : rule),
+        });
     };
 
     const moveValueRule = (ruleId: string, direction: -1 | 1) => {
-        if (!valueRulesConfig) return;
+        if (!hasDefaultValueRules) return;
         const index = valueRules.findIndex(rule => rule.id === ruleId);
         const nextIndex = index + direction;
         if (index < 0 || nextIndex < 0 || nextIndex >= valueRules.length) return;
         const nextRules = [...valueRules];
         [nextRules[index], nextRules[nextIndex]] = [nextRules[nextIndex], nextRules[index]];
-        onPatch({ [valueRulesConfig.fieldKey]: nextRules } as Partial<Stat>);
+        onPatch({ defaultValueRules: nextRules });
     };
 
     const renderValueInput = (value: StatValue, onChange: (value: StatValue) => void) => (
@@ -335,21 +310,6 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 {renderStatTypeOptions()}
                             </select>
                         </div>
-
-                        {/*Temporarily removing this feature:
-                        category === 'actor' && (
-                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                <label style={fieldLabelStyle}>Per Actor</label>
-                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={stat.perActor === true}
-                                        onChange={(e) => onPatch({ perActor: e.target.checked })}
-                                    />
-                                    Maps other actors to distinct values
-                                </label>
-                            </div>
-                        )*/}
 
                         <ConditionalFlagEditor
                             label="Send to LLM"
@@ -420,7 +380,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </div>
                         )}
 
-                        {isSourcedOption && !valueRulesConfig?.visible && (
+                        {isSourcedOption && !hasDefaultValueRules && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>{normalizedStat.type === 'optionList' ? 'Initially Active' : 'Default Option'}</label>
                                 {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
@@ -429,7 +389,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
                         {(normalizedStat.type === 'option' || isOptionListStatType(normalizedStat.type)) && !isSourcedOption && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
-                                {valueRulesConfig?.visible ? null : isOptionListStatType(normalizedStat.type) ? (
+                                {hasDefaultValueRules ? null : isOptionListStatType(normalizedStat.type) ? (
                                     <div style={{ ...inlineFieldTopStyle, marginBottom: 4 }}>
                                         <label style={fieldLabelStyle}>Initially Active</label>
                                         {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
@@ -483,28 +443,28 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </div>
                         )}
 
-                        {normalizedStat.type === 'text' && !valueRulesConfig?.visible && (
+                        {normalizedStat.type === 'text' && !hasDefaultValueRules && (
                             <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Value</label>
                                 {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
-                        {isReferenceDisplayType(normalizedStat.type) && !valueRulesConfig?.visible && (
+                        {isReferenceDisplayType(normalizedStat.type) && !hasDefaultValueRules && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Reference</label>
                                 {renderValueInput(normalizedStat.default, (defaultValue) => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
-                        {isReferenceListDisplayType(normalizedStat.type) && !valueRulesConfig?.visible && (
+                        {isReferenceListDisplayType(normalizedStat.type) && !hasDefaultValueRules && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default References</label>
                                 {renderValueInput(normalizedStat.default, (defaultValue) => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
-                        {normalizedStat.type === 'checkbox' && !valueRulesConfig?.visible && (
+                        {normalizedStat.type === 'checkbox' && !hasDefaultValueRules && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Value</label>
                                 {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
@@ -515,7 +475,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             <div style={{ ...inlineFieldTopStyle, marginBottom: 0 }}>
                                 <label style={fieldLabelStyle}>Properties</label>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-                                    {!valueRulesConfig?.visible && (
+                                    {!hasDefaultValueRules && (
                                         <div>
                                             <div style={compactChipLabelStyle}>Default</div>
                                             {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
@@ -544,10 +504,10 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                         )}
                     </div>
 
-                    {valueRulesConfig && valueRulesConfig.visible && (
+                    {hasDefaultValueRules && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 10 }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <label style={fieldLabelStyle}>{valueRulesConfig.title}</label>
+                                <label style={fieldLabelStyle}>Default Value Rules</label>
                                 <Button
                                     variant="secondary"
                                     onClick={addValueRule}
@@ -557,7 +517,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 </Button>
                             </div>
                             <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                {valueRulesConfig.description}
+                                Evaluated in order when a new game starts. The first matching rule wins and seeds this stat's starting value. The final Default Value rule is used if no earlier rule matches.
                             </span>
                             {valueRules.map((rule, ruleIndex) => (
                                 <div

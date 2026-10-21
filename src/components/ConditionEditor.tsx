@@ -22,8 +22,8 @@ interface ConditionEditorProps {
     items?: ItemLike[];
     locations?: LocationLike[];
     stage?: Stage | (() => Stage);
-    // The content type whose context-bound entity can be targeted as 'Variable' (e.g. the actor a perActor
-    // stat rule is being resolved for); omitted where no such entity is bound.
+    // The content type whose context-bound entity can be targeted as 'Variable' (e.g. a scheduled actor);
+    // omitted where no such entity is bound.
     variableContentType?: ContentType;
     onChange: (conditionCollections: ConditionCollection[]) => void;
     // When provided, renders a dropdown per condition collection (on its first row) letting the caller

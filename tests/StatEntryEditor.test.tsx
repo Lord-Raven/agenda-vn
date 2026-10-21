@@ -59,6 +59,13 @@ for (const category of ['global', 'actor', 'location', 'item'] as const) {
             assert.equal((html.match(/aria-label="Remove option"/g) || []).length, 2);
             assert.match(html, /value="First option"/);
             assert.match(html, /First description/);
+            assert.doesNotMatch(html, /Per Actor|Maps other actors|target actor being considered/);
+            if (category === 'global') {
+                assert.match(html, /Default Value Rules/);
+            } else {
+                assert.doesNotMatch(html, /Default Value Rules/);
+                assert.match(html, type === 'option' ? /Default Option/ : /Initially Active/);
+            }
         });
     }
 }

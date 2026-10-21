@@ -86,7 +86,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const globalStats = useMemo(() => stageInstance.getConfiguration().globalStats || [], [stageInstance]);
     const actorStats = useMemo(() => stageInstance.getConfiguration().actorStats || [], [stageInstance]);
     const updatableGlobalStats = globalStats;
-    const updatableActorStats = useMemo(() => actorStats.filter((stat) => !stat.perActor), [actorStats]);
+    const updatableActorStats = actorStats;
     const updatableLocationStats = useMemo(() => stageInstance.getConfiguration().locationStats || [], [stageInstance]);
     const updatableItemStats = useMemo(() => stageInstance.getConfiguration().itemStats || [], [stageInstance]);
     const actors = useMemo(() => stageInstance.getConfiguration().actors || [], [stageInstance]);

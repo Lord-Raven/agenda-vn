@@ -125,7 +125,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
         const target = outcome.type === OutcomeType.ACTOR_STAT ? 'actor' : 'global';
         const stats = target === 'actor' ? stage().getConfiguration().actorStats : stage().getConfiguration().globalStats;
         const stat = stats.find((candidate) => candidate.name === `${outcome.details?.statName || ''}`.trim());
-        if (!stat || stat.perActor) {
+        if (!stat) {
             return false;
         }
         const actor = target === 'actor' ? resolveActor(outcome.details?.actorId) : undefined;

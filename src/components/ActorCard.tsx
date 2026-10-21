@@ -63,7 +63,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
     const configuredStats = stageInstance.getConfiguration().actorStats || [];
     const statControls = actor ? stageInstance.getVisibleControls('actorCard', actor).flatMap(control => {
         const stat = configuredStats.find(candidate => candidate.id === control.statId);
-        return control.type === 'actorStatDisplay' && stat?.name?.trim() && !stat.perActor
+        return control.type === 'actorStatDisplay' && stat?.name?.trim()
             ? [{ control, stat }]
             : [];
     }) : [];

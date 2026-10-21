@@ -467,7 +467,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             if (skit) {
                 currentActors.forEach(actor => {
                     builder.addBlock(actor.name, () => {
-                        const actorBuilder = buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage, currentActors.filter(a => a.id !== actor.id));
+                        const actorBuilder = buildActorContext(actor, determineOutfit(actor.id, skit, skit.script.length - 1), stage);
                         if (actor.displayName && actor.displayName !== actor.name) {
                             actorBuilder.addBlock('Display Name', actor.displayName);
                         }
@@ -510,7 +510,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         `  ${skit.initialLocationId ? getLocationName(skit.initialLocationId, stage) : 'Unknown Location'}\n` +
                         `    ${getLocationDescription(skit.initialLocationId, stage) || 'No description available.'}`)
                     .addBlock('Available Characters',
-                        availableActors.map(actor => buildActorContext(actor, '', stage, [], ['summary', 'profile']).format()).join('\n'))
+                        availableActors.map(actor => buildActorContext(actor, '', stage, ['summary', 'profile']).format()).join('\n'))
                     .addBlock('Response Format',
                         buildStructuredResponseFormat(SKIT_GUIDANCE_FIELDS, { includeEndTag: true }))
                     .addBlock('Additional Context',

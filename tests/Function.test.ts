@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } from '../src/Stage';
-import { Actor, getActorLore, resolveActorSchedule, resolveInitialActorStatValue } from '../src/content/Actor';
+import { Actor, buildActorContext, getActorLore, resolveActorSchedule, resolveInitialActorStatValue } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
 import { getLocationDescription, Location } from '../src/content/Location';
-import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveAvailableStatOptions, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
+import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveAvailableStatOptions, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateContext, generateSkitScript, Skit } from '../src/content/Skit';
 import { cloneGameFunction, functionPickerOptions, functionReference, globalStatReference, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { evaluateCondition } from '../src/content/Condition';
@@ -722,7 +722,6 @@ test('function placeholders format every non-void return type without normalizin
 
 test('function substitution preserves existing stat and actor tags, unknown tags, and literal returned text', () => {
     const { stage, save, configuration } = fixture();
-    configuration.actorStats.push(stat('Relationships', 'number', { perActor: true }));
     save.actors.a.displayName = 'Player display';
     save.actors.b.displayName = 'Friend';
     configuration.functions = [
@@ -735,7 +734,7 @@ test('function substitution preserves existing stat and actor tags, unknown tags
     const source = '{{user}} / {{char}} / {{global:Score}} / {{ user:score }} / {{CHAR:Choices}} / {{Literal}}';
     assert.equal(processLoreText(source, stage, save.actors.b),
         'Same name / Friend / 2 / 2 / Second, First / {{global:Score}} {{Unknown}} $&');
-    const unchanged = '{{Unknown}} {{Test function}} {{global}} {{global:missing}} {{char:Relationships}} {{}} {{  }}';
+    const unchanged = '{{Unknown}} {{Test function}} {{global}} {{global:missing}} {{char:Missing stat}} {{}} {{  }}';
     assert.equal(processLoreText(unchanged, stage, save.actors.b), unchanged);
     assert.equal(processLoreText('{{char}} {{char:Score}}', stage), '{{char}} {{char:Score}}');
     assert.equal(processLoreText(undefined, stage), '');
@@ -1305,6 +1304,64 @@ test('direct and script assignments snapshot sources and reject invalid sources 
     assert.deepEqual(result, { value: [['literal', 'a', 'a'], ['a']], errors: [] });
     assert.throws(() => stage.setGlobalStatValue('copy', [functionReference('missing')]), /Unknown function reference/);
     assert.deepEqual(save.globalStatValues!.copy, originalParty);
+});
+
+test('configuration updates preserve typed entity values, seed defaults, and remove stale IDs', () => {
+    const cases: [StatType, StatValue][] = [
+        ['number', 5], ['text', 'hello'], ['checkbox', false],
+        ['option', 'first'], ['optionList', ['first']],
+        ['actor', 'b'], ['actorList', ['a', 'b']],
+        ['item', 'item'], ['itemList', ['item']],
+        ['location', 'place'], ['locationList', ['place']],
+    ];
+    for (const sync of ['syncActorStats', 'syncLocationStats', 'syncItemStats'] as const) {
+        const { stage, save, configuration } = fixture();
+        stage.saveData = { configuration, saves: [save], lastSaveSlot: 0 };
+        const definitions = cases.map(([type, value]) => stat(type, type, {
+            default: value, options: [{ id: 'first', name: 'First', description: '' }],
+        }));
+        configuration.actorStats = configuration.locationStats = configuration.itemStats = definitions;
+        const entity = sync === 'syncActorStats' ? save.actors.b
+            : sync === 'syncLocationStats' ? save.atlas.place : save.inventory[0];
+        entity.statMap = { stale: 42, checkbox: true, number: 8, actorList: ['b'] };
+        stage.updateConfiguration({ actorStats: definitions, locationStats: definitions, itemStats: definitions });
+        const expected = {
+            ...Object.fromEntries(cases),
+            checkbox: true, number: 8, actorList: ['b'],
+        };
+        assert.deepEqual(entity.statMap, expected, sync);
+        stage.updateConfiguration({});
+        assert.deepEqual(entity.statMap, expected, `${sync} is stable on repeated synchronization`);
+    }
+});
+
+test('global default rules keep first-match ordering, normalization, and fallback behavior', () => {
+    const definition = stat('Score', 'number', { default: 3, min: 0, max: 10, defaultValueRules: [
+        { id: 'skip', value: 1, conditions: [[{ type: 'globalStat', statId: 'Flag', comparison: 'equals', value: true }]] },
+        { id: 'match', value: 20, conditions: [] },
+        { id: 'later', value: 4, conditions: [] },
+    ] });
+    assert.equal(resolveStatValueRule(definition.defaultValueRules, definition, { globalStatValues: { Flag: false } }), 10);
+    assert.equal(buildInitialGlobalStatValues([definition]).Score, 10);
+    assert.equal(buildInitialGlobalStatValues([definition], { Score: 6 }).Score, 6);
+    definition.defaultValueRules = definition.defaultValueRules!.slice(0, 1);
+    assert.equal(resolveStatValueRule(definition.defaultValueRules, definition, { globalStatValues: { Flag: false } }), undefined);
+    assert.equal(buildInitialGlobalStatValues([definition]).Score, 3);
+});
+
+test('actor context retains ordinary stats and conditional LLM visibility', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.actorStats = [
+        stat('Score', 'number', { llmSees: { value: true, conditions: [] } }),
+        stat('Party', 'actorList', { llmSees: { value: true, conditions: [] } }),
+        stat('Hidden', 'text', { llmSees: { value: false, conditions: [] } }),
+    ];
+    save.actors.a.statMap.Hidden = 'secret';
+    const context = buildActorContext(save.actors.a, '', stage, ['stats']).format();
+    assert.match(context, /Score: 2/);
+    assert.match(context, /Party: Same name/);
+    assert.doesNotMatch(context, /Hidden|secret|Stats Toward Others/);
+    assert.doesNotMatch(buildActorContext(save.actors.a, '', stage, ['summary']).format(), /Score|Party/);
 });
 
 test('synchronizing legacy saves materializes references once for global and entity stats', () => {

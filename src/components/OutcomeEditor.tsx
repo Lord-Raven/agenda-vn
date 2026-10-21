@@ -61,7 +61,7 @@ export const SkitActionInput: FC<SkitActionInputProps> = ({ label, type, value, 
             {reference ? <>
                 <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                     Existing stat binding: {ownerName} / {referencedStat?.name || reference.statId}
-                    {(!referencedStat || referencedStat.type !== type || referencedStat.perActor) && ' (missing or incompatible stat)'}
+                    {(!referencedStat || referencedStat.type !== type) && ' (missing or incompatible stat)'}
                 </span>
                 <Button onClick={() => onChange(literalDefault)} aria-label={`Replace ${label} stat binding`}>Replace</Button>
             </> : type === 'location' ? (
@@ -81,7 +81,7 @@ export const OutcomeEditor: FC<OutcomeEditorProps> = ({ actions, onChange, skitT
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const functions = stageInstance?.getConfiguration().functions || [];
     const targetActors = excludePlayerTargets ? actors.filter(actor => actor.id !== stageInstance?.getSave().playerId) : actors;
-    const statsByType = { global: globalStats, actor: actorStats.filter(stat => !stat.perActor), location: locationStats, item: itemStats };
+    const statsByType = { global: globalStats, actor: actorStats, location: locationStats, item: itemStats };
     const entitiesByType = { actor: targetActors, location: locations, item: items };
     const createUpdate = (): StatUpdate => ({
         id: generateUuid(), kind: 'stat',
