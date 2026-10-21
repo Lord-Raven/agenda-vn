@@ -63,6 +63,7 @@ export const ActorPortrait: FC<ActorPortraitProps> = ({
 
                 return (
                     <motion.div
+                        data-has-image={Boolean(cachedImageUrl)}
                         title={title ?? actor.name}
                         aria-label={ariaLabel ?? actor.name}
                         initial={fadeInWhenLoaded ? { opacity: 0 } : false}

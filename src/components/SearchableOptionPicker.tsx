@@ -1,6 +1,7 @@
 import { FC, ReactNode, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DoNotDisturb } from '@mui/icons-material';
+import { Box } from '@mui/material';
 import type { Stage } from '../Stage';
 import type { StatType } from '../content/Stat';
 import { valuePickerOptions, isFunctionReference, isValueReference } from '../content/Function';
@@ -132,6 +133,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         if (option.imageUrl) {
             return (
                 <img
+                    data-has-image="true"
                     src={option.imageUrl}
                     alt={option.label}
                     style={{
@@ -319,13 +321,19 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         : multiple
             ? (selectedOptions.length > 0
                 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', minWidth: 0 }}>
-                        {visibleSelectedOptions.map((option, index) => (
-                            <span key={`picker-selected-${option.key}`} style={{ display: 'inline-flex', marginLeft: index === 0 ? 0 : -8, flexShrink: 0 }}>
+                    <Box component="span" sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        minWidth: 0,
+                        '& > span + span': { marginLeft: '6px' },
+                        '& > span:has([data-has-image="true"]) + span:has([data-has-image="true"])': { marginLeft: '-8px' },
+                    }}>
+                        {visibleSelectedOptions.map((option) => (
+                            <span key={`picker-selected-${option.key}`} style={{ display: 'inline-flex', flexShrink: 0 }}>
                                 {renderOptionAvatar(option, false, 22)}
                             </span>
                         ))}
-                    </span>
+                    </Box>
                     {selectedOptions.length === 1 && (
                         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px' }}>{selectedOptions[0].label}</span>
                     )}

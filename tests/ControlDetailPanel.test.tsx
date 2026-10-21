@@ -12,6 +12,12 @@ import { SearchableOptionPicker } from '../src/components/SearchableOptionPicker
 import { StatValueInput } from '../src/components/StatValueInput';
 import { normalizeStatShape } from '../src/components/StatEntryEditor';
 import { IconPicker, resolveIcon } from '../src/components/StatRating';
+import { ContentListPortraits } from '../src/components/ContentListControl';
+import { ActorPortrait } from '../src/components/ActorPortrait';
+import { ItemPortrait } from '../src/components/ItemPortrait';
+import { LocationPortrait } from '../src/components/LocationPortrait';
+import { Actor } from '../src/content/Actor';
+import { getThumbnailUrl } from '../src/utils/ImageCache';
 
 const createStage = (control: Control) => {
     const configuration: GameConfiguration = {
@@ -42,6 +48,64 @@ const sourceStat = (id: string, type: StatType, value: string | string[] = '') =
     id, name: `Global ${id}`, type, default: value, guidance: '',
     llmSees: { value: true, conditions: [] }, llmMaintained: { value: true, conditions: [] },
 });
+
+test('selected list previews space text fallbacks and overlap only adjacent image avatars', () => {
+    const options = [
+        { key: 'first', label: 'First', imageUrl: 'first.png' },
+        { key: 'second', label: 'Second', imageUrl: 'second.png' },
+        { key: 'text', label: 'Text' },
+        { key: 'third', label: 'Third', imageUrl: 'third.png' },
+        { key: 'fourth', label: 'Fourth', imageUrl: 'fourth.png' },
+        { key: 'other-text', label: 'Other' },
+        { key: 'overflow', label: 'Overflow' },
+    ];
+    const html = renderToStaticMarkup(<SearchableOptionPicker multiple
+        options={options} values={options.map(option => option.key)} onChange={() => {}} />);
+    assert.match(html, />TE<\/span>/);
+    assert.match(html, />OT<\/span>/);
+    assert.equal((html.match(/<img[^>]*data-has-image="true"/g) || []).length, 4);
+    assert.match(html, />\+1<\/span>/);
+    assert.match(html, />span\+span\{margin-left:6px;\}/);
+    assert.match(html, />span:has\(\[data-has-image="true"\]\)\+span:has\(\[data-has-image="true"\]\)\{margin-left:-8px;\}/);
+    assert.doesNotMatch(html, /style="[^"]*margin-left:-/);
+});
+
+test('custom portrait avatars overlap only after their images are available', async () => {
+    const imageUrl = 'portrait-overlap-test.png';
+    const actor = new Actor({
+        id: 'actor', name: 'Alice Baker', outfitId: 'default',
+        outfits: [{ id: 'default', name: 'Default', description: '', prompts: {}, emotionPack: { base: imageUrl } }],
+    });
+    const render = () => renderToStaticMarkup(<SearchableOptionPicker multiple
+        options={[
+            { key: 'actor', label: actor.name, renderAvatar: size => <ActorPortrait actor={actor} size={size} /> },
+            { key: 'item', label: 'Item', renderAvatar: size => <ItemPortrait item={{ id: 'item', name: 'Item', imageUrl }} width={size} height={size} /> },
+            { key: 'location', label: 'Location', renderAvatar: size => <LocationPortrait location={{ id: 'location', name: 'Location', imageUrl }} width={size} height={size} /> },
+        ]}
+        values={['actor', 'item', 'location']} onChange={() => {}} />);
+    const html = render();
+    assert.equal((html.match(/data-has-image="false"/g) || []).length, 3);
+    assert.doesNotMatch(html, /<div[^>]*data-has-image="true"/);
+    assert.match(html, />AB<\/span>/);
+    assert.match(html, /data-testid="Inventory2Icon"/);
+    assert.match(html, /data-testid="PlaceIcon"/);
+
+    await getThumbnailUrl(imageUrl, 44);
+    const loadedHtml = render();
+    assert.equal((loadedHtml.match(/<div[^>]*data-has-image="true"/g) || []).length, 3);
+    assert.doesNotMatch(loadedHtml, /data-has-image="false"|>AB<\/span>|data-testid="(?:Inventory2|Place)Icon"/);
+});
+
+for (const kind of ['actor', 'item', 'location'] as const) {
+    test(`${kind} portrait lists overlap only adjacent images, not missing references`, () => {
+        const stage = createStage(new Control());
+        const html = renderToStaticMarkup(<ContentListPortraits kind={kind}
+            values={['missing-first', 'missing-second']} stage={stage} label="List stat" />);
+        assert.equal((html.match(/<div[^>]*role="listitem"/g) || []).length, 2);
+        assert.match(html, /\[role="listitem"\]:has\(\[data-has-image="true"\]\)\+\[role="listitem"\]:has\(\[data-has-image="true"\]\)\{margin-left:-6px;\}/);
+        assert.equal((html.match(/margin-left:-6px/g) || []).length, 1);
+    });
+}
 
 for (const kind of ['actor', 'item', 'location'] as const) {
     test(`${kind} pickers label global scalar and list selections rather than treating them as literal IDs`, () => {

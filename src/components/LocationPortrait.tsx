@@ -49,6 +49,7 @@ export const LocationPortrait: FC<LocationPortraitProps> = ({
 
     return (
         <div
+            data-has-image={Boolean(imageUrl)}
             title={title ?? location.name}
             aria-label={ariaLabel ?? location.name}
             style={{

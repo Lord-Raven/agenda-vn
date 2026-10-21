@@ -103,7 +103,17 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                 }}
             >
                 {/* A horizontal scroll container also clips vertically, so reserve room for scaled portraits and shadows. */}
-                <Box ref={trackRef} role="list" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '8px 6px', width: 'max-content', overflow: 'visible' }}>
+                <Box ref={trackRef} role="list" sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    padding: '8px 6px',
+                    width: 'max-content',
+                    overflow: 'visible',
+                    '& > [role="listitem"]:has([data-has-image="true"]) + [role="listitem"]:has([data-has-image="true"])': {
+                        marginLeft: `-${PORTRAIT_OVERLAP}px`,
+                    },
+                }}>
                     {values.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 'clamp(1rem, 10cqi, 1.75rem)' }}>None</span>}
                     {values.map((id, index) => {
                         const actor = kind === 'actor' ? save.actors?.[id] : undefined;
@@ -118,7 +128,6 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                                 aria-label={name}
                                 sx={{
                                     flexShrink: 0,
-                                    marginLeft: index > 0 ? `-${PORTRAIT_OVERLAP}px` : 0,
                                     position: 'relative',
                                     overflow: 'visible',
                                     scrollSnapAlign: 'start',

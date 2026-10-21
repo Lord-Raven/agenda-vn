@@ -29,8 +29,8 @@ const defaultGlobalStat = (): Stat => {
             description: 'Default option behavior for this setting.',
         }],
         defaultValueRules: [{ id: `default:${id}`, value: 'Default', conditions: [] }],
-        llmSees: { value: true, conditions: [] },
-        llmMaintained: { value: true, conditions: [] },
+        llmSees: { value: false, conditions: [] },
+        llmMaintained: { value: false, conditions: [] },
     };
 };
 
@@ -47,8 +47,8 @@ const defaultTypedStat = (): Stat => {
         min: 0,
         max: 100,
         options: [],
-        llmSees: { value: true, conditions: [] },
-        llmMaintained: { value: true, conditions: [] },
+        llmSees: { value: false, conditions: [] },
+        llmMaintained: { value: false, conditions: [] },
     };
 };
 

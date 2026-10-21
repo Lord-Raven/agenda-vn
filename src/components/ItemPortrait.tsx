@@ -49,6 +49,7 @@ export const ItemPortrait: FC<ItemPortraitProps> = ({
 
     return (
         <div
+            data-has-image={Boolean(imageUrl)}
             title={title ?? item.name}
             aria-label={ariaLabel ?? item.name}
             style={{
