@@ -209,12 +209,14 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 
     const renderOptionButton = (option: PickerOption) => {
         const active = multiple ? selectedValues.includes(option.key) : selectedValue === option.key;
+        const selectionIndex = multiple && active ? selectedValues.indexOf(option.key) : -1;
         return (
             <button
                 key={`picker-option-${option.key}`}
                 type="button"
                 onClick={() => handleSelect(option.key)}
                 style={{
+                    position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -234,6 +236,30 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                     overflowWrap: 'anywhere',
                 }}
             >
+                {selectionIndex >= 0 && (
+                    <span
+                        aria-label={`Selection ${selectionIndex + 1}`}
+                        style={{
+                            position: 'absolute',
+                            top: '4px',
+                            right: '4px',
+                            minWidth: '16px',
+                            height: '16px',
+                            padding: '0 4px',
+                            boxSizing: 'border-box',
+                            borderRadius: '8px',
+                            background: 'var(--agenda-highlight)',
+                            color: 'var(--agenda-surface-raised)',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            lineHeight: '16px',
+                            textAlign: 'center',
+                            pointerEvents: 'none',
+                        }}
+                    >
+                        {selectionIndex + 1}
+                    </span>
+                )}
                 {renderOptionAvatar(option, active, 30)}
                 <span style={{ maxWidth: '100%' }}>{option.label}</span>
             </button>
