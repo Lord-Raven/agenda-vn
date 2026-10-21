@@ -50,7 +50,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     }
 
     if (stat.type === 'option') {
-        const selectedOption = findStatOptionByValue(stat, value);
+        const selectedOption = findStatOptionByValue(stat, value, optionContext);
         const options = resolveAvailableStatOptions(stat, value, optionContext);
         return (
             <SearchableOptionPicker value={isValueReference(value) ? value : selectedOption?.value || ''}
@@ -63,9 +63,9 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
 
     if (isOptionListStatType(stat.type)) {
         const selectedIds = Array.isArray(value)
-            ? (normalizeStatValue(value, stat) as string[])
+            ? Array.from(new Set(value.map(entry => isValueReference(entry) ? entry : findStatOptionByValue(stat, entry, optionContext)?.value || entry)))
             : isValueReference(value) ? [value] : [];
-        const pool = resolveStatOptionPool(stat);
+        const pool = resolveAvailableStatOptions(stat, value, optionContext);
         if (valuePickerOptions(stageInstance?.getConfiguration(), 'option').length || valuePickerOptions(stageInstance?.getConfiguration(), 'optionList').length || selectedIds.some(isValueReference)) {
             return <SearchableOptionPicker multiple values={selectedIds} onChange={next => onChange(Array.isArray(next) ? next : [])}
                 options={pool.map(option => ({ key: option.id!, label: option.name, description: option.description }))}

@@ -75,6 +75,14 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                 <Box style={{ display: 'grid', gap: 8 }}>
                     <Typography variant="subtitle2" style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>Function script reference</Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
+                        Use <strong>Score()</strong>, <strong>call("Function name")</strong>, or
+                        <strong> get("Global Stat")</strong> in formulas; numeric formulas support +, -, *, /, %,
+                        parentheses, and dice (for example, 1d6). In text values, call <strong>Greeting()</strong>
+                        or use <strong>{'{{Greeting}}'}</strong> in lore or descriptions. Names are case-insensitive;
+                        duplicate names are ambiguous. Function-backed values are read-only, and Test runs on a
+                        copy without saving changes.
+                    </Typography>
+                    <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         Functions are global and take no parameters. Use <strong>get(name)</strong> / <strong>set(name, value)</strong> to read or update global stats.
                         Use <strong>getActor(name)</strong>, <strong>getLocation(name)</strong>, and
                         <strong>getItem(name)</strong> to resolve another entity by name.
@@ -115,7 +123,7 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
             <TextArea
                 value={script}
                 onChange={(event) => onScriptChange(event.target.value)}
-                rows={16}
+                rows={20}
                 placeholder={[
                     'set(\'Gold\', get(\'Gold\') + 10);',
                     '// Read list objects without changing get()\'s ID values:',

@@ -198,7 +198,7 @@ const resolveOptionListSource = (statId: string, context?: OptionListSourceConte
 };
 
 export const isSourcedOptionStat = (stat: Stat | undefined): boolean => (
-    stat?.type === 'option' && !!stat.optionSourceStatId?.trim()
+    (stat?.type === 'option' || stat?.type === 'optionList') && !!stat.optionSourceStatId?.trim()
 );
 
 // Ids are materialized so filtering the list later doesn't change index-derived fallback ids.
@@ -209,13 +209,15 @@ const materializeOptions = (options: StatOption[] | undefined): StatOption[] => 
 // Every option a stat's value may refer to: its own options, or (for a sourced option stat) the source
 // optionList's full pool, including options not currently active.
 export const resolveStatOptionPool = (stat: Stat | undefined, context?: OptionListSourceContext): StatOption[] => {
-    if (!stat) {
-        return [];
+    const visited = new Set<string>();
+    while (stat && isSourcedOptionStat(stat)) {
+        if (visited.has(stat.id)) {
+            return [];
+        }
+        visited.add(stat.id);
+        stat = resolveOptionListSource(stat.optionSourceStatId!, context)?.stat;
     }
-    if (isSourcedOptionStat(stat)) {
-        return materializeOptions(resolveOptionListSource(stat.optionSourceStatId!, context)?.stat.options);
-    }
-    return materializeOptions(stat.options);
+    return materializeOptions(stat?.options);
 };
 
 // The options currently offered for selection. For a sourced option stat, only those active in the source
@@ -225,13 +227,23 @@ export const resolveAvailableStatOptions = (stat: Stat | undefined, currentValue
     if (!stat || !isSourcedOptionStat(stat)) {
         return pool;
     }
-    const source = resolveOptionListSource(stat.optionSourceStatId!, context);
-    if (!source) {
-        return pool;
+    let available = pool;
+    let current = stat;
+    const visited = new Set<string>();
+    while (isSourcedOptionStat(current) && !visited.has(current.id)) {
+        visited.add(current.id);
+        const source = resolveOptionListSource(current.optionSourceStatId!, context);
+        if (!source) {
+            break;
+        }
+        const activeIds = new Set(resolveStatValue(source.value, { ...source.stat, options: pool, optionSourceStatId: undefined }, source) as string[]);
+        available = available.filter(option => activeIds.has(option.id!));
+        current = source.stat;
     }
-    const activeIds = new Set(resolveStatValue(source.value, source.stat, source) as string[]);
-    const currentId = findStatOptionByValue(stat, currentValue, context)?.value;
-    return pool.filter((option) => activeIds.has(option.id!) || option.id === currentId);
+    const availableIds = new Set(available.map(option => option.id!));
+    const currentIds = new Set((Array.isArray(currentValue) ? currentValue : [currentValue])
+        .map(value => findStatOptionByValue(stat, value, context)?.value));
+    return pool.filter(option => availableIds.has(option.id!) || currentIds.has(option.id!));
 };
 
 export const findStatOptionByValue = (stat: Stat | undefined, value: unknown, context?: OptionListSourceContext): { option: StatOption; index: number; value: string } | undefined => {
@@ -326,7 +338,7 @@ export type Stat = {
     default: StatValue;
     type: StatType;
     options?: StatOption[];
-    // Only meaningful when type is 'option': id of a global 'optionList' stat to take options from instead of `options`.
+    // For 'option' and 'optionList': id of an 'optionList' stat to take options from instead of `options`.
     optionSourceStatId?: string;
     min?: number;
     max?: number;
@@ -374,7 +386,7 @@ export const cloneStat = (stat: Stat): Stat => ({
         name: option.name,
         description: option.description,
     })),
-    optionSourceStatId: stat.type === 'option' && stat.optionSourceStatId ? stat.optionSourceStatId : undefined,
+    optionSourceStatId: isSourcedOptionStat(stat) ? stat.optionSourceStatId : undefined,
     min: Number.isFinite(stat.min) ? Number(stat.min) : undefined,
     max: Number.isFinite(stat.max) ? Number(stat.max) : undefined,
 });
@@ -503,6 +515,9 @@ export const resolveStatValue = (value: unknown, stat: Stat, context: { resolveV
 
 // Maps option ids/names to canonical ids of an optionList's pool, dropping unknown entries and duplicates.
 const normalizeOptionListIds = (values: unknown[], stat: Stat): string[] => {
+    if (isSourcedOptionStat(stat) && resolveStatOptionPool(stat).length === 0) {
+        return Array.from(new Set(normalizeReferenceListValue(values)));
+    }
     const ids = values
         .map((entry) => isValueReference(entry) ? entry : findStatOptionByValue(stat, entry)?.value)
         .filter((id): id is string => !!id);

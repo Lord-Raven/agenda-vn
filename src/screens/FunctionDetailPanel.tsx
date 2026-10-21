@@ -51,31 +51,6 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                         {FUNCTION_RETURN_TYPES.map(type => <option key={type} value={type}>{FUNCTION_RETURN_TYPE_LABELS[type]}</option>)}
                     </select>
                 </label>
-                <p style={{ color: 'var(--agenda-text-muted)', margin: 0 }}>
-                    In numeric values, defaults, and value rules, use {'Score() * 2 + 1'}, {'call("Function name")'},
-                    {' '}or {'get("Global Stat")'}. Formulas support +, -, *, /, %, parentheses, and dice (1d6).
-                    In text values use {'Greeting()'} or embed {'{{Greeting}}'} in other text.
-                    Names are case-insensitive; duplicate names are ambiguous and must use ID references instead.
-                    Inputs apply on blur or Enter so unfinished formulas are not evaluated while typing.
-                </p>
-                <p style={{ color: 'var(--agenda-text-muted)', margin: 0 }}>
-                    Global JavaScript functions can be invoked by recurring rules, button controls, or other functions.
-                    {' '}
-                    Return IDs for content references, option IDs for options, and arrays of IDs for lists.
-                    Typed functions can be selected as value sources. Stat assignments evaluate functions and referenced
-                    Stats once and store the result; triggering a rule again evaluates its sources again.
-                    Value evaluation is read-only, including nested calls.
-                    Tests run against a copy of the current game and do not save their changes.
-                </p>
-                <p style={{ color: 'var(--agenda-text-muted)', margin: 0 }}>
-                    Use {'{{Function name}}'} in lore, actor lore, or location descriptions to insert a non-void
-                    function's current result. Names are case-insensitive and surrounding whitespace is ignored.
-                    Each occurrence is evaluated read-only, including nested calls; errors stop substitution.
-                    Checkboxes become yes/no, content IDs become names, and lists are comma-separated.
-                    Option results use IDs because functions have no option pool.
-                    Unknown names and void functions remain unchanged. Existing user/char/global tags take precedence.
-                    Returned text is not expanded again.
-                </p>
                 <label style={{ color: 'var(--agenda-text-muted)' }}>
                     Description
                     <TextArea value={fn.description} onChange={event => onChange({ description: event.target.value })} rows={3} style={{ width: '100%' }} />

@@ -29,17 +29,18 @@ export const normalizeStatShape = (stat: Stat): Stat => {
     if (isValueReference(stat.default) || (stat.type === 'number' && isNumericValueExpression(stat.default))) {
         normalized.default = stat.default;
     }
-    return normalized.type === 'option' ? normalized : { ...normalized, optionSourceStatId: undefined };
+    return normalized.type === 'option' || normalized.type === 'optionList' ? normalized : { ...normalized, optionSourceStatId: undefined };
 };
 
 const normalizeStatShapeForType = (stat: Stat): Stat => {
-    if (stat.type === 'option' && isSourcedOptionStat(stat)) {
+    if (isSourcedOptionStat(stat)) {
         // Options come from the source list; the stat's own options are kept in case the source is cleared.
         return {
             ...stat,
-            default: typeof stat.default === 'string' ? stat.default : '',
+            default: stat.type === 'optionList' ? normalizeReferenceListValue(stat.default) : typeof stat.default === 'string' ? stat.default : '',
             min: undefined,
             max: undefined,
+            ...(stat.type === 'optionList' ? { perActor: false, perActorDefaultRules: [] } : {}),
         };
     }
 
@@ -288,7 +289,8 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     };
 
     const renderValueInput = (value: StatValue, onChange: (value: StatValue) => void) => (
-        <StatValueInput stat={stat} value={value} onChange={onChange} actors={valueActors} items={items} locations={locations} stage={stage} />
+        <StatValueInput stat={stat} value={value} onChange={onChange} actors={valueActors} items={items} locations={locations} stage={stage}
+            optionContext={{ sourceStats: [...globalStats, ...selfStats] }} />
     );
 
     return (
@@ -397,13 +399,13 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 />
                             </div>
                         )}
-                        {normalizedStat.type === 'option' && (optionListSources.length > 0 || isSourcedOption) && (
+                        {(normalizedStat.type === 'option' || normalizedStat.type === 'optionList') && (optionListSources.length > 0 || isSourcedOption) && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Option Source</label>
                                 <select
                                     className="input-base"
                                     value={normalizedStat.optionSourceStatId || ''}
-                                    onChange={(e) => patchStat({ optionSourceStatId: e.target.value || undefined, default: '' })}
+                                    onChange={(e) => patchStat({ optionSourceStatId: e.target.value || undefined, default: normalizedStat.type === 'optionList' ? [] : '' })}
                                 >
                                     <option value="">Own options</option>
                                     {optionListSources.map(source => (
@@ -420,12 +422,12 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
 
                         {isSourcedOption && !valueRulesConfig?.visible && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
-                                <label style={fieldLabelStyle}>Default Option</label>
+                                <label style={fieldLabelStyle}>{normalizedStat.type === 'optionList' ? 'Initially Active' : 'Default Option'}</label>
                                 {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                             </div>
                         )}
 
-                        {((normalizedStat.type === 'option' && !isSourcedOption) || isOptionListStatType(normalizedStat.type)) && (
+                        {(normalizedStat.type === 'option' || isOptionListStatType(normalizedStat.type)) && !isSourcedOption && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: 10 }}>
                                 {valueRulesConfig?.visible ? null : isOptionListStatType(normalizedStat.type) ? (
                                     <div style={{ ...inlineFieldTopStyle, marginBottom: 4 }}>
