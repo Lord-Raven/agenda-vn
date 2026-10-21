@@ -268,8 +268,24 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         );
     };
 
+    const selectedOptions = selectedValues
+        .map((key) => options.find((option) => option.key === key))
+        .filter((option): option is PickerOption => Boolean(option));
+
     const pickerContent = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {multiple && (
+                <div role="group" aria-label="Current elements" style={{ display: 'grid', gap: 6 }}>
+                    <div style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                        Current elements ({selectedOptions.length})
+                    </div>
+                    {selectedOptions.length > 0
+                        ? <div style={{ ...optionGridStyle, maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
+                            {selectedOptions.map(renderOptionButton)}
+                        </div>
+                        : <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>{emptyLabel}</span>}
+                </div>
+            )}
             <div style={{ position: 'relative' }}>
                 <input
                     type="text"
@@ -310,9 +326,6 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         </div>
     );
 
-    const selectedOptions = selectedValues
-        .map((key) => options.find((option) => option.key === key))
-        .filter((option): option is PickerOption => Boolean(option));
     const visibleSelectedOptions = selectedOptions.slice(0, MAX_SELECTED_PREVIEW);
     const overflowSelectedCount = selectedOptions.length - visibleSelectedOptions.length;
 
