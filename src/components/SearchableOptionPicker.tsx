@@ -280,8 +280,29 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                         Current elements ({selectedOptions.length})
                     </div>
                     {selectedOptions.length > 0
-                        ? <div style={{ ...optionGridStyle, maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
-                            {selectedOptions.map(renderOptionButton)}
+                        ? <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
+                            {selectedOptions.map((option) => (
+                                <button
+                                    key={`picker-current-${option.key}`}
+                                    type="button"
+                                    aria-label={`Remove ${option.label}`}
+                                    title={option.label}
+                                    onClick={() => handleSelect(option.key)}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0,
+                                        border: 0,
+                                        borderRadius: '4px',
+                                        background: 'transparent',
+                                        cursor: 'pointer',
+                                        padding: '2px',
+                                    }}
+                                >
+                                    {renderOptionAvatar(option, false, 22)}
+                                </button>
+                            ))}
                         </div>
                         : <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>{emptyLabel}</span>}
                 </div>

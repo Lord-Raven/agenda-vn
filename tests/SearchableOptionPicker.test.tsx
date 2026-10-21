@@ -43,8 +43,11 @@ test('list picker shows every current element in selection order above search, i
     assert.match(currentElements, /Current elements \(8\)/);
     assert.equal((currentElements.match(/<button/g) || []).length, 8);
     assert.equal((currentElements.match(/<img/g) || []).length, 8);
+    assert.doesNotMatch(currentElements, /Selection \d|>Element \d<\/span>/);
+    assert.match(currentElements, /display:flex;flex-wrap:wrap/);
     values.forEach((key, index) => {
-        assert.match(currentElements, new RegExp(`aria-label="Selection ${index + 1}"`));
+        assert.match(currentElements, new RegExp(`aria-label="Remove Element ${7 - index}" title="Element ${7 - index}"`));
+        assert.match(currentElements, /width:22px;height:22px/);
         if (index > 0) {
             assert.ok(currentElements.indexOf(`src="portrait-${7 - index}.png"`)
                 > currentElements.indexOf(`src="portrait-${8 - index}.png"`));
@@ -52,6 +55,21 @@ test('list picker shows every current element in selection order above search, i
     });
     assert.match(html.slice(searchStart), /0 results/);
     assert.doesNotMatch(html.slice(searchStart), /Selection \d/);
+});
+
+test('current elements use compact initials and custom avatars without visible names', () => {
+    const html = renderOpenPicker({
+        multiple: true, values: ['initials', 'custom'],
+        options: [
+            { key: 'initials', label: 'Alice' },
+            { key: 'custom', label: 'Bob', renderAvatar: size => <img src="custom.png" width={size} height={size} alt="Bob" /> },
+        ],
+        onChange: () => {},
+    });
+    const currentElements = html.slice(html.indexOf('aria-label="Current elements"'), html.indexOf('<input'));
+    assert.match(currentElements, />AL<\/span>/);
+    assert.match(currentElements, /src="custom.png" width="22" height="22"/);
+    assert.doesNotMatch(currentElements, />Alice<|>Bob<|Selection \d/);
 });
 
 test('empty list picker shows its empty label above search', () => {
