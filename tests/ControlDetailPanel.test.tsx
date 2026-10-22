@@ -105,6 +105,16 @@ for (const kind of ['actor', 'item', 'location'] as const) {
         assert.match(html, /\[role="listitem"\]:has\(\[data-has-image="true"\]\)\+\[role="listitem"\]:has\(\[data-has-image="true"\]\)\{margin-left:-6px;\}/);
         assert.equal((html.match(/margin-left:-6px/g) || []).length, 1);
     });
+
+    test(`${kind} map overlays use compact overlapping portraits, including fallbacks`, () => {
+        const stage = createStage(new Control());
+        const html = renderToStaticMarkup(<ContentListPortraits kind={kind}
+            values={['missing-first', 'missing-second']} stage={stage} label="Map contents" variant="overlay" size={28} />);
+        assert.equal((html.match(/<div[^>]*role="listitem"/g) || []).length, 2);
+        assert.match(html, /\[role="listitem"\]\+\[role="listitem"\]\{margin-left:-9px;\}/);
+        assert.match(html, /width:28px;height:28px/);
+        assert.doesNotMatch(html, /width:clamp/);
+    });
 }
 
 for (const kind of ['actor', 'item', 'location'] as const) {

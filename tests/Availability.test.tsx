@@ -10,6 +10,8 @@ import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { ActorScheduleEditor } from '../src/components/ActorScheduleEditor';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { LocationDetailPanel } from '../src/screens/LocationDetailPanel';
+import { getMapLinkAvailability, Map as GameMap, MapLink } from '../src/content/Map';
+import { DefinedMapView } from '../src/screens/DefinedMapView';
 
 const stat = cloneStat({
     id: 'score', name: 'Local Score', type: 'number', default: 0, guidance: '',
@@ -123,3 +125,102 @@ test('actor schedule editor exposes actor stats and Variable', () => {
     assert.match(html, /value="score" selected="">Local Score/);
     assert.match(html, />Variable</);
 });
+
+const buttonCondition = (value: number): ContentStatCondition => ({
+    ...ownStatCondition('location'), targetId: 'local', value,
+});
+const createMapButton = (patch: Partial<MapLink> = {}): MapLink => ({
+    type: 'button', parentId: 'map', childId: '', name: 'Test Button',
+    coordinates: { x: 0.5, y: 0.5 }, ...patch,
+});
+const buttonContext: ConditionContext = {
+    locationStats: [stat], atlas: { local: new Location({ id: 'local', statMap: { score: 5 } }) },
+};
+
+test('legacy map buttons stay visible and use conditions only to enable clicks', () => {
+    assert.deepEqual(getMapLinkAvailability(createMapButton(), buttonContext), { visible: true, enabled: true });
+    const button = createMapButton({ conditionCollections: [[buttonCondition(10)]] });
+    assert.deepEqual(getMapLinkAvailability(button, buttonContext), { visible: true, enabled: false });
+    button.conditionCollections?.push([buttonCondition(5)]);
+    assert.deepEqual(getMapLinkAvailability(button, buttonContext), { visible: true, enabled: true });
+});
+
+test('map buttons evaluate visibility and enabled groups independently', () => {
+    for (const enabled of [false, true]) {
+        for (const visible of [false, true]) {
+            const button = createMapButton({
+                conditionCollections: [[buttonCondition(enabled ? 5 : 10)], [buttonCondition(visible ? 5 : 10)]],
+                availabilityModes: ['enabled', 'visible'],
+            });
+            assert.deepEqual(getMapLinkAvailability(button, buttonContext), { enabled, visible });
+        }
+    }
+    const button = createMapButton({
+        conditionCollections: [[buttonCondition(10)], [buttonCondition(5)]],
+        availabilityModes: ['visible', 'visible'],
+    });
+    assert.deepEqual(getMapLinkAvailability(button, buttonContext), { enabled: true, visible: true });
+    button.conditionCollections = [[buttonCondition(5), buttonCondition(10)]];
+    assert.deepEqual(getMapLinkAvailability(button, buttonContext), { enabled: true, visible: false });
+});
+
+test('map navigation links retain their existing condition behavior', () => {
+    const link = createMapButton({
+        type: 'target', childId: 'local',
+        conditionCollections: [[buttonCondition(10)]], availabilityModes: ['visible'],
+    });
+    assert.deepEqual(getMapLinkAvailability(link, buttonContext), { visible: true, enabled: false });
+    delete link.type;
+    assert.deepEqual(getMapLinkAvailability(link, buttonContext), { visible: true, enabled: false });
+});
+
+test('map cloning and JSON round trips preserve independent button availability modes', () => {
+    const original = new GameMap({ links: [createMapButton({
+        conditionCollections: [[buttonCondition(10)]], availabilityModes: ['visible'],
+    })] });
+    const cloned = new GameMap(original);
+    assert.notEqual(cloned.links[0].availabilityModes, original.links[0].availabilityModes);
+    cloned.links[0].availabilityModes![0] = 'enabled';
+    assert.deepEqual(original.links[0].availabilityModes, ['visible']);
+    const restored = new GameMap(JSON.parse(JSON.stringify(original)));
+    assert.deepEqual(getMapLinkAvailability(restored.links[0], buttonContext), { visible: false, enabled: true });
+});
+
+test('map rendering hides invisible buttons and their content while keeping disabled buttons', () => {
+    const stage = createStage(new Location({ id: 'local', name: 'Hidden Content Location', statMap: { score: 0 } }));
+    const map = new GameMap({ id: 'map', links: [
+        createMapButton({ name: 'Hidden Button', conditionCollections: [[buttonCondition(10)]], availabilityModes: ['visible'],
+            contentList: { kind: 'location', values: ['local'] } }),
+        createMapButton({ name: 'Disabled Button', conditionCollections: [[buttonCondition(10)]] }),
+        createMapButton({ name: 'Enabled Button', conditionCollections: [[buttonCondition(0)]], availabilityModes: ['visible'] }),
+    ] });
+    const html = renderToStaticMarkup(<TooltipProvider>
+        <DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={false} />
+    </TooltipProvider>);
+    assert.doesNotMatch(html, /Hidden Button/);
+    assert.doesNotMatch(html, /Hidden Content Location/);
+    assert.match(html, /aria-label="Disabled Button" disabled=""/);
+    assert.match(html, /aria-label="Enabled Button"/);
+    assert.doesNotMatch(html, /aria-label="Enabled Button" disabled/);
+});
+
+for (const isVerticalLayout of [false, true]) {
+    test(`map button contents use unique, overlapping portraits in ${isVerticalLayout ? 'vertical' : 'horizontal'} layouts`, () => {
+        const stage = createStage(new Location({ id: 'local', name: 'Local', statMap: {} }));
+        const map = new GameMap({ id: 'map', links: [
+            createMapButton({ name: 'Locations', contentList: { kind: 'location', values: ['local', 'local', 'other', 'local'] } }),
+        ] });
+        const html = renderToStaticMarkup(<TooltipProvider>
+            <DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={isVerticalLayout} />
+        </TooltipProvider>);
+        const size = isVerticalLayout ? 28 : 40;
+        const markerSize = isVerticalLayout ? 48 : 64;
+        assert.equal((html.match(/role="group" aria-label="Locations contents"/g) || []).length, 1);
+        assert.equal((html.match(/<div[^>]*role="listitem"/g) || []).length, 2);
+        assert.equal((html.match(/data-has-image="false"/g) || []).length, 1);
+        assert.ok(html.includes(`translate(-50%, calc(-50% + ${markerSize / 2 + size / 3}px))`));
+        assert.ok(html.includes(`width:${size}px;height:${size}px`));
+        assert.ok(html.includes(`margin-left:-${Math.round(size * 0.32)}px`));
+        assert.doesNotMatch(html, /container-type:inline-size/);
+    });
+}

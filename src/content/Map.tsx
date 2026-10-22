@@ -133,6 +133,41 @@ export async function generateMapAlternativeImage(map: Map, alternative: Alterna
     return request;
 }
 
+export type MapFitMode = 'cover' | 'contain';
+
+// Link coordinates are stored in the editor's 16:9 preview space, where the image is centered.
+export const MAP_PREVIEW_SIZE = { width: 16, height: 9 } as const;
+
+type Size = { width: number; height: number };
+
+// Computes where an image renders inside a container for the given fit mode. Alignment matches
+// CSS background-position percentages (0 = start, 1 = end).
+export const getMapImageRect = (fitMode: MapFitMode, container: Size, image: Size, alignment: { x: number; y: number } = { x: 0.5, y: 0.5 }) => {
+    const scale = fitMode === 'contain'
+        ? Math.min(container.width / image.width, container.height / image.height)
+        : Math.max(container.width / image.width, container.height / image.height);
+    const width = image.width * scale;
+    const height = image.height * scale;
+    return { left: (container.width - width) * alignment.x, top: (container.height - height) * alignment.y, width, height };
+};
+
+// Converts a point in the 16:9 preview space to unit coordinates on the source image (may fall outside 0..1).
+export const previewToImageCoordinates = (fitMode: MapFitMode, image: Size, x: number, y: number) => {
+    const rect = getMapImageRect(fitMode, MAP_PREVIEW_SIZE, image);
+    return {
+        x: (x * MAP_PREVIEW_SIZE.width - rect.left) / rect.width,
+        y: (y * MAP_PREVIEW_SIZE.height - rect.top) / rect.height,
+    };
+};
+
+export const imageToPreviewCoordinates = (fitMode: MapFitMode, image: Size, x: number, y: number) => {
+    const rect = getMapImageRect(fitMode, MAP_PREVIEW_SIZE, image);
+    return {
+        x: (rect.left + x * rect.width) / MAP_PREVIEW_SIZE.width,
+        y: (rect.top + y * rect.height) / MAP_PREVIEW_SIZE.height,
+    };
+};
+
 // A map contains navigation links and action buttons.
 export class Map {
     id: string = generateUuid();
@@ -145,6 +180,8 @@ export class Map {
     imageUrl: string = ''; // URL for the map image
     alternativeImages: AlternativeImage[] = [];
     focalPoint: { x: number, y: number } = { x: 0.5, y: 0.5 }; // Focus within the editor's 16:9 preview space, used when the runtime viewport crops the image
+    fitMode: MapFitMode = 'cover'; // 'cover' fills the view (cropping around the focal point); 'contain' guarantees the entire image displays
+    fillColor: string = ''; // Color filling the empty edges around a 'contain' map; empty uses the default map backdrop
     availabilityConditions: ConditionCollection[] = [];
     links: MapLink[] = [];
 
@@ -152,17 +189,33 @@ export class Map {
         Object.assign(this, data || {});
         this.alternativeImages = (data?.alternativeImages || []).map(createAlternativeImage);
         this.focalPoint = { x: data?.focalPoint?.x ?? 0.5, y: data?.focalPoint?.y ?? 0.5 };
+        this.fitMode = data?.fitMode === 'contain' ? 'contain' : 'cover';
+        this.fillColor = data?.fillColor || '';
         this.availabilityConditions = (data?.availabilityConditions || []).map((collection) => [...collection]);
         this.links = (data?.links || []).map((link) => ({
             ...link,
             parentId: data?.id || this.id,
             coordinates: { ...link.coordinates },
             conditionCollections: (link.conditionCollections || []).map((collection) => [...collection]),
+            ...(link.availabilityModes ? { availabilityModes: [...link.availabilityModes] } : {}),
             ...(link.actions ? { actions: link.actions.map(cloneStatUpdateAction) } : {}),
             ...(link.contentList ? { contentList: { ...link.contentList, values: [...link.contentList.values] } } : {}),
         }));
     }
 }
+
+export type MapLinkAvailabilityMode = 'enabled' | 'visible';
+
+export const getMapLinkAvailability = (link: MapLink, context: ConditionContext): { visible: boolean; enabled: boolean } => {
+    const collections = link.conditionCollections || [];
+    if (link.type !== 'button') {
+        return { visible: true, enabled: evaluateConditionCollections(collections, context) };
+    }
+    return {
+        visible: evaluateConditionCollections(collections.filter((_, index) => link.availabilityModes?.[index] === 'visible'), context),
+        enabled: evaluateConditionCollections(collections.filter((_, index) => link.availabilityModes?.[index] !== 'visible'), context),
+    };
+};
 
 export interface MapLink {
     type?: 'target' | 'button'; // Omitted on legacy navigation links.
@@ -170,6 +223,7 @@ export interface MapLink {
     childId: string; // The ID of the child map or location; unused by buttons.
     coordinates: { x: number; y: number }; // Coordinates for the link on the parent Map (x and y are between 0 and 1, representing a percentage of the map's width and height)
     conditionCollections?: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
+    availabilityModes?: MapLinkAvailabilityMode[]; // Per-collection button requirement; omitted entries default to enabled.
     name?: string;
     iconName?: string;
     actions?: StatUpdateAction[];

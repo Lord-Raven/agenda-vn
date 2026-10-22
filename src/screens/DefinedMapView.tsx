@@ -2,7 +2,7 @@ import { CSSProperties, FC, Fragment, ReactNode, useEffect, useLayoutEffect, use
 import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings, TouchApp } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
-import { getMapImageUrl, Map as GameMap } from '../content/Map';
+import { getMapImageRect, getMapImageUrl, getMapLinkAvailability, Map as GameMap, MapFitMode, previewToImageCoordinates } from '../content/Map';
 import { getLocationImageUrl, getLocationName } from '../content/Location';
 import { getCurrentLocation, Skit } from '../content/Skit';
 import { Stage } from '../Stage';
@@ -10,7 +10,6 @@ import { ScreenType } from './BaseScreen';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { useTooltip } from '../components/TooltipContext';
 import { Button } from '../components/UiComponents';
-import { evaluateConditionCollections } from '../content/Condition';
 import { LocationActorPortraits } from '../components/LocationActorPortraits';
 import { GlobalStatBar } from '../components/GlobalStatBar';
 import { ControlDock } from '../components/ControlDock';
@@ -182,22 +181,16 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
     const { width: imageWidth, height: imageHeight } = mapImageSize;
     const hasMeasuredMap = Boolean(viewportWidth && viewportHeight && imageWidth && imageHeight);
 
+    const fitMode: MapFitMode = displayedMap.fitMode === 'contain' ? 'contain' : 'cover';
+    const isContained = fitMode === 'contain';
+    const imageSize = { width: imageWidth, height: imageHeight };
+
     // The editor stores coordinates in its fixed 16:9 preview space. Map a point from that
-    // space onto the source image so it can be projected through the runtime cover crop.
-    const toSourceCoordinates = (x: number, y: number) => {
-        const previewWidth = 16;
-        const previewHeight = 9;
-        const previewScale = Math.max(previewWidth / imageWidth, previewHeight / imageHeight);
-        const previewRenderedWidth = imageWidth * previewScale;
-        const previewRenderedHeight = imageHeight * previewScale;
-        return {
-            x: (x * previewWidth - (previewWidth - previewRenderedWidth) / 2) / previewRenderedWidth,
-            y: (y * previewHeight - (previewHeight - previewRenderedHeight) / 2) / previewRenderedHeight,
-        };
-    };
+    // space onto the source image so it can be projected through the runtime fit.
+    const toSourceCoordinates = (x: number, y: number) => previewToImageCoordinates(fitMode, imageSize, x, y);
 
     const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
-    const rawFocalPoint = hasMeasuredMap
+    const rawFocalPoint = hasMeasuredMap && !isContained
         ? toSourceCoordinates(displayedMap.focalPoint?.x ?? 0.5, displayedMap.focalPoint?.y ?? 0.5)
         : { x: 0.5, y: 0.5 };
     const focalPoint = { x: clampUnit(rawFocalPoint.x), y: clampUnit(rawFocalPoint.y) };
@@ -208,14 +201,10 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
 
         if (hasMeasuredMap) {
             const source = toSourceCoordinates(x, y);
-            const runtimeScale = Math.max(viewportWidth / imageWidth, viewportHeight / imageHeight);
-            const renderedWidth = imageWidth * runtimeScale;
-            const renderedHeight = imageHeight * runtimeScale;
-            // Matches the background-position percentage formula so markers track the focal crop.
-            const offsetX = (viewportWidth - renderedWidth) * focalPoint.x;
-            const offsetY = (viewportHeight - renderedHeight) * focalPoint.y;
-            left = (offsetX + source.x * renderedWidth) / viewportWidth;
-            top = (offsetY + source.y * renderedHeight) / viewportHeight;
+            // Matches the background-size/position used to render the map so markers track the image.
+            const rendered = getMapImageRect(fitMode, { width: viewportWidth, height: viewportHeight }, imageSize, focalPoint);
+            left = (rendered.left + source.x * rendered.width) / viewportWidth;
+            top = (rendered.top + source.y * rendered.height) / viewportHeight;
         }
 
         // Keep markers clear of the viewport edges so nothing is clipped by the focal shift.
@@ -298,7 +287,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.45, ease: 'easeInOut' }}
-                                style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundSize: 'cover', backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`, backgroundRepeat: 'no-repeat' }}
+                                style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundColor: isContained && displayedMap.fillColor ? displayedMap.fillColor : undefined, backgroundSize: fitMode, backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`, backgroundRepeat: 'no-repeat' }}
                             >
                                 {displayedMap.links.map((link, index) => {
                                     const isButton = link.type === 'button';
@@ -311,6 +300,10 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     if (linkedLocation && !stage().isLocationVisible(linkedLocation.id)) {
                                         return null;
                                     }
+                                    const availability = getMapLinkAvailability(link, stage().getScheduleContext(save));
+                                    if (!availability.visible) {
+                                        return null;
+                                    }
                                     const markerKey = `${displayedMap.id}-${index}`;
                                     const isHovered = hoveredLink === markerKey;
                                     const locationImageUrl = getLocationImageUrl(linkedLocation, stage());
@@ -321,13 +314,12 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     const ButtonIcon = isButton && link.iconName ? resolveIcon(link.iconName, stage()) : TouchApp;
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
-                                    const isLinkAvailable = evaluateConditionCollections(link.conditionCollections, stage().getScheduleContext(save));
-                                    const isInteractive = isLinkAvailable && Boolean(isButton || linkedMap || canVisitLocation);
+                                    const isInteractive = availability.enabled && Boolean(isButton || linkedMap || canVisitLocation);
                                     const contentValues = isButton && link.contentList
-                                        ? normalizeReferenceListValue(stage().resolveValue(link.contentList.values, `${link.contentList.kind}List`, save))
+                                        ? [...new Set(normalizeReferenceListValue(stage().resolveValue(link.contentList.values, `${link.contentList.kind}List`, save)))]
                                         : [];
-                                    const contentWidth = Math.min(200, Math.max(0, mapViewportSize.width - 16) || 200);
-                                    const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize, contentValues.length ? actorPortraitSize + 72 : 0);
+                                    const contentWidth = Math.min(200, Math.max(0, mapViewportSize.width - 16) || 200, 12 + contentValues.length * actorPortraitSize - Math.max(0, contentValues.length - 1) * Math.round(actorPortraitSize * 0.32));
+                                    const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize, contentValues.length ? actorPortraitSize * 5 / 6 + 8 : 0);
                                     const handleMarkerClick = () => {
                                         if (!isInteractive) return;
                                         if (isButton) {
@@ -404,8 +396,12 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                             </div>
                                         )}
                                         {isButton && link.contentList && contentValues.length > 0 && (
-                                            <div style={{ position: 'absolute', ...markerPosition.style, left: `clamp(${contentWidth / 2 + 8}px, ${markerPosition.style.left}, calc(100% - ${contentWidth / 2 + 8}px))`, transform: `translate(-50%, ${markerSize / 2 + actorPortraitSize}px)`, width: contentWidth, containerType: 'inline-size', zIndex: isHovered ? 5 : 3 }}>
-                                                <ContentListPortraits kind={link.contentList.kind} values={contentValues} stage={stage()} label={`${markerName} contents`} />
+                                            <div
+                                                onMouseEnter={() => setHoveredLink(markerKey)}
+                                                onMouseLeave={() => setHoveredLink(null)}
+                                                style={{ position: 'absolute', ...markerPosition.style, left: `clamp(${contentWidth / 2 + 8}px, ${markerPosition.style.left}, calc(100% - ${contentWidth / 2 + 8}px))`, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, width: contentWidth, zIndex: isHovered ? 5 : 3 }}
+                                            >
+                                                <ContentListPortraits kind={link.contentList.kind} values={contentValues} stage={stage()} label={`${markerName} contents`} variant="overlay" size={actorPortraitSize} />
                                             </div>
                                         )}
                                         </Fragment>

@@ -1,9 +1,9 @@
 import { FC, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, ArrowDownward, ArrowUpward, AutoAwesome, CenterFocusStrong, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place, TouchApp } from '@mui/icons-material';
-import { generateMapAlternativeImage, Map as GameMap, MapLink } from '../content/Map';
+import { generateMapAlternativeImage, imageToPreviewCoordinates, Map as GameMap, MapFitMode, MapLink, MapLinkAvailabilityMode, previewToImageCoordinates } from '../content/Map';
 import { Stage } from '../Stage';
-import { Button, ReferenceMultiSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, ColorPickerInput, ReferenceMultiSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -24,6 +24,11 @@ interface MapDetailPanelProps {
 
 const clampCoordinate = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 
+const BUTTON_AVAILABILITY_OPTIONS: Array<{ value: MapLinkAvailabilityMode; label: string }> = [
+    { value: 'enabled', label: 'Enabled (grayed out when unmet)' },
+    { value: 'visible', label: 'Visible (hidden when unmet)' },
+];
+
 const selectStyle = {
     minHeight: 38,
     width: '100%',
@@ -34,7 +39,7 @@ const selectStyle = {
     padding: '0 8px',
 };
 
-type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages'> & { focalX: number; focalY: number; availabilityConditions: ConditionCollection[] };
+type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages' | 'fitMode' | 'fillColor'> & { focalX: number; focalY: number; availabilityConditions: ConditionCollection[] };
 
 const createMapDraft = (map: GameMap): MapDraft => ({
     name: map.name,
@@ -47,6 +52,8 @@ const createMapDraft = (map: GameMap): MapDraft => ({
     availabilityConditions: (map.availabilityConditions || []).map((collection) => [...collection]),
     focalX: map.focalPoint?.x ?? 0.5,
     focalY: map.focalPoint?.y ?? 0.5,
+    fitMode: map.fitMode === 'contain' ? 'contain' : 'cover',
+    fillColor: map.fillColor || '',
 });
 
 export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorMode, onChange, onDeactivate }) => {
@@ -61,6 +68,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
     const [isLinksCollapsed, setIsLinksCollapsed] = useState(true);
     const [expandedLinks, setExpandedLinks] = useState<number[]>([]);
     const [draft, setDraft] = useState<MapDraft>(() => createMapDraft(map));
+    const [baseImageSize, setBaseImageSize] = useState<{ width: number; height: number } | null>(null);
     const draftRef = useRef(draft);
     const previewRef = useRef<HTMLDivElement>(null);
     const autoSaveTimeoutRef = useRef<number | null>(null);
@@ -132,6 +140,8 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         persistedMap.alternativeImages = nextDraft.alternativeImages.map(createAlternativeImage);
         persistedMap.availabilityConditions = nextDraft.availabilityConditions.map((collection) => [...collection]);
         persistedMap.focalPoint = { x: clampCoordinate(nextDraft.focalX), y: clampCoordinate(nextDraft.focalY) };
+        persistedMap.fitMode = nextDraft.fitMode;
+        persistedMap.fillColor = nextDraft.fillColor.trim();
 
         const nextPriority = Number.isFinite(nextDraft.priority) ? nextDraft.priority : 0;
         const conflict = latestMaps.find(candidate => candidate.id !== persistedMap.id && candidate.active !== false && candidate.priority === nextPriority);
@@ -190,6 +200,47 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
             setPreviewSelection('base');
         }
     }, [draft.alternativeImages.length, previewSelection]);
+
+    useEffect(() => {
+        setBaseImageSize(null);
+        if (!draft.imageUrl) {
+            return;
+        }
+
+        let cancelled = false;
+        const image = new Image();
+        image.onload = () => {
+            if (!cancelled && image.naturalWidth && image.naturalHeight) {
+                setBaseImageSize({ width: image.naturalWidth, height: image.naturalHeight });
+            }
+        };
+        image.src = draft.imageUrl;
+        return () => { cancelled = true; };
+    }, [draft.imageUrl]);
+
+    const fillColorSwatches = useMemo(() => buildHexColorSwatches([
+        draft.fillColor,
+        ...sourceMaps.filter(candidate => candidate.id !== map.id).map(candidate => candidate.fillColor),
+    ]), [draft.fillColor, map.id, sourceMaps]);
+
+    // Links are stored in the preview's 16:9 space, so re-project them when the fit changes to keep
+    // each marker over the same spot on the image.
+    const changeFitMode = (nextFitMode: MapFitMode) => {
+        if (nextFitMode === draft.fitMode) {
+            return;
+        }
+        const previousFitMode = draft.fitMode;
+        if (baseImageSize && map.links.length) {
+            persist(() => {
+                map.links.forEach((link) => {
+                    const source = previewToImageCoordinates(previousFitMode, baseImageSize, link.coordinates.x, link.coordinates.y);
+                    const next = imageToPreviewCoordinates(nextFitMode, baseImageSize, source.x, source.y);
+                    link.coordinates = { x: clampCoordinate(next.x), y: clampCoordinate(next.y) };
+                });
+            });
+        }
+        updateDraft('fitMode', nextFitMode);
+    };
 
     const updateDraft = <K extends keyof MapDraft>(field: K, value: MapDraft[K]) => {
         setDraft(current => ({ ...current, [field]: value }));
@@ -384,6 +435,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         cursor: 'pointer',
     });
 
+    const isContained = draft.fitMode === 'contain';
     const previewImageUrl = previewSelection === 'base'
         ? draft.imageUrl
         : draft.alternativeImages[previewSelection]?.imageUrl || draft.imageUrl;
@@ -545,6 +597,12 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                                 The list is reevaluated after button actions and displayed beneath the marker.
                                             </span>
                                         </>}
+                                        {link.type === 'button' && (
+                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                                Enabled conditions control whether the button can be clicked. Visible conditions control whether the button and its content list appear.
+                                                At least one group of each configured kind must pass; all conditions within a group must pass.
+                                            </span>
+                                        )}
                                         <ConditionEditor
                                             conditionCollections={link.conditionCollections || []}
                                             globalStats={stageInstance.getConfiguration().globalStats || []}
@@ -557,6 +615,11 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                             items={stageInstance.getSave().inventory || []}
                                             variableContentType="actor"
                                             onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
+                                            collectionCategories={link.type === 'button' ? BUTTON_AVAILABILITY_OPTIONS : undefined}
+                                            collectionCategoryValues={link.type === 'button' ? (link.conditionCollections || []).map((_, collectionIndex) => link.availabilityModes?.[collectionIndex] || 'enabled') : undefined}
+                                            onCollectionCategoryValuesChange={link.type === 'button' ? (values) => updateLink(index, {
+                                                availabilityModes: values.map(value => value === 'visible' ? 'visible' : 'enabled'),
+                                            }) : undefined}
                                         />
                                     </>}
                                 </div>
@@ -568,9 +631,37 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
 
             <div>
                 <strong style={{ display: 'block', color: 'var(--agenda-text-primary)', marginBottom: 8 }}>Preview</strong>
-                <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 8px' }}>Drag link markers to position them. Drag the crosshair to set the focal point kept in view when the map image is cropped.</p>
-                <div ref={previewRef} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: previewImageUrl ? `url(${previewImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden', touchAction: 'none', marginBottom: 10 }}>
-                    <div
+                <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 8px' }}>
+                    {isContained
+                        ? 'Drag link markers to position them. The entire map image always displays; the fill color covers any empty edges.'
+                        : 'Drag link markers to position them. Drag the crosshair to set the focal point kept in view when the map image is cropped.'}
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: isContained ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 1fr)', gap: 12, marginBottom: 10 }}>
+                    <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
+                        Image Sizing
+                        <select aria-label="Image sizing" style={selectStyle} value={draft.fitMode}
+                            onChange={event => changeFitMode(event.target.value === 'contain' ? 'contain' : 'cover')}>
+                            <option value="cover">Fill view (crop to focal point)</option>
+                            <option value="contain">Show entire map</option>
+                        </select>
+                    </label>
+                    {isContained && (
+                        <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
+                            Edge Fill Color
+                            <ColorPickerInput
+                                value={draft.fillColor}
+                                onChange={value => updateDraft('fillColor', value)}
+                                placeholder="#RRGGBB (default backdrop)"
+                                popoverTitle="Choose edge fill color"
+                                swatches={fillColorSwatches}
+                                fallbackColor="#000000"
+                                inputStyle={{ flex: 1 }}
+                            />
+                        </label>
+                    )}
+                </div>
+                <div ref={previewRef} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', backgroundColor: isContained && draft.fillColor ? draft.fillColor : 'color-mix(in srgb, var(--agenda-surface-base) 88%, transparent)', backgroundImage: previewImageUrl ? `url(${previewImageUrl})` : 'none', backgroundSize: draft.fitMode, backgroundRepeat: 'no-repeat', backgroundPosition: 'center', border: '1px solid var(--agenda-line-strong)', borderRadius: 8, overflow: 'hidden', touchAction: 'none', marginBottom: 10 }}>
+                    {!isContained && <div
                         role="button"
                         tabIndex={0}
                         aria-label="Drag to set focal point"
@@ -587,7 +678,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                         style={{ position: 'absolute', left: `${draft.focalX * 100}%`, top: `${draft.focalY * 100}%`, transform: 'translate(-50%, -50%)', zIndex: 4, display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '50%', color: 'var(--agenda-text-primary)', backgroundColor: 'color-mix(in srgb, var(--agenda-highlight) 55%, transparent)', border: '2px dashed var(--agenda-text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,.65)', cursor: 'grab', userSelect: 'none' }}
                     >
                         <CenterFocusStrong style={{ fontSize: 18 }} />
-                    </div>
+                    </div>}
                     {map.links.map((link, index) => {
                         const locationImageUrl = link.type !== 'button' ? activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl : undefined;
                         const markerName = link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);

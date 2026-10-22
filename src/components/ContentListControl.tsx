@@ -24,6 +24,8 @@ interface ContentListPortraitsProps {
     values: string[];
     stage: Stage;
     label: string;
+    variant?: 'carousel' | 'overlay';
+    size?: number;
 }
 
 const PORTRAIT_SIZE = 56;
@@ -35,7 +37,10 @@ const portraitStyle = {
     fontSize: 'clamp(12px, 9cqi, 19px)',
 };
 
-export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label }) => {
+export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label, variant = 'carousel', size = PORTRAIT_SIZE }) => {
+    const isOverlay = variant === 'overlay';
+    const overlap = isOverlay ? Math.round(size * 0.32) : PORTRAIT_OVERLAP;
+    const imageStyle = isOverlay ? { ...portraitStyle, width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.34)) } : portraitStyle;
     const rootRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
     const trackRef = useRef<HTMLDivElement>(null);
@@ -71,7 +76,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
         const viewport = viewportRef.current;
         if (viewport) {
             viewport.scrollBy({
-                left: direction * Math.max((trackRef.current?.firstElementChild?.clientWidth ?? PORTRAIT_SIZE) - PORTRAIT_OVERLAP, viewport.clientWidth - PORTRAIT_SIZE),
+                left: direction * Math.max((trackRef.current?.firstElementChild?.clientWidth ?? size) - overlap, viewport.clientWidth - size),
                 behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
             });
         }
@@ -82,7 +87,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
         : 'none';
 
     return (
-        <Box ref={rootRef} role="group" aria-label={label} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', textAlign: 'left', width: '100%', minWidth: 0 }}>
+        <Box ref={rootRef} role="group" aria-label={label} sx={{ display: 'flex', alignItems: 'center', justifyContent: isOverlay ? 'center' : 'flex-start', textAlign: 'left', width: '100%', minWidth: 0 }}>
             {navigation.overflow && (
                 <IconButton size="small" aria-label={`Previous ${label}`} disabled={!navigation.previous} onClick={() => scroll(-1)} sx={{ padding: 0, color: 'var(--agenda-text-primary)' }}>
                     <ChevronLeft />
@@ -92,7 +97,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                 ref={viewportRef}
                 onScroll={updateNavigation}
                 sx={{
-                    flex: 1,
+                    flex: isOverlay ? '0 1 auto' : 1,
                     minWidth: 0,
                     overflowX: 'auto',
                     scrollbarWidth: 'none',
@@ -110,8 +115,8 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                     padding: '8px 6px',
                     width: 'max-content',
                     overflow: 'visible',
-                    '& > [role="listitem"]:has([data-has-image="true"]) + [role="listitem"]:has([data-has-image="true"])': {
-                        marginLeft: `-${PORTRAIT_OVERLAP}px`,
+                    [isOverlay ? '& > [role="listitem"] + [role="listitem"]' : '& > [role="listitem"]:has([data-has-image="true"]) + [role="listitem"]:has([data-has-image="true"])']: {
+                        marginLeft: `-${overlap}px`,
                     },
                 }}>
                     {values.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 'clamp(1rem, 10cqi, 1.75rem)' }}>None</span>}
@@ -132,14 +137,15 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                                     overflow: 'visible',
                                     scrollSnapAlign: 'start',
                                     borderRadius: '50%',
-                                    '&:hover, &:focus-visible': { zIndex: 1, transform: 'scale(1.1)', outline: '2px solid var(--agenda-highlight)', outlineOffset: 1 },
+                                    zIndex: isOverlay ? values.length - index : undefined,
+                                    '&:hover, &:focus-visible': { zIndex: isOverlay ? values.length + 1 : 1, transform: 'scale(1.1)', outline: '2px solid var(--agenda-highlight)', outlineOffset: 1 },
                                     '@media (prefers-reduced-motion: no-preference)': { transition: 'transform 0.15s ease-out' },
                                 }}
                             >
-                                {actor ? <ActorPortrait actor={actor} stage={stage} size={PORTRAIT_SIZE} style={portraitStyle} title="" />
-                                    : item ? <ItemPortrait item={item} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} style={portraitStyle} borderRadius="50%" title={name} />
-                                        : location ? <LocationPortrait location={location} stage={stage} width={PORTRAIT_SIZE} height={PORTRAIT_SIZE} style={portraitStyle} borderRadius="50%" title={name} />
-                                            : <Box sx={{ ...portraitStyle, display: 'grid', placeItems: 'center', borderRadius: '50%', border: '2px solid var(--agenda-line-strong)', color: 'var(--agenda-text-muted)' }}><FallbackIcon sx={{ fontSize: '1.4em' }} /></Box>}
+                                {actor ? <ActorPortrait actor={actor} stage={stage} size={size} style={imageStyle} title="" />
+                                    : item ? <ItemPortrait item={item} stage={stage} width={size} height={size} style={imageStyle} borderRadius="50%" title={name} />
+                                        : location ? <LocationPortrait location={location} stage={stage} width={size} height={size} style={imageStyle} borderRadius="50%" title={name} />
+                                            : <Box sx={{ ...imageStyle, display: 'grid', placeItems: 'center', borderRadius: '50%', border: '2px solid var(--agenda-line-strong)', color: 'var(--agenda-text-muted)' }}><FallbackIcon sx={{ fontSize: '1.4em' }} /></Box>}
                             </Box>
                         );
                         if (actor) {
