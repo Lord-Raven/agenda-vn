@@ -181,6 +181,7 @@ export class Actor {
     role: string = ''; // Optional role for this actor. This displays beneath the name in the NamePlate and under name in the ActorCard.
     birthDate: string = ''; // Optional birth date for this actor, in YYYY-MM-DD format. Used for age calculations and display.
     summary: string = ''; // A one-to-two sentence summary of this character. Used on ActorCard and in Creator Notes generation.
+    sourcePath: string = ''; // Optional Chub attribution path (author/resource), linked at the bottom of ActorCard.
     description: string = ''; // Core physical description—not outfit-oriented
     background: string = ''; // Backstory and integral traits of this character (as opposed to "profile"/lore entry, which contains evolving details).
     profile: string = ''; // Evolving personality profile backed by a lore entry; this reflects the character's development and motives over time.
@@ -201,6 +202,7 @@ export class Actor {
     static fromSave(savedActor: any): Actor {
         const actor = Object.create(Actor.prototype);
         Object.assign(actor, savedActor);
+        actor.sourcePath = savedActor?.sourcePath || '';
         actor.active = savedActor?.active !== false;
         actor.voiceModulation = normalizeVoiceModulation(savedActor?.voiceModulation);
         actor.statMap = savedActor?.statMap && typeof savedActor.statMap === 'object' ? { ...savedActor.statMap } : {};

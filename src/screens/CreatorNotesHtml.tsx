@@ -54,7 +54,10 @@ export const buildCreatorNotesHtml = ({
             const actorName = escapeHtml(actor.displayName || actor.name || 'Unnamed Character');
             const actorSummary = escapeHtml((actor.summary || 'No summary provided.').replace(/\s+/g, ' ').trim());
             const portraitUrl = getEmotionImage(actor, 'neutral', stage, actor.outfitId) || getEmotionImage(actor, 'base', stage, actor.outfitId) || ' ';
-            return `<div class="cast-item" tabindex="0" data-cast-item style="anchor-name: --cast-${index}; --cast-anchor: --cast-${index};"><img src="${escapeHtml(portraitUrl)}" alt="${actorName}" class="cast-portrait" /><span class="cast-name">${actorName}</span><div class="cast-tooltip">${actorSummary}</div></div>`;
+            const sourceLink = actor.sourcePath
+                ? `<a class="cast-source" href="${escapeHtml(`https://chub.ai/characters/${actor.sourcePath}`)}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 8H7a4 4 0 0 0 0 8h3m4-8h3a4 4 0 0 1 0 8h-3M8 12h8" /></svg>${escapeHtml(actor.sourcePath.split('/')[0])}</a>`
+                : '';
+            return `<div class="cast-item" tabindex="0" data-cast-item style="anchor-name: --cast-${index}; --cast-anchor: --cast-${index};"><img src="${escapeHtml(portraitUrl)}" alt="${actorName}" class="cast-portrait" /><span class="cast-name">${actorName}</span>${sourceLink}<div class="cast-tooltip">${actorSummary}</div></div>`;
         })
         .join('');
 
@@ -239,6 +242,9 @@ export const buildCreatorNotesHtml = ({
             box-shadow: 0 2px 8px rgba(2, 8, 18, 0.45);
         }
         .creator-notes .cast-name { display: block; font-size: 1rem; line-height: 1.12; font-weight: 700; color: ${uiSettings.textPrimaryColor}; max-width: 100%; overflow-wrap: anywhere; }
+        .creator-notes .cast-source { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 0.75rem; color: var(--mem-mist); text-decoration: none; max-width: 100%; overflow-wrap: anywhere; }
+        .creator-notes .cast-source svg { flex-shrink: 0; }
+        .creator-notes .cast-source:hover, .creator-notes .cast-source:focus-visible { color: var(--mem-verdant); text-decoration: underline; }
         .creator-notes .panel h2 { margin: 0 0 10px; font-size: 1.4em; font-family: var(--mem-font-flavor); letter-spacing: 0.06em; text-transform: uppercase; color: ${uiSettings.textPrimaryColor}; text-shadow: 0 0 18px ${uiSettings.accentColor}55, 0 4px 10px rgba(3, 7, 15, 0.66); }
         .creator-notes .panel p { margin: 0.4em 0; color: ${uiSettings.textMutedColor}; }
         .creator-notes .panel b { color: ${uiSettings.textPrimaryColor}; }

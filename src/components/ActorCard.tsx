@@ -1,5 +1,6 @@
 import { FC, useMemo } from 'react';
-import { Box } from '@mui/material';
+import { Box, Link } from '@mui/material';
+import { Link as LinkIcon } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { isReferenceDisplayType, isReferenceListDisplayType, formatReferenceStatText, formatStatOptionValueText, Stat, StatValue } from '../content/Stat';
 import { Actor } from '../content/Actor';
@@ -170,6 +171,27 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
                         );
                     })}
                 </Box>
+            )}
+
+            {actor.sourcePath && (
+                <Link
+                    href={`https://chub.ai/characters/${actor.sourcePath}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    underline="hover"
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        alignSelf: 'center',
+                        gap: 0.5,
+                        marginTop: 'auto',
+                        fontSize: '0.75rem',
+                        color: 'var(--agenda-text-muted)',
+                    }}
+                >
+                    <LinkIcon sx={{ fontSize: '1rem' }} />
+                    {actor.sourcePath.split('/')[0]}
+                </Link>
             )}
         </Box>
     );

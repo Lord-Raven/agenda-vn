@@ -123,13 +123,57 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 </Title>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     {stage().isOwner && (
-                                        <Button
-                                            onClick={() => setIsCreateMode((current) => !current)}
-                                            variant={isCreatorMode ? 'primary' : 'secondary'}
-                                            style={{ minWidth: '100px' }}
-                                        >
-                                            {isCreatorMode ? 'Create' : 'Manage'}
-                                        </Button>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{
+                                                color: isCreatorMode ? 'var(--agenda-text-muted)' : 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: isCreatorMode ? 400 : 700,
+                                            }}>
+                                                Manage
+                                            </span>
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-label="Create mode"
+                                                aria-checked={isCreatorMode}
+                                                title={isCreatorMode ? 'Switch to manage mode' : 'Switch to create mode'}
+                                                onClick={() => setIsCreateMode((current) => !current)}
+                                                style={{
+                                                    position: 'relative',
+                                                    width: '46px',
+                                                    height: '26px',
+                                                    padding: 0,
+                                                    border: '1px solid var(--agenda-line-strong)',
+                                                    borderRadius: '13px',
+                                                    background: isCreatorMode ? 'var(--agenda-highlight)' : 'var(--agenda-surface-base)',
+                                                    cursor: 'pointer',
+                                                    transition: 'background 0.2s ease',
+                                                }}
+                                            >
+                                                <span
+                                                    aria-hidden="true"
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '2px',
+                                                        left: '3px',
+                                                        width: '20px',
+                                                        height: '20px',
+                                                        borderRadius: '50%',
+                                                        background: 'var(--agenda-text-primary)',
+                                                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.35)',
+                                                        transform: isCreatorMode ? 'translateX(18px)' : 'translateX(0)',
+                                                        transition: 'transform 0.2s ease',
+                                                    }}
+                                                />
+                                            </button>
+                                            <span style={{
+                                                color: isCreatorMode ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)',
+                                                fontSize: '14px',
+                                                fontWeight: isCreatorMode ? 700 : 400,
+                                            }}>
+                                                Create
+                                            </span>
+                                        </div>
                                     )}
                                     <motion.button
                                         whileHover={{ scale: 1.1 }}

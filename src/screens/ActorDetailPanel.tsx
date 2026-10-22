@@ -227,6 +227,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         role: string;
         birthDate: string;
         summary: string;
+        sourcePath: string;
         category: string;
         description: string;
         background: string;
@@ -243,6 +244,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         role: actor.role || '',
         birthDate: actor.birthDate || '',
         summary: actor.summary || '',
+        sourcePath: actor.sourcePath || '',
         category: actor.category ?? '',
         description: actor.description || '',
         background: actor.background || '',
@@ -529,6 +531,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         persistedActor.role = nextEditedActor.role.trim();
         persistedActor.birthDate = nextEditedActor.birthDate.trim();
         persistedActor.summary = nextEditedActor.summary.trim();
+        persistedActor.sourcePath = nextEditedActor.sourcePath.trim();
         persistedActor.category = nextEditedActor.category.trim();
         persistedActor.description = nextEditedActor.description;
         persistedActor.background = nextEditedActor.background;
@@ -684,6 +687,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             role: actor.role || '',
             birthDate: actor.birthDate || '',
             summary: actor.summary || '',
+            sourcePath: actor.sourcePath || '',
             category: actor.category ?? '',
             description: actor.description || '',
             background: actor.background || '',
@@ -1887,6 +1891,29 @@ ${indent}}`;
 
                                     <div>
                                         <label 
+                                            style={{
+                                                display: 'block',
+                                                color: 'var(--agenda-highlight)',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                marginBottom: '8px',
+                                            }}
+                                        >
+                                            Source Path
+                                        </label>
+                                        <TextInput
+                                            id="actor-source-path"
+                                            aria-label="Source Path"
+                                            fullWidth
+                                            value={editedActor.sourcePath}
+                                            onChange={(e) => handleInputChange('sourcePath', e.target.value)}
+                                            placeholder="SomeAuthor/a-character-with-id-aca19a976af2"
+                                            title="Optional Chub author/resource path for attribution on the actor card."
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label
                                             style={{
                                                 display: 'block',
                                                 color: 'var(--agenda-highlight)',

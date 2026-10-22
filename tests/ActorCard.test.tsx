@@ -132,6 +132,38 @@ test('actor cards show age only in calendar mode and retain other metadata in da
     assert.equal(actor.birthDate, '2000-10-09');
 });
 
+test('actor cards show source attribution with a link icon after all other card content', () => {
+    const { actor, configuration, render } = fixture();
+    actor.sourcePath = 'SomeAuthor/a-character-with-id-aca19a976af2';
+    actor.summary = 'Character summary';
+    configuration.controls = [new Control({ type: 'actorStatDisplay', statId: 'Health', label: 'Health' })];
+
+    const html = render();
+    assert.match(html, /href="https:\/\/chub.ai\/characters\/SomeAuthor\/a-character-with-id-aca19a976af2"/);
+    assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+    assert.match(html, /data-testid="LinkIcon"[^]*<\/svg>SomeAuthor<\/a><\/div>$/);
+    assert.ok(html.indexOf('Character summary') < html.indexOf('href="https://chub.ai/characters/'));
+    assert.ok(html.indexOf('Health') < html.indexOf('href="https://chub.ai/characters/'));
+});
+
+test('actor cards omit source attribution when the path is empty or absent in an older save', () => {
+    const { actor, render } = fixture();
+    assert.doesNotMatch(render(), /chub\.ai\/characters\/|data-testid="LinkIcon"/);
+
+    const restored = Actor.fromSave({ id: actor.id, name: actor.name });
+    assert.equal(restored.sourcePath, '');
+    Object.assign(actor, restored);
+    assert.doesNotMatch(render(), /chub\.ai\/characters\/|data-testid="LinkIcon"/);
+});
+
+test('actor source attribution survives construction, cloning, and save round trips', () => {
+    const sourcePath = 'SomeAuthor/a-character-with-id-aca19a976af2';
+    const actor = new Actor({ name: 'Alice', sourcePath });
+    assert.equal(actor.sourcePath, sourcePath);
+    assert.equal(new Actor(actor).sourcePath, sourcePath);
+    assert.equal(Actor.fromSave(JSON.parse(JSON.stringify(actor))).sourcePath, sourcePath);
+});
+
 for (const isNewGame of [false, true]) {
     for (const birthDate of ['', '2000-10-09']) {
         test(`settings show the birth-date field only in calendar mode (new game: ${isNewGame}, birth date: ${birthDate})`, () => {

@@ -79,3 +79,32 @@ test('exported tooltips fit their text, wrap at 360px, and include edge-aware pl
     assert.ok(html.includes('anchor-name: --cast-1;'));
     assert.ok(!html.includes('900px'));
 });
+
+test('cast attribution links appear directly beneath character names with a link icon and author name', () => {
+    const actor = new Actor({
+        name: 'Alice',
+        displayName: 'Captain Alice',
+        sourcePath: 'SomeAuthor/a-character-with-id-aca19a976af2',
+        summary: 'A character summary.',
+    });
+    const html = buildHtml([actor]);
+    assert.match(html, /<span class="cast-name">Captain Alice<\/span><a class="cast-source" href="https:\/\/chub\.ai\/characters\/SomeAuthor\/a-character-with-id-aca19a976af2" target="_blank" rel="noopener noreferrer">/);
+    assert.match(html, /<svg[^>]*aria-hidden="true"[^>]*>[^]*?<\/svg>SomeAuthor<\/a><div class="cast-tooltip">A character summary\.<\/div>/);
+});
+
+test('cast attribution is omitted for actors without a source path, including older saves', () => {
+    const html = buildHtml([new Actor({ name: 'Alice' }), Actor.fromSave({ name: 'Bob' })]);
+    assert.doesNotMatch(html, /<a class="cast-source"|https:\/\/chub\.ai\/characters\//);
+    assert.match(html, /<span class="cast-name">Alice<\/span><div class="cast-tooltip">/);
+    assert.match(html, /<span class="cast-name">Bob<\/span><div class="cast-tooltip">/);
+});
+
+test('cast attribution escapes both author names and source URL attributes', () => {
+    const html = buildHtml([new Actor({
+        name: 'Alice',
+        sourcePath: 'Author<&"/character?x=1&y="test"',
+    })]);
+    assert.ok(html.includes('href="https://chub.ai/characters/Author&lt;&amp;&quot;/character?x=1&amp;y=&quot;test&quot;"'));
+    assert.ok(html.includes('</svg>Author&lt;&amp;&quot;</a>'));
+    assert.ok(!html.includes('Author<&"'));
+});

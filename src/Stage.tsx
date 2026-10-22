@@ -837,6 +837,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     role: 'You',
                     birthDate: playerData.birthDate ?? '',
                     summary: '',
+                    sourcePath: '',
                     description: '',
                     background: '',
                     profile: playerData.personality,
