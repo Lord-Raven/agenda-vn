@@ -817,10 +817,21 @@ test('function substitution reaches world lore, actor lore, locations, and gener
     configuration.functions = [typedFunction('Value', 'text', 'return `Current score: ${get("Score")}`;')];
     const world = createLoreEntry({ title: 'World', content: 'World {{Value}}', constant: true });
     const actorLore = createLoreEntry({ type: 'character', title: 'Same name', content: 'Actor {{Value}} / {{char:Score}}' });
+    const conditionTriggeredLore = createLoreEntry({
+        title: 'Condition Triggered',
+        content: 'Conditional {{Value}}',
+        triggers: ['never-in-script'],
+        triggerConditionCollections: [[{
+            type: 'globalStat',
+            statId: 'Score',
+            comparison: 'greaterThanOrEqual',
+            value: 2,
+        }]],
+    });
     save.actors.b.loreId = actorLore.id;
     save.atlas.place.description = 'Location {{Value}}';
-    save.lorebook = [world, actorLore];
-    assert.equal(formatLoreEntriesAsContext([world], stage), 'World:\nWorld Current score: 2');
+    save.lorebook = [world, actorLore, conditionTriggeredLore];
+    assert.equal(formatLoreEntriesAsContext([world], stage), '<World>\n  World Current score: 2\n</World>');
     assert.equal(getActorLore('b', stage), 'Actor Current score: 2 / 2');
     assert.equal(getLocationDescription('place', stage), 'Location Current score: 2');
 
@@ -828,6 +839,7 @@ test('function substitution reaches world lore, actor lore, locations, and gener
     const prompt = buildPrompt().addBlock('Context', generateContext(skit, stage, 5)).format();
     assert.match(prompt, /World Current score: 2/);
     assert.match(prompt, /Actor Current score: 2 \/ 2/);
+    assert.match(prompt, /Conditional Current score: 2/);
     assert.match(prompt, /Location Current score: 2/);
     assert.doesNotMatch(prompt, /\{\{Value\}\}/);
     assert.equal(world.content, 'World {{Value}}');

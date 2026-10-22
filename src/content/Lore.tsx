@@ -62,6 +62,7 @@ export type Lore = {
     priority: number;
     probability: number; // 1 to 100
     conditionCollections: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
+    triggerConditionCollections: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
 }
 
 const resolveLoreProbability = (entry: Lore): number => {
@@ -162,18 +163,15 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
 }
 
 export const formatLoreEntriesAsContext = (entries: Lore[], stage: Stage): string => {
-    return entries
-        .map((entry) => {
-            const title = (entry.title || '').trim() || 'Lore';
-            const content = processLoreText(entry.content, stage).trim();
-            if (!content) {
-                return '';
-            }
-
-            return `${title}:\n${content}`;
-        })
-        .filter(Boolean)
-        .join('\n\n');
+    const builder = buildPrompt();
+    entries.forEach((entry) => {
+        const title = (entry.title || '').trim() || 'Lore';
+        const content = processLoreText(entry.content, stage).trim();
+        if (content) {
+            builder.addBlock(title, content);
+        }
+    });
+    return builder.formatBlocks();
 };
 
 export function createLoreEntry(params: Partial<Omit<Lore, 'id'>>): Lore {
@@ -191,6 +189,7 @@ export function createLoreEntry(params: Partial<Omit<Lore, 'id'>>): Lore {
         probability: 100,
         ...params,
         conditionCollections: (params.conditionCollections || []).map((collection) => [...collection]),
+        triggerConditionCollections: (params.triggerConditionCollections || []).map((collection) => [...collection]),
         id: generateUuid()
     };
 }

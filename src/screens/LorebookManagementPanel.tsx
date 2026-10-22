@@ -1,6 +1,6 @@
 import React, { FC, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Add, Close, KeyboardArrowDownRounded, KeyboardArrowUpRounded, Visibility, VisibilityOff } from '@mui/icons-material';
+import { Add, KeyboardArrowDownRounded, KeyboardArrowUpRounded, Visibility, VisibilityOff } from '@mui/icons-material';
 import { Chip } from '@mui/material';
 import { Stage } from '../Stage';
 import { createLoreEntry, Lore } from '../content/Lore';
@@ -622,6 +622,19 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                                                 stage={stage}
                                                 onChange={(conditionCollections) => updateSelectedLore({ conditionCollections })}
                                             />
+                                        </div>
+
+                                        <div style={{ display: 'grid', gap: '6px', opacity: selectedLore.constant ? 0.5 : 1 }}>
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Triggering Conditions</label>
+                                            <div style={{ pointerEvents: selectedLore.constant ? 'none' : 'auto' }}>
+                                                <ConditionEditor
+                                                    conditionCollections={selectedLore.triggerConditionCollections || []}
+                                                    globalStats={stage().getConfiguration().globalStats || []}
+                                                    actors={Object.values(stage().getSave().actors || {})}
+                                                    stage={stage}
+                                                    onChange={(triggerConditionCollections) => updateSelectedLore({ triggerConditionCollections })}
+                                                />
+                                            </div>
                                         </div>
 
                                         <div

@@ -125,33 +125,35 @@ export class PromptBuilder {
   format(opts: FormatOptions = { pretty: true, indent: '  ' }): string {
     const { pretty = true, indent = '  ' } = opts;
     const nl = pretty ? '\n' : '';
-    const ind = pretty ? indent : '';
+    return `<${this.rootTag}>${nl}${this.formatBlocksAtLevel(1, pretty, indent)}</${this.rootTag}>`;
+  }
 
-    const parts: string[] = [];
-    const formatBlock = (block: PromptBlock, level: number) => {
-      const pad = pretty ? ind.repeat(level) : '';
-      parts.push(`${pad}<${block.title}>${nl}`);
+  formatBlocks(opts: FormatOptions = { pretty: true, indent: '  ' }): string {
+    const { pretty = true, indent = '  ' } = opts;
+    const formatted = this.formatBlocksAtLevel(0, pretty, indent);
+    return pretty && formatted.endsWith('\n') ? formatted.slice(0, -1) : formatted;
+  }
 
-      // content first (if any)
-      if (block.content !== undefined) {
-        const content = pretty ? this.indentContent(block.content, ind.repeat(level + 1)) : block.content;
-        parts.push(pretty ? ind.repeat(level + 1) : '');
-        parts.push(content + nl);
-      }
+  private formatBlocksAtLevel(level: number, pretty: boolean, indent: string): string {
+    return this.blocks.map(block => this.formatBlock(block, level, pretty, indent)).join('');
+  }
 
-      // then children (if any)
-      if (block.children && block.children.length) {
-        block.children.forEach(child => formatBlock(child, level + 1));
-      }
+  private formatBlock(block: PromptBlock, level: number, pretty: boolean, indent: string): string {
+    const nl = pretty ? '\n' : '';
+    const pad = pretty ? indent.repeat(level) : '';
+    const contentIndent = pretty ? indent.repeat(level + 1) : '';
+    let formatted = `${pad}<${block.title}>${nl}`;
 
-      parts.push(`${pad}</${block.title}>${nl}`);
-    };
+    if (block.content !== undefined) {
+      const content = pretty ? this.indentContent(block.content, contentIndent) : block.content;
+      formatted += `${contentIndent}${content}${nl}`;
+    }
 
-    // root wrapper
-    parts.push(`<${this.rootTag}>${nl}`);
-    this.blocks.forEach(b => formatBlock(b, 1));
-    parts.push(`</${this.rootTag}>`);
-    return parts.join('');
+    if (block.children?.length) {
+      formatted += block.children.map(child => this.formatBlock(child, level + 1, pretty, indent)).join('');
+    }
+
+    return `${formatted}${pad}</${block.title}>${nl}`;
   }
 
   // helper: returns sanitized tag (letters/diacritics, numbers, underscore, dash allowed)

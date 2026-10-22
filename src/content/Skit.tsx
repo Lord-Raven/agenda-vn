@@ -397,15 +397,18 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
                 return true;
             }
 
-            return lore.triggers.some(trigger => {
-                    // Scan lore.scanDepth entries of the current skit for details that match this trigger
-                    for (let i = skit ? skit.script.length - 1 : 0; i >= Math.max(0, (skit ? skit.script.length - lore.scanDepth : 0)); i--) {
-                        if((skit?.script[i]?.message || '').toLowerCase().includes(trigger.toLowerCase())) {
-                            return true;
-                        }
+            const keywordTriggered = lore.triggers.some(trigger => {
+                // Scan lore.scanDepth entries of the current skit for details that match this trigger
+                for (let i = skit ? skit.script.length - 1 : 0; i >= Math.max(0, (skit ? skit.script.length - lore.scanDepth : 0)); i--) {
+                    if ((skit?.script[i]?.message || '').toLowerCase().includes(trigger.toLowerCase())) {
+                        return true;
                     }
-                    return false;
+                }
+                return false;
             });
+            const conditionTriggered = evaluateConditionCollections(lore.triggerConditionCollections, conditionContext, false);
+
+            return keywordTriggered || conditionTriggered;
     }).sort((a, b) => a.insertionOrder - b.insertionOrder);
 
     // Run probabilities on triggered lore with one shared probability roll-set so constant lore stays consistent across all context blocks.
