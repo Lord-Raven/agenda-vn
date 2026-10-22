@@ -3,7 +3,7 @@ import { AddCircleOutline } from '@mui/icons-material';
 import { Stat } from '../content/Stat';
 import { ConditionalFlag } from '../content/Stat';
 import { ContentType } from '../content/Condition';
-import { ConditionEditor } from './ConditionEditor';
+import { ConditionEditor, createDefaultCondition } from './ConditionEditor';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 import { Button } from './UiComponents';
@@ -68,7 +68,7 @@ export const ConditionalFlagEditor: FC<ConditionalFlagEditorProps> = ({
                     variant="secondary"
                     onClick={() => onChange({
                         ...flag,
-                        conditions: [...flag.conditions, [{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]],
+                        conditions: [...flag.conditions, [createDefaultCondition(globalStats)]],
                     })}
                     onMouseEnter={() => setTooltip(`Add a Condition for ${label}`, AddCircleOutline)}
                     onMouseLeave={clearTooltip}

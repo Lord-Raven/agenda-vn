@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
 import { findStatOptionByValue, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
-import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, variableContentValue } from '../content/Condition';
+import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, GlobalStatCondition, variableContentValue } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
 import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
@@ -141,6 +141,11 @@ const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
     return typeof stat.default === 'number' ? stat.default : 0;
 };
 
+export const createDefaultCondition = (globalStats: Stat[]): GlobalStatCondition => {
+    const stat = globalStats[0];
+    return { type: 'globalStat', statId: stat?.id || '', comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) };
+};
+
 type ContentTargetEntity = { id: string; name: string; category?: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] };
 
 const resolveContentTargetImage = (contentType: ContentType, entity: ContentTargetEntity): string => {
@@ -255,8 +260,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         const [type, rawContentType] = kind.split(':');
         const contentType = (CONTENT_TYPES.includes(rawContentType as ContentType) ? rawContentType : 'actor') as ContentType;
         if (type === 'globalStat') {
-            const stat = globalStats[0];
-            return { type: 'globalStat', statId: stat?.id || '', comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) };
+            return createDefaultCondition(globalStats);
         }
         if (type === 'contentIdentity') {
             return { type: 'contentIdentity', contentType, comparison: 'equals', value: concreteTargetOptionsFor(contentType)[0]?.key || '' };
@@ -444,7 +448,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                 <Button
                     variant="secondary"
                     onClick={() => {
-                        onChange([...conditionCollections, [{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]]);
+                        onChange([...conditionCollections, [createDefaultCondition(globalStats)]]);
                         if (collectionCategoryValues) {
                             onCollectionCategoryValuesChange?.([...collectionCategoryValues, collectionCategories?.[0]?.value || '']);
                         }

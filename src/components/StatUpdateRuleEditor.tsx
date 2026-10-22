@@ -6,7 +6,7 @@ import { GameFunction } from '../content/Function';
 import { Condition } from '../content/Condition';
 import { formatTimeSlot } from '../content/CalendarEvent';
 import { Button } from './UiComponents';
-import { ConditionEditor } from './ConditionEditor';
+import { ConditionEditor, createDefaultCondition } from './ConditionEditor';
 import { OutcomeEditor, OutcomeEditorContext } from './OutcomeEditor';
 
 export { SkitActionInput } from './OutcomeEditor';
@@ -126,7 +126,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, onC
             <Button variant="secondary" onClick={() => {
                 const rule: StatUpdateRule = {
                     id: generateUuid(),
-                    conditions: [[{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]],
+                    conditions: [[createDefaultCondition(globalStats)]],
                     updates: [],
                 };
                 setCollapsedRules(prev => ({ ...prev, [rule.id]: false }));
