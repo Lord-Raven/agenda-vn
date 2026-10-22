@@ -33,6 +33,7 @@ export class Control {
     type: ControlType = 'button';
     availabilityConditions: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
 
+    // Labels/descriptions resolve context tags at render time: {{Stat Name}}, {{Function Name}}, {{global:Stat Name}}, {{user}}.
     // Stat controls fall back to the stat's name when label is blank; iconName decorates the label.
     label: string = '';
     iconName: string = '';

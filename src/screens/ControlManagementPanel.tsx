@@ -177,7 +177,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
                         control={selectedControl}
                         stage={stage}
                         onUpdate={() => setControlRevision((current) => current + 1)}
-                        onDeactivate={() => setSelectedControlId(null)}
+                        onDelete={() => setSelectedControlId(null)}
                     />
                 )}
             </div>

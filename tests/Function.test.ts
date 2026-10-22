@@ -677,6 +677,35 @@ const typedFunction = (id: string, returnType: StatType, script: string): GameFu
     id, name: id, description: '', returnType, script,
 });
 
+test('bare global stat tags resolve current values, defaults, references and formatted options', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.globalStats.push(
+        stat('summary', 'text', { name: 'Score summary', default: functionReference('summary-function') }),
+        stat('enabled', 'checkbox', { name: 'Enabled', default: false }),
+        stat('fallback', 'text', { name: 'Fallback', default: 'Default text' }),
+    );
+    configuration.functions = [typedFunction('summary-function', 'text', 'return `Score: ${get("Score")}`;')];
+    configuration.globalStatValues = { fallback: 'Configured text' };
+    const source = '{{ score }} / {{sCoRe SuMmArY}} / {{Places}} / {{Choices}} / {{Enabled}} / {{Fallback}}';
+    assert.equal(processLoreText(source, stage), '2 / Score: 2 / Town / Second, First / no / Configured text');
+    save.globalStatValues!.Score = 0;
+    save.globalStatValues!.fallback = '';
+    assert.equal(processLoreText(source, stage), '0 / Score: 0 / Town / Second, First / no / ');
+    delete configuration.globalStatValues.fallback;
+    delete save.globalStatValues!.fallback;
+    assert.equal(processLoreText('{{Fallback}} {{Unknown}}', stage), 'Default text {{Unknown}}');
+});
+
+test('function and reserved tags keep precedence over bare global stat tags', () => {
+    const { stage, configuration } = fixture();
+    configuration.globalStats.push(stat('user', 'text', { default: 'Not the player' }));
+    configuration.functions = [typedFunction('Score', 'text', 'return "Function result";')];
+    assert.equal(processLoreText('{{Score}} / {{global:Score}} / {{user}}', stage), 'Function result / 2 / Same name');
+    configuration.functions[0].returnType = 'void';
+    configuration.functions[0].script = 'set("Score", 9);';
+    assert.equal(processLoreText('{{Score}}', stage), '{{Score}}');
+});
+
 test('function placeholders evaluate each occurrence by name against current state without changing source text', () => {
     const { stage, save, configuration } = fixture();
     configuration.functions = [

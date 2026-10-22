@@ -9,6 +9,10 @@ import { cloneStat, Stat } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { SettingsScreen } from '../src/screens/SettingsScreen';
 import { TooltipProvider } from '../src/components/TooltipContext';
+import { ControlRenderer } from '../src/components/ControlRenderer';
+import { OutcomeDisplay } from '../src/components/OutcomeDisplay';
+import { OutcomeType } from '../src/content/Outcome';
+import { functionReference } from '../src/content/Function';
 
 const makeStat = (id: string, extra: Partial<Stat> = {}): Stat => cloneStat({
     id, name: id, type: 'number', default: 10, guidance: '',
@@ -37,6 +41,83 @@ const fixture = () => {
     const render = () => renderToStaticMarkup(<TooltipProvider><ActorCard actor={actor} stage={() => stage} /></TooltipProvider>);
     return { actor, configuration, save, stage, render };
 };
+
+test('button and stat controls substitute labels and descriptions on each render without changing templates', () => {
+    const { configuration, save, stage } = fixture();
+    configuration.globalStats = [
+        makeStat('Gold', { default: 3 }),
+        makeStat('Summary', { type: 'text', default: functionReference('summary') }),
+    ];
+    configuration.functions = [{ id: 'summary', name: 'Score summary', description: '', returnType: 'text', script: 'return `Gold: ${get("Gold")}`;' }];
+    save.globalStatValues = { Gold: 5 };
+    const control = new Control({
+        label: '{{ Gold }} / {{Summary}} / {{Score summary}}',
+        description: '{{user}} has {{global:Gold}} gold. {{Unknown}}',
+        statId: 'Gold',
+    });
+    const render = () => renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />);
+    for (const type of ['button', 'statDisplay', 'statEditor'] as const) {
+        control.type = type;
+        const html = render();
+        assert.match(html, /5 \/ Gold: 5 \/ Gold: 5/);
+        assert.match(html, /title="Alice has 5 gold. \{\{Unknown\}\}"/);
+    }
+    save.globalStatValues.Gold = 0;
+    assert.match(render(), /0 \/ Gold: 0 \/ Gold: 0/);
+    assert.equal(control.label, '{{ Gold }} / {{Summary}} / {{Score summary}}');
+    assert.equal(control.description, '{{user}} has {{global:Gold}} gold. {{Unknown}}');
+});
+
+test('button name and stat name fallbacks support tags while empty evaluated labels stay empty', () => {
+    const { configuration, stage } = fixture();
+    configuration.globalStats = [makeStat('Empty', { type: 'text', default: '' }), makeStat('value', { name: '{{user}} value' })];
+    const render = (control: Control) => renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />);
+    assert.match(render(new Control({ name: 'Hello {{user}}' })), /Hello Alice/);
+    assert.match(render(new Control({ type: 'statDisplay', statId: 'value' })), /Alice value/);
+    assert.doesNotMatch(render(new Control({ label: '{{Empty}}', name: 'Do not fall back' })), /Empty|Do not fall back|Button</);
+});
+
+test('actor-card controls substitute tags with the displayed actor as char', () => {
+    const { configuration, render } = fixture();
+    configuration.globalStats = [makeStat('Gold', { default: 3 })];
+    configuration.controls = [new Control({
+        type: 'actorStatDisplay', statId: 'Health',
+        label: '{{char}}: {{char:Health}} / {{Gold}}',
+        description: '{{user}} sees {{char}}',
+    })];
+    const html = render();
+    assert.match(html, /Alice: 7 \/ 3/);
+    assert.match(html, /title="Alice sees Alice"/);
+});
+
+test('settings and outcome controls substitute labels and settings descriptions', () => {
+    const { configuration, stage } = fixture();
+    configuration.globalStats = [makeStat('Gold', { default: 3 })];
+    configuration.controls = [
+        new Control({ type: 'settings', statId: 'Gold', label: 'Setting {{Gold}}', description: '{{user}} has {{Gold}}' }),
+        new Control({ type: 'statOutcome', statId: 'Gold', label: 'Result {{Gold}}' }),
+        new Control({ type: 'statOutcome', outcomeStatTarget: 'actor', statId: 'Health', label: '{{char}} health {{char:Health}}' }),
+    ];
+    const html = renderToStaticMarkup(<TooltipProvider><SettingsScreen stage={() => stage} onCancel={() => {}} onConfirm={() => {}} setScreenType={() => {}} /></TooltipProvider>);
+    assert.match(html, /Setting 3/);
+    assert.match(html, /Alice has 3/);
+    const outcomes = [
+        { type: OutcomeType.PLAYER_STAT, description: '', details: { statName: 'Gold', changeValue: 1 } },
+        { type: OutcomeType.ACTOR_STAT, description: '', details: { actorId: 'alice', statName: 'Health', changeValue: 1 } },
+    ];
+    const outcomeHtml = renderToStaticMarkup(<OutcomeDisplay outcomes={outcomes} stage={() => stage} />);
+    assert.match(outcomeHtml, /World · Result 3/);
+    assert.match(outcomeHtml, /Alice health 7/);
+});
+
+test('control tag evaluation surfaces errors and cannot mutate game state', () => {
+    const { configuration, save, stage } = fixture();
+    configuration.globalStats = [makeStat('Gold', { default: 3 })];
+    configuration.functions = [{ id: 'bad', name: 'Bad', description: '', returnType: 'text', script: 'set("Gold", 100); return "Done";' }];
+    const control = new Control({ label: '{{Bad}}' });
+    assert.throws(() => renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />), /read-only/);
+    assert.deepEqual(save.globalStatValues, {});
+});
 
 test('actor cards show age only in calendar mode and retain other metadata in day mode', () => {
     const { actor, configuration, render } = fixture();

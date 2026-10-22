@@ -12,7 +12,7 @@ interface ControlDetailPanelProps {
     control: Control;
     stage: () => Stage;
     onUpdate?: () => void;
-    onDeactivate?: (controlId: string) => void;
+    onDelete?: (controlId: string) => void;
 }
 
 type ControlDraft = {
@@ -81,7 +81,7 @@ const sectionHeadingStyle: React.CSSProperties = {
     paddingBottom: '5px',
 };
 
-export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage, onUpdate, onDeactivate }) => {
+export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage, onUpdate, onDelete }) => {
     const stageInstance = stage();
     const globalStats = useMemo(() => stageInstance.getConfiguration().globalStats || [], [stageInstance]);
     const actorStats = useMemo(() => stageInstance.getConfiguration().actorStats || [], [stageInstance]);
@@ -161,13 +161,12 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleDeactivate = () => {
+    const handleDelete = () => {
         const configuredControls = stageInstance.getConfiguration().controls || [];
-        const persistedControl = new Control({ ...control, active: false });
         stageInstance.updateConfiguration({
-            controls: configuredControls.map((candidate) => candidate.id === control.id ? persistedControl : candidate),
+            controls: configuredControls.filter((candidate) => candidate.id !== control.id),
         });
-        onDeactivate?.(control.id);
+        onDelete?.(control.id);
     };
 
     const usesActorStat = draft.type === 'actorStatDisplay' || (draft.type === 'statOutcome' && draft.outcomeStatTarget === 'actor');
@@ -180,7 +179,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                 <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
                     Control: {draft.name || '(Unnamed Control)'}
                 </Title>
-                <Button variant="danger" onClick={handleDeactivate}>Deactivate</Button>
+                <Button variant="danger" onClick={handleDelete}>Delete</Button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', flex: 1, minHeight: 0, overflowY: 'auto' }}>

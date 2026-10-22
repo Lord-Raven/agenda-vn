@@ -8,6 +8,7 @@ import { Stage } from '../Stage';
 import { ActorPortrait } from './ActorPortrait';
 import { resolveStatValueText, StatValueDisplay } from './StatDisplay';
 import { resolveIcon, StatRating } from './StatRating';
+import { processLoreText } from '../content/Lore';
 
 interface OutcomeDisplayProps {
     outcomes: Outcome[];
@@ -85,7 +86,7 @@ const getNumericStatChangeSign = (stat: Stat | undefined, outcome: Outcome, stag
 };
 
 const formatStatNameWithSign = (stat: Stat, control: Control, outcome: Outcome, stage: Stage, actor?: Actor): string => {
-    const statName = control.label.trim() || stat.name;
+    const statName = processLoreText(control.label.trim() || stat.name, stage, actor);
     const sign = getNumericStatChangeSign(stat, outcome, stage, actor);
     return sign ? `${statName} ${sign}` : statName;
 };
@@ -218,7 +219,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     bottomLine = renderStatOutcome(outcome, actor);
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
                     const { stat, control } = statMatches.get(outcome)!;
-                    topLine = renderStatNameLabel(control, `World · ${control.label.trim() || stat.name}`, stage());
+                    topLine = renderStatNameLabel(control, `World · ${processLoreText(control.label.trim() || stat.name, stage())}`, stage());
                     bottomLine = renderStatOutcome(outcome);
                 } else if (outcome.type === OutcomeType.LORE_UPDATE) {
                     topLine = 'Lore Update';

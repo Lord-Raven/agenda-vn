@@ -10,6 +10,7 @@ import { Button } from './UiComponents';
 import { ContentListControl } from './ContentListControl';
 import { isValueReference } from '../content/Function';
 import { Skit } from '../content/Skit';
+import { processLoreText } from '../content/Lore';
 
 interface ControlRendererProps {
     control: Control;
@@ -70,6 +71,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         return (
             <Button
                 variant="secondary"
+                title={processLoreText(control.description, stageInstance).trim() || undefined}
                 onClick={() => {
                     let skit: Skit | null;
                     try {
@@ -85,7 +87,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                 style={{ ...sizingStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isVerticalLayout ? 4 : 6, padding: isVerticalLayout ? '4px 6px' : '8px 14px', ...(isVerticalLayout ? { fontSize: '0.8rem', minHeight: 32 } : {}), whiteSpace: 'normal', overflowWrap: 'anywhere' }}
             >
                 {Icon && <Icon fontSize="small" />}
-                {control.label?.trim() || control.name?.trim() || 'Button'}
+                {processLoreText(control.label?.trim() || control.name?.trim() || 'Button', stageInstance)}
             </Button>
         );
     }
@@ -101,11 +103,11 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         ?? stat.default;
     const normalizedValue = control.type === 'statEditor' ? normalizeStatValue(rawValue, stat) : stageInstance.readStatValue(rawValue, stat);
     const StatIcon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;
-    const label = control.label.trim() || statName;
+    const label = processLoreText(control.label.trim() || statName, stageInstance);
     const selectedOptionDescription = stat.type === 'option'
         ? resolveStatText(findStatOptionByValue(stat, normalizedValue)?.option.description, stageInstance).trim()
         : '';
-    const tooltipText = [resolveStatText(control.description, stageInstance).trim(), selectedOptionDescription]
+    const tooltipText = [processLoreText(control.description, stageInstance).trim(), selectedOptionDescription]
         .filter(Boolean)
         .join('\n\n');
     const referenceKind = resolveReferenceKind(stat.type);

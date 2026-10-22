@@ -96,8 +96,9 @@ const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined
     return (stats || []).find((stat) => stat.id === key || (stat.name || '').trim().toLowerCase() === lowerKey);
 };
 
-// Resolves template tags in lore text for LLM/display use. Unresolvable tags (unknown stat/function, no target
-// actor, void functions) are left untouched. Don't use on text written back to the lore entry.
+// Resolves template tags in lore and control text for LLM/display use. Bare names prefer functions, then global stats.
+// Unresolvable tags (unknown stat/function, no target actor, void functions) are left untouched.
+// Don't use on text written back to the source.
 export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor): string {
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
@@ -123,10 +124,17 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
         if (functionKey !== undefined) {
             const name = functionKey.trim().toLowerCase();
             const fn = (configuration.functions || []).find(candidate => candidate.name.trim().toLowerCase() === name);
-            if (!fn || !fn.returnType || fn.returnType === 'void') {
+            if (fn) {
+                if (!fn.returnType || fn.returnType === 'void') {
+                    return match;
+                }
+                return formatValue(fn.returnType, stage.resolveValue(functionReference(fn.id), fn.returnType, save));
+            }
+            const stat = findStatByKey(configuration.globalStats, functionKey.trim());
+            if (!stat) {
                 return match;
             }
-            return formatValue(fn.returnType, stage.resolveValue(functionReference(fn.id), fn.returnType, save));
+            return formatStatValue(stat, save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id]);
         }
         const tagName = tag?.toLowerCase();
         if (tagName === 'global') {

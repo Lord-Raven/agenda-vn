@@ -69,6 +69,7 @@ interface ButtonProps {
 	onClick?: () => void;
 	style?: React.CSSProperties;
 	className?: string;
+	title?: string;
 	onMouseEnter?: () => void;
 	onMouseLeave?: () => void;
 	'aria-label'?: string;
@@ -81,6 +82,7 @@ export const Button: FC<ButtonProps> = ({
 	onClick,
 	className = '',
 	style,
+	title,
 	onMouseEnter,
 	onMouseLeave,
 	'aria-label': ariaLabel,
@@ -91,6 +93,7 @@ export const Button: FC<ButtonProps> = ({
 		<motion.button
 			className={`${buttonClass} ${className}`}
 			disabled={disabled}
+			title={title}
 			onClick={onClick}
 			onMouseEnter={onMouseEnter}
 			onMouseLeave={onMouseLeave}
