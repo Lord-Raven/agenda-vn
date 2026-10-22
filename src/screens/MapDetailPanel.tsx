@@ -59,6 +59,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
     const [isGeneratingVariants, setIsGeneratingVariants] = useState<Record<number, boolean>>({});
     const [previewSelection, setPreviewSelection] = useState<'base' | number>('base');
     const [isLinksCollapsed, setIsLinksCollapsed] = useState(true);
+    const [expandedLinks, setExpandedLinks] = useState<number[]>([]);
     const [draft, setDraft] = useState<MapDraft>(() => createMapDraft(map));
     const draftRef = useRef(draft);
     const previewRef = useRef<HTMLDivElement>(null);
@@ -441,7 +442,10 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                         type="button"
                         aria-label={`${isLinksCollapsed ? 'Expand' : 'Collapse'} Links`}
                         aria-expanded={!isLinksCollapsed}
-                        onClick={() => setIsLinksCollapsed(current => !current)}
+                        onClick={() => {
+                            setIsLinksCollapsed(current => !current);
+                            setExpandedLinks([]);
+                        }}
                         style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer' }}
                     >
                         <ExpandMore style={{ transform: isLinksCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
@@ -454,91 +458,110 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                 </div>
                 {!isLinksCollapsed && (
                     <div style={{ display: 'grid', gap: 8 }}>
-                        {map.links.map((link, index) => (
-                            <div key={index} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
-                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
-                                    Link Type
-                                    <select aria-label="Link type" style={selectStyle} value={link.type || 'target'}
-                                        onChange={event => updateLink(index, { type: event.target.value === 'button' ? 'button' : 'target' })}>
-                                        <option value="target">Map / location</option>
-                                        <option value="button">Button</option>
-                                    </select>
-                                </label>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto', gap: 8, alignItems: 'center' }}>
-                                    {link.type === 'button' ? (
-                                        <TextInput fullWidth aria-label="Button name" placeholder="Button name" value={link.name || ''} onChange={event => updateLink(index, { name: event.target.value })} />
-                                    ) : <SearchableOptionPicker
-                                        value={link.childId}
-                                        onChange={nextValue => updateLink(index, { childId: (nextValue as string) || link.childId })}
-                                        options={[
-                                            ...activeLocations.map(location => ({ key: location.id, label: getLocationName(location.id, stageInstance), category: location.category?.trim() || 'Uncategorized', imageUrl: location.imageUrl, icon: Place, description: 'Location' })),
-                                            ...activeMaps.map(candidate => ({ key: candidate.id, label: candidate.name, category: candidate.category?.trim() || 'Uncategorized', imageUrl: candidate.imageUrl, icon: MapIcon, description: 'Map' })),
-                                        ]}
-                                        title="Choose link target"
-                                        placeholder="Search locations and maps"
-                                        functionType="location"
-                                        stage={stage}
-                                    />}
-                                    <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
-                                    <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
-                                    <Button variant="danger" onClick={() => persist(() => map.links.splice(index, 1))} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
+                        {map.links.map((link, index) => {
+                            const isCollapsed = !expandedLinks.includes(index);
+                            const linkName = link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);
+                            return (
+                                <div key={index} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
+                                    <button
+                                        type="button"
+                                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${linkName}`}
+                                        aria-expanded={!isCollapsed}
+                                        onClick={() => setExpandedLinks(current => isCollapsed ? [...current, index] : current.filter(linkIndex => linkIndex !== index))}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer', textAlign: 'left' }}
+                                    >
+                                        <ExpandMore style={{ flexShrink: 0, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
+                                        <strong style={{ overflowWrap: 'anywhere' }}>{linkName}</strong>
+                                    </button>
+                                    {!isCollapsed && <>
+                                        {link.type === 'button' ? (
+                                            <TextInput fullWidth aria-label="Button name" placeholder="Button name" value={link.name || ''} onChange={event => updateLink(index, { name: event.target.value })} />
+                                        ) : <SearchableOptionPicker
+                                            value={link.childId}
+                                            onChange={nextValue => updateLink(index, { childId: (nextValue as string) || link.childId })}
+                                            options={[
+                                                ...activeLocations.map(location => ({ key: location.id, label: getLocationName(location.id, stageInstance), category: location.category?.trim() || 'Uncategorized', imageUrl: location.imageUrl, icon: Place, description: 'Location' })),
+                                                ...activeMaps.map(candidate => ({ key: candidate.id, label: candidate.name, category: candidate.category?.trim() || 'Uncategorized', imageUrl: candidate.imageUrl, icon: MapIcon, description: 'Map' })),
+                                            ]}
+                                            title="Choose link target"
+                                            placeholder="Search locations and maps"
+                                            functionType="location"
+                                            stage={stage}
+                                        />}
+                                        <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
+                                            Link Type
+                                            <select aria-label="Link type" style={selectStyle} value={link.type || 'target'}
+                                                onChange={event => updateLink(index, { type: event.target.value === 'button' ? 'button' : 'target' })}>
+                                                <option value="target">Map / location</option>
+                                                <option value="button">Button</option>
+                                            </select>
+                                        </label>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+                                            <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
+                                            <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
+                                            <Button variant="danger" aria-label={`Delete ${linkName}`} onClick={() => {
+                                                persist(() => map.links.splice(index, 1));
+                                                setExpandedLinks(current => current.filter(linkIndex => linkIndex !== index).map(linkIndex => linkIndex > index ? linkIndex - 1 : linkIndex));
+                                            }} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
+                                        </div>
+                                        {link.type === 'button' && <>
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Button Icon (optional)</label>
+                                            <IconPicker stage={stage} value={link.iconName || undefined} allowClear onChange={iconName => updateLink(index, { iconName: iconName || '' })} />
+                                            <strong style={{ color: 'var(--agenda-text-primary)' }}>Outcomes (on click)</strong>
+                                            <OutcomeEditor actions={link.actions || []} onChange={actions => updateLink(index, { actions })}
+                                                globalStats={stageInstance.getConfiguration().globalStats || []}
+                                                actorStats={stageInstance.getConfiguration().actorStats || []}
+                                                locationStats={stageInstance.getConfiguration().locationStats || []}
+                                                itemStats={stageInstance.getConfiguration().itemStats || []}
+                                                actors={(isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})).filter(actor => actor.active !== false)}
+                                                locations={activeLocations}
+                                                items={(isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []).filter(item => item.active !== false)}
+                                                stage={stage}
+                                            />
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
+                                                Content below button (optional)
+                                                <select aria-label="Button content type" style={selectStyle} value={link.contentList?.kind || ''}
+                                                    onChange={event => {
+                                                        const kind = CONTENT_TYPES.find(type => type === event.target.value);
+                                                        updateLink(index, { contentList: kind ? { kind, values: [] } : undefined });
+                                                    }}>
+                                                    <option value="">None</option>
+                                                    <option value="actor">Actors</option>
+                                                    <option value="item">Items</option>
+                                                    <option value="location">Locations</option>
+                                                </select>
+                                            </label>
+                                            {link.contentList && <ReferenceMultiSelect
+                                                kind={link.contentList.kind} values={link.contentList.values}
+                                                onChange={values => {
+                                                    if (link.contentList) updateLink(index, { contentList: { ...link.contentList, values } });
+                                                }}
+                                                actors={isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})}
+                                                items={isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []}
+                                                locations={activeLocations} stage={stage}
+                                            />}
+                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                                Choose literal content, a function, or a global stat of the selected content type.
+                                                The list is reevaluated after button actions and displayed beneath the marker.
+                                            </span>
+                                        </>}
+                                        <ConditionEditor
+                                            conditionCollections={link.conditionCollections || []}
+                                            globalStats={stageInstance.getConfiguration().globalStats || []}
+                                            actorStats={stageInstance.getConfiguration().actorStats || []}
+                                            locationStats={stageInstance.getConfiguration().locationStats || []}
+                                            itemStats={stageInstance.getConfiguration().itemStats || []}
+                                            actors={Object.values(stageInstance.getSave().actors || {})}
+                                            stage={stage}
+                                            locations={Object.values(stageInstance.getSave().atlas || {})}
+                                            items={stageInstance.getSave().inventory || []}
+                                            variableContentType="actor"
+                                            onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
+                                        />
+                                    </>}
                                 </div>
-                                {link.type === 'button' && <>
-                                    <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Button Icon (optional)</label>
-                                    <IconPicker stage={stage} value={link.iconName || undefined} allowClear onChange={iconName => updateLink(index, { iconName: iconName || '' })} />
-                                    <strong style={{ color: 'var(--agenda-text-primary)' }}>Outcomes (on click)</strong>
-                                    <OutcomeEditor actions={link.actions || []} onChange={actions => updateLink(index, { actions })}
-                                        globalStats={stageInstance.getConfiguration().globalStats || []}
-                                        actorStats={stageInstance.getConfiguration().actorStats || []}
-                                        locationStats={stageInstance.getConfiguration().locationStats || []}
-                                        itemStats={stageInstance.getConfiguration().itemStats || []}
-                                        actors={(isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})).filter(actor => actor.active !== false)}
-                                        locations={activeLocations}
-                                        items={(isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []).filter(item => item.active !== false)}
-                                        stage={stage}
-                                    />
-                                    <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
-                                        Content below button (optional)
-                                        <select aria-label="Button content type" style={selectStyle} value={link.contentList?.kind || ''}
-                                            onChange={event => {
-                                                const kind = CONTENT_TYPES.find(type => type === event.target.value);
-                                                updateLink(index, { contentList: kind ? { kind, values: [] } : undefined });
-                                            }}>
-                                            <option value="">None</option>
-                                            <option value="actor">Actors</option>
-                                            <option value="item">Items</option>
-                                            <option value="location">Locations</option>
-                                        </select>
-                                    </label>
-                                    {link.contentList && <ReferenceMultiSelect
-                                        kind={link.contentList.kind} values={link.contentList.values}
-                                        onChange={values => {
-                                            if (link.contentList) updateLink(index, { contentList: { ...link.contentList, values } });
-                                        }}
-                                        actors={isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})}
-                                        items={isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []}
-                                        locations={activeLocations} stage={stage}
-                                    />}
-                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                        Choose literal content, a function, or a global stat of the selected content type.
-                                        The list is reevaluated after button actions and displayed beneath the marker.
-                                    </span>
-                                </>}
-                                <ConditionEditor
-                                    conditionCollections={link.conditionCollections || []}
-                                    globalStats={stageInstance.getConfiguration().globalStats || []}
-                                    actorStats={stageInstance.getConfiguration().actorStats || []}
-                                    locationStats={stageInstance.getConfiguration().locationStats || []}
-                                    itemStats={stageInstance.getConfiguration().itemStats || []}
-                                    actors={Object.values(stageInstance.getSave().actors || {})}
-                                    stage={stage}
-                                    locations={Object.values(stageInstance.getSave().atlas || {})}
-                                    items={stageInstance.getSave().inventory || []}
-                                    variableContentType="actor"
-                                    onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
-                                />
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

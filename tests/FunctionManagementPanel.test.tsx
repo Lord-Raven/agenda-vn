@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isValidElement } from 'react';
+import React, { isValidElement, ReactNode } from 'react';
 import { GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { Control } from '../src/content/Control';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
@@ -98,6 +98,108 @@ test('maps can offer action buttons even without another map or location', () =>
     assert.match(html, /Drag Rest marker/);
     assert.match(html, /data-testid="HotelIcon"/);
     assert.doesNotMatch(html, /Drag Missing target marker/);
+});
+
+test('map link disclosures start collapsed, expand independently and reset when Links reopens', () => {
+    const { stage, configuration } = fixture();
+    const destination = new GameMap({ id: 'destination', name: 'World' });
+    const map = new GameMap({ id: 'map', links: [
+        { type: 'button', parentId: 'map', childId: '', name: 'Rest', coordinates: { x: .5, y: .5 }, actions: [] },
+        { parentId: 'map', childId: destination.id, coordinates: { x: .3, y: .3 } },
+        { type: 'button', parentId: 'map', childId: '', coordinates: { x: .7, y: .7 } },
+    ] });
+    configuration.maps = [map, destination];
+    const states: unknown[] = [];
+    let hookIndex = 0;
+    let inspectingPanel = false;
+    let panel: ReactNode;
+    const useState = React.useState;
+    const stateMock = mock.method(React, 'useState', (initial: unknown) => {
+        if (!inspectingPanel) return useState(initial);
+        const index = hookIndex++;
+        if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
+        return [states[index], (next: unknown) => {
+            states[index] = typeof next === 'function' ? next(states[index]) : next;
+        }];
+    });
+    const Probe = () => {
+        hookIndex = 0;
+        inspectingPanel = true;
+        try {
+            panel = MapDetailPanel({ map, stage: () => stage, isCreatorMode: true, onChange: () => {}, onDeactivate: () => {} });
+            return panel;
+        } finally {
+            inspectingPanel = false;
+        }
+    };
+    const render = () => renderToStaticMarkup(<Probe />);
+    const click = (label: string) => {
+        let handler: (() => void) | undefined;
+        const visit = (children: ReactNode) => React.Children.forEach(children, child => {
+            if (!isValidElement<{ children?: ReactNode; 'aria-label'?: string; onClick?: () => void }>(child)) return;
+            if (child.props['aria-label'] === label) handler = child.props.onClick;
+            visit(child.props.children);
+        });
+        visit(panel);
+        assert.ok(handler, `Missing button: ${label}`);
+        handler();
+    };
+    try {
+        assert.match(render(), /aria-label="Expand Links" aria-expanded="false"/);
+        click('Expand Links');
+        let html = render();
+        for (const name of ['Rest', 'World', 'Button']) {
+            assert.ok(html.includes(`aria-label="Expand ${name}" aria-expanded="false"`));
+        }
+        assert.doesNotMatch(html, /aria-label="Button name"|aria-label="Link type"|Outcomes \(on click\)/);
+
+        click('Expand Rest');
+        html = render();
+        assert.match(html, /aria-label="Collapse Rest" aria-expanded="true"/);
+        assert.match(html, /aria-label="Expand World" aria-expanded="false"/);
+        assert.ok(html.indexOf('aria-label="Button name"') < html.indexOf('aria-label="Link type"'));
+        assert.match(html, /Outcomes \(on click\)/);
+        assert.match(html, /aria-label="X coordinate"/);
+
+        click('Expand World');
+        html = render();
+        assert.match(html, /aria-label="Collapse Rest" aria-expanded="true"/);
+        assert.match(html, /aria-label="Collapse World" aria-expanded="true"/);
+        const worldEditor = html.slice(html.indexOf('aria-label="Collapse World"'));
+        assert.ok(worldEditor.indexOf('Choose link target') < worldEditor.indexOf('aria-label="Link type"'));
+
+        click('Collapse Rest');
+        html = render();
+        assert.match(html, /aria-label="Expand Rest" aria-expanded="false"/);
+        assert.match(html, /aria-label="Collapse World" aria-expanded="true"/);
+        assert.doesNotMatch(html, /aria-label="Button name"|Outcomes \(on click\)/);
+
+        click('Collapse Links');
+        assert.doesNotMatch(render(), /aria-label="Collapse World"/);
+        click('Expand Links');
+        html = render();
+        assert.match(html, /aria-label="Expand World" aria-expanded="false"/);
+        assert.doesNotMatch(html, /aria-label="Link type"/);
+
+        click('Expand Rest');
+        render();
+        click('Expand World');
+        render();
+        const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
+        Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout: () => 1 } });
+        try {
+            click('Delete Rest');
+        } finally {
+            if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor);
+            else Reflect.deleteProperty(globalThis, 'window');
+        }
+        html = render();
+        assert.equal(map.links.length, 2);
+        assert.match(html, /aria-label="Collapse World" aria-expanded="true"/);
+        assert.match(html, /aria-label="Expand Button" aria-expanded="false"/);
+    } finally {
+        stateMock.mock.restore();
+    }
 });
 
 test('defined maps show named action icons, fallback icons, disabled conditions and resolved content portraits', () => {
