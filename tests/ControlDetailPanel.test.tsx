@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Stage, GameConfiguration } from '../src/Stage';
-import { Control, ControlType } from '../src/content/Control';
+import { Control, ControlType, STAT_DISPLAY_TYPES } from '../src/content/Control';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
 import { ControlRenderer } from '../src/components/ControlRenderer';
@@ -208,6 +208,57 @@ test('settings controls use the Settings placement and own a description', () =>
     assert.match(html, /Description/);
     assert.doesNotMatch(html, /Width Weight|Label Icon/);
 });
+
+for (const outcomeStatTarget of ['global', 'actor'] as const) {
+    for (const displayType of STAT_DISPLAY_TYPES) {
+        test(`${outcomeStatTarget} numeric outcomes expose ${displayType} display settings`, () => {
+            const control = new Control({
+                type: 'statOutcome', statId: 'score', outcomeStatTarget,
+                displayType, displayColor: '#123456', ratingIconName: 'favorite',
+            });
+            const stage = createStage(control);
+            const stats = [sourceStat('score', 'number')];
+            if (outcomeStatTarget === 'actor') {
+                stage.getConfiguration().actorStats = stats;
+            } else {
+                stage.getConfiguration().globalStats = stats;
+            }
+            const html = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
+            assert.match(html, /<label[^>]*>Display<\/label>/);
+            for (const option of STAT_DISPLAY_TYPES) {
+                assert.ok(html.includes(`<option value="${option}"${option === displayType ? ' selected=""' : ''}>`));
+            }
+            assert.match(html, /Display Color/);
+            assert.match(html, /#123456/);
+            if (displayType === 'rating') {
+                assert.match(html, /Rating Icon/);
+                assert.match(html, /aria-label="Selected icon: favorite"/);
+            } else {
+                assert.doesNotMatch(html, /Rating Icon/);
+            }
+        });
+    }
+
+    test(`${outcomeStatTarget} nonnumeric outcomes expose color but not numeric display settings`, () => {
+        const control = new Control({ type: 'statOutcome', statId: 'text', outcomeStatTarget });
+        const stage = createStage(control);
+        stage.getConfiguration().globalStats = [sourceStat('text', outcomeStatTarget === 'global' ? 'text' : 'number')];
+        stage.getConfiguration().actorStats = [sourceStat('text', outcomeStatTarget === 'actor' ? 'text' : 'number')];
+        const html = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
+        assert.match(html, /Display Color/);
+        assert.doesNotMatch(html, /<label[^>]*>Display<\/label>|Rating Icon/);
+    });
+}
+
+for (const type of ['statEditor', 'settings'] as const) {
+    test(`${type} does not expose read-only display settings`, () => {
+        const control = new Control({ type, statId: 'score' });
+        const stage = createStage(control);
+        stage.getConfiguration().globalStats = [sourceStat('score', 'number')];
+        const html = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
+        assert.doesNotMatch(html, /<label[^>]*>Display<\/label>|Rating Icon|Display Color/);
+    });
+}
 
 for (const type of ['button', 'statDisplay', 'statEditor', 'actorStatDisplay', 'statOutcome'] satisfies ControlType[]) {
     test(`${type} exposes width weight only for top/bottom controls`, () => {

@@ -172,6 +172,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const usesActorStat = draft.type === 'actorStatDisplay' || (draft.type === 'statOutcome' && draft.outcomeStatTarget === 'actor');
     const selectableStats = usesActorStat ? updatableActorStats : updatableGlobalStats;
     const selectedStat = selectableStats.find((stat) => stat.id === draft.statId);
+    const supportsDisplaySettings = draft.type === 'statDisplay' || draft.type === 'actorStatDisplay' || draft.type === 'statOutcome';
 
     return (
         <GlassPanel variant="default" style={{ overflow: 'visible', position: 'relative', padding: '20px', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
@@ -402,7 +403,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <IconPicker stage={stage} value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
                             </div>
                         )}
-                        {(draft.type === 'statDisplay' || draft.type === 'actorStatDisplay') && selectedStat?.type === 'number' && (
+                        {supportsDisplaySettings && selectedStat?.type === 'number' && (
                             <div style={{ marginTop: 15 }}>
                                 <label style={labelStyle}>Display</label>
                                 <select style={selectStyle} value={draft.displayType}
@@ -421,7 +422,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 )}
                             </div>
                         )}
-                        {(draft.type === 'statDisplay' || draft.type === 'actorStatDisplay') && (
+                        {supportsDisplaySettings && (
                             <div style={{ marginTop: 15 }}>
                                 <label style={labelStyle}>Display Color</label>
                                 <ColorPickerInput value={draft.displayColor} popoverTitle="Choose Display Color"
