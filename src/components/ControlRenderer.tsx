@@ -49,8 +49,8 @@ const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]
 };
 
 // Renders a single Control per its type: 'button' as a clickable action, 'statDisplay'/'statEditor' as the
-// same labeled box the Global Stat Bar used to render directly from globalStats. Used by both GlobalStatBar
-// (placement 'top') and the bottom control dock (placement 'bottom').
+// labeled boxes, or an inline icon and value in vertical layouts. Used by both GlobalStatBar (placement
+// 'top') and the bottom control dock (placement 'bottom').
 export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onActivate, isVerticalLayout = false }) => {
     const stageInstance = stage();
     const fontSize = isVerticalLayout ? 'clamp(0.8rem, 10cqi, 1rem)' : valueFontSize;
@@ -124,24 +124,31 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
 
     return (
         <Box
+            role="group"
+            aria-label={label}
             title={tooltipText || undefined}
             sx={{
                 ...boxStyle,
                 ...sizingStyle,
+                ...(isVerticalLayout ? { flexDirection: 'row', alignItems: 'center' } : {}),
                 ...(displaysImageList ? {
-                    gap: 0.25,
+                    gap: isVerticalLayout ? 0.6 : 0.25,
                     padding: isVerticalLayout ? '2px 6px' : '2px 10px',
                     minWidth: imageListMinWidth,
                     ...(isVerticalLayout ? { borderRadius: '8px' } : {}),
-                } : isVerticalLayout ? { gap: 0.25, padding: '4px 6px', borderRadius: '8px' } : {}),
+                } : isVerticalLayout ? { gap: 0.6, padding: '4px 6px', borderRadius: '8px' } : {}),
             }}
         >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', lineHeight: 1.2 }}>
-                {StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)' }} />}
-                <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: isVerticalLayout ? '0.6rem' : '0.66rem', letterSpacing: isVerticalLayout ? '0.05em' : '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
-                    {label}
-                </Typography>
-            </Box>
+            {isVerticalLayout ? (
+                StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)', flexShrink: 0 }} />
+            ) : (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', lineHeight: 1.2 }}>
+                    {StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)' }} />}
+                    <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.66rem', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                        {label}
+                    </Typography>
+                </Box>
+            )}
 
             <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, minHeight: isVerticalLayout ? 20 : 32, containerType: 'inline-size' }}>
             {referenceKind && isReferenceListDisplayType(stat.type) && !(control.type === 'statEditor' && isValueReference(rawValue)) ? (

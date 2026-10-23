@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GameConfiguration, Stage } from '../src/Stage';
 import { GlobalStatBar } from '../src/components/GlobalStatBar';
+import { ControlDock } from '../src/components/ControlDock';
 import { Control } from '../src/content/Control';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 
@@ -58,6 +59,44 @@ for (const isVerticalLayout of [false, true]) {
         assert.match(html, /flex-wrap:wrap/);
         assert.ok(html.includes(`flex:2 1 calc(${isVerticalLayout ? 96 : 150}px * 2)`));
     });
+}
+
+for (const placement of ['top', 'bottom'] as const) {
+    for (const type of ['statDisplay', 'statEditor'] as const) {
+        for (const withIcon of [false, true]) {
+            for (const isVerticalLayout of [false, true]) {
+                test(`${placement} ${type} keeps the value ${isVerticalLayout ? 'inline without a label' : 'below its label'} (icon: ${withIcon})`, () => {
+                    const stage = createStage();
+                    const configuration = stage.getConfiguration();
+                    configuration.globalStats = [{
+                        id: 'health', name: 'Health', type: 'number', default: 42, guidance: '',
+                        llmSees: { value: true, conditions: [] },
+                        llmMaintained: { value: true, conditions: [] },
+                    }];
+                    configuration.controls = [new Control({
+                        placement, type, statId: 'health', label: 'Current health',
+                        iconName: withIcon ? 'heart' : '', description: 'Health description',
+                    })];
+                    const Bar = placement === 'top' ? GlobalStatBar : ControlDock;
+                    const html = renderToStaticMarkup(<Bar stage={() => stage} isVerticalLayout={isVerticalLayout} />);
+                    assert.match(html, /role="group" aria-label="Current health" title="Health description"/);
+                    if (isVerticalLayout) {
+                        assert.doesNotMatch(html, />Current health</);
+                        assert.match(html, /flex-direction:row;[^}]*align-items:center/);
+                    } else {
+                        assert.match(html, />Current health</);
+                    }
+                    const valueIndex = html.indexOf(type === 'statEditor' ? 'value="42"' : '>42<');
+                    assert.ok(valueIndex >= 0, 'the stat value is preserved');
+                    const iconIndex = html.indexOf('data-testid="FavoriteIcon"');
+                    assert.equal(iconIndex >= 0, withIcon);
+                    if (withIcon) {
+                        assert.ok(iconIndex < valueIndex, 'the icon precedes the value');
+                    }
+                });
+            }
+        }
+    }
 }
 
 // Set CHROME_BIN to run geometric regression checks with an existing Chromium installation.

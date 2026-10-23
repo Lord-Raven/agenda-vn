@@ -165,6 +165,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                     <EventAvailable fontSize="small" />
                                 </Button>
                                 )}
+                                {!isVerticalLayout && (
                                 <Button
                                     variant="secondary"
                                     onClick={() => setShowContentManagement(true)}
@@ -174,6 +175,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                                 >
                                     <EditNote fontSize="small" />
                                 </Button>
+                                )}
                                 <Button
                                     variant="secondary"
                                     onClick={() => setScreenType(ScreenType.MENU)}

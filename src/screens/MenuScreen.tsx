@@ -1,7 +1,7 @@
 import { FC, useEffect, useState } from "react";
 import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
-import { FiberNew, Folder, PlayArrow, Save, SaveAlt, Settings } from "@mui/icons-material";
+import { EditNote, FiberNew, Folder, PlayArrow, Save, SaveAlt, Settings } from "@mui/icons-material";
 import { SettingsScreen } from "./SettingsScreen";
 import { BlurredBackground } from "@lord-raven/novel-visualizer";
 import { Button } from "../components/UiComponents";
@@ -10,6 +10,7 @@ import { Box } from "@mui/material";
 import { useTooltip } from "../components/TooltipContext";
 import React from "react";
 import { SaveLoadScreen } from "./SaveLoadScreen";
+import { ContentManagementScreen } from "./ContentManagementScreen";
 
 interface MenuScreenProps {
     stage: () => Stage;
@@ -19,6 +20,7 @@ interface MenuScreenProps {
 export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     const [hoveredButton, setHoveredButton] = useState<string | null>(null);
     const [showSettings, setShowSettings] = useState(false);
+    const [showContentManagement, setShowContentManagement] = useState(false);
     const [isNewGameSettings, setIsNewGameSettings] = useState(false);
     const [expandedSection, setExpandedSection] = useState<'menu' | 'version' | 'attribution'>('menu');
     const { setTooltip, clearTooltip } = useTooltip();
@@ -37,7 +39,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     // Handle escape key to continue game if available
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && !disableAllButtons) {
+            if (event.key === 'Escape' && !disableAllButtons && !showContentManagement) {
                 if (showSettings) {
                     handleSettingsCancel();
                 } else if (showSaveLoad) {
@@ -50,7 +52,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [showSettings]);
+    }, [showSettings, showSaveLoad, showContentManagement]);
 
     const handleContinue = () => {
         setScreenType(stage().getCurrentSkit() ? ScreenType.SKIT : ScreenType.MAP);
@@ -144,6 +146,14 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
             enabled: !disableAllButtons,
             tooltip: disableAllButtons ? 'Currently unavailable' : 'Adjust game settings and preferences',
             icon: Settings
+        },
+        {
+            key: 'contentManagement',
+            label: 'Content Management',
+            onClick: () => setShowContentManagement(true),
+            enabled: !disableAllButtons,
+            tooltip: disableAllButtons ? 'Currently unavailable' : 'Manage configuration, actors, locations, and more',
+            icon: EditNote
         },
     ];
 
@@ -487,6 +497,16 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                     mode={saveLoadMode}
                     onClose={() => setShowSaveLoad(false)}
                     setScreenType={setScreenType}
+                />
+            )}
+
+            {showContentManagement && (
+                <ContentManagementScreen
+                    stage={stage}
+                    onClose={() => {
+                        stage().saveGame();
+                        setShowContentManagement(false);
+                    }}
                 />
             )}
 

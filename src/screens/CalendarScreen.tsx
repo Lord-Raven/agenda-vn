@@ -346,6 +346,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, 
                                 >
                                     <MapRounded fontSize="small" />
                                 </Button>
+                                {!isVerticalLayout && (
                                 <Button
                                     variant="secondary"
                                     onClick={() => setShowContentManagement(true)}
@@ -355,6 +356,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, 
                                 >
                                     <EditNote fontSize="small" />
                                 </Button>
+                                )}
                                 <Button
                                     variant="secondary"
                                     onClick={() => setScreenType(ScreenType.MENU)}

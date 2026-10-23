@@ -34,7 +34,8 @@ export class Control {
     availabilityConditions: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
 
     // Labels/descriptions resolve context tags at render time: {{Stat Name}}, {{Function Name}}, {{global:Stat Name}}, {{user}}.
-    // Stat controls fall back to the stat's name when label is blank; iconName decorates the label.
+    // Stat controls fall back to the stat's name when label is blank. Vertical top/bottom bars hide the
+    // label and show iconName beside the value instead; other layouts use it to decorate the label.
     label: string = '';
     iconName: string = '';
     description: string = '';

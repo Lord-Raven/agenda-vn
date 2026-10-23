@@ -25,7 +25,7 @@ import {
     VolumeUp,
     VolumeOff
 } from '@mui/icons-material';
-import { IconButton } from '@mui/material';
+import { Box, IconButton } from '@mui/material';
 import React from "react";
 import { Emotion } from "../content/Emotion";
 
@@ -260,51 +260,62 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                                         {isAudioEnabled ? <VolumeUp /> : <VolumeOff />}
                                     </IconButton>
                                 )}
-                                <IconButton
-                                    onClick={() => setShowContentManagement(true)}
-                                    onMouseEnter={() => setTooltip('Content Management', EditNote)}
-                                    onMouseLeave={() => clearTooltip()}
-                                    sx={cornerButtonSx}
-                                >
-                                    <EditNote />
-                                </IconButton>
-                                <IconButton
-                                    onClick={() => setScreenType(ScreenType.MENU)}
-                                    onMouseEnter={() => setTooltip('Main Menu', MenuIcon)}
-                                    onMouseLeave={() => clearTooltip()}
-                                    sx={cornerButtonSx}
-                                >
-                                    <MenuIcon />
-                                </IconButton>
-                                <IconButton
-                                    onClick={handleClose}
-                                    onMouseEnter={() => setTooltip(isLoading ? 'Cannot close while content is generating' : ((accumulatedOutcomes.length > 0 ? 'Accept Outcomes and ' : '') + (shouldHighlightCloseButton ? 'End Scene Here' : 'End Scene Here (Discard Remaining Entries)')), shouldHighlightCloseButton ? Close : Warning)}
-                                    onMouseLeave={() => clearTooltip()}
-                                    disabled={isLoading || skit.script.length < 3}
-                                    sx={{
-                                        ...cornerButtonSx,
-                                        ...(!isLoading && shouldHighlightCloseButton ? {
-                                            color: 'var(--agenda-warning)',
-                                            backgroundColor: 'color-mix(in srgb, var(--agenda-warning) 12%, transparent)',
-                                            animation: 'closeButtonPulse 1.6s ease-in-out infinite',
-                                            '@keyframes closeButtonPulse': {
-                                                '0%, 100%': {
-                                                    transform: 'scale(1)',
-                                                    boxShadow: '0 0 0 0 color-mix(in srgb, var(--agenda-text-primary) 35%, transparent)'
-                                                },
-                                                '50%': {
-                                                    transform: 'scale(1.08)',
-                                                    boxShadow: '0 0 0 8px transparent'
+                                {!isVerticalLayout && (
+                                    <IconButton
+                                        onClick={() => setShowContentManagement(true)}
+                                        onMouseEnter={() => setTooltip('Content Management', EditNote)}
+                                        onMouseLeave={() => clearTooltip()}
+                                        sx={cornerButtonSx}
+                                    >
+                                        <EditNote />
+                                    </IconButton>
+                                )}
+                                <Box sx={{
+                                    display: 'flex',
+                                    flexDirection: isVerticalLayout ? 'column-reverse' : 'row',
+                                    alignItems: 'center',
+                                    gap: 0.75,
+                                }}>
+                                    <IconButton
+                                        aria-label="Main Menu"
+                                        onClick={() => setScreenType(ScreenType.MENU)}
+                                        onMouseEnter={() => setTooltip('Main Menu', MenuIcon)}
+                                        onMouseLeave={() => clearTooltip()}
+                                        sx={cornerButtonSx}
+                                    >
+                                        <MenuIcon />
+                                    </IconButton>
+                                    <IconButton
+                                        aria-label="Close Scene"
+                                        onClick={handleClose}
+                                        onMouseEnter={() => setTooltip(isLoading ? 'Cannot close while content is generating' : ((accumulatedOutcomes.length > 0 ? 'Accept Outcomes and ' : '') + (shouldHighlightCloseButton ? 'End Scene Here' : 'End Scene Here (Discard Remaining Entries)')), shouldHighlightCloseButton ? Close : Warning)}
+                                        onMouseLeave={() => clearTooltip()}
+                                        disabled={isLoading || skit.script.length < 3}
+                                        sx={{
+                                            ...cornerButtonSx,
+                                            ...(!isLoading && shouldHighlightCloseButton ? {
+                                                color: 'var(--agenda-warning)',
+                                                backgroundColor: 'color-mix(in srgb, var(--agenda-warning) 12%, transparent)',
+                                                animation: 'closeButtonPulse 1.6s ease-in-out infinite',
+                                                '@keyframes closeButtonPulse': {
+                                                    '0%, 100%': {
+                                                        transform: 'scale(1)',
+                                                        boxShadow: '0 0 0 0 color-mix(in srgb, var(--agenda-text-primary) 35%, transparent)'
+                                                    },
+                                                    '50%': {
+                                                        transform: 'scale(1.08)',
+                                                        boxShadow: '0 0 0 8px transparent'
+                                                    }
                                                 }
+                                            } : {}),
+                                            '&.Mui-disabled': {
+                                                color: 'color-mix(in srgb, var(--agenda-text-primary) 25%, transparent)'
                                             }
-                                        } : {}),
-                                        '&.Mui-disabled': {
-                                            color: 'color-mix(in srgb, var(--agenda-text-primary) 25%, transparent)'
-                                        }
-                                    }}
-                                >
-                                    <Close />
-                                </IconButton>
+                                        }}
+                                    >
+                                        <Close />
+                                    </IconButton>
+                                </Box>
                             </>
                         }
                     />
