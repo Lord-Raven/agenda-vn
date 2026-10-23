@@ -16,6 +16,7 @@ interface ContentListControlProps {
     stage: Stage;
     display: ContentListDisplay;
     label: string;
+    isVerticalLayout?: boolean;
     onChange?: (values: string[]) => void;
 }
 
@@ -28,19 +29,19 @@ interface ContentListPortraitsProps {
     size?: number;
 }
 
-const PORTRAIT_SIZE = 56;
+const PORTRAIT_SIZE = 40;
 const PORTRAIT_OVERLAP = 6;
-const portraitStyle = {
-    width: 'clamp(36px, 28cqi, 56px)',
-    height: 'clamp(36px, 28cqi, 56px)',
-    boxSizing: 'border-box' as const,
-    fontSize: 'clamp(12px, 9cqi, 19px)',
-};
 
 export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label, variant = 'carousel', size = PORTRAIT_SIZE }) => {
     const isOverlay = variant === 'overlay';
     const overlap = isOverlay ? Math.round(size * 0.32) : PORTRAIT_OVERLAP;
-    const imageStyle = isOverlay ? { ...portraitStyle, width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.34)) } : portraitStyle;
+    const dimension = isOverlay ? size : `clamp(${Math.min(28, size)}px, 28cqi, ${size}px)`;
+    const imageStyle = {
+        width: dimension,
+        height: dimension,
+        boxSizing: 'border-box' as const,
+        fontSize: Math.max(11, Math.round(size * 0.34)),
+    };
     const rootRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
     const trackRef = useRef<HTMLDivElement>(null);
@@ -119,7 +120,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                         marginLeft: `-${overlap}px`,
                     },
                 }}>
-                    {values.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 'clamp(1rem, 10cqi, 1.75rem)' }}>None</span>}
+                    {values.length === 0 && <span style={{ display: 'flex', alignItems: 'center', height: dimension, color: 'var(--agenda-text-muted)', fontSize: imageStyle.fontSize }}>None</span>}
                     {values.map((id, index) => {
                         const actor = kind === 'actor' ? save.actors?.[id] : undefined;
                         const item = kind === 'item' ? save.inventory?.find((candidate) => candidate.id === id) : undefined;
@@ -178,7 +179,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
     );
 };
 
-export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, stage, display, label, onChange }) => {
+export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, stage, display, label, isVerticalLayout = false, onChange }) => {
     const save = stage.getSave();
     const resolvedValues = stage.resolveValue(values, kind === 'actor' ? 'actorList' : kind === 'item' ? 'itemList' : 'locationList') as string[];
     const carousel = display !== 'abbreviated';
@@ -188,7 +189,7 @@ export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, 
 
     return (
         <>
-            {carousel && <ContentListPortraits kind={kind} values={resolvedValues} stage={stage} label={label} />}
+            {carousel && <ContentListPortraits kind={kind} values={resolvedValues} stage={stage} label={label} size={isVerticalLayout ? 24 : PORTRAIT_SIZE} />}
             {(!carousel || onChange) && (
                 <ReferenceMultiSelect
                     kind={kind}

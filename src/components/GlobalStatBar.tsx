@@ -39,6 +39,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
     const currentTimeOfDay = save?.currentTimeOfDay || "morning";
     const DateTimeIcon = getDateTimeIcon(currentTimeOfDay);
     const isPhaseMode = stageInstance.getTimeMode() === "phase";
+    const usePhaseSegments = isVerticalLayout && isPhaseMode && stageInstance.getDateMode() === "turnBased";
     const currentPhaseIndex = Math.max(CALENDAR_TIME_OF_DAY_ORDER.indexOf(currentTimeOfDay as CalendarTimeOfDay), 0);
     const dateLabel = stageInstance.getDateMode() === "turnBased"
         ? `Day ${stageInstance.getDayNumberForDate(currentDate)}`
@@ -91,10 +92,12 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                         flex: "0 0 auto",
                         whiteSpace: "nowrap",
                         display: "flex",
+                        flexDirection: usePhaseSegments ? "column" : "row",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: isVerticalLayout ? 0.4 : 0.8,
+                        gap: usePhaseSegments ? "2px" : isVerticalLayout ? 0.4 : 0.8,
                         padding: isVerticalLayout ? "4px 6px" : "8px 10px",
+                        ...(usePhaseSegments ? { minHeight: 30, boxSizing: "border-box" } : {}),
                         borderRadius: isVerticalLayout ? "8px" : "12px",
                         border: "1px solid var(--agenda-panel-border)",
                         background: "color-mix(in srgb, var(--agenda-panel-surface) 88%, transparent)",
@@ -106,13 +109,35 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                             color: "var(--agenda-text-primary)",
                             fontFamily: "var(--agenda-font-flavor)",
                             fontWeight: 700,
-                            fontSize: isVerticalLayout ? '0.85rem' : { xs: '1.25rem', md: '1.8rem' },
+                            fontSize: usePhaseSegments ? '0.8rem' : isVerticalLayout ? '0.85rem' : { xs: '1.25rem', md: '1.8rem' },
+                            ...(usePhaseSegments ? { lineHeight: 1.1 } : {}),
                             whiteSpace: "nowrap",
                         }}
                     >
                         {dateLabel}
                     </Typography>
-                    {isPhaseMode ? (
+                    {usePhaseSegments ? (
+                        <Box
+                            role="img"
+                            aria-label={`Phase ${currentPhaseIndex + 1} of ${CALENDAR_TIME_OF_DAY_ORDER.length}`}
+                            sx={{ display: "flex", gap: "2px", width: "100%" }}
+                        >
+                            {CALENDAR_TIME_OF_DAY_ORDER.map((slot, index) => (
+                                <Box
+                                    key={slot}
+                                    component="span"
+                                    aria-hidden="true"
+                                    sx={{
+                                        flex: 1,
+                                        height: "3px",
+                                        borderRadius: "1px",
+                                        backgroundColor: index <= currentPhaseIndex ? "var(--agenda-highlight)" : "var(--agenda-text-muted)",
+                                        opacity: index <= currentPhaseIndex ? 1 : 0.45,
+                                    }}
+                                />
+                            ))}
+                        </Box>
+                    ) : isPhaseMode ? (
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.1 }}>
                             {CALENDAR_TIME_OF_DAY_ORDER.map((slot, index) => {
                                 // HourglassTop reads as sand already fallen, so it marks elapsed phases.

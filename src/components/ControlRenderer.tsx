@@ -158,6 +158,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                     stage={stageInstance}
                     display={control.contentListDisplay}
                     label={label}
+                    isVerticalLayout={isVerticalLayout}
                     onChange={control.type === 'statEditor' ? (nextValue) => {
                         stageInstance.setGlobalStatValue(stat.id, nextValue);
                         onActivate();

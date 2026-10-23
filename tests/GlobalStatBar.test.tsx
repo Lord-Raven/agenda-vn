@@ -10,6 +10,7 @@ import { GlobalStatBar } from '../src/components/GlobalStatBar';
 import { ControlDock } from '../src/components/ControlDock';
 import { Control } from '../src/content/Control';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
+import { CALENDAR_TIME_OF_DAY_ORDER } from '../src/content/CalendarEvent';
 
 const createStage = () => {
     const configuration: GameConfiguration = {
@@ -61,6 +62,39 @@ for (const isVerticalLayout of [false, true]) {
     });
 }
 
+for (const dateMode of ['calendar', 'turnBased'] as const) {
+    for (const timeMode of ['timeOfDay', 'phase'] as const) {
+        for (const isVerticalLayout of [false, true]) {
+            for (const [phaseIndex, currentTimeOfDay] of CALENDAR_TIME_OF_DAY_ORDER.entries()) {
+                test(`date indicator: ${dateMode}, ${timeMode}, vertical ${isVerticalLayout}, ${currentTimeOfDay}`, () => {
+                    const stage = createStage();
+                    Object.assign(stage.getConfiguration(), { dateMode, timeMode });
+                    const save = { ...stage.getSave()!, currentTimeOfDay };
+                    stage.getSave = () => save;
+                    const html = renderToStaticMarkup(<GlobalStatBar stage={() => stage} isVerticalLayout={isVerticalLayout} />);
+                    const useSegments = dateMode === 'turnBased' && timeMode === 'phase' && isVerticalLayout;
+                    assert.equal(html.includes('role="img"'), useSegments);
+                    assert.equal(html.includes('Hourglass'), timeMode === 'phase' && !useSegments);
+                    const segments = html.match(/<span\b[^>]*aria-hidden="true"[^>]*>/g) || [];
+                    assert.equal(segments.length, useSegments ? 4 : 0);
+                    if (useSegments) {
+                        assert.match(html, new RegExp(`aria-label="Phase ${phaseIndex + 1} of 4"`));
+                        assert.match(html, />Day 1</);
+                        segments.forEach((segment, index) => {
+                            const className = segment.match(/\bcss-[\w-]+/)![0];
+                            const styles = html.match(new RegExp(`\\.${className}\\{([^}]+)\\}`))![1];
+                            assert.ok(styles.includes(`background-color:var(--agenda-${index <= phaseIndex ? 'highlight' : 'text-muted'})`));
+                            assert.ok(styles.includes(`opacity:${index <= phaseIndex ? '1' : '0.45'}`));
+                        });
+                    } else if (timeMode === 'timeOfDay') {
+                        assert.match(html, /data-testid="(?:WbTwilight|WbSunny|Bedtime|Bed)Icon"/);
+                    }
+                });
+            }
+        }
+    }
+}
+
 for (const placement of ['top', 'bottom'] as const) {
     for (const type of ['statDisplay', 'statEditor'] as const) {
         for (const withIcon of [false, true]) {
@@ -100,6 +134,72 @@ for (const placement of ['top', 'bottom'] as const) {
 }
 
 // Set CHROME_BIN to run geometric regression checks with an existing Chromium installation.
+test('vertical Day phase segments stay beneath the label and match compact control heights', { skip: !process.env.CHROME_BIN }, () => {
+    const directory = mkdtempSync(join(tmpdir(), 'agenda-day-segments-'));
+    try {
+        const fixtures: string[] = [];
+        for (const withButtons of [false, true]) {
+            for (const day of [1, 12345]) {
+                for (const currentTimeOfDay of CALENDAR_TIME_OF_DAY_ORDER) {
+                    const stage = createStage();
+                    const configuration = stage.getConfiguration();
+                    Object.assign(configuration, { dateMode: 'turnBased', timeMode: 'phase' });
+                    configuration.globalStats = [{
+                        id: 'health', name: 'Health', type: 'number', default: 42, guidance: '',
+                        llmSees: { value: true, conditions: [] },
+                        llmMaintained: { value: true, conditions: [] },
+                    }];
+                    configuration.controls = [
+                        new Control({ name: 'Action', placement: 'top' }),
+                        new Control({ type: 'statDisplay', statId: 'health', label: 'Health', placement: 'top' }),
+                    ];
+                    const save = { ...stage.getSave()!, currentTimeOfDay };
+                    stage.getSave = () => save;
+                    stage.getDayNumberForDate = () => day;
+                    fixtures.push(renderToStaticMarkup(<GlobalStatBar
+                        stage={() => stage}
+                        isVerticalLayout
+                        buttons={withButtons ? <button>Menu</button> : undefined}
+                    />));
+                }
+            }
+        }
+        const fixture = join(directory, 'layout.html');
+        writeFileSync(fixture, `<!doctype html><body style="margin:0;font-size:16px">
+            ${fixtures.map(html => `<main style="width:320px">${html}</main>`).join('')}
+            <pre id="result"></pre>
+            <script>
+                const errors = [];
+                function check(value, message) { if (!value) errors.push(message); }
+                document.querySelectorAll('main').forEach((main, index) => {
+                    const day = main.querySelector('[title^="Current Date:"]');
+                    const bounds = day.getBoundingClientRect();
+                    const label = day.querySelector('p').getBoundingClientRect();
+                    const segments = [...day.querySelectorAll('[role="img"] span')].map(element => element.getBoundingClientRect());
+                    check(bounds.height >= 30 && bounds.height <= 32, index + ': compact Day height');
+                    main.querySelectorAll('button:not([title]), [role="group"]').forEach(control => {
+                        if (control.textContent === 'Menu') return;
+                        check(Math.abs(control.getBoundingClientRect().height - bounds.height) <= 2, index + ': aligned control height');
+                    });
+                    check(segments.length === 4, index + ': four segments');
+                    segments.forEach((segment, segmentIndex) => {
+                        check(segment.width > 0 && segment.height === 3, index + ': horizontal segment');
+                        check(segment.top >= label.bottom && segment.bottom < bounds.bottom, index + ': below label inside badge');
+                        check(segment.top === segments[0].top, index + ': segments on one line');
+                        if (segmentIndex) check(segment.left > segments[segmentIndex - 1].right, index + ': separated segments');
+                    });
+                });
+                document.getElementById('result').textContent = errors.length ? JSON.stringify(errors) : 'PASS';
+            </script>`);
+        const output = execFileSync(process.env.CHROME_BIN!, [
+            '--headless', '--no-sandbox', '--disable-gpu', '--dump-dom', `file://${fixture}`,
+        ], { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
+        assert.match(output, /<pre id="result">PASS<\/pre>/);
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
 test('wrapped stats reclaim the area below the upper-right actions', { skip: !process.env.CHROME_BIN }, () => {
     const directory = mkdtempSync(join(tmpdir(), 'agenda-stat-bar-'));
     try {

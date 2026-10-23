@@ -214,13 +214,41 @@ test('carousel list controls reduce vertical padding and reserve room for multip
         />);
         assert.match(html, new RegExp(`min-width:${expectedMinWidth}`));
         assert.match(html, /padding:2px (?:10|6)px/);
-        assert.match(html, /padding:2px 6px;width:max-content/);
+        assert.match(html, /padding:2px 6px;[^}]*width:max-content/);
+        const dimension = isVerticalLayout ? 'clamp(24px, 28cqi, 24px)' : 'clamp(28px, 28cqi, 40px)';
+        assert.ok(html.includes(`width:${dimension};height:${dimension}`));
+        assert.doesNotMatch(html, /56px/);
     }
 
     const abbreviated = new Control({ type: 'statDisplay', statId: 'actors', contentListDisplay: 'abbreviated' });
     const abbreviatedHtml = renderToStaticMarkup(<ControlRenderer control={abbreviated} stage={() => stage} onActivate={() => {}} />);
     assert.doesNotMatch(abbreviatedHtml, /min-width:180px|padding:2px 10px/);
 });
+
+for (const kind of ['actor', 'item', 'location'] as const) {
+    for (const isVerticalLayout of [false, true]) {
+        test(`${kind} list controls keep portraits and empty states compact (vertical: ${isVerticalLayout})`, () => {
+            const control = new Control({ type: 'statEditor', statId: 'list' });
+            const stage = createStage(control);
+            const stat = sourceStat('list', `${kind}List`, ['missing']);
+            stage.getConfiguration().globalStats = [stat];
+            const render = () => renderToStaticMarkup(<ControlRenderer
+                control={control} stage={() => stage} isVerticalLayout={isVerticalLayout} onActivate={() => {}}
+            />);
+            const dimension = isVerticalLayout ? 'clamp(24px, 28cqi, 24px)' : 'clamp(28px, 28cqi, 40px)';
+            const html = render();
+            assert.ok(html.includes(`width:${dimension};height:${dimension}`));
+            assert.match(html, /<div[^>]*role="listitem"/);
+            assert.match(html, />Edit Global list</);
+
+            stat.default = [];
+            const emptyHtml = render();
+            assert.ok(emptyHtml.includes(`height:${dimension}`));
+            assert.match(emptyHtml, />None</);
+            assert.doesNotMatch(emptyHtml, /<div[^>]*role="listitem"/);
+        });
+    }
+}
 
 test('settings controls use the Settings placement and own a description', () => {
     const control = new Control({ type: 'settings', placement: 'top', description: 'Player-facing guidance' });
