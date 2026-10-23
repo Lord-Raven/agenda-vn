@@ -1,10 +1,9 @@
 import React, { FC, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Add, KeyboardArrowDownRounded, KeyboardArrowUpRounded, Visibility, VisibilityOff } from '@mui/icons-material';
-import { Chip } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { createLoreEntry, Lore } from '../content/Lore';
-import { Button, ConfirmDialog, TextArea, TextInput } from '../components/UiComponents';
+import { ConfirmDialog } from '../components/UiComponents';
 import { findBestNameMatch, getLinkedActorLore } from '../content/Actor';
 import { getLinkedLocationLore } from '../content/Location';
 import {
@@ -13,8 +12,7 @@ import {
     toggleSidebarCollapseState,
     useCachedSidebarCollapseState,
 } from '../components/CategorizedEntrySidebar';
-import { ConditionEditor } from '../components/ConditionEditor';
-
+import { LorebookDetailPanel } from './LorebookDetailPanel';
 
 interface LorebookManagementPanelProps {
     stage: () => Stage;
@@ -44,62 +42,6 @@ const sortLoreEntries = (entries: Lore[]) => {
         }
         return a.title.localeCompare(b.title);
     });
-};
-
-const parseTriggers = (value: string) => {
-    return value
-        .split(/\r?\n|,/)
-        .map((trigger) => trigger.trim())
-        .filter((trigger) => trigger.length > 0);
-};
-
-const asNumber = (value: string, fallback: number) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-interface NumberStepperInputProps {
-    value: number;
-    onChange: (value: number) => void;
-    ariaLabel: string;
-    disabled?: boolean;
-}
-
-const NumberStepperInput: FC<NumberStepperInputProps> = ({ value, onChange, ariaLabel, disabled }) => {
-    return (
-        <div className="number-stepper-shell">
-            <TextInput
-                type="number"
-                step="any"
-                value={String(value)}
-                onChange={(event) => onChange(asNumber(event.target.value, value))}
-                disabled={disabled}
-                className="number-stepper-input"
-                fullWidth
-                aria-label={ariaLabel}
-            />
-            <div className="number-stepper-buttons" aria-hidden="true">
-                <button
-                    type="button"
-                    className="number-stepper-button"
-                    onClick={() => onChange(value + 1)}
-                    disabled={disabled}
-                    tabIndex={-1}
-                >
-                    <KeyboardArrowUpRounded fontSize="small" />
-                </button>
-                <button
-                    type="button"
-                    className="number-stepper-button"
-                    onClick={() => onChange(value - 1)}
-                    disabled={disabled}
-                    tabIndex={-1}
-                >
-                    <KeyboardArrowDownRounded fontSize="small" />
-                </button>
-            </div>
-        </div>
-    );
 };
 
 export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stage, isCreatorMode }) => {
@@ -135,8 +77,6 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
         const initialEntries = sortLoreEntries(isCreatorMode ? stage().getConfiguration().lorebook || [] : save.lorebook || []);
         return initialEntries[0]?.id || null;
     });
-    const [editingTriggerIndex, setEditingTriggerIndex] = useState<number | 'new' | null>(null);
-    const [editingTriggerValue, setEditingTriggerValue] = useState('');
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [collapsedCategories, setCollapsedCategories] = useCachedSidebarCollapseState('lorebook-management');
     const [collapsedCharacterCategories, setCollapsedCharacterCategories] = useCachedSidebarCollapseState('lorebook-character-categories');
@@ -381,55 +321,11 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
         updateSelectedLore({ title });
     };
 
-    const updateSelectedLoreContent = (content: string) => {
-        if (!selectedLoreId || !selectedLore) {
-            return;
-        }
-        updateSelectedLore({ content });
-    };
-
     const toggleLoreEnabled = (loreId: string) => {
         applyLorebookChange((entries) => entries.map((entry) => (
             entry.id === loreId ? { ...entry, enabled: !entry.enabled } : entry
         )));
     };
-
-    const cancelTriggerEdit = () => {
-        setEditingTriggerIndex(null);
-        setEditingTriggerValue('');
-    };
-
-    const commitTriggerEdit = () => {
-        if (!selectedLore || editingTriggerIndex === null) {
-            return;
-        }
-
-        const nextValues = parseTriggers(editingTriggerValue);
-
-        if (editingTriggerIndex === 'new') {
-            if (nextValues.length > 0) {
-                updateSelectedLore({ triggers: [...selectedLore.triggers, ...nextValues] });
-            }
-            cancelTriggerEdit();
-            return;
-        }
-
-        const nextTriggers = [...selectedLore.triggers];
-        nextTriggers.splice(editingTriggerIndex, 1, ...nextValues);
-        // Remove non-distinct entries:
-        updateSelectedLore({ triggers: Array.from(new Set(nextTriggers)) });
-        cancelTriggerEdit();
-    };
-
-    useEffect(() => {
-        cancelTriggerEdit();
-    }, [selectedLoreId]);
-
-    useEffect(() => {
-        if (selectedLore?.constant && editingTriggerIndex !== null) {
-            cancelTriggerEdit();
-        }
-    }, [selectedLore?.constant, editingTriggerIndex]);
 
     useEffect(() => {
         setIsDeleteConfirmOpen(false);
@@ -440,10 +336,12 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
             <div
                 style={{
                     display: 'grid',
-                    gridTemplateColumns: 'minmax(280px, 360px) 1fr',
+                    gridTemplateColumns: 'minmax(280px, 360px) minmax(0, 1fr)',
                     gap: '20px',
                     flex: 1,
                     minHeight: 0,
+                    minWidth: 0,
+                    height: '100%',
                 }}
             >
                 <CategorizedEntrySidebar
@@ -533,330 +431,47 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
                     }}
                 />
 
-                            <div
-                                style={{
-                                    background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
-                                    border: '1px solid var(--agenda-line-subtle)',
-                                    borderRadius: '12px',
-                                    padding: '18px',
-                                    overflow: 'hidden',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    minHeight: 0,
-                                }}
-                            >
-                                {!selectedLore ? (
-                                    <div
-                                        style={{
-                                            color: 'var(--agenda-text-muted)',
-                                            fontSize: '15px',
-                                            textAlign: 'center',
-                                            padding: '30px',
-                                        }}
-                                    >
-                                        Select a lore entry to view and edit details.
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', height: '100%', minHeight: 0 }}>
-                                        {selectedLoreMatchesExistingActor && (
-                                            <div
-                                                style={{
-                                                    color: 'var(--agenda-text-primary)',
-                                                    background: 'color-mix(in srgb, var(--agenda-highlight) 14%, transparent)',
-                                                    border: '1px solid var(--agenda-line-strong)',
-                                                    borderRadius: '10px',
-                                                    padding: '10px 12px',
-                                                    fontSize: '13px',
-                                                    lineHeight: 1.4,
-                                                }}
-                                            >
-                                                This entry is providing the lore for a matching character.
-                                            </div>
-                                        )}
-
-                                        {selectedLoreMatchesExistingLocation && (
-                                            <div
-                                                style={{
-                                                    color: 'var(--agenda-text-primary)',
-                                                    background: 'color-mix(in srgb, var(--agenda-accent-primary) 14%, transparent)',
-                                                    border: '1px solid color-mix(in srgb, var(--agenda-accent-primary) 42%, transparent)',
-                                                    borderRadius: '10px',
-                                                    padding: '10px 12px',
-                                                    fontSize: '13px',
-                                                    lineHeight: 1.4,
-                                                }}
-                                            >
-                                                This entry is providing the description for a matching location.
-                                            </div>
-                                        )}
-
-                                        <div style={{ display: 'grid', gap: '6px' }}>
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Title</label>
-                                            <TextInput
-                                                value={selectedLore.title}
-                                                onChange={(event) => updateSelectedLoreTitle(event.target.value)}
-                                                fullWidth
-                                            />
-                                        </div>
-
-                                        <div style={{ display: 'grid', gap: '6px' }}>
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Category</label>
-                                            <select
-                                                value={selectedLore.type}
-                                                onChange={(event) => updateSelectedLore({ type: event.target.value as LoreCategory })}
-                                                className="input-base"
-                                                style={{ width: '100%' }}
-                                            >
-                                                {categoryOrder.map((category) => (
-                                                    <option key={category} value={category}>{getCategoryLabel(category)}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <div style={{ display: 'grid', gap: '6px' }}>
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Availability</label>
-                                            <ConditionEditor
-                                                conditionCollections={selectedLore.conditionCollections || []}
-                                                globalStats={stage().getConfiguration().globalStats || []}
-                                                actors={Object.values(stage().getSave().actors || {})}
-                                                stage={stage}
-                                                onChange={(conditionCollections) => updateSelectedLore({ conditionCollections })}
-                                            />
-                                        </div>
-
-                                        <div style={{ display: 'grid', gap: '6px', opacity: selectedLore.constant ? 0.5 : 1 }}>
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Triggering Conditions</label>
-                                            <div style={{ pointerEvents: selectedLore.constant ? 'none' : 'auto' }}>
-                                                <ConditionEditor
-                                                    conditionCollections={selectedLore.triggerConditionCollections || []}
-                                                    globalStats={stage().getConfiguration().globalStats || []}
-                                                    actors={Object.values(stage().getSave().actors || {})}
-                                                    stage={stage}
-                                                    onChange={(triggerConditionCollections) => updateSelectedLore({ triggerConditionCollections })}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div
-                                            style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                                                gap: '10px',
-                                            }}
-                                        >
-                                            <div style={{ display: 'grid', gap: '6px' }}>
-                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Order</label>
-                                                <NumberStepperInput
-                                                    value={selectedLore.insertionOrder}
-                                                    onChange={(value) => updateSelectedLore({ insertionOrder: value })}
-                                                    ariaLabel="Lore insertion order"
-                                                />
-                                            </div>
-                                            <div style={{ display: 'grid', gap: '6px' }}>
-                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Priority</label>
-                                                <NumberStepperInput
-                                                    value={selectedLore.priority}
-                                                    onChange={(value) => updateSelectedLore({ priority: value })}
-                                                    ariaLabel="Lore priority"
-                                                />
-                                            </div>
-                                            <div style={{ display: 'grid', gap: '6px' }}>
-                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Probability</label>
-                                                <NumberStepperInput
-                                                    value={selectedLore.probability}
-                                                    onChange={(value) => updateSelectedLore({ probability: value })}
-                                                    ariaLabel="Lore probability"
-                                                />
-                                            </div>
-                                            <div style={{ display: 'grid', gap: '6px' }}>
-                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Scan Depth</label>
-                                                <NumberStepperInput
-                                                    value={selectedLore.scanDepth}
-                                                    onChange={(value) => updateSelectedLore({ scanDepth: value })}
-                                                    disabled={selectedLore.constant}
-                                                    ariaLabel="Lore scan depth"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <label
-                                            style={{
-                                                color: 'var(--agenda-text-muted)',
-                                                fontSize: '13px',
-                                                display: 'flex',
-                                                gap: '8px',
-                                                alignItems: 'center',
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedLore.updatable ?? true}
-                                                onChange={(event) => updateSelectedLore({ updatable: event.target.checked })}
-                                            />
-                                            Generatively Maintained
-                                        </label>
-
-                                        <div style={{ display: 'grid', gap: '6px' }}>
-                                            <div
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between',
-                                                    gap: '12px',
-                                                }}
-                                            >
-                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Triggers</label>
-                                                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedLore.constant}
-                                                        onChange={(event) => updateSelectedLore({ constant: event.target.checked })}
-                                                    />
-                                                    Constant
-                                                </label>
-                                            </div>
-                                            <div
-                                                style={{
-                                                    display: 'flex',
-                                                    flexWrap: 'wrap',
-                                                    gap: '8px',
-                                                    padding: '8px',
-                                                    borderRadius: '10px',
-                                                    border: '1px solid var(--agenda-line-subtle)',
-                                                    background: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)',
-                                                    minHeight: '44px',
-                                                    alignItems: 'center',
-                                                    opacity: selectedLore.constant ? 0.5 : 1,
-                                                    pointerEvents: selectedLore.constant ? 'none' : 'auto',
-                                                }}
-                                            >
-                                                {selectedLore.triggers.map((trigger, index) => {
-                                                    if (editingTriggerIndex === index) {
-                                                        return (
-                                                            <input
-                                                                key={`editing-${index}`}
-                                                                value={editingTriggerValue}
-                                                                onChange={(event) => setEditingTriggerValue(event.target.value)}
-                                                                onBlur={commitTriggerEdit}
-                                                                onKeyDown={(event) => {
-                                                                    if (event.key === 'Enter') {
-                                                                        event.preventDefault();
-                                                                        commitTriggerEdit();
-                                                                    }
-                                                                    if (event.key === 'Escape') {
-                                                                        event.preventDefault();
-                                                                        cancelTriggerEdit();
-                                                                    }
-                                                                }}
-                                                                autoFocus
-                                                                className="input-base"
-                                                                style={{ width: '160px', height: '34px' }}
-                                                            />
-                                                        );
-                                                    }
-
-                                                    return (
-                                                        <Chip
-                                                            key={`${trigger}-${index}`}
-                                                            label={trigger}
-                                                            disabled={selectedLore.constant}
-                                                            onClick={() => {
-                                                                setEditingTriggerIndex(index);
-                                                                setEditingTriggerValue(trigger);
-                                                            }}
-                                                            onDelete={() => {
-                                                                const nextTriggers = selectedLore.triggers.filter((_, triggerIndex) => triggerIndex !== index);
-                                                                updateSelectedLore({ triggers: nextTriggers });
-                                                            }}
-                                                            size="small"
-                                                            sx={{
-                                                                color: 'rgba(224, 240, 255, 0.95)',
-                                                                backgroundColor: 'rgba(0, 255, 136, 0.16)',
-                                                                border: '1px solid rgba(0, 255, 136, 0.35)',
-                                                                '.MuiChip-deleteIcon': {
-                                                                    color: 'rgba(224, 240, 255, 0.7)',
-                                                                    '&:hover': {
-                                                                        color: 'rgba(224, 240, 255, 1)',
-                                                                    },
-                                                                },
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-
-                                                {editingTriggerIndex === 'new' ? (
-                                                    <input
-                                                        value={editingTriggerValue}
-                                                        onChange={(event) => setEditingTriggerValue(event.target.value)}
-                                                        onBlur={commitTriggerEdit}
-                                                        onKeyDown={(event) => {
-                                                            if (event.key === 'Enter') {
-                                                                event.preventDefault();
-                                                                commitTriggerEdit();
-                                                            }
-                                                            if (event.key === 'Escape') {
-                                                                event.preventDefault();
-                                                                cancelTriggerEdit();
-                                                            }
-                                                        }}
-                                                        autoFocus
-                                                        placeholder="new trigger"
-                                                        className="input-base"
-                                                        style={{ width: '160px', height: '34px' }}
-                                                    />
-                                                ) : (
-                                                    <Chip
-                                                        icon={<Add />}
-                                                        label="Add trigger"
-                                                        variant="outlined"
-                                                        disabled={selectedLore.constant}
-                                                        onClick={() => {
-                                                            setEditingTriggerIndex('new');
-                                                            setEditingTriggerValue('');
-                                                        }}
-                                                        size="small"
-                                                        sx={{
-                                                            color: 'rgba(224, 240, 255, 0.85)',
-                                                            borderColor: 'rgba(0, 255, 136, 0.35)',
-                                                            backgroundColor: 'rgba(0, 255, 136, 0.08)',
-                                                            '& .MuiChip-icon': {
-                                                                color: 'rgba(224, 240, 255, 0.8)',
-                                                            },
-                                                        }}
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minHeight: 0 }}>
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Content</label>
-                                            <TextArea
-                                                value={selectedLore.content}
-                                                onChange={(event) => updateSelectedLoreContent(event.target.value)}
-                                                style={{ width: '100%', flex: 1, minHeight: 0, resize: 'none', overflowY: 'auto' }}
-                                            />
-                                        </div>
-
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                                            {isCreatorMode && (
-                                                <Button
-                                                    variant="secondary"
-                                                    onClick={() => {
-                                                        const applied = stage().applyConfigurationLoreToSave(selectedLore.id);
-                                                        stage().showPriorityMessage(applied
-                                                            ? `${selectedLore.title || 'Lore entry'} applied to the active save.`
-                                                            : `${selectedLore.title || 'Lore entry'} does not exist in the active save yet.`);
-                                                    }}
-                                                >
-                                                    Apply
-                                                </Button>
-                                            )}
-                                            <Button variant="secondary" onClick={cloneSelectedLore}>Clone</Button>
-                                            <Button variant="danger" onClick={deleteSelectedLore}>Delete</Button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                <div
+                    style={{
+                        background: 'color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
+                        border: '1px solid var(--agenda-line-subtle)',
+                        borderRadius: '12px',
+                        overflowY: 'auto',
+                        overflowX: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minHeight: 0,
+                        minWidth: 0,
+                        maxHeight: '100%',
+                    }}
+                >
+                    {!selectedLore ? (
+                        <div
+                            style={{
+                                color: 'var(--agenda-text-muted)',
+                                fontSize: '15px',
+                                textAlign: 'center',
+                                padding: '30px',
+                            }}
+                        >
+                            Select a lore entry to view and edit details.
+                        </div>
+                    ) : (
+                        <LorebookDetailPanel
+                            key={selectedLore.id}
+                            lore={selectedLore}
+                            stage={stage}
+                            isCreatorMode={isCreatorMode}
+                            categories={categoryOrder.map((category) => ({ value: category, label: getCategoryLabel(category) }))}
+                            matchesExistingActor={selectedLoreMatchesExistingActor}
+                            matchesExistingLocation={selectedLoreMatchesExistingLocation}
+                            onChange={updateSelectedLore}
+                            onTitleChange={updateSelectedLoreTitle}
+                            onClone={cloneSelectedLore}
+                            onDelete={deleteSelectedLore}
+                        />
+                    )}
+                </div>
             </div>
             <ConfirmDialog
                 isOpen={isDeleteConfirmOpen && selectedLore !== null}
