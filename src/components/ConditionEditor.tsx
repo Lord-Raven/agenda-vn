@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
-import { findStatOptionByValue, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat } from '../content/Stat';
+import { findStatOptionByValue, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat, StatType } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, GlobalStatCondition, variableContentValue } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
@@ -9,7 +9,7 @@ import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 import { Stage } from '../Stage';
-import { listElementType } from '../content/Function';
+import { isFunctionReference, isValueReference, listElementType, valuePickerOptions } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
 
 interface ConditionEditorProps {
@@ -272,6 +272,93 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         return { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' };
     };
 
+    const valueTypeFor = (condition: Condition) => {
+        if (condition.type === 'calendar') {
+            return condition.field === 'timeOfDay' || condition.field === 'dayOfWeek' ? 'text' : 'number';
+        }
+        if (condition.type === 'contentIdentity') {
+            return condition.contentType;
+        }
+        const stat = statsForCondition(condition).find(candidate => candidate.id === condition.statId);
+        return stat ? listElementType(stat.type) || stat.type : undefined;
+    };
+
+    const isValidSourceFor = (value: string, type: StatType, previousType?: StatType): boolean => {
+        const stageInstance = typeof stage === 'function' ? stage() : stage;
+        return valuePickerOptions(stageInstance?.getConfiguration() || { globalStats }, type).some(option => option.key === value)
+            || (!stageInstance && isFunctionReference(value) && previousType === type);
+    };
+
+    // Conditions on lists compare a single element, so scalar and list stats share a value type.
+    const isValidValueFor = (value: Condition['value'], next: Condition, previous: Condition): boolean => {
+        const type = valueTypeFor(next);
+        if (isValueReference(value) && type) {
+            return isValidSourceFor(value, type, valueTypeFor(previous));
+        }
+        if (next.type === 'calendar') {
+            if (next.field === 'timeOfDay') {
+                return CALENDAR_TIME_OF_DAY_ORDER.some(slot => slot === value);
+            }
+            if (next.field === 'dayOfWeek') {
+                return ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(String(value));
+            }
+        }
+        if (type === 'actor' || type === 'location' || type === 'item') {
+            return typeof value === 'string' && (
+                concreteTargetOptionsFor(type).some(option => option.key === value)
+                || (next.type !== 'contentIdentity' && (value === '' || (variableContentType === type && value === variableContentValue(type))))
+            );
+        }
+        if (type === 'option' && (next.type === 'globalStat' || next.type === 'contentStat')) {
+            const { statId } = next;
+            const stat = statsForCondition(next).find(candidate => candidate.id === statId);
+            return !!findStatOptionByValue(stat, value);
+        }
+        if (type === 'checkbox') {
+            return typeof value === 'boolean';
+        }
+        if (type === 'text') {
+            return typeof value === 'string';
+        }
+        return type === 'number' && (
+            (typeof value === 'number' && Number.isFinite(value))
+            || (typeof value === 'string' && (valueTypeFor(previous) === 'number' || (value.trim() !== '' && Number.isFinite(Number(value)))))
+        );
+    };
+
+    const retainValidSelections = (previous: Condition, next: Condition, preserveStatId = false): Condition => {
+        if (next.type === 'globalStat' || next.type === 'contentStat') {
+            if (preserveStatId && (previous.type === 'globalStat' || previous.type === 'contentStat')
+                && statsForCondition(next).some(stat => stat.id === previous.statId)) {
+                next = { ...next, statId: previous.statId };
+            }
+            if (next.type === 'contentStat' && previous.type === 'contentStat'
+                && (targetOptionsFor(next.contentType).some(option => option.key === previous.targetId)
+                    || (isValueReference(previous.targetId) && isValidSourceFor(previous.targetId, next.contentType, previous.contentType)))) {
+                next = { ...next, targetId: previous.targetId };
+            }
+            const { statId } = next;
+            const stat = statsForCondition(next).find(candidate => candidate.id === statId);
+            return {
+                ...next,
+                comparison: getDefaultComparison(stat, previous.comparison),
+                value: isValidValueFor(previous.value, next, previous) ? previous.value : getDefaultConditionValue(stat),
+            };
+        }
+        if (next.type === 'contentIdentity') {
+            return {
+                ...next,
+                comparison: previous.comparison === 'equals' || previous.comparison === 'notEquals' ? previous.comparison : next.comparison,
+                value: typeof previous.value === 'string' && isValidValueFor(previous.value, next, previous) ? previous.value : next.value,
+            };
+        }
+        return {
+            ...next,
+            comparison: COMPARISONS.some(option => option.value === previous.comparison) ? previous.comparison : next.comparison,
+            value: typeof previous.value !== 'boolean' && isValidValueFor(previous.value, next, previous) ? previous.value : next.value,
+        };
+    };
+
     const renderValueInput = (condition: Condition, collectionIndex: number, conditionIndex: number) => {
         const updateValue = (value: string | number | boolean) => updateCondition(collectionIndex, conditionIndex, { ...condition, value } as Condition);
         if (condition.type === 'calendar') {
@@ -385,7 +472,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         <select
                             style={selectStyle}
                             value={conditionKindValue(condition)}
-                            onChange={(event) => updateCondition(collectionIndex, conditionIndex, createConditionOfKind(event.target.value))}
+                            onChange={(event) => updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, createConditionOfKind(event.target.value), true))}
                         >
                             <option value="calendar">Calendar</option>
                             <option value="globalStat">Global Stat</option>
@@ -395,7 +482,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             {variableContentType && <option value={`contentIdentity:${variableContentType}`}>{CONTENT_TYPE_LABELS[variableContentType]} Identity</option>}
                         </select>
                         {condition.type === 'calendar' ? (
-                            <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 })}>
+                            <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 }))}>
                                 {buildCalendarFields().map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
                             </select>
                         ) : condition.type === 'contentStat' ? (
@@ -417,7 +504,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         {(condition.type === 'globalStat' || condition.type === 'contentStat') && (
                             <select style={selectStyle} value={condition.statId} onChange={(event) => {
                                 const stat = statsForCondition(condition).find(candidate => candidate.id === event.target.value);
-                                updateCondition(collectionIndex, conditionIndex, { ...condition, statId: event.target.value, comparison: getDefaultComparison(stat, condition.comparison), value: getDefaultConditionValue(stat) });
+                                updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, { ...condition, statId: event.target.value, comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) }));
                             }}>
                                 {statsForCondition(condition).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
                             </select>
