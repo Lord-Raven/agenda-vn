@@ -96,7 +96,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                         onClick={(e) => e.stopPropagation()}
                         style={{
                             width: '90vw',
-                            maxWidth: '1400px',
+                            maxWidth: '2000px',
                             maxHeight: '90vh',
                         }}
                     >

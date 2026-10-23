@@ -13,7 +13,7 @@ import {
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 import { ConditionCollection } from '../content/Condition';
 import { Stat, StatValue, normalizeStatValue, resolveStatDefault } from '../content/Stat';
-import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, ColorPickerInput, ConfirmDialog, GlassPanel, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { StatValueInput } from '../components/StatValueInput';
@@ -76,10 +76,12 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         (item.alternativeImages || []).map(() => false),
     );
     const [expandedStatIds, setExpandedStatIds] = useState<Set<string>>(new Set());
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const editedItemRef = useRef(editedItem);
     const editedStatMapRef = useRef(editedStatMap);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
+    const isDeactivatingRef = useRef(false);
 
     const persistItem = (nextItem: typeof editedItem, nextStatMap: { [key: string]: StatValue }) => {
         if (autoSaveTimeoutRef.current) {
@@ -171,7 +173,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
 
     useEffect(() => {
         return () => {
-            if (autoSaveTimeoutRef.current) {
+            if (autoSaveTimeoutRef.current && !isDeactivatingRef.current) {
                 persistItem(editedItemRef.current, editedStatMapRef.current);
             }
         };
@@ -218,29 +220,32 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
     };
 
     const handleDeactivateItem = () => {
+        isDeactivatingRef.current = true;
+        persistItem(editedItemRef.current, editedStatMapRef.current);
+
         const linkedLore = getLinkedItemLore(item, stage(), isCreatorMode);
-        item.active = false;
-
         const itemsWithLoreId = (isCreatorMode ? stage().getConfiguration().items || [] : stage().getSave().inventory || [])
-            .filter((candidate) => candidate !== item && candidate.loreId === linkedLore?.id);
-
-        if (linkedLore && itemsWithLoreId.length === 0) {
-            if (isCreatorMode) {
-                stage().updateConfiguration({ lorebook: (stage().getConfiguration().lorebook || []).filter((entry) => entry.id !== linkedLore.id) });
-            } else {
-                const save = stage().getSave();
-                save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
-                stage().saveGame();
-            }
-        }
+            .filter((candidate) => candidate.id !== item.id && candidate.loreId === linkedLore?.id);
+        const shouldRemoveLinkedLore = linkedLore && itemsWithLoreId.length === 0;
 
         if (isCreatorMode) {
+            const configuration = stage().getConfiguration();
             stage().updateConfiguration({
-                items: (stage().getConfiguration().items || []).map((candidate) => candidate.id === item.id ? new Item(item) : candidate),
+                items: (configuration.items || []).map((candidate) =>
+                    candidate.id === item.id ? new Item({ ...candidate, active: false }) : candidate,
+                ),
+                ...(shouldRemoveLinkedLore
+                    ? { lorebook: (configuration.lorebook || []).filter((entry) => entry.id !== linkedLore.id) }
+                    : {}),
             });
         } else {
             const save = stage().getSave();
-            save.inventory = (save.inventory || []).map((candidate) => candidate.id === item.id ? new Item(item) : candidate);
+            save.inventory = (save.inventory || []).map((candidate) =>
+                candidate.id === item.id ? new Item({ ...candidate, active: false }) : candidate,
+            );
+            if (shouldRemoveLinkedLore) {
+                save.lorebook = (save.lorebook || []).filter((entry) => entry.id !== linkedLore.id);
+            }
             stage().saveGame();
         }
 
@@ -637,10 +642,21 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                         zIndex: 1,
                     }}>
                         {isCreatorMode && <Button variant="secondary" onClick={handleApplyToSave}>Apply to Save</Button>}
-                        <Button variant="danger" onClick={handleDeactivateItem}>Deactivate</Button>
+                        <Button variant="danger" onClick={() => setIsDeleteDialogOpen(true)}>Delete</Button>
                     </div>
                 </GlassPanel>
             </motion.div>
+            <ConfirmDialog
+                isOpen={isDeleteDialogOpen}
+                title={`Delete Item: ${editedItem.name || item.name}`}
+                message="This will mark this item as inactive (soft delete), hide it from management lists, and delete its linked lorebook entry unless another item shares it. Existing references remain intact in past content. Continue?"
+                confirmText="Delete Item"
+                onConfirm={() => {
+                    setIsDeleteDialogOpen(false);
+                    handleDeactivateItem();
+                }}
+                onCancel={() => setIsDeleteDialogOpen(false)}
+            />
         </AnimatePresence>
     );
 };
