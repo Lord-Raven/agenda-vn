@@ -5,7 +5,7 @@ import { findStatOptionByValue, Stat, StatValue, applyUserPlaceholder, isNumeric
 import { compareControlPriority, Control } from '../content/Control';
 import { DEFAULT_UI_SETTINGS } from '../content/Style';
 import { GlassPanel, Title, Button, ColorPickerInput, TextArea, TextInput } from '../components/UiComponents';
-import { Close, Forum, VoiceChat } from '@mui/icons-material';
+import { Close, Forum, Vibration, VoiceChat } from '@mui/icons-material';
 import { useTooltip } from '../components/TooltipContext';
 import { ScreenType } from './BaseScreen';
 import { StatValueInput } from '../components/StatValueInput';
@@ -34,10 +34,10 @@ interface SettingsData {
     playerColor: string;
     playerFontFamily: string;
     birthDate: string;
-    textToSpeech: boolean;
     enableImpersonation: boolean;
     enableFontEffects: boolean;
     enableTextToSpeech: boolean;
+    enableHaptics: boolean;
     betaMode: boolean;
     language: string;
 }
@@ -88,10 +88,10 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         playerColor: resolvePlayerThemeColor(stageInstance.getPlayerActor()?.themeColor || ''),
         playerFontFamily: stageInstance.getPlayerActor()?.themeFontFamily || stageInstance.getConfiguration()?.uiSettings?.primaryFontFamily || DEFAULT_UI_SETTINGS.primaryFontFamily,
         birthDate: stageInstance.getPlayerActor()?.birthDate || '',
-        textToSpeech: (stageInstance.getSave()?.textToSpeech ?? true),
         enableImpersonation: (stageInstance.getSave()?.enableImpersonation ?? true),
         enableFontEffects: (stageInstance.getSave()?.enableFontEffects ?? true),
         enableTextToSpeech: (stageInstance.getSave()?.enableTextToSpeech ?? true),
+        enableHaptics: (stageInstance.getSave()?.enableHaptics ?? true),
         betaMode: (stageInstance.getSave()?.betaMode ?? false),
         language: stageInstance.getSave()?.language || 'English',
     });
@@ -156,10 +156,10 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                 themeColor: playerThemeColor,
                 themeFontFamily: settings.playerFontFamily,
                 data: {
-                    textToSpeech: settings.textToSpeech,
                     enableImpersonation: settings.enableImpersonation,
                     enableFontEffects: settings.enableFontEffects,
                     enableTextToSpeech: settings.enableTextToSpeech,
+                    enableHaptics: settings.enableHaptics,
                     betaMode: settings.betaMode,
                     language: settings.language,
                     globalStatValues: resolvedGlobalStatValues,
@@ -171,10 +171,10 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             console.log('Updating settings');
             const saveData = stageInstance.getSave();
 
-            saveData.textToSpeech = settings.textToSpeech;
             saveData.enableImpersonation = settings.enableImpersonation;
             saveData.enableFontEffects = settings.enableFontEffects;
             saveData.enableTextToSpeech = settings.enableTextToSpeech;
+            saveData.enableHaptics = settings.enableHaptics;
             saveData.betaMode = settings.betaMode;
             saveData.language = settings.language;
             saveData.globalStatValues = {
@@ -607,15 +607,15 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                     <motion.div
                                         whileHover={{ scale: 1.01 }}
                                         whileTap={{ scale: 0.99 }}
-                                        onClick={() => setSettings(prev => ({ ...prev, textToSpeech: !prev.textToSpeech }))}
+                                        onClick={() => setSettings(prev => ({ ...prev, enableTextToSpeech: !prev.enableTextToSpeech }))}
                                         onMouseEnter={() => setTooltip('Disable Text-to-Speech to conserve credits.', VoiceChat)}
                                         onMouseLeave={clearTooltip}
                                         style={{
                                             padding: '12px',
-                                            background: settings.textToSpeech
+                                            background: settings.enableTextToSpeech
                                                 ? 'color-mix(in srgb, var(--agenda-highlight) 18%, transparent)'
                                                 : 'color-mix(in srgb, var(--agenda-panel-surface) 86%, transparent)',
-                                            border: settings.textToSpeech
+                                            border: settings.enableTextToSpeech
                                                 ? '2px solid color-mix(in srgb, var(--agenda-highlight) 50%, transparent)'
                                                 : '2px solid var(--agenda-panel-border)',
                                             borderRadius: '8px',
@@ -631,8 +631,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 width: '20px',
                                                 height: '20px',
                                                 borderRadius: '4px',
-                                                background: settings.textToSpeech ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
-                                                border: '2px solid ' + (settings.textToSpeech ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
+                                                background: settings.enableTextToSpeech ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
+                                                border: '2px solid ' + (settings.enableTextToSpeech ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -640,7 +640,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 transition: 'all 0.2s ease',
                                             }}
                                         >
-                                            {settings.textToSpeech && (
+                                            {settings.enableTextToSpeech && (
                                                 <motion.span
                                                     initial={{ scale: 0 }}
                                                     animate={{ scale: 1 }}
@@ -656,12 +656,74 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                         </div>
                                         <span
                                             style={{
-                                                color: settings.textToSpeech ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
+                                                color: settings.enableTextToSpeech ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
                                                 fontSize: '13px',
-                                                fontWeight: settings.textToSpeech ? 'bold' : 'normal',
+                                                fontWeight: settings.enableTextToSpeech ? 'bold' : 'normal',
                                             }}
                                         >
                                             Text-to-Speech
+                                        </span>
+                                    </motion.div>
+
+                                    {/* Haptics Toggle */}
+                                    <motion.div
+                                        whileHover={{ scale: 1.01 }}
+                                        whileTap={{ scale: 0.99 }}
+                                        onClick={() => setSettings(prev => ({ ...prev, enableHaptics: !prev.enableHaptics }))}
+                                        onMouseEnter={() => setTooltip('Enable haptics during skit interactions.', Vibration)}
+                                        onMouseLeave={clearTooltip}
+                                        style={{
+                                            padding: '12px',
+                                            background: settings.enableHaptics
+                                                ? 'color-mix(in srgb, var(--agenda-highlight) 18%, transparent)'
+                                                : 'color-mix(in srgb, var(--agenda-panel-surface) 86%, transparent)',
+                                            border: settings.enableHaptics
+                                                ? '2px solid color-mix(in srgb, var(--agenda-highlight) 50%, transparent)'
+                                                : '2px solid var(--agenda-panel-border)',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                width: '20px',
+                                                height: '20px',
+                                                borderRadius: '4px',
+                                                background: settings.enableHaptics ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 10%, transparent)',
+                                                border: '2px solid ' + (settings.enableHaptics ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)'),
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0,
+                                                transition: 'all 0.2s ease',
+                                            }}
+                                        >
+                                            {settings.enableHaptics && (
+                                                <motion.span
+                                                    initial={{ scale: 0 }}
+                                                    animate={{ scale: 1 }}
+                                                    style={{
+                                                        color: 'var(--agenda-text-primary)',
+                                                        fontSize: '14px',
+                                                        fontWeight: 'bold',
+                                                    }}
+                                                >
+                                                    ✓
+                                                </motion.span>
+                                            )}
+                                        </div>
+                                        <span
+                                            style={{
+                                                color: settings.enableHaptics ? 'var(--agenda-highlight)' : 'color-mix(in srgb, var(--agenda-text-primary) 72%, transparent)',
+                                                fontSize: '13px',
+                                                fontWeight: settings.enableHaptics ? 'bold' : 'normal',
+                                            }}
+                                        >
+                                            Haptics
                                         </span>
                                     </motion.div>
 

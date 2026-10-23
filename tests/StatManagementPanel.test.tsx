@@ -148,6 +148,7 @@ test('Rules is a creator-only content tab, independent of calendar events, with 
         const creatorHtml = render();
         assert.match(creatorHtml, /role="switch" aria-label="Create mode" aria-checked="true"/);
         assert.match(creatorHtml, /Manage[\s\S]*aria-checked="true"[\s\S]*Create/);
+        assert.match(creatorHtml, />Stats \(4\)<\/button>/);
         assert.match(creatorHtml, /> Rules<\/button>/);
         assert.match(creatorHtml, /Universal Schedule|Stat Update Events/);
         assert.doesNotMatch(creatorHtml, /Events \(0\)/);
@@ -156,6 +157,7 @@ test('Rules is a creator-only content tab, independent of calendar events, with 
         const manageHtml = render();
         assert.doesNotMatch(manageHtml, /role="switch"/);
         assert.doesNotMatch(manageHtml, /> Rules<\/button>|Universal Schedule|Stat Update Events/);
+        assert.match(manageHtml, />Stats \(4\)<\/button>/);
         assert.match(manageHtml, /No actors|Create Actor|Select an actor/);
     } finally {
         if (descriptor) {

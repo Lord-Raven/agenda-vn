@@ -1064,7 +1064,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             const ttsPromises = scriptEntries.map(async (entry) => {
                 const actor = entry.speakerId ? save.actors[entry.speakerId] : null;
                 // Only TTS if entry.speaker matches an actor from stage().getSave().actors and entry.message includes dialogue in quotes.
-                if (!actor || actor.id === save.playerId || !entry.message.includes('"') || !save.textToSpeech) {
+                if (!actor || actor.id === save.playerId || !entry.message.includes('"') || !save.enableTextToSpeech) {
                     console.log(`Skipping TTS: ${(!actor || actor.id === save.playerId) ? "No matching non-player actor" : (!entry.message.includes('"') ? "No dialogue in quotes" : "Text-to-speech disabled")}.`);
                     entry.speechUrl = '';
                     return;

@@ -51,10 +51,10 @@ export type SaveType = {
     inventory: Item[];
     timeline: TimelineEntry[];
     timestamp: number; // Time of last save
-    textToSpeech?: boolean;
     enableImpersonation?: boolean;
     enableFontEffects?: boolean;
     enableTextToSpeech?: boolean;
+    enableHaptics?: boolean;
     language?: string;
     lorebook?: Lore[];
     currentDate?: string;

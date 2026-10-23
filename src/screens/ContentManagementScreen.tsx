@@ -252,7 +252,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     }}
                                 >
                                     <BarChart />
-                                    Stats
+                                    Stats ({stage().getConfiguration().globalStats.length + stage().getConfiguration().actorStats.length + stage().getConfiguration().locationStats.length + stage().getConfiguration().itemStats.length})
                                 </Button>
                                 {isCreatorMode && (
                                     <Button

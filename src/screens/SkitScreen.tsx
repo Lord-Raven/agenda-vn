@@ -91,6 +91,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
     const [showContentManagement, setShowContentManagement] = React.useState(false);
     const [isAudioEnabled, setIsAudioEnabled] = React.useState<boolean>(stage().getSave().enableTextToSpeech || true);
     const isTextToSpeechEnabled = stage().getSave().enableTextToSpeech;
+    const isHapticsEnabled = stage().getSave().enableHaptics;
     const currentScriptIndex = Math.min(Math.max(skit.currentIndex || 0, 0), Math.max(skit.script.length - 1, 0));
     const shouldHighlightCloseButton = !isLoading && skit.script.length >= 3 && currentScriptIndex >= skit.script.length - 1;
 
@@ -377,6 +378,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                             };
                         }}
                         enableAudio={isTextToSpeechEnabled && isAudioEnabled}
+                        enableHaptics={isHapticsEnabled}
                         enablePopInSpeakers={true}
                         enableTalkingAnimation={true}
                         enableFontEffects={stage().getSave().enableFontEffects}
