@@ -47,20 +47,42 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
     return (
         <Box
             sx={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: isVerticalLayout ? 0.5 : 1,
+                display: "flow-root",
                 width: "100%",
             }}
         >
+            {buttons && (
+                <Box
+                    sx={{
+                        float: "right",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        flexWrap: "wrap",
+                        justifyContent: "flex-end",
+                        gap: 0.75,
+                        maxWidth: "100%",
+                        marginBottom: isVerticalLayout ? 0.5 : 1,
+                    }}
+                >
+                    {buttons}
+                </Box>
+            )}
             <Box
                 sx={{
-                    display: "flex",
+                    // Each stat must participate in the float's flow, not a separate flex column.
+                    display: buttons ? "contents" : "flex",
                     flexWrap: "wrap",
                     gap: isVerticalLayout ? 0.5 : 1,
-                    flex: 1,
                     minWidth: 0,
                     alignItems: "stretch",
+                    ...(buttons ? {
+                        "& > *": {
+                            float: "left",
+                            maxWidth: theme => `calc(100% - ${theme.spacing(isVerticalLayout ? 0.5 : 1)})`,
+                            marginRight: isVerticalLayout ? 0.5 : 1,
+                            marginBottom: isVerticalLayout ? 0.5 : 1,
+                        },
+                    } : {}),
                 }}
             >
                 <Box
@@ -125,19 +147,6 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                     />
                 ))}
             </Box>
-
-            {buttons && (
-                <Box
-                    sx={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 0.75,
-                        flexShrink: 0,
-                    }}
-                >
-                    {buttons}
-                </Box>
-            )}
         </Box>
     );
 };

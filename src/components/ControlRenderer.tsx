@@ -60,8 +60,11 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     }
 
     const widthWeight = control.widthWeight ?? 1;
+    // Floated top controls use the same preferred width as flex-based control rows.
+    const preferredWidth = `calc(${isVerticalLayout ? 96 : 150}px * ${widthWeight})`;
     const sizingStyle = {
-        flex: `${widthWeight} 1 calc(${isVerticalLayout ? 96 : 150}px * ${widthWeight})`,
+        flex: `${widthWeight} 1 ${preferredWidth}`,
+        width: preferredWidth,
         minWidth: 0,
         boxSizing: 'border-box' as const,
     };

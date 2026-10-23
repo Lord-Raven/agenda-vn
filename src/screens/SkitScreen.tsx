@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect } from "react";
+import { FC, useCallback, useEffect, useLayoutEffect } from "react";
 import { Stage } from "../Stage";
 import { ScreenType } from "./BaseScreen";
 import { BlurredBackground, NovelVisualizer } from "@lord-raven/novel-visualizer";
@@ -108,6 +108,23 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
     
     const actors = stage().getSave().actors;
 
+    const headerRef = React.useRef<HTMLDivElement>(null);
+    const [headerHeight, setHeaderHeight] = React.useState(0);
+    useLayoutEffect(() => {
+        const header = headerRef.current;
+        if (!header) return;
+        const updateHeight = () => setHeaderHeight(header.offsetTop + header.offsetHeight);
+        updateHeight();
+        const observer = new ResizeObserver(updateHeight);
+        observer.observe(header);
+        if (header.offsetParent) observer.observe(header.offsetParent);
+        return () => observer.disconnect();
+    }, [isVerticalLayout]);
+    // NovelVisualizer now spans the full screen (so actors can overflow behind the header), but its overlay
+    // region starts at a fixed % from the top (1% vertical / 5% horizontal). Shift overlay content so it
+    // lands where it did when the visualizer started below the header.
+    const overlayTopOffset = headerHeight * (1 - (isVerticalLayout ? 0.01 : 0.05));
+
     
     const onSkitChange = useCallback((newSkit: Skit) => {
         // Keep skit object identity stable, but force this component to re-render.
@@ -208,12 +225,14 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                 top: 0,
                 left: 0,
                 right: 0,
-                bottom: 0,
-                display: 'flex',
-                flexDirection: 'column'
+                bottom: 0
             }}>
-                <div style={{
-                    padding: '12px 16px 0',
+                <div ref={headerRef} style={{
+                    position: 'absolute',
+                    top: isVerticalLayout ? '1%' : 0,
+                    left: isVerticalLayout ? '1%' : 0,
+                    right: isVerticalLayout ? '1%' : 0,
+                    padding: isVerticalLayout ? 0 : '12px 16px 0',
                     zIndex: 10
                 }}>
                     <GlobalStatBar
@@ -289,6 +308,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         }
                     />
                 </div>
+                <div style={{ position: 'absolute', inset: 0 }}>
                     <NovelVisualizer
                         skit={skit}
                         loading={isLoading}
@@ -365,13 +385,14 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                                 ? <ActorCard actor={actor as Actor} stage={stage} />
                                 : null;
                             return (
-                                <>
+                                <div style={{ position: 'absolute', top: overlayTopOffset, left: 0, right: 0, bottom: 0 }}>
                                     {overlayContent}
                                     <OutcomeDisplay outcomes={accumulatedOutcomes} stage={stage} />
-                                </>
+                                </div>
                             );
                         }}
                     />
+                </div>
             </div>
 
             {/* Content Management Modal */}
