@@ -114,9 +114,28 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         .filter(Boolean)
         .join('\n\n');
     const referenceKind = resolveReferenceKind(stat.type);
+    const displaysImageList = Boolean(
+        referenceKind
+        && isReferenceListDisplayType(stat.type)
+        && control.contentListDisplay !== 'abbreviated'
+        && !(control.type === 'statEditor' && isValueReference(rawValue)),
+    );
+    const imageListMinWidth = isVerticalLayout ? 150 : 180;
 
     return (
-        <Box title={tooltipText || undefined} sx={{ ...boxStyle, ...sizingStyle, ...(isVerticalLayout ? { gap: 0.25, padding: '4px 6px', borderRadius: '8px' } : {}) }}>
+        <Box
+            title={tooltipText || undefined}
+            sx={{
+                ...boxStyle,
+                ...sizingStyle,
+                ...(displaysImageList ? {
+                    gap: 0.25,
+                    padding: isVerticalLayout ? '2px 6px' : '2px 10px',
+                    minWidth: imageListMinWidth,
+                    ...(isVerticalLayout ? { borderRadius: '8px' } : {}),
+                } : isVerticalLayout ? { gap: 0.25, padding: '4px 6px', borderRadius: '8px' } : {}),
+            }}
+        >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', lineHeight: 1.2 }}>
                 {StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)' }} />}
                 <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: isVerticalLayout ? '0.6rem' : '0.66rem', letterSpacing: isVerticalLayout ? '0.05em' : '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>

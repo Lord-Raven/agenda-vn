@@ -112,7 +112,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'flex-start',
-                    padding: '8px 6px',
+                    padding: '2px 6px',
                     width: 'max-content',
                     overflow: 'visible',
                     [isOverlay ? '& > [role="listitem"] + [role="listitem"]' : '& > [role="listitem"]:has([data-has-image="true"]) + [role="listitem"]:has([data-has-image="true"])']: {

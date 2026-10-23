@@ -200,6 +200,28 @@ for (const placement of ['top', 'bottom'] as const) {
     }
 }
 
+test('carousel list controls reduce vertical padding and reserve room for multiple portraits', () => {
+    const control = new Control({ type: 'statDisplay', statId: 'actors' });
+    const stage = createStage(control);
+    stage.getConfiguration().globalStats = [sourceStat('actors', 'actorList', ['actor-1'])];
+
+    for (const [isVerticalLayout, expectedMinWidth] of [[false, '180px'], [true, '150px']] as const) {
+        const html = renderToStaticMarkup(<ControlRenderer
+            control={control}
+            stage={() => stage}
+            isVerticalLayout={isVerticalLayout}
+            onActivate={() => {}}
+        />);
+        assert.match(html, new RegExp(`min-width:${expectedMinWidth}`));
+        assert.match(html, /padding:2px (?:10|6)px/);
+        assert.match(html, /padding:2px 6px;width:max-content/);
+    }
+
+    const abbreviated = new Control({ type: 'statDisplay', statId: 'actors', contentListDisplay: 'abbreviated' });
+    const abbreviatedHtml = renderToStaticMarkup(<ControlRenderer control={abbreviated} stage={() => stage} onActivate={() => {}} />);
+    assert.doesNotMatch(abbreviatedHtml, /min-width:180px|padding:2px 10px/);
+});
+
 test('settings controls use the Settings placement and own a description', () => {
     const control = new Control({ type: 'settings', placement: 'top', description: 'Player-facing guidance' });
     assert.equal(control.placement, 'settings');
