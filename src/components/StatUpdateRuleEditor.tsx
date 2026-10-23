@@ -53,6 +53,9 @@ const describeCalendarCondition = (condition: Condition): string | undefined => 
 
 const describeTrigger = (rule: StatUpdateRule): string => {
     const conditions = (rule.conditions || []).flatMap(collection => collection);
+    if (rule.trigger === 'startup') {
+        return conditions.length ? 'New game start-up (conditional)' : 'New game start-up';
+    }
     const labels = conditions.map(describeCalendarCondition).filter((label): label is string => Boolean(label));
     const hasOtherConditions = labels.length < conditions.length;
     const base = labels.length > 0 ? `Every ${labels.join(', ')}` : 'Every time period';
@@ -111,13 +114,24 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, onC
                             <Button variant="danger" onClick={() => onChange(rules.filter(current => current.id !== rule.id))} aria-label="Delete stat update event" style={iconButtonStyle}><Delete fontSize="small" /></Button>
                         </div>
                         {!isCollapsed && <>
+                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
+                                Trigger
+                                <select aria-label="Rule trigger" value={rule.trigger || 'timePeriod'}
+                                    style={{ marginLeft: 8, padding: 6, background: 'var(--agenda-surface-base)', color: 'var(--agenda-text-primary)', border: '1px solid var(--agenda-line-subtle)', borderRadius: 6 }}
+                                    onChange={event => updateRule(rule.id, { trigger: event.target.value === 'startup' ? 'startup' : 'timePeriod' })}>
+                                    <option value="timePeriod">Every time period</option>
+                                    <option value="startup">New game start-up</option>
+                                </select>
+                            </label>
                             <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>When</label>
                             <ConditionEditor globalStats={globalStats} actorStats={actorStats} locationStats={locationStats} itemStats={itemStats}
                                 actors={conditionActors} items={items} locations={locations} stage={stage}
                                 conditionCollections={rule.conditions} onChange={conditions => updateRule(rule.id, { conditions })} />
-                            {rule.conditions.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Applies at the start of every time period.</span>}
+                            {rule.conditions.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                {rule.trigger === 'startup' ? 'Applies once when a new game starts.' : 'Applies at the start of every time period.'}
+                            </span>}
                             <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13, marginTop: 4 }}>Then</label>
-                            <OutcomeEditor {...context} actions={rule.updates} onChange={updates => updateRule(rule.id, { updates })} skitTiming="afterPeriod" excludePlayerTargets />
+                            <OutcomeEditor {...context} actions={rule.updates} onChange={updates => updateRule(rule.id, { updates })} skitTiming={rule.trigger === 'startup' ? 'immediate' : 'afterPeriod'} excludePlayerTargets />
                         </>}
                     </div>
                 );
@@ -126,6 +140,7 @@ export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, onC
             <Button variant="secondary" onClick={() => {
                 const rule: StatUpdateRule = {
                     id: generateUuid(),
+                    trigger: 'timePeriod',
                     conditions: [[createDefaultCondition(globalStats)]],
                     updates: [],
                 };

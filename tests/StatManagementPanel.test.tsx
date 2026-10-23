@@ -108,6 +108,22 @@ test('rules contain the existing schedule and recurring updates with configured 
     assert.doesNotMatch(html, /Select a stat/);
 });
 
+test('rules display startup events alongside recurring events using the same action summaries', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = [{ id: 'initialize', name: 'Initialize world', description: '', returnType: 'void', script: '' }];
+    configuration.statUpdateRules = [{
+        id: 'startup', trigger: 'startup', conditions: [], updates: [
+            { id: 'scene', kind: 'skit', locationId: 'town', actorIds: [] },
+            { id: 'invoke', kind: 'function', functionId: 'initialize' },
+            { id: 'weather', targetType: 'global', targetId: 'any', statId: 'weather', operation: 'set', value: 'Snowy' },
+        ],
+    }];
+    const html = renderToStaticMarkup(<RulesManagementPanel stage={() => stage} />);
+    assert.match(html, /New game start-up/);
+    assert.match(html, /Start a skit; Invoke Initialize world; Weather set to Snowy/);
+    assert.match(html, /Without a skit, new games open on the map/);
+});
+
 test('manage-mode stats retain the global-value editor and do not expose creator rules', () => {
     const { stage } = fixture();
     const html = renderToStaticMarkup(

@@ -83,29 +83,6 @@ const ACTOR_SEED_FIELDS: StructuredFieldDefinition[] = [
     },
 ];
 
-const INTRO_SKIT_FIELDS: StructuredFieldDefinition[] = [
-    {
-        key: 'reasoning',
-        label: 'Reasoning',
-        description: 'Consider recent events and dialogue to draw conclusions about the nature and participants of the upcoming scene.'
-    },
-    {
-        key: 'guidance',
-        label: 'Guidance',
-        description: 'A concise intro scene direction that establishes the world, tone, and immediate hook for the player.',
-    },
-    {
-        key: 'location',
-        label: 'Location',
-        description: 'A single location name selected from Available Locations.',
-    },
-    {
-        key: 'participants',
-        label: 'Participants',
-        description: '<participant>Character Name</participant> for each character selected from Available Characters who should be present in the intro.',
-    },
-];
-
 const LORE_UPDATE_CANDIDATE_FIELDS: StructuredFieldDefinition[] = [
     {
         key: 'reasoning',
@@ -157,7 +134,7 @@ export type GameConfiguration = {
     globalStats: Stat[], // Stats that apply to the game in general (player or world state)
     functions: GameFunction[], // Global scripts invoked by actions or other functions
     globalStatValues: {[key: string]: StatValue}, // Selected/default values for global stats
-    statUpdateRules: StatUpdateRule[], // Recurring stat changes applied as in-game time advances
+    statUpdateRules: StatUpdateRule[], // Conditional actions at new-game startup or as in-game time advances
     controls: Control[], // UI controls displayed in map docks, Settings, outcomes, or actor cards.
     uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
@@ -274,6 +251,7 @@ export type PortableGameConfiguration = {
     itemStats: Stat[];
     globalStats: Stat[];
     functions: GameFunction[];
+    statUpdateRules: StatUpdateRule[];
     globalStatValues: { [key: string]: StatValue };
     actors: Actor[];
     locations: Location[];
@@ -305,6 +283,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     itemStats: (input.itemStats || []).map(cloneStat),
     globalStats: (input.globalStats || []).map(cloneStat),
     functions: (input.functions || []).map(cloneGameFunction),
+    statUpdateRules: cloneStatUpdateRules(input.statUpdateRules),
     globalStatValues: { ...(input.globalStatValues || {}) },
     actors: (input.actors || []).map(actor => cloneActor(actor)),
     locations: (input.locations || []).map(location => cloneLocation(location)),
@@ -627,6 +606,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // Resolve the first skit only after every stat/function action has finished.
     runButtonActions(actions: StatUpdateAction[]): Skit | null {
         const save = this.getSave();
+        const skit = this.applyActions(save, actions);
+        this.saveGame();
+        return skit;
+    }
+
+    private applyActions(save: SaveType, actions: StatUpdateAction[]): Skit | null {
         const context = this.getScheduleContext(save);
         for (const action of actions) {
             if (action.kind !== 'skit') {
@@ -638,7 +623,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (skit) {
             save.timeline.push({ date: save.currentDate || this.getStartingDate(save), skit });
         }
-        this.saveGame();
         return skit;
     }
 
@@ -992,36 +976,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             console.error('Error running lore updates for new game', error);
         });
 
-        // Generate the intro skit for the new game.
-        const generatedIntroSeed = await this.generateIntroSkitSeed(newSave).catch(error => {
-            console.error('Failed to generate intro skit seed for new game', error);
-            return null;
-        });
-        const defaultLocationId = Object.values(newSave.atlas || {})[0]?.id || '';
-        const defaultInitialActors = Object.values(newSave.actors || {})
-            .filter(actor => actor.id !== newSave.playerId)
-            .slice(0, 1)
-            .map(actor => actor.id);
-        const hasIntroSkitContent = Boolean(defaultLocationId) && defaultInitialActors.length > 0;
-
-        if (hasIntroSkitContent) {
-            const introSkit = new Skit({
-                initialLocationId: generatedIntroSeed?.locationId || defaultLocationId,
-                guidance: generatedIntroSeed?.guidance || `${this.getPlayerActor()?.name || 'The player'} is briefly introduced to the concept of the world or setting.`,
-                script: [],
-                initialActors: generatedIntroSeed?.initialActorIds?.length ? generatedIntroSeed.initialActorIds : defaultInitialActors,
-                summary: ''
-            });
-
-            // Push intro to timeline to start the game:
-            newSave.timeline.push({
-                calendarEventId: undefined,
-                date: newSave.currentDate || this.getStartingDate(newSave),
-                skit: introSkit
-            });
-        } else {
-            console.log('Skipping intro skit for blank or underpopulated new game');
-        }
+        const startupContext = this.getScheduleContext(newSave);
+        const startupActions = (persistedConfiguration.statUpdateRules || [])
+            .filter(rule => rule.trigger === 'startup' && evaluateConditionCollections(rule.conditions, startupContext))
+            .flatMap(rule => rule.updates || []);
+        this.applyActions(newSave, startupActions);
 
         delete this.generationPromises['newGame']; // Clear the dummy promise to allow the loading screen to finish.
 
@@ -1632,7 +1591,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // position (exclusive) and the save's current one (inclusive), so recurring rules such as "every morning"
     // still fire for periods skipped by a multi-day jump.
     private applyStatUpdateRules(save: SaveType, previousDate: string, previousTimeOfDay: CalendarTimeOfDay): Skit | null {
-        const rules = this.getConfiguration().statUpdateRules || [];
+        const rules = (this.getConfiguration().statUpdateRules || []).filter(rule => rule.trigger !== 'startup');
         if (rules.length === 0) {
             return null;
         }
@@ -3029,83 +2988,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .format();
     }
 
-    private async generateIntroSkitSeed(save: SaveType): Promise<{ guidance: string; locationId: string; initialActorIds: string[] } | null> {
-        const locations = Object.values(save.atlas || {});
-        const availableActors = Object.values(save.actors || {}).filter(actor => actor.id !== save.playerId);
-
-        if (!locations.length || !availableActors.length) {
-            return null;
-        }
-
-        let response = '';
-        let attempts = 3;
-        while (attempts > 0) {
-            attempts--;
-
-            response = await this.generateText(
-                buildPrompt()
-                    .addBlock('Instructions',
-                        `This is a preparatory request for the opening scene of a visual novel centering on {{user}}. ` +
-                        `Generate concise but evocative guidance for the intro skit, plus a suitable location and 1-3 participants. ` +
-                        `The guidance should introduce the core concept of the world and a strong first-scene hook. `)
-                    .addBlock('Available Locations', locations.map(location =>
-                        `${location.name}: ${location.description || 'No description available.'}`,
-                    ))
-                    .addBlock('Available Characters', availableActors.slice(0, 14).map(actor =>
-                        `${actor.name}: ${actor.profile || actor.description || 'No profile available.'}`,
-                    ))
-                    .addBlock('Response Format', buildStructuredResponseFormat(INTRO_SKIT_FIELDS, { includeEndTag: true }))
-                    .addBlock('Example Response',
-                        buildStructuredExampleResponse(
-                            INTRO_SKIT_FIELDS,
-                            {
-                                reasoning: 'The scene should establish the world and its rules while engaging the player based on their background.',
-                                guidance: `${this.getPlayerActor()?.name || 'The player'} arrives expecting a normal beginning, but the first conversation immediately reveals this world is stranger, more intimate, and more precarious than it first appears.`,
-                                location: locations[0]?.name || 'Unknown Location',
-                                participants: '<participant>John Doe</participant><participant>Jane Smith</participant>',
-                            },
-                            { includeEndTag: true },
-                        ))
-                    .addBlock('Additional Context', generateContext(undefined, this, 3))
-                    .format(),
-                20,
-                1000,
-                INTRO_SKIT_FIELDS,
-            ).catch(error => {
-                console.error('Error generating intro skit seed', error);
-                return '';
-            });
-
-            if (!response?.trim()) {
-                continue;
-            }
-
-            const parsedResponse = parseStructuredResponse(response, INTRO_SKIT_FIELDS);
-            const guidance = (parsedResponse.guidance || '').trim();
-            const locationText = (parsedResponse.location || '').trim();
-            const participantsText = (parsedResponse.participants || '').trim();
-
-            if (!guidance) {
-                continue;
-            }
-
-            const matchedLocation = findBestNameMatch(locationText, locations, ['name']);
-            const locationId = matchedLocation?.id || locations[0].id;
-            const initialActorIds = parseStructuredListValue(participantsText, 'participant')
-                .map(name => findBestNameMatch(name.trim(), availableActors, ['name'])?.id)
-                .filter((id): id is string => Boolean(id))
-                .slice(0, 3);
-
-            return {
-                guidance,
-                locationId,
-                initialActorIds,
-            };
-        }
-
-        return null;
-    }
-
     async summaryCheck() {
         const save = this.getSave();
         // Look at past skits (starting from the beginning), and find one that doesn't have a summary, to generate:
@@ -3207,6 +3089,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             itemStats: configuration.itemStats,
             globalStats: configuration.globalStats,
             functions: configuration.functions,
+            statUpdateRules: configuration.statUpdateRules,
             globalStatValues,
             actors: (configuration.actors || []).filter(actor => actor.active !== false),
             locations: (configuration.locations || []).filter(location => location.active !== false),

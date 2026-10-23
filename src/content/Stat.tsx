@@ -609,10 +609,11 @@ export type StartSkitAction = {
 
 export type StatUpdateAction = GameAction | StartSkitAction;
 
-// A recurring "every <calendar condition> do these things" rule; conditions are the same ConditionCollections
-// used by schedules and default-value rules, and are re-evaluated for each in-game period entered.
+// Conditions use the same collections as schedules and default-value rules. Missing triggers retain
+// the original recurring behavior; startup rules run only when a new save is initialized.
 export type StatUpdateRule = {
     id: string;
+    trigger?: 'timePeriod' | 'startup';
     conditions: ConditionCollection[];
     updates: StatUpdateAction[];
 };
@@ -665,6 +666,7 @@ export const cloneStatUpdateAction = (source: unknown): StatUpdateAction => {
 
 export const cloneStatUpdateRule = (rule: any): StatUpdateRule => ({
     id: rule?.id || generateUuid(),
+    trigger: rule?.trigger === 'startup' ? 'startup' : 'timePeriod',
     conditions: Array.isArray(rule?.conditions)
         ? rule.conditions.map((collection: unknown) => Array.isArray(collection) ? [...collection] : [])
         : [],

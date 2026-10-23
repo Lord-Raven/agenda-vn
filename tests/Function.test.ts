@@ -457,6 +457,123 @@ const skitAction = (extra: Partial<StartSkitAction> = {}): StartSkitAction => ({
     id: 'skit-action', kind: 'skit', locationId: 'place', actorIds: ['b'], ...extra,
 });
 
+const newGameFixture = () => {
+    const { stage, configuration } = fixture();
+    Object.assign(stage, {
+        primaryUser: { anonymizedId: 'player' },
+        saveData: { saves: Array(10).fill(undefined), configuration, lastSaveSlot: 0 },
+        generationPromises: {},
+    });
+    // Keep new-game initialization real while excluding remote generation and persistence.
+    stage.getSave = () => stage.saveData.saves[stage.saveData.lastSaveSlot]!;
+    stage.loadActors = () => {};
+    stage['identifyActorsNeedingLoreUpdate'] = async () => [];
+    stage['runLoreUpdatesWithConcurrency'] = async () => {};
+    stage.saveGame = () => {};
+    stage.generateText = async () => { throw new Error('Unexpected opening-scene generation'); };
+    return { stage, configuration };
+};
+
+const playerData = { name: 'Player', personality: '', data: { globalStatValues: { Score: 4 } } };
+
+test('new games with populated content have no automatic opening skit', async () => {
+    const { stage } = newGameFixture();
+    await stage.startNewGame(playerData);
+    assert.deepEqual(stage.getSave().timeline, []);
+    assert.equal(stage.getCurrentSkit(), null);
+    assert.equal(stage.getSave().globalStatValues?.Score, 4);
+    assert.equal(stage.generationPromises.newGame, undefined);
+});
+
+test('startup rules use initialized player choices, run all writes, and resolve only the first skit last', async () => {
+    const { stage, configuration } = newGameFixture();
+    configuration.functions = [
+        gameFunction('set("Score", get("Score") + 1);'),
+        { ...gameFunction('return "Score: " + get("Score");'), id: 'guidance', returnType: 'text' },
+    ];
+    configuration.statUpdateRules = [
+        {
+            id: 'opening', trigger: 'startup',
+            conditions: [[{ type: 'globalStat', statId: 'Score', comparison: 'equals', value: 4 }]],
+            updates: [
+                skitAction({ guidance: functionReference('guidance') }),
+                { id: 'invoke', kind: 'function', functionId: 'test-function' },
+            ],
+        },
+        {
+            id: 'second', trigger: 'startup', conditions: [],
+            updates: [
+                skitAction({ locationId: 'missing' }),
+                { id: 'write', targetType: 'global', targetId: 'any', statId: 'Score', operation: 'adjust', value: 2 },
+            ],
+        },
+        {
+            id: 'unmatched', trigger: 'startup',
+            conditions: [[{ type: 'globalStat', statId: 'Score', comparison: 'equals', value: 0 }]],
+            updates: [skitAction({ locationId: 'missing' })],
+        },
+        {
+            id: 'recurring', conditions: [],
+            updates: [{ id: 'write', targetType: 'global', targetId: 'any', statId: 'Score', operation: 'adjust', value: 1 }],
+        },
+    ];
+    await stage.startNewGame(playerData);
+    const save = stage.getSave();
+    assert.equal(save.globalStatValues?.Score, 7);
+    assert.equal(save.timeline.length, 1);
+    assert.equal(save.timeline[0].date, configuration.startingDate);
+    assert.equal(stage.getCurrentSkit()?.guidance, 'Score: 7');
+    assert.deepEqual(stage.getCurrentSkit()?.initialActors, ['b']);
+    assert.equal(stage.getCurrentSkit()?.initialLocationId, 'place');
+
+    save.currentTimeOfDay = 'afternoon';
+    assert.equal(stage['applyStatUpdateRules'](save, save.currentDate!, 'morning'), null);
+    assert.equal(save.globalStatValues?.Score, 8);
+    assert.equal(save.timeline.length, 1);
+});
+
+test('startup changes without a skit leave the map available and do not rerun on load', async () => {
+    const { stage, configuration } = newGameFixture();
+    configuration.statUpdateRules = [{
+        id: 'initialize', trigger: 'startup', conditions: [],
+        updates: [{ id: 'write', targetType: 'global', targetId: 'any', statId: 'Score', operation: 'adjust', value: 2 }],
+    }];
+    await stage.startNewGame(playerData);
+    assert.equal(stage.getSave().globalStatValues?.Score, 6);
+    assert.equal(stage.getCurrentSkit(), null);
+    stage.loadSave(stage.saveData.lastSaveSlot);
+    assert.equal(stage.getSave().globalStatValues?.Score, 6);
+    assert.equal(stage.getCurrentSkit(), null);
+});
+
+test('startup-only skits whose conditions fail do not create an opening scene', async () => {
+    const { stage, configuration } = newGameFixture();
+    configuration.statUpdateRules = [{
+        id: 'unmatched', trigger: 'startup',
+        conditions: [[{ type: 'globalStat', statId: 'Score', comparison: 'equals', value: 0 }]],
+        updates: [skitAction({ locationId: 'missing' })],
+    }];
+    await stage.startNewGame(playerData);
+    assert.equal(stage.getCurrentSkit(), null);
+    assert.equal(stage.getSave().globalStatValues?.Score, 4);
+});
+
+test('rule cloning and JSON/storage export retain startup triggers and default legacy rules to recurring', () => {
+    const { stage, configuration } = newGameFixture();
+    configuration.statUpdateRules = [
+        { id: 'startup', trigger: 'startup', conditions: [], updates: [skitAction()] },
+        { id: 'legacy', conditions: [], updates: [] },
+    ];
+    const portable = JSON.parse(JSON.stringify(buildPortableGameConfiguration(configuration)));
+    assert.equal(portable.statUpdateRules[0].trigger, 'startup');
+    assert.equal(portable.statUpdateRules[1].trigger, 'timePeriod');
+    assert.deepEqual(portable.statUpdateRules[0].updates, [skitAction()]);
+    assert.deepEqual(stage['buildPortableConfiguration']().statUpdateRules, portable.statUpdateRules);
+    const cloned = cloneStatUpdateRules(portable.statUpdateRules);
+    assert.deepEqual(cloned, portable.statUpdateRules);
+    assert.notEqual(cloned[0].updates, configuration.statUpdateRules[0].updates);
+});
+
 test('skit actions survive configuration cloning without sharing participant lists or stat references', () => {
     const action = skitAction({ guidance: { targetType: 'actor', targetId: 'b', statId: 'Directions' } });
     const cloned = cloneStatUpdateRules([{ id: 'rule', conditions: [], updates: [action] }]);
