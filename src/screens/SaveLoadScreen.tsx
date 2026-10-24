@@ -108,6 +108,11 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
         const save = stage().saveData.saves[slotIndex];
         const isEmpty = !save;
         const isCurrentSlot = stage().saveData.lastSaveSlot === slotIndex;
+        const canUpdate = stageInstance.canUpdateSave(slotIndex);
+        const updateDisabled = !hasOpenSlot || isUpdating || isRefreshing || refreshFailed;
+        const updateTooltip = hasOpenSlot
+            ? 'Clone and Update'
+            : 'Clone and Update (a free save slot is required).';
 
         // Get non-warden, non-player actors:
         let actors = !isEmpty
@@ -143,7 +148,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                     delay: slotIndex * 0.05,
                     x: { duration: 0.2 }
                 }}
-                style={{ width: '100%' }}
+                style={{ width: '100%', position: 'relative' }}
             >
                 <Button
                     variant="menu"
@@ -168,7 +173,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         width: '100%',
                         height: '85px',
                         padding: '8px 12px',
-                        paddingRight: isEmpty ? '12px' : '50px',
+                        paddingRight: isEmpty ? '12px' : canUpdate ? '90px' : '50px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'stretch',
@@ -183,64 +188,6 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         overflow: 'hidden'
                     }}
                 >
-                    {/* Delete button for filled slots */}
-                    {!isEmpty && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteConfirmSlot(slotIndex);
-                            }}
-                            onMouseEnter={(e) => {
-                                e.stopPropagation();
-                                setTooltip(isCurrentSlot ? 'Cannot delete current save' : 'Delete save', Delete);
-                            }}
-                            onMouseLeave={(e) => {
-                                e.stopPropagation();
-                                clearTooltip();
-                            }}
-                            disabled={isCurrentSlot || isUpdating || isRefreshing}
-                            style={{
-                                position: 'absolute',
-                                top: 0,
-                                right: 0,
-                                bottom: 0,
-                                width: '40px',
-                                background: isCurrentSlot
-                                    ? 'color-mix(in srgb, var(--agenda-text-primary) 20%, transparent)'
-                                    : 'color-mix(in srgb, var(--agenda-danger-text) 24%, transparent)',
-                                border: 'none',
-                                borderLeft: isCurrentSlot
-                                    ? '1px solid color-mix(in srgb, var(--agenda-text-primary) 34%, transparent)'
-                                    : '1px solid color-mix(in srgb, var(--agenda-danger-text) 44%, transparent)',
-                                borderRadius: '0 4px 4px 0',
-                                color: isCurrentSlot
-                                    ? 'color-mix(in srgb, var(--agenda-text-primary) 48%, transparent)'
-                                    : 'var(--agenda-danger-text)',
-                                cursor: isCurrentSlot ? 'not-allowed' : 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.2s',
-                                fontSize: '18px',
-                                opacity: isCurrentSlot ? 0.5 : 1
-                            }}
-                            onMouseOver={(e) => {
-                                if (!isCurrentSlot) {
-                                    e.currentTarget.style.background = 'color-mix(in srgb, var(--agenda-danger-text) 34%, transparent)';
-                                    e.currentTarget.style.color = 'color-mix(in srgb, var(--agenda-danger-text) 80%, var(--agenda-text-primary))';
-                                }
-                            }}
-                            onMouseOut={(e) => {
-                                if (!isCurrentSlot) {
-                                    e.currentTarget.style.background = 'color-mix(in srgb, var(--agenda-danger-text) 24%, transparent)';
-                                    e.currentTarget.style.color = 'var(--agenda-danger-text)';
-                                }
-                            }}
-                        >
-                            <Delete fontSize="small" />
-                        </button>
-                    )}
-
                     {isEmpty ? (
                         <div style={{
                             display: 'flex',
@@ -259,7 +206,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                             <div style={{
                                 position: 'absolute',
                                 bottom: 0,
-                                right: '40px',
+                                right: canUpdate ? '80px' : '40px',
                                 display: 'flex',
                                 height: '85px',
                                 opacity: 0.3,
@@ -315,23 +262,97 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         </>
                     )}
                 </Button>
-                {stageInstance.canUpdateSave(slotIndex) && (
-                    <Button
-                        variant="menu"
-                        onClick={() => void handleCloneAndUpdate(slotIndex)}
-                        disabled={!hasOpenSlot || isUpdating || isRefreshing || refreshFailed}
+                {canUpdate && (
+                    <span
+                        title={updateTooltip}
                         onMouseEnter={() => setTooltip(
-                            hasOpenSlot
-                                ? `Copy to an empty slot and apply ${stageInstance.isOwner ? 'the creator draft' : 'published configuration'} and content. The original save is kept.`
-                                : 'Free a save slot to clone and update. The original will not be overwritten.',
+                            updateTooltip,
                             SystemUpdateAlt,
                         )}
                         onMouseLeave={clearTooltip}
-                        style={{ marginTop: '6px', padding: '6px 12px' }}
+                        onFocus={() => setTooltip(updateTooltip, SystemUpdateAlt)}
+                        onBlur={clearTooltip}
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            right: '40px',
+                            bottom: 0,
+                            width: '40px',
+                            cursor: updateDisabled ? 'not-allowed' : 'pointer'
+                        }}
                     >
-                        <SystemUpdateAlt fontSize="small" />
-                        {' '}Clone and Update{!hasOpenSlot ? ' (empty slot required)' : ''}
-                    </Button>
+                        <button
+                            aria-label="Clone and Update"
+                            onClick={() => void handleCloneAndUpdate(slotIndex)}
+                            disabled={updateDisabled}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                padding: 0,
+                                background: 'color-mix(in srgb, var(--agenda-highlight) 15%, transparent)',
+                                border: 'none',
+                                borderLeft: '1px solid color-mix(in srgb, var(--agenda-highlight) 34%, transparent)',
+                                borderRadius: 0,
+                                color: 'var(--agenda-highlight)',
+                                cursor: 'inherit',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: updateDisabled ? 0.5 : 1,
+                                pointerEvents: updateDisabled ? 'none' : 'auto'
+                            }}
+                        >
+                            <SystemUpdateAlt fontSize="small" />
+                        </button>
+                    </span>
+                )}
+                {!isEmpty && (
+                    <button
+                        aria-label="Delete save"
+                        onClick={() => setDeleteConfirmSlot(slotIndex)}
+                        onMouseEnter={() => setTooltip(isCurrentSlot ? 'Cannot delete current save' : 'Delete save', Delete)}
+                        onMouseLeave={clearTooltip}
+                        disabled={isCurrentSlot || isUpdating || isRefreshing}
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
+                            width: '40px',
+                            background: isCurrentSlot
+                                ? 'color-mix(in srgb, var(--agenda-text-primary) 20%, transparent)'
+                                : 'color-mix(in srgb, var(--agenda-danger-text) 24%, transparent)',
+                            border: 'none',
+                            borderLeft: isCurrentSlot
+                                ? '1px solid color-mix(in srgb, var(--agenda-text-primary) 34%, transparent)'
+                                : '1px solid color-mix(in srgb, var(--agenda-danger-text) 44%, transparent)',
+                            borderRadius: '0 4px 4px 0',
+                            color: isCurrentSlot
+                                ? 'color-mix(in srgb, var(--agenda-text-primary) 48%, transparent)'
+                                : 'var(--agenda-danger-text)',
+                            cursor: isCurrentSlot ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s',
+                            fontSize: '18px',
+                            opacity: isCurrentSlot ? 0.5 : 1
+                        }}
+                        onMouseOver={(e) => {
+                            if (!isCurrentSlot) {
+                                e.currentTarget.style.background = 'color-mix(in srgb, var(--agenda-danger-text) 34%, transparent)';
+                                e.currentTarget.style.color = 'color-mix(in srgb, var(--agenda-danger-text) 80%, var(--agenda-text-primary))';
+                            }
+                        }}
+                        onMouseOut={(e) => {
+                            if (!isCurrentSlot) {
+                                e.currentTarget.style.background = 'color-mix(in srgb, var(--agenda-danger-text) 24%, transparent)';
+                                e.currentTarget.style.color = 'var(--agenda-danger-text)';
+                            }
+                        }}
+                    >
+                        <Delete fontSize="small" />
+                    </button>
                 )}
             </motion.div>
         );

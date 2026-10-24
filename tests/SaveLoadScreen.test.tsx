@@ -319,21 +319,32 @@ test('SaveLoadScreen offers clone and update for outdated player and creator sav
         <SaveLoadScreen stage={() => stage} mode={mode} onClose={() => {}} />
     </TooltipProvider>);
     const updateButtons = (html: string) => [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)]
-        .filter(match => match[2].includes('Clone and Update'));
+        .filter(match => match[1].includes('aria-label="Clone and Update"'));
     for (const mode of ['save', 'load'] as const) {
-        const buttons = updateButtons(render(mode));
+        const html = render(mode);
+        const buttons = updateButtons(html);
         assert.equal(buttons.length, 1);
         assert.doesNotMatch(buttons[0][1], /disabled/);
+        assert.match(buttons[0][2], /data-testid="SystemUpdateAltIcon"/);
+        assert.doesNotMatch(buttons[0][2], /Clone and Update/);
+        assert.match(buttons[0][1], /height:100%/);
+        assert.match(html, /<span title="Clone and Update" style="[^"]*top:0;right:40px;bottom:0;width:40px/);
+        assert.match(html, /<\/button><span title="Clone and Update"/);
+        assert.match(html, /<\/span><button aria-label="Delete save"/);
+        assert.match(html, /padding-right:90px/);
         stage.isOwner = true;
         assert.equal(updateButtons(render(mode)).length, 1);
         stage.isOwner = false;
     }
     stage.saveData.saves.fill(source);
-    const fullSlotButtons = updateButtons(render('load'));
+    const fullSlotHtml = render('load');
+    const fullSlotButtons = updateButtons(fullSlotHtml);
     assert.equal(fullSlotButtons.length, 10);
+    assert.equal([...fullSlotHtml.matchAll(/title="Clone and Update \(a free save slot is required\)\."/g)].length, 10);
     fullSlotButtons.forEach(button => {
         assert.match(button[1], /disabled=""/);
-        assert.match(button[2], /empty slot required/);
+        assert.match(button[1], /pointer-events:none/);
+        assert.doesNotMatch(button[2], /free save slot/);
     });
     stage.saveData.saves[9] = undefined;
     const openSlotButtons = updateButtons(render('load'));
