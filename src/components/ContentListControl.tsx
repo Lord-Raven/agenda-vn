@@ -31,10 +31,12 @@ interface ContentListPortraitsProps {
 
 const PORTRAIT_SIZE = 40;
 const PORTRAIT_OVERLAP = 6;
+const PORTRAIT_HOVER_SCALE = 1.1;
 
 export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label, variant = 'carousel', size = PORTRAIT_SIZE }) => {
     const isOverlay = variant === 'overlay';
     const overlap = isOverlay ? Math.round(size * 0.32) : PORTRAIT_OVERLAP;
+    const hoverPadding = Math.ceil(size * (PORTRAIT_HOVER_SCALE - 1) / 2 + 3 * PORTRAIT_HOVER_SCALE);
     const dimension = isOverlay ? size : `clamp(${Math.min(28, size)}px, 28cqi, ${size}px)`;
     const imageStyle = {
         width: dimension,
@@ -103,17 +105,18 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                     overflowX: 'auto',
                     scrollbarWidth: 'none',
                     scrollSnapType: 'x proximity',
+                    scrollPadding: `${hoverPadding}px`,
                     maskImage: edgeMask,
                     WebkitMaskImage: edgeMask,
                     '&::-webkit-scrollbar': { display: 'none' },
                 }}
             >
-                {/* A horizontal scroll container also clips vertically, so reserve room for scaled portraits and shadows. */}
+                {/* Scroll containers clip both axes; include the scaled outline in the gutter. */}
                 <Box ref={trackRef} role="list" sx={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'flex-start',
-                    padding: '2px 6px',
+                    padding: `${hoverPadding}px`,
                     width: 'max-content',
                     overflow: 'visible',
                     [isOverlay ? '& > [role="listitem"] + [role="listitem"]' : '& > [role="listitem"]:has([data-has-image="true"]) + [role="listitem"]:has([data-has-image="true"])']: {
@@ -139,7 +142,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                                     scrollSnapAlign: 'start',
                                     borderRadius: '50%',
                                     zIndex: isOverlay ? values.length - index : undefined,
-                                    '&:hover, &:focus-visible': { zIndex: isOverlay ? values.length + 1 : 1, transform: 'scale(1.1)', outline: '2px solid var(--agenda-highlight)', outlineOffset: 1 },
+                                    '&:hover, &:focus-visible': { zIndex: isOverlay ? values.length + 1 : 1, transform: `scale(${PORTRAIT_HOVER_SCALE})`, outline: '2px solid var(--agenda-highlight)', outlineOffset: 1 },
                                     '@media (prefers-reduced-motion: no-preference)': { transition: 'transform 0.15s ease-out' },
                                 }}
                             >

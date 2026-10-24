@@ -247,19 +247,6 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         }}
                         buttons={
                             <>
-                                {isTextToSpeechEnabled && (
-                                    <IconButton
-                                        onClick={() => setIsAudioEnabled(prev => !prev)}
-                                        onMouseEnter={() => setTooltip(isAudioEnabled ? 'Mute Audio' : 'Enable Audio', isAudioEnabled ? VolumeUp : VolumeOff)}
-                                        onMouseLeave={() => clearTooltip()}
-                                        sx={{
-                                            ...cornerButtonSx,
-                                            opacity: isAudioEnabled ? 0.95 : 0.55,
-                                        }}
-                                    >
-                                        {isAudioEnabled ? <VolumeUp /> : <VolumeOff />}
-                                    </IconButton>
-                                )}
                                 {!isVerticalLayout && (
                                     <IconButton
                                         onClick={() => setShowContentManagement(true)}
@@ -404,6 +391,14 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                                 </div>
                             );
                         }}
+                        additionalActionButtons={isTextToSpeechEnabled ? [
+                            {
+                                id: 'soundToggle',
+                                label: isAudioEnabled ? 'Unmute' : 'Mute',
+                                content: isAudioEnabled ? <VolumeOff /> : <VolumeUp />,
+                                onClick: () => setIsAudioEnabled(prev => !prev)
+                            }
+                        ] : []}
                     />
                 </div>
             </div>
