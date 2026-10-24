@@ -29,7 +29,22 @@ const creatorTabs: TabType[] = ['game', 'style', 'rules', 'functions', 'controls
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
     const isCreatorMode = stage().isOwner && isCreateMode;
+    const [publishStatus, setPublishStatus] = useState<'idle' | 'publishing' | 'published' | 'failed'>('idle');
     const eventsEnabled = stage().areEventsEnabled();
+
+    useEffect(() => {
+        if (publishStatus !== 'published' && publishStatus !== 'failed') {
+            return;
+        }
+        const timeout = window.setTimeout(() => setPublishStatus('idle'), 2500);
+        return () => window.clearTimeout(timeout);
+    }, [publishStatus]);
+
+    const handlePublish = async () => {
+        setPublishStatus('publishing');
+        const success = await stage().publishStageConfiguration();
+        setPublishStatus(success ? 'published' : 'failed');
+    };
     const [activeTab, setActiveTab] = useState<TabType>(() => {
         const savedTab = sessionStorage.getItem(tabStorageKey) as TabType | null;
         return savedTab && tabs.includes(savedTab) && (isCreatorMode || !creatorTabs.includes(savedTab)) && (eventsEnabled || savedTab !== 'calendarEvents') ? savedTab : 'actors';
@@ -173,6 +188,18 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                             }}>
                                                 Create
                                             </span>
+                                            <Button
+                                                variant="secondary"
+                                                disabled={publishStatus === 'publishing'}
+                                                onClick={handlePublish}
+                                                title="Publish the current configuration so other users receive it"
+                                                style={{ marginLeft: '8px', padding: '6px 14px', fontSize: '14px' }}
+                                            >
+                                                {publishStatus === 'publishing' ? 'Publishing...'
+                                                    : publishStatus === 'published' ? 'Published'
+                                                    : publishStatus === 'failed' ? 'Publish Failed'
+                                                    : 'Publish'}
+                                            </Button>
                                         </div>
                                     )}
                                     <motion.button

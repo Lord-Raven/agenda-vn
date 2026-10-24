@@ -59,8 +59,8 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     };
 
     const handleNewGame = async () => {
-        // Refresh configuration before showing new game settings to ensure
-        // the user's selections match the current published configuration
+        // Refresh configuration before showing new game settings so players start from the latest
+        // published configuration (a no-op for creators, who work from their chat-state configuration)
         await stage().readStageConfiguration();
         setIsNewGameSettings(true);
         setShowSettings(true);

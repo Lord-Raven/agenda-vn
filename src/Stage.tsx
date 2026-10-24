@@ -322,6 +322,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     });
     anticipatedLoadingPromiseCount: number = 4;
     isOwner: boolean = false;
+    // False when this chat had no prior chat state, so there are no unpublished creator changes to protect.
+    private hadChatState: boolean = false;
 
     constructor(data: InitialData<InitStateType, ChatStateType, MessageStateType, ConfigType>) {
         super(data);
@@ -357,6 +359,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
 
         // Populate default saves with SAVE_SLOT_COUNT undefines:
+        this.hadChatState = chatState != null;
         this.saveData = chatState != null
             ? chatState
             : {
@@ -776,6 +779,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 await this.readStageConfiguration();
             } else {
                 console.log(`Successfully accessed sensitive storage for ${this.primaryCharacter.anonymizedId}`);
+                // Creators load configuration from chat state; only a brand-new chat is seeded from the published configuration.
+                if (!this.hadChatState) {
+                    await this.readStageConfiguration();
+                }
                 this.isOwner = true;
             }
         } catch (error) {
@@ -1021,8 +1028,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             currentSave.timestamp = Date.now();
         }
         this.messenger.updateChatState(this.saveData);
-        // Save configuration to storage (this will only do something if the user has storage access, which is only true for the owner of the bot.)
-        this.updateStageConfiguration();
     }
 
     isCalendarScreenLoading(): boolean {
@@ -3108,7 +3113,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // Storage functionality
+    // Creators work from chat state so unpublished changes are never overwritten by the published configuration.
     async readStageConfiguration(speakerIds: string[] = []): Promise<void> {
+        if (this.isOwner) {
+            return;
+        }
         console.log('Attempting to read stage configuration');
         const characterIds = speakerIds.length ? speakerIds : [this.primaryCharacter.anonymizedId];
         const response = await this.storage.get('agenda_configuration').forCharacters(characterIds);
@@ -3127,12 +3136,19 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
 
-    async updateStageConfiguration() {
-        // Only the owner can update the stage configuration.
-        if (this.isOwner) {
+    // Pushes the chat-state configuration to global storage so other users pick it up. Only the owner can publish.
+    async publishStageConfiguration(): Promise<boolean> {
+        if (!this.isOwner) {
+            return false;
+        }
+        try {
             const portableConfiguration = this.buildPortableConfiguration();
-            const response = await this.storage.set('agenda_configuration', portableConfiguration).forCharacterSensitive(this.primaryCharacter.anonymizedId);
+            const response: any = await this.storage.set('agenda_configuration', portableConfiguration).forCharacterSensitive(this.primaryCharacter.anonymizedId);
             console.log(response);
+            return !(response?.errors && response.errors.length);
+        } catch (error) {
+            console.log(`Error publishing stage configuration: ${error}`);
+            return false;
         }
     }
 
