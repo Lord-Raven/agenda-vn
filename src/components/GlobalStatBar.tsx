@@ -110,7 +110,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                             fontFamily: "var(--agenda-font-flavor)",
                             fontWeight: 700,
                             fontSize: usePhaseSegments ? '0.8rem' : isVerticalLayout ? '0.85rem' : { xs: '1.25rem', md: '1.8rem' },
-                            ...(usePhaseSegments ? { lineHeight: 1.1 } : {}),
+                            ...(usePhaseSegments ? { lineHeight: 1.1 } : isVerticalLayout ? { lineHeight: "20px" } : {}),
                             whiteSpace: "nowrap",
                         }}
                     >

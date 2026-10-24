@@ -311,6 +311,58 @@ test('content list displays match ordinary control heights without clipping port
     }
 });
 
+test('compact day and date indicators match stat control heights', { skip: !process.env.CHROME_BIN }, () => {
+    const directory = mkdtempSync(join(tmpdir(), 'agenda-date-height-'));
+    try {
+        const fixtures: string[] = [];
+        for (const dateMode of ['calendar', 'turnBased'] as const) {
+            for (const timeMode of ['timeOfDay', 'phase'] as const) {
+                for (const withButtons of [false, true]) {
+                    const stage = createStage();
+                    const configuration = stage.getConfiguration();
+                    Object.assign(configuration, { dateMode, timeMode });
+                    configuration.globalStats = [{
+                        id: 'health', name: 'Health', type: 'number', default: 42, guidance: '',
+                        llmSees: { value: true, conditions: [] },
+                        llmMaintained: { value: true, conditions: [] },
+                    }];
+                    configuration.controls = [new Control({
+                        type: 'statDisplay', statId: 'health', label: 'Health', placement: 'top',
+                    })];
+                    fixtures.push(renderToStaticMarkup(<GlobalStatBar
+                        stage={() => stage}
+                        isVerticalLayout
+                        buttons={withButtons ? <button>Menu</button> : undefined}
+                    />));
+                }
+            }
+        }
+        const fixture = join(directory, 'layout.html');
+        writeFileSync(fixture, `<!doctype html><style>
+            :root { --agenda-panel-border: #ddd; }
+            </style><body style="margin:0;font-size:16px">
+            ${fixtures.map(html => `<main style="width:320px">${html}</main>`).join('')}
+            <pre id="result"></pre>
+            <script>
+                const errors = [];
+                document.querySelectorAll('main').forEach((main, index) => {
+                    const date = main.querySelector('[title^="Current Date:"]').getBoundingClientRect();
+                    const stat = main.querySelector('[role="group"]').getBoundingClientRect();
+                    if (Math.abs(date.height - stat.height) > 0.1) {
+                        errors.push(index + ': date height ' + date.height + ' differs from stat height ' + stat.height);
+                    }
+                });
+                document.getElementById('result').textContent = errors.length ? JSON.stringify(errors) : 'PASS';
+            </script>`);
+        const output = execFileSync(process.env.CHROME_BIN!, [
+            '--headless', '--no-sandbox', '--disable-gpu', '--dump-dom', `file://${fixture}`,
+        ], { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
+        assert.equal(output.match(/<pre id="result">([^<]*)<\/pre>/)?.[1], 'PASS');
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
 test('vertical Day phase segments stay beneath the label and match compact control heights', { skip: !process.env.CHROME_BIN }, () => {
     const directory = mkdtempSync(join(tmpdir(), 'agenda-day-segments-'));
     try {
