@@ -97,7 +97,9 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                         justifyContent: "center",
                         gap: usePhaseSegments ? "2px" : isVerticalLayout ? 0.4 : 0.8,
                         padding: isVerticalLayout ? "4px 6px" : "8px 10px",
-                        ...(usePhaseSegments ? { minHeight: 30, boxSizing: "border-box" } : {}),
+                        // Match the stat card's padding, label line, gap, and minimum value height.
+                        minHeight: isVerticalLayout ? 30 : theme => `calc(14px + 0.792rem + ${theme.spacing(0.5)} + 32px)`,
+                        boxSizing: "border-box",
                         borderRadius: isVerticalLayout ? "8px" : "12px",
                         border: "1px solid var(--agenda-panel-border)",
                         background: "color-mix(in srgb, var(--agenda-panel-surface) 88%, transparent)",
@@ -110,7 +112,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                             fontFamily: "var(--agenda-font-flavor)",
                             fontWeight: 700,
                             fontSize: usePhaseSegments ? '0.8rem' : isVerticalLayout ? '0.85rem' : { xs: '1.25rem', md: '1.8rem' },
-                            ...(usePhaseSegments ? { lineHeight: 1.1 } : isVerticalLayout ? { lineHeight: "20px" } : {}),
+                            lineHeight: usePhaseSegments ? 1.1 : isVerticalLayout ? "20px" : 1.2,
                             whiteSpace: "nowrap",
                         }}
                     >
