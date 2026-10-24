@@ -1,4 +1,5 @@
 import {ReactElement} from "react";
+import { v4 as uuidv4 } from 'uuid';
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import { ConditionContext, evaluateConditionCollections } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
@@ -43,6 +44,7 @@ type ChatStateType = {
 };
 
 export type SaveType = {
+    configuration?: GameConfiguration; // Snapshot of the rules used by this playthrough; absent on legacy saves.
     playerId: string;
     actors: {[key: string]: Actor};
     atlas: {[key: string]: Location};
@@ -118,9 +120,9 @@ const ACTOR_SCRIPT_FIELDS: (keyof Actor)[] = ['name', 'displayName', 'role', 'bi
 const LOCATION_SCRIPT_FIELDS: (keyof Location)[] = ['name', 'description', 'category', 'imagePrompt', 'imageUrl', 'themeColor'];
 const ITEM_SCRIPT_FIELDS: (keyof Item)[] = ['name', 'description', 'category', 'imagePrompt', 'imageUrl', 'themeColor'];
 
-// Represents a configuration that is used to initialize new games, but can also influence existing games.
+// Canon configuration for new games. Saves retain snapshots; creator rule edits also update the active snapshot.
 export type GameConfiguration = {
-    
+    versionId?: string; // Changed on each successful publication, not on local creator edits.
     actors: Actor[], // All defined actors for a new game
     locations: Location[], // All defined locations for a new game
     items: Item[], // All defined items for a new game
@@ -238,6 +240,9 @@ type TimelineEntry = {
 // The subset of GameConfiguration that is portable: it is what gets exported as JSON from the GameManagementPanel
 // and is the same content pushed to/pulled from storage so new games (and other owner-hosted chats) stay in sync.
 export type PortableGameConfiguration = {
+    versionId?: string;
+    artStyle?: string;
+    universalSchedule?: ActorSchedule;
     title: string;
     titleImageUrl: string;
     titleImagePrompt: string;
@@ -270,6 +275,9 @@ export type PortableGameConfiguration = {
 
 // Shared by the GameManagementPanel's JSON export/preview and Stage's storage sync so both always agree on shape.
 export const buildPortableGameConfiguration = (input: PortableGameConfiguration): PortableGameConfiguration => ({
+    versionId: input.versionId,
+    artStyle: input.artStyle,
+    universalSchedule: cloneActorSchedule(input.universalSchedule),
     title: input.title,
     titleImageUrl: input.titleImageUrl,
     titleImagePrompt: input.titleImagePrompt,
@@ -300,6 +308,20 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     controls: (input.controls || []).map((control) => new Control(control)),
 });
 
+const cloneConfiguration = (configuration: GameConfiguration): GameConfiguration => {
+    const copy: GameConfiguration = JSON.parse(JSON.stringify(configuration));
+    return { ...copy, ...buildPortableGameConfiguration(copy), artStyle: copy.artStyle,
+        universalSchedule: cloneActorSchedule(copy.universalSchedule) };
+};
+
+const getStorageError = (response: { error?: string; errors?: unknown[]; status?: number }): string | undefined => {
+    if (!response) return 'Storage returned no response.';
+    if (response.error) return response.error;
+    if (response.errors?.length) return JSON.stringify(response.errors);
+    if (response.status !== undefined && response.status >= 400) return `Storage request failed (${response.status}).`;
+    return undefined;
+};
+
 export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateType, ConfigType> {
 
     readonly SAVE_SLOT_COUNT = 10;
@@ -324,19 +346,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     isOwner: boolean = false;
     // False when this chat had no prior chat state, so there are no unpublished creator changes to protect.
     private hadChatState: boolean = false;
+    private statContextSave?: SaveType;
+    private cloneUpdateInProgress = false;
 
     constructor(data: InitialData<InitStateType, ChatStateType, MessageStateType, ConfigType>) {
         super(data);
         // Registered before any save/config normalization so sourced option stats can see their optionList.
         setOptionListSourceResolver((statId) => {
-            const configuration = this.saveData?.configuration;
+            const save = this.statContextSave || this.saveData?.saves?.[this.saveData.lastSaveSlot];
+            const configuration = save?.configuration || this.saveData?.configuration;
             const globalStat = configuration?.globalStats?.find((candidate) => candidate.id === statId);
             if (!globalStat) {
                 const stat = [...(configuration?.actorStats || []), ...(configuration?.locationStats || []), ...(configuration?.itemStats || [])]
                     .find((candidate) => candidate.id === statId);
                 return stat ? { stat } : undefined;
             }
-            const save = this.saveData?.saves?.[this.saveData.lastSaveSlot];
             return { stat: globalStat, value: save?.globalStatValues?.[statId] ?? configuration?.globalStatValues?.[statId],
                 resolveValue: (value, type) => this.resolveValue(value, type, save) };
         });
@@ -436,23 +460,36 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 universalSchedule: cloneActorSchedule(activeSave?.universalSchedule),
                 lorebook: (activeSave?.lorebook || []).map(cloneLore),
                 calendarEvents: [],
-                actorStats: (this.getConfiguration()?.actorStats || []).map(cloneStat),
-                locationStats: (this.getConfiguration()?.locationStats || []).map(cloneStat),
-                itemStats: (this.getConfiguration()?.itemStats || []).map(cloneStat),
-                globalStats: (this.getConfiguration()?.globalStats || []).map(cloneStat),
+                actorStats: [],
+                locationStats: [],
+                itemStats: [],
+                globalStats: [],
                 globalStatValues: { ...(activeSave?.globalStatValues || {}) },
-                statUpdateRules: cloneStatUpdateRules(this.getConfiguration()?.statUpdateRules),
-                controls: (this.getConfiguration()?.controls || []).map((control) => new Control(control)),
+                statUpdateRules: [],
+                controls: [],
                 uiSettings: cloneUiSettings(activeSave?.uiSettings || {}),
             };
-            this.syncUniversalSchedule();
-            return;
         }
 
         // Backfill any missing fields and coerce array items into proper class instances in place, rather than
         // replacing the whole configuration (and its arrays) with new clones on every call. getConfiguration()
         // callers rely on the returned references being stable so in-place edits actually stick.
-        const configuration = this.saveData.configuration;
+        this.normalizeConfiguration(this.saveData.configuration, defaultConfiguration);
+        this.saveData.saves.forEach(save => {
+            if (save) {
+                save.configuration ??= {
+                    ...cloneConfiguration(this.saveData.configuration),
+                    universalSchedule: cloneActorSchedule(save.universalSchedule),
+                };
+                this.normalizeConfiguration(save.configuration, defaultConfiguration);
+            }
+        });
+        const configuration = activeSave?.configuration || this.saveData.configuration;
+        setActiveTimeMode(configuration.timeMode);
+        this.syncUniversalSchedule();
+    }
+
+    private normalizeConfiguration(configuration: GameConfiguration, defaultConfiguration: GameConfiguration) {
         configuration.actors = (configuration.actors || defaultConfiguration.actors).map(actor => actor instanceof Actor ? actor : cloneActor(actor));
         configuration.locations = (configuration.locations || defaultConfiguration.locations).map(location => location instanceof Location ? location : cloneLocation(location));
         configuration.items = (configuration.items || defaultConfiguration.items).map(item => item instanceof Item ? item : cloneItem(item));
@@ -483,21 +520,26 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         configuration.dateMode = configuration.dateMode === 'turnBased' ? 'turnBased' : 'calendar';
         configuration.timeMode = configuration.timeMode === 'phase' ? 'phase' : 'timeOfDay';
         configuration.useEvents = configuration.useEvents !== false;
-        setActiveTimeMode(configuration.timeMode);
-
-        this.syncUniversalSchedule();
     }
 
-    // The universal schedule lives on the configuration but is mirrored into every save so it can be resolved from save context.
+    // Creator rule edits are mirrored into the active snapshot, never into other save slots.
     private syncUniversalSchedule() {
         this.saveData.saves.forEach((save) => {
             if (save) {
-                save.universalSchedule = cloneActorSchedule(this.saveData.configuration.universalSchedule);
+                const configuration = save.configuration || this.saveData.configuration;
+                save.universalSchedule = cloneActorSchedule(configuration.universalSchedule);
             }
         });
     }
 
-    getConfiguration(): GameConfiguration {
+    // Creator tools use the draft; explicit save contexts always use that playthrough's snapshot.
+    getConfiguration(save?: SaveType): GameConfiguration {
+        this.ensureChatState();
+        const selectedSave = save || this.saveData.saves[this.saveData.lastSaveSlot];
+        return ((save || !this.isOwner) && selectedSave?.configuration) || this.saveData.configuration;
+    }
+
+    getPublishedConfiguration(): GameConfiguration {
         this.ensureChatState();
         return this.saveData.configuration;
     }
@@ -505,7 +547,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // Builds a ScheduleContext from a save, adding the stat definitions needed to resolve schedule entries
     // that point at a location-type ActorStat rather than a fixed location id.
     getScheduleContext(save: SaveType): ScheduleContext {
-        const configuration = this.getConfiguration();
+        const configuration = this.getConfiguration(save);
         return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats,
             resolveValue: (value, type) => this.resolveValue(value, type, save) };
     }
@@ -513,7 +555,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = []): StatValue {
         const namedSource = (name: string, kind: 'function' | 'stat', expectedType: StatType): StatValue => {
             const normalizedName = name.trim().toLowerCase();
-            const configuration = this.getConfiguration();
+            const configuration = this.getConfiguration(save);
             const matches = kind === 'function'
                 ? configuration.functions.filter(fn => fn.name.trim().toLowerCase() === normalizedName)
                 : configuration.globalStats.filter(stat => stat.name.trim().toLowerCase() === normalizedName);
@@ -525,7 +567,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
         if (isGlobalStatReference(value)) {
             const id = globalStatReferenceId(value);
-            const configuration = this.getConfiguration();
+            const configuration = this.getConfiguration(save);
             const stat = configuration.globalStats.find(candidate => candidate.id === id);
             if (!stat) {
                 throw new Error(`Unknown global stat reference: ${id}`);
@@ -540,7 +582,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
         if (isFunctionReference(value)) {
             const id = functionReferenceId(value);
-            const fn = this.getConfiguration().functions.find(candidate => candidate.id === id);
+            const fn = this.getConfiguration(save).functions.find(candidate => candidate.id === id);
             if (!fn) {
                 throw new Error(`Unknown function reference: ${id}`);
             }
@@ -566,7 +608,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (call) return namedSource(call[1], 'function', 'text');
             return value.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, name: string) => {
                 if (['user', 'char'].includes(name.trim().toLowerCase())) return match;
-                if (!this.getConfiguration().functions.some(fn => fn.name.trim().toLowerCase() === name.trim().toLowerCase())) return match;
+                if (!this.getConfiguration(save).functions.some(fn => fn.name.trim().toLowerCase() === name.trim().toLowerCase())) return match;
                 return String(namedSource(name, 'function', 'text'));
             });
         }
@@ -576,7 +618,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 if (!isValueReference(entry)) {
                     return typeof entry === 'string' ? [entry] : [];
                 }
-                const configuration = this.getConfiguration();
+                const configuration = this.getConfiguration(save);
                 const sourceType = isGlobalStatReference(entry)
                     ? configuration.globalStats.find(candidate => candidate.id === globalStatReferenceId(entry))?.type
                     : configuration.functions.find(candidate => candidate.id === functionReferenceId(entry))?.returnType;
@@ -588,7 +630,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     readStatValue(value: unknown, stat: Stat, save: SaveType = this.getSave(), stack: string[] = []): StatValue {
-        return resolveStatValue(value, stat, { resolveValue: (source, type) => this.resolveValue(source, type, save, stack) });
+        return this.withStatContext(save, () =>
+            resolveStatValue(value, stat, { resolveValue: (source, type) => this.resolveValue(source, type, save, stack) }));
+    }
+
+    private withStatContext<T>(save: SaveType, action: () => T): T {
+        const previousSave = this.statContextSave;
+        this.statContextSave = save;
+        try {
+            return action();
+        } finally {
+            this.statContextSave = previousSave;
+        }
     }
 
     // Actor-card rules bind "Variable" actor targets to the actor whose card is displayed.
@@ -597,7 +650,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             ...this.getScheduleContext(this.getSave()),
             ...(placement === 'actorCard' || placement === 'outcome' ? { currentActor: actor } : {}),
         };
-        return (this.getConfiguration().controls || [])
+        return (this.getConfiguration(this.getSave()).controls || [])
             .filter((control) => control.placement === placement && isControlAvailable(control, context))
             .sort(compareControlPriority);
     }
@@ -631,7 +684,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Directly sets a global stat's value (used by 'statEditor' controls) and saves.
     setGlobalStatValue(statId: string, value: StatValue) {
-        const stat = (this.getConfiguration().globalStats || []).find((candidate) => candidate.id === statId);
+        const stat = (this.getConfiguration(this.getSave()).globalStats || []).find((candidate) => candidate.id === statId);
         if (!stat) {
             return;
         }
@@ -641,10 +694,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.saveGame();
     }
 
-    updateConfiguration(updates: Partial<GameConfiguration>) {
+    updateConfiguration(updates: Partial<GameConfiguration>, usePublished: boolean = false) {
         this.ensureChatState();
-        const current = this.saveData.configuration;
-        this.saveData.configuration = {
+        const currentSave = this.saveData.saves[this.saveData.lastSaveSlot];
+        const current = (!usePublished && !this.isOwner && currentSave?.configuration) || this.saveData.configuration;
+        const next = {
             ...current,
             ...updates,
             actors: (updates.actors ?? current.actors).map(actor => actor instanceof Actor ? actor : cloneActor(actor)),
@@ -653,32 +707,52 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             maps: (updates.maps ?? current.maps).map(map => map instanceof GameMap ? map : cloneMap(map)),
         };
 
-        const currentSave = this.saveData.saves[this.saveData.lastSaveSlot];
+        if (!usePublished && !this.isOwner && currentSave) {
+            currentSave.configuration = next;
+        } else {
+            this.saveData.configuration = next;
+        }
+        const affectedSave = usePublished && !this.isOwner ? undefined : currentSave;
         if (updates.globalStats) {
-            const configuration = this.saveData.configuration;
+            const configuration = next;
             configuration.globalStatValues = { ...(configuration.globalStatValues || {}) };
             configuration.globalStats.forEach((stat) => {
                 const previousStat = current.globalStats?.find((candidate) => candidate.id === stat.id);
-                [configuration.globalStatValues, currentSave?.globalStatValues].forEach((values) => {
+                [configuration.globalStatValues, affectedSave?.globalStatValues].forEach((values) => {
                     if (values && values[stat.id] !== undefined) {
                         values[stat.id] = includeNewOptionListOptions(values[stat.id], previousStat, stat)!;
                     }
                 });
             });
         }
-        if (currentSave) {
+        if (this.isOwner && affectedSave) {
+            const snapshot = affectedSave.configuration!;
+            // Content still requires its own Apply action; all other draft edits are live in this slot.
+            affectedSave.configuration = {
+                ...cloneConfiguration(next),
+                actors: snapshot.actors,
+                locations: snapshot.locations,
+                items: snapshot.items,
+                maps: snapshot.maps,
+                lorebook: snapshot.lorebook,
+                calendarEvents: snapshot.calendarEvents,
+                versionId: snapshot.versionId,
+            };
+            if (updates.uiSettings) affectedSave.uiSettings = cloneUiSettings(next.uiSettings);
+        }
+        if (affectedSave) {
             // Preserve the save's own values (e.g. changed in-game via stat update rules); only fill gaps
             // from configuration so this doesn't clobber player progress with the configured tester defaults.
-            currentSave.globalStatValues = {
-                ...(this.saveData.configuration.globalStatValues || {}),
-                ...(currentSave.globalStatValues || {}),
+            affectedSave.globalStatValues = {
+                ...(next.globalStatValues || {}),
+                ...(affectedSave.globalStatValues || {}),
             };
-            this.syncGlobalStats(currentSave);
-            this.syncActorStats(currentSave);
-            this.syncLocationStats(currentSave);
-            this.syncItemStats(currentSave);
+            this.syncGlobalStats(affectedSave);
+            this.syncActorStats(affectedSave);
+            this.syncLocationStats(affectedSave);
+            this.syncItemStats(affectedSave);
         }
-        setActiveTimeMode(this.saveData.configuration.timeMode);
+        setActiveTimeMode(this.getConfiguration(affectedSave).timeMode);
         this.syncUniversalSchedule();
     }
 
@@ -772,10 +846,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         // Test whether userId has storage access to update this bot.
         try {
-            const response: any = await this.storage.set('dummy', {data: "dummy data"}).forCharacterSensitive(this.primaryCharacter.anonymizedId);
+            const response = await this.storage.set('dummy', {data: "dummy data"}).forCharacterSensitive(this.primaryCharacter.anonymizedId);
             console.log(response);
-            if (response.errors && response.errors.length) {
-                console.log(`Failed sensitive storage access for ${this.primaryCharacter.anonymizedId}: ${response.errors}`);
+            const storageError = getStorageError(response);
+            if (storageError) {
+                console.log(`Failed sensitive storage access for ${this.primaryCharacter.anonymizedId}: ${storageError}`);
                 await this.readStageConfiguration();
             } else {
                 console.log(`Successfully accessed sensitive storage for ${this.primaryCharacter.anonymizedId}`);
@@ -815,7 +890,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         playerData: {name: string, personality: string, themeColor?: string, themeFontFamily?: string, birthDate?: string},
         selectedGlobalStatValues: {[key: string]: StatValue} = {},
     ): SaveType {
-        const configuration = this.getConfiguration();
+        const configuration = this.getPublishedConfiguration();
         const startingDate = configuration.startingDate || new Date().toISOString().slice(0, 10);
 
         const actors: {[key: string]: Actor} = {
@@ -867,6 +942,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .map(configuredItem => cloneItem(configuredItem, true));
 
         const draftSaveContext = {
+            configuration: cloneConfiguration(configuration),
             playerId: this.primaryUser.anonymizedId,
             actors,
             atlas,
@@ -884,14 +960,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             this.expandRecurringEvent(this.normalizeCalendarEventForSave(cloneCalendarEvent(event), draftSaveContext)),
         );
 
-        const globalStatValues = buildInitialGlobalStatValues(configuration.globalStats || [], selectedGlobalStatValues,
-            this.getScheduleContext(draftSaveContext), draftSaveContext.globalStatValues);
+        const globalStatValues = this.withStatContext(draftSaveContext, () =>
+            buildInitialGlobalStatValues(configuration.globalStats || [], selectedGlobalStatValues,
+                this.getScheduleContext(draftSaveContext), draftSaveContext.globalStatValues));
 
         this.syncActorStats(draftSaveContext);
         this.syncLocationStats(draftSaveContext);
         this.syncItemStats(draftSaveContext);
 
-        return {playerId: this.primaryUser.anonymizedId,
+        return {configuration: draftSaveContext.configuration,
+            playerId: this.primaryUser.anonymizedId,
             actors,
             atlas,
             maps: (configuration.maps || []).filter(map => map.active !== false).map(cloneMap),
@@ -922,7 +1000,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const newSave: SaveType = this.generateFreshSave(playerData, selectedGlobalStatValues);
         Object.assign(newSave, saveSettings);
 
-        const persistedConfiguration = this.getConfiguration();
+        const persistedConfiguration = this.getPublishedConfiguration();
 
         if (!newSave.globalStatValues) {
             newSave.globalStatValues = { ...(persistedConfiguration.globalStatValues || {}) };
@@ -1011,9 +1089,114 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
     
     loadSave(slotIndex: number) {
-        if (this.saveData.saves[this.saveData.lastSaveSlot]) {
+        if (this.saveData.saves[slotIndex]) {
             this.saveData.lastSaveSlot = slotIndex;
+            setActiveTimeMode(this.getConfiguration(this.saveData.saves[slotIndex]).timeMode);
         }
+    }
+
+    canUpdateSave(slotIndex: number): boolean {
+        const save = this.saveData.saves[slotIndex];
+        if (!save) return false;
+        const published = this.getPublishedConfiguration();
+        if (this.isOwner) {
+            return JSON.stringify(buildPortableGameConfiguration(published))
+                !== JSON.stringify(buildPortableGameConfiguration(save.configuration!));
+        }
+        return !!published.versionId
+            && save.configuration?.versionId !== published.versionId;
+    }
+
+    async cloneAndUpdateSave(slotIndex: number): Promise<number> {
+        return this.updateSaveFromConfiguration(slotIndex, true);
+    }
+
+    // Applies the entire creator draft to the current slot without publishing or requiring a free slot.
+    async applyConfigurationToSave(): Promise<void> {
+        if (!this.isOwner) throw new Error('Only creators can apply the draft configuration.');
+        await this.updateSaveFromConfiguration(this.saveData.lastSaveSlot, false);
+    }
+
+    private async updateSaveFromConfiguration(slotIndex: number, clone: boolean): Promise<number> {
+        if (this.cloneUpdateInProgress) {
+            throw new Error('A save update is already in progress.');
+        }
+        this.cloneUpdateInProgress = true;
+        try {
+            return await this.createUpdatedSave(slotIndex, clone);
+        } finally {
+            this.cloneUpdateInProgress = false;
+        }
+    }
+
+    private async createUpdatedSave(slotIndex: number, clone: boolean): Promise<number> {
+        if (!this.saveData.saves[slotIndex]) {
+            throw new Error('An existing save is required to apply configuration.');
+        }
+        if (clone && !this.canUpdateSave(slotIndex)) {
+            throw new Error(this.isOwner
+                ? 'This save already matches the creator draft.'
+                : 'This save has no published update available.');
+        }
+        const targetSlot = clone
+            ? Array.from({ length: this.SAVE_SLOT_COUNT }, (_, index) => index)
+                .find(index => !this.saveData.saves[index])
+            : slotIndex;
+        if (targetSlot === undefined) {
+            throw new Error('An empty save slot is required to clone and update.');
+        }
+        const source = this.saveData.saves[slotIndex]!;
+        const copy: SaveType = JSON.parse(JSON.stringify(source));
+        const configuration = cloneConfiguration(this.getPublishedConfiguration());
+        copy.configuration = configuration;
+        configuration.actors.forEach(actor => {
+            if (actor.id !== copy.playerId) copy.actors[actor.id] = cloneActor(actor, true);
+        });
+        configuration.locations.forEach(location => { copy.atlas[location.id] = cloneLocation(location, true); });
+        configuration.items.forEach(item => {
+            const index = copy.inventory.findIndex(candidate => candidate.id === item.id);
+            if (index < 0) copy.inventory.push(cloneItem(item, true));
+            else copy.inventory[index] = cloneItem(item, true);
+        });
+        configuration.maps.forEach(map => {
+            const index = copy.maps.findIndex(candidate => candidate.id === map.id);
+            if (index < 0) copy.maps.push(cloneMap(map));
+            else copy.maps[index] = cloneMap(map);
+        });
+        const lorebook = copy.lorebook ??= [];
+        configuration.lorebook.forEach(entry => {
+            const index = lorebook.findIndex(candidate => candidate.id === entry.id);
+            if (index < 0) lorebook.push(cloneLore(entry));
+            else lorebook[index] = cloneLore(entry);
+        });
+        const seriesIds = new Set(configuration.calendarEvents.map(event => event.recurrenceParentId || event.id));
+        copy.upcomingEvents = (copy.upcomingEvents || [])
+            .filter(event => !seriesIds.has(event.recurrenceParentId || event.id));
+        const completedEvents = new Set(copy.timeline.map(entry => entry.calendarEventId).filter(Boolean));
+        const series = new Map<string, CalendarEvent>();
+        [...configuration.calendarEvents].sort((a, b) => this.compareCalendarEvents(a, b)).forEach(event => {
+            const seriesId = event.recurrenceParentId || event.id;
+            if (!series.has(seriesId)) series.set(seriesId, { ...event, id: seriesId });
+        });
+        copy.upcomingEvents.push(...[...series.values()].flatMap(event =>
+            this.expandRecurringEvent(this.normalizeCalendarEventForSave(cloneCalendarEvent(event), copy)))
+            .filter(event => !completedEvents.has(event.id)));
+        copy.universalSchedule = cloneActorSchedule(configuration.universalSchedule);
+        copy.uiSettings = cloneUiSettings(configuration.uiSettings);
+        this.ensureCalendarState(copy);
+        copy.maps = copy.maps.map(cloneMap);
+        copy.timestamp = Date.now();
+
+        // Persist an isolated candidate first: a rejected write must not consume a slot or switch games.
+        const nextState = { ...this.saveData, saves: [...this.saveData.saves], lastSaveSlot: targetSlot };
+        nextState.saves[targetSlot] = copy;
+        const response = await this.messenger.updateChatState(nextState);
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to persist the updated save.');
+        }
+        this.saveData = nextState;
+        setActiveTimeMode(configuration.timeMode);
+        return targetSlot;
     }
 
     saveToSlot(slotIndex: number) {
@@ -1456,21 +1639,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Whether the active configuration hides real calendar dates behind an abstract Day N counter.
     getDateMode(): DateMode {
-        return this.getConfiguration().dateMode === 'turnBased' ? 'turnBased' : 'calendar';
+        return this.getConfiguration(this.getSave()).dateMode === 'turnBased' ? 'turnBased' : 'calendar';
     }
 
     // Whether the four daily slots are presented as named times of day or as abstract numbered phases.
     getTimeMode(): TimeMode {
-        return this.getConfiguration().timeMode === 'phase' ? 'phase' : 'timeOfDay';
+        return this.getConfiguration(this.getSave()).timeMode === 'phase' ? 'phase' : 'timeOfDay';
     }
 
     areEventsEnabled(): boolean {
-        return this.getConfiguration().useEvents !== false;
+        return this.getConfiguration(this.getSave()).useEvents !== false;
     }
 
     // Converts a YYYY-MM-DD date into the 1-based day number relative to the configured starting date.
     getDayNumberForDate(dateKey: string): number {
-        const startingDate = this.getConfiguration().startingDate || this.formatDate(new Date());
+        const startingDate = this.getConfiguration(this.getSave()).startingDate || this.formatDate(new Date());
         const start = new Date(`${startingDate}T00:00:00Z`);
         const target = new Date(`${dateKey}T00:00:00Z`);
         if (Number.isNaN(start.getTime()) || Number.isNaN(target.getTime())) {
@@ -1483,7 +1666,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Converts a 1-based day number back into a YYYY-MM-DD date relative to the configured starting date.
     getDateForDayNumber(dayNumber: number): string {
-        const startingDate = this.getConfiguration().startingDate || this.formatDate(new Date());
+        const startingDate = this.getConfiguration(this.getSave()).startingDate || this.formatDate(new Date());
         const normalizedDayNumber = Number.isFinite(dayNumber) ? Math.floor(dayNumber) : 1;
         return this.addDays(startingDate, normalizedDayNumber - 1);
     }
@@ -1596,7 +1779,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // position (exclusive) and the save's current one (inclusive), so recurring rules such as "every morning"
     // still fire for periods skipped by a multi-day jump.
     private applyStatUpdateRules(save: SaveType, previousDate: string, previousTimeOfDay: CalendarTimeOfDay): Skit | null {
-        const rules = (this.getConfiguration().statUpdateRules || []).filter(rule => rule.trigger !== 'startup');
+        const rules = (this.getConfiguration(save).statUpdateRules || []).filter(rule => rule.trigger !== 'startup');
         if (rules.length === 0) {
             return null;
         }
@@ -1643,7 +1826,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (typeof source !== 'object' || Array.isArray(source)) {
             if (type === 'text' && typeof source === 'string' && source.trim()) {
                 const name = source.trim().toLowerCase();
-                const fn = !isValueReference(source) && this.getConfiguration().functions.find(candidate => candidate.returnType === 'text' && candidate.name.trim().toLowerCase() === name);
+                const fn = !isValueReference(source) && this.getConfiguration(save).functions.find(candidate => candidate.returnType === 'text' && candidate.name.trim().toLowerCase() === name);
                 if (fn) {
                     source = functionReference(fn.id);
                 }
@@ -1652,7 +1835,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             validateFunctionResult(value, type);
             return value;
         }
-        const configuration = this.getConfiguration();
+        const configuration = this.getConfiguration(save);
         const stats = source.targetType === 'global' ? configuration.globalStats
             : source.targetType === 'actor' ? configuration.actorStats
                 : source.targetType === 'location' ? configuration.locationStats : configuration.itemStats;
@@ -1696,7 +1879,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     // global function invocation ('function' kind).
     private applyStatUpdateAction(save: SaveType, update: GameAction, context: ConditionContext) {
         if (update.kind === 'function') {
-            const fn = this.getConfiguration().functions.find(candidate => candidate.id === update.functionId);
+            const fn = this.getConfiguration(save).functions.find(candidate => candidate.id === update.functionId);
             if (!fn) {
                 console.error(`Unknown function: ${update.functionId}`);
                 return;
@@ -1742,8 +1925,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return activeItems.filter(item => item.id === itemId);
     }
 
-    private getStatsForUpdateTarget(targetType: StatUpdate['targetType']): Stat[] {
-        const configuration = this.getConfiguration();
+    private getStatsForUpdateTarget(targetType: StatUpdate['targetType'], save: SaveType): Stat[] {
+        const configuration = this.getConfiguration(save);
         switch (targetType) {
             case 'global': return configuration.globalStats || [];
             case 'location': return configuration.locationStats || [];
@@ -1767,7 +1950,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Builds the get/set accessors a function script uses to read/write a global stat by name.
     private buildGlobalScriptAccessors(save: SaveType, context: ScriptContext): Pick<FunctionScriptBindings, 'get' | 'getObjects' | 'set'> {
-        const stats = this.getConfiguration().globalStats || [];
+        const stats = this.getConfiguration(save).globalStats || [];
         const findStat = (name: string) => stats.find(candidate => candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
         return {
             get: (name: string) => {
@@ -1805,7 +1988,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             });
         }
         const kind = resolveReferenceKind(stat.type)!;
-        const configuration = this.getConfiguration();
+        const configuration = this.getConfiguration(save);
         const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
         const fields = kind === 'actor' ? ACTOR_SCRIPT_FIELDS : kind === 'location' ? LOCATION_SCRIPT_FIELDS : ITEM_SCRIPT_FIELDS;
         return ids.flatMap(id => {
@@ -1876,44 +2059,44 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private findActorScriptEntity(save: SaveType, name: string, context: ScriptContext): FunctionScriptEntity | undefined {
         const actor = Object.values(save.actors || {}).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return actor ? this.buildEntityScriptAccessor(save, actor, 'actor', this.getConfiguration().actorStats || [], ACTOR_SCRIPT_FIELDS, context) : undefined;
+        return actor ? this.buildEntityScriptAccessor(save, actor, 'actor', this.getConfiguration(save).actorStats || [], ACTOR_SCRIPT_FIELDS, context) : undefined;
     }
 
     private findLocationScriptEntity(save: SaveType, name: string, context: ScriptContext): FunctionScriptEntity | undefined {
         const location = Object.values(save.atlas || {}).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return location ? this.buildEntityScriptAccessor(save, location, 'location', this.getConfiguration().locationStats || [], LOCATION_SCRIPT_FIELDS, context) : undefined;
+        return location ? this.buildEntityScriptAccessor(save, location, 'location', this.getConfiguration(save).locationStats || [], LOCATION_SCRIPT_FIELDS, context) : undefined;
     }
 
     private findItemScriptEntity(save: SaveType, name: string, context: ScriptContext): FunctionScriptEntity | undefined {
         const item = (save.inventory || []).find(candidate => candidate.active !== false && candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
-        return item ? this.buildEntityScriptAccessor(save, item, 'item', this.getConfiguration().itemStats || [], ITEM_SCRIPT_FIELDS, context) : undefined;
+        return item ? this.buildEntityScriptAccessor(save, item, 'item', this.getConfiguration(save).itemStats || [], ITEM_SCRIPT_FIELDS, context) : undefined;
     }
 
     // Every active (non-deleted) actor/location/item, wrapped as FunctionScriptEntity, for scripts that need to
     // loop over the full cast (e.g. `actors().forEach(a => ...)`).
     private buildActorScriptEntities(save: SaveType, context: ScriptContext): FunctionScriptEntity[] {
-        const actorStats = this.getConfiguration().actorStats || [];
+        const actorStats = this.getConfiguration(save).actorStats || [];
         return Object.values(save.actors || {})
             .filter(actor => actor.active !== false)
             .map(actor => this.buildEntityScriptAccessor(save, actor, 'actor', actorStats, ACTOR_SCRIPT_FIELDS, context));
     }
 
     private buildLocationScriptEntities(save: SaveType, context: ScriptContext): FunctionScriptEntity[] {
-        const locationStats = this.getConfiguration().locationStats || [];
+        const locationStats = this.getConfiguration(save).locationStats || [];
         return Object.values(save.atlas || {})
             .filter(location => location.active !== false)
             .map(location => this.buildEntityScriptAccessor(save, location, 'location', locationStats, LOCATION_SCRIPT_FIELDS, context));
     }
 
     private buildItemScriptEntities(save: SaveType, context: ScriptContext): FunctionScriptEntity[] {
-        const itemStats = this.getConfiguration().itemStats || [];
+        const itemStats = this.getConfiguration(save).itemStats || [];
         return (save.inventory || [])
             .filter(item => item.active !== false)
             .map(item => this.buildEntityScriptAccessor(save, item, 'item', itemStats, ITEM_SCRIPT_FIELDS, context));
     }
 
     private buildFunctionScriptBindings(save: SaveType, depth: number, context: ScriptContext, onError?: (message: string) => void): FunctionScriptBindings {
-        const configuration = this.getConfiguration();
+        const configuration = this.getConfiguration(save);
         const call = (name: string): unknown => {
             if (depth >= MAX_FUNCTION_INVOCATION_DEPTH) {
                 throw new Error('Maximum function invocation depth exceeded.');
@@ -1971,7 +2154,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private applyStatUpdate(save: SaveType, update: StatUpdate, context: ConditionContext = {}) {
-        const stat = this.getStatsForUpdateTarget(update.targetType).find(candidate => candidate.id === update.statId);
+        const stat = this.getStatsForUpdateTarget(update.targetType, save).find(candidate => candidate.id === update.statId);
         if (!stat) {
             return;
         }
@@ -2009,7 +2192,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType, useConfiguration: boolean = false): CalendarEvent {
-        const configuration = this.getConfiguration();
+        const configuration = this.getConfiguration(save);
         const allLocations = useConfiguration
             ? (configuration.locations || []).filter(location => location.active !== false)
             : Object.values(save.atlas || {}).filter(location => location.active !== false);
@@ -2218,7 +2401,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     private getStartingDate(save: SaveType): string {
 
-        return this.getConfiguration().startingDate || save.currentDate || new Date().toISOString().slice(0, 10);
+        return this.getConfiguration(save).startingDate || save.currentDate || new Date().toISOString().slice(0, 10);
     }
 
     private buildEventName(locationName: string, participantNames: string[]): string {
@@ -2261,7 +2444,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }));
 
         save.globalStatValues = {
-            ...(this.getConfiguration().globalStatValues || {}),
+            ...(this.getConfiguration(save).globalStatValues || {}),
             ...(save.globalStatValues || {}),
         };
 
@@ -2278,16 +2461,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private syncActorStats(save: SaveType) {
-        this.syncEntityStats(Object.values(save.actors || {}), this.getConfiguration().actorStats, save);
+        this.syncEntityStats(Object.values(save.actors || {}), this.getConfiguration(save).actorStats, save);
     }
 
     private syncLocationStats(save: SaveType) {
-        this.syncEntityStats(Object.values(save.atlas || {}), this.getConfiguration().locationStats, save);
+        this.syncEntityStats(Object.values(save.atlas || {}), this.getConfiguration(save).locationStats, save);
     }
 
     private syncItemStats(save: SaveType) {
         save.inventory = (save.inventory || []).map(item => item instanceof Item ? item : cloneItem(item));
-        this.syncEntityStats(save.inventory, this.getConfiguration().itemStats, save);
+        this.syncEntityStats(save.inventory, this.getConfiguration(save).itemStats, save);
     }
 
     private syncEntityStats(entities: { statMap: Record<string, StatValue> }[], stats: Stat[] | undefined, save: SaveType) {
@@ -2313,7 +2496,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private syncGlobalStats(save: SaveType) {
-        const configuredStats = (this.getConfiguration().globalStats || []).filter(stat => stat?.name?.trim());
+        const configuredStats = (this.getConfiguration(save).globalStats || []).filter(stat => stat?.name?.trim());
         const currentValues = save.globalStatValues && typeof save.globalStatValues === 'object'
             ? save.globalStatValues
             : {};
@@ -2551,7 +2734,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     const statMap = outcome.details?.statMap || {};
                     if (actorId && save.actors?.[actorId]) {
                         const actor = save.actors[actorId];
-                        const configuredStats = (this.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim());
+                        const configuredStats = (this.getConfiguration(save).actorStats || []).filter(stat => stat?.name?.trim());
                         const configuredStatByName = new Map(configuredStats.map(stat => [stat.name, stat]));
 
                         if (outcome.details?.absoluteValue !== undefined) {
@@ -2594,7 +2777,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 case 'PLAYER_STAT':
                     // For global/world stat changes, we expect a statName and either a numeric changeValue
                     // (delta) or an absoluteValue for a direct assignment (e.g. text/option stats).
-                    const configuredGlobalStats = (this.getConfiguration().globalStats || []).filter(stat => stat?.name?.trim());
+                    const configuredGlobalStats = (this.getConfiguration(save).globalStats || []).filter(stat => stat?.name?.trim());
                     const configuredGlobalStatByName = new Map(configuredGlobalStats.map(stat => [stat.name, stat]));
                     const incomingGlobalStatName = `${outcome.details?.statName || ''}`.trim();
                     const resolvedGlobalStat = configuredGlobalStatByName.get(incomingGlobalStatName)
@@ -3081,6 +3264,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         });
 
         return buildPortableGameConfiguration({
+            versionId: configuration.versionId,
+            artStyle: configuration.artStyle,
+            universalSchedule: configuration.universalSchedule,
             title: configuration.title,
             titleImageUrl: configuration.titleImageUrl,
             titleImagePrompt: configuration.titleImagePrompt,
@@ -3121,6 +3307,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         console.log('Attempting to read stage configuration');
         const characterIds = speakerIds.length ? speakerIds : [this.primaryCharacter.anonymizedId];
         const response = await this.storage.get('agenda_configuration').forCharacters(characterIds);
+        const storageError = getStorageError(response);
+        if (storageError) throw new Error(`Failed to read the published configuration: ${storageError}`);
         // response.data is a list of StorageDatum entries; the stored configuration lives in an entry's `value`.
         const entries = Array.isArray(response?.data) ? response.data : [];
         const storedContent = entries.find((entry: any) => entry?.key === 'agenda_configuration' && entry.value)?.value;
@@ -3131,7 +3319,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         // If there was content, load it as the game's configuration so new games use the latest saved content.
         if (storedContent && typeof storedContent === 'object') {
             console.log('Should load configuration');
-            this.updateConfiguration(storedContent as Partial<GameConfiguration>);
+            const updates = storedContent as Partial<GameConfiguration>;
+            this.updateConfiguration({ ...updates, versionId: updates.versionId }, true);
+            const result = await this.messenger.updateChatState(this.saveData);
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to persist the downloaded configuration.');
+            }
         }
     }
 
@@ -3143,11 +3336,19 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
         try {
             const portableConfiguration = this.buildPortableConfiguration();
-            const response: any = await this.storage.set('agenda_configuration', portableConfiguration).forCharacterSensitive(this.primaryCharacter.anonymizedId);
+            portableConfiguration.versionId = uuidv4();
+            const response = await this.storage.set('agenda_configuration', portableConfiguration).forCharacterSensitive(this.primaryCharacter.anonymizedId);
             console.log(response);
-            return !(response?.errors && response.errors.length);
+            const storageError = getStorageError(response);
+            if (storageError) throw new Error(storageError);
+            this.saveData.configuration.versionId = portableConfiguration.versionId;
+            const result = await this.messenger.updateChatState(this.saveData);
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to persist the published configuration version.');
+            }
+            return true;
         } catch (error) {
-            console.log(`Error publishing stage configuration: ${error}`);
+            console.error(`Error publishing stage configuration: ${error}`);
             return false;
         }
     }

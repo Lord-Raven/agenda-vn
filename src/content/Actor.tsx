@@ -928,7 +928,7 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
             ...stage.getScheduleContext(save),
             currentActor: { id: actor.id, name: actor.name, statMap: actor.statMap },
         };
-        const actorStats = (stage.getConfiguration().actorStats || []).filter(stat => stat?.name?.trim() && isStatLlmSeen(stat, actorStatContext));
+        const actorStats = (stage.getConfiguration(save).actorStats || []).filter(stat => stat?.name?.trim() && isStatLlmSeen(stat, actorStatContext));
         const statLines = actorStats
             .filter(stat => actor.statMap?.[stat.id] !== undefined)
             .map(stat => `${stat.name}: ${formatActorStatValue(stage.readStatValue(actor.statMap[stat.id], stat, save), stat, save.atlas, save.actors, save.inventory)}`);

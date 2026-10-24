@@ -43,7 +43,7 @@ const formatReferenceStatValue = (stat: { type: StatType }, value: unknown, stag
 );
 
 const buildActorStatPromptContext = (stage: Stage, save: ReturnType<Stage['getSave']>): PromptBuilder | string => {
-    const configuration = stage.getConfiguration();
+    const configuration = stage.getConfiguration(save);
     const actors = Object.values(save.actors || {}).filter(actor => actor?.id && actor.active !== false);
     const baseContext = stage.getScheduleContext(save);
     const stats = (configuration.actorStats || [])
@@ -67,7 +67,7 @@ const buildActorStatPromptContext = (stage: Stage, save: ReturnType<Stage['getSa
 };
 
 const buildGlobalStatPromptContext = (stage: Stage, save: ReturnType<Stage['getSave']>): PromptBuilder | string => {
-    const configuration = stage.getConfiguration();
+    const configuration = stage.getConfiguration(save);
     const stats = configuration.globalStats || [];
     const values = { ...(configuration.globalStatValues || {}), ...(save.globalStatValues || {}) };
     const optionContext = { sourceStats: stats, globalStatValues: values };
@@ -307,7 +307,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     const currentActors = skit ? getCurrentActors(skit, skit.script.length - 1).map(actorId => save.actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[] : [];
     currentActors.forEach(() => {});
     const lorebook = save.lorebook || [];
-    const agendaConfig = stage.getConfiguration();
+    const agendaConfig = stage.getConfiguration(save);
     const conditionContext: ConditionContext = stage.getScheduleContext(save);
     const passedProbabilityLoreIds = new Set(
         lorebook.filter((lore) => isLoreProbabilityActive(lore)).map((lore) => lore.id),
@@ -731,7 +731,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 }
 
                 if (!normalizedActorName) {
-                    const matchedGlobalStat = findBestNameMatch(normalizedStatName, stage.getConfiguration().globalStats || [], ['name']);
+                    const matchedGlobalStat = findBestNameMatch(normalizedStatName, stage.getConfiguration(save).globalStats || [], ['name']);
                     if (!matchedGlobalStat) {
                         return undefined;
                     }
@@ -773,7 +773,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 }
 
                 const matchedActor = findBestNameMatch(normalizedActorName, actorPool, ['name']);
-                const matchedStat = findBestNameMatch(normalizedStatName, stage.getConfiguration().actorStats || [], ['name']);
+                const matchedStat = findBestNameMatch(normalizedStatName, stage.getConfiguration(save).actorStats || [], ['name']);
                 if (!matchedActor || !matchedStat) {
                     return undefined;
                 }

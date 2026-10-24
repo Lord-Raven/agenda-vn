@@ -102,7 +102,7 @@ const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined
 // Don't use on text written back to the source.
 export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor): string {
     const save = stage.getSave();
-    const configuration = stage.getConfiguration();
+    const configuration = stage.getConfiguration(save);
     const player = stage.getPlayerActor();
     const lookup = { actors: save.actors, items: save.inventory, locations: save.atlas };
 

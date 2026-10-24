@@ -95,14 +95,14 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         );
     }
 
-    const stat = (stageInstance.getConfiguration().globalStats || []).find((candidate) => candidate.id === control.statId);
+    const stat = (stageInstance.getConfiguration(stageInstance.getSave()).globalStats || []).find((candidate) => candidate.id === control.statId);
     const statName = stat?.name?.trim();
     if (!stat || !statName) {
         return null;
     }
 
     const rawValue = stageInstance.getSave()?.globalStatValues?.[stat.id]
-        ?? stageInstance.getConfiguration()?.globalStatValues?.[stat.id]
+        ?? stageInstance.getConfiguration(stageInstance.getSave())?.globalStatValues?.[stat.id]
         ?? stat.default;
     const normalizedValue = control.type === 'statEditor' ? normalizeStatValue(rawValue, stat) : stageInstance.readStatValue(rawValue, stat);
     const StatIcon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;

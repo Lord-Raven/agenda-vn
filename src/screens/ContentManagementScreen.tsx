@@ -1,4 +1,5 @@
 import React, { FC, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
 import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2, Code, Rule } from '@mui/icons-material';
@@ -30,6 +31,11 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
     const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
     const isCreatorMode = stage().isOwner && isCreateMode;
     const [publishStatus, setPublishStatus] = useState<'idle' | 'publishing' | 'published' | 'failed'>('idle');
+    const [applyStatus, setApplyStatus] = useState<'idle' | 'applying' | 'applied' | 'failed'>('idle');
+    const [applyError, setApplyError] = useState<string | null>(null);
+    const applyInProgress = React.useRef(false);
+    const isBusy = publishStatus === 'publishing' || applyStatus === 'applying';
+    const hasSave = !!stage().saveData.saves[stage().saveData.lastSaveSlot];
     const eventsEnabled = stage().areEventsEnabled();
 
     useEffect(() => {
@@ -40,8 +46,33 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
         return () => window.clearTimeout(timeout);
     }, [publishStatus]);
 
+    useEffect(() => {
+        if (applyStatus !== 'applied') return;
+        const timeout = window.setTimeout(() => setApplyStatus('idle'), 2500);
+        return () => window.clearTimeout(timeout);
+    }, [applyStatus]);
+
+    const handleApply = async () => {
+        if (applyInProgress.current || isBusy) return;
+        applyInProgress.current = true;
+        setApplyError(null);
+        try {
+            // Unmount editors first so their pending debounced changes flush before taking the draft snapshot.
+            flushSync(() => setApplyStatus('applying'));
+            await stage().applyConfigurationToSave();
+            setApplyStatus('applied');
+        } catch (error) {
+            console.error('Failed to apply creator configuration', error);
+            setApplyStatus('failed');
+            setApplyError(error instanceof Error ? error.message : 'Failed to apply configuration.');
+        } finally {
+            applyInProgress.current = false;
+        }
+    };
+
     const handlePublish = async () => {
-        setPublishStatus('publishing');
+        if (isBusy) return;
+        flushSync(() => setPublishStatus('publishing'));
         const success = await stage().publishStageConfiguration();
         setPublishStatus(success ? 'published' : 'failed');
     };
@@ -153,6 +184,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                                 aria-checked={isCreatorMode}
                                                 title={isCreatorMode ? 'Switch to manage mode' : 'Switch to create mode'}
                                                 onClick={() => setIsCreateMode((current) => !current)}
+                                                disabled={isBusy}
                                                 style={{
                                                     position: 'relative',
                                                     width: '46px',
@@ -190,7 +222,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                             </span>
                                             <Button
                                                 variant="secondary"
-                                                disabled={publishStatus === 'publishing'}
+                                                disabled={isBusy}
                                                 onClick={handlePublish}
                                                 title="Publish the current configuration so other users receive it"
                                                 style={{ marginLeft: '8px', padding: '6px 14px', fontSize: '14px' }}
@@ -200,12 +232,27 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                                     : publishStatus === 'failed' ? 'Publish Failed'
                                                     : 'Publish'}
                                             </Button>
+                                            <Button
+                                                variant="secondary"
+                                                disabled={isBusy || !hasSave}
+                                                onClick={handleApply}
+                                                title={hasSave
+                                                    ? 'Apply all draft configuration and content to the current save without cloning or publishing. Matching content is replaced.'
+                                                    : 'Start or load a game before applying the draft'}
+                                                style={{ padding: '6px 14px', fontSize: '14px' }}
+                                            >
+                                                {applyStatus === 'applying' ? 'Applying...'
+                                                    : applyStatus === 'applied' ? 'Applied'
+                                                    : applyStatus === 'failed' ? 'Apply Failed'
+                                                    : 'Apply'}
+                                            </Button>
                                         </div>
                                     )}
                                     <motion.button
                                         whileHover={{ scale: 1.1 }}
                                         whileTap={{ scale: 0.9 }}
                                         onClick={onClose}
+                                        disabled={isBusy}
                                         style={{
                                             background: 'transparent',
                                             border: 'none',
@@ -222,6 +269,8 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     </motion.button>
                                 </div>
                             </div>
+                            {applyError && <div role="alert" style={{ color: 'var(--agenda-danger-text)', marginBottom: '12px' }}>{applyError}</div>}
+                            {applyStatus === 'applied' && <div role="status">Applied draft configuration and content to the current save.</div>}
 
                             {/* Tab Navigation */}
                             <div style={{
@@ -394,7 +443,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                             </div>
 
                             {/* Content Area */}
-                            <div style={{
+                            {isBusy ? <div role="status">{applyStatus === 'applying' ? 'Applying draft...' : 'Publishing draft...'}</div> : <div style={{
                                 flex: 1,
                                 overflow: 'auto',
                                 paddingRight: '10px',
@@ -458,7 +507,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 {activeTab === 'controls' && (
                                     <ControlManagementPanel stage={stage} />
                                 )}
-                            </div>
+                            </div>}
                         </GlassPanel>
                     </motion.div>
                 </motion.div>

@@ -118,6 +118,9 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
 
     const portableGameConfiguration = useMemo(() => {
         return buildPortableGameConfiguration({
+            versionId: configuration.versionId,
+            artStyle,
+            universalSchedule: configuration.universalSchedule,
             title,
             titleImageUrl,
             titleImagePrompt,
@@ -153,6 +156,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         activeLocations,
         activeMaps,
         actorStats,
+        artStyle,
         backgroundImagePrompt,
         backgroundImageUrl,
         castActorIds,
@@ -170,6 +174,8 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         configuration.controls,
         configuration.functions,
         configuration.statUpdateRules,
+        configuration.versionId,
+        configuration.universalSchedule,
         stageInstance,
         startingDate,
         title,

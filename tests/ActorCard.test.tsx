@@ -37,6 +37,7 @@ const fixture = () => {
     };
     const stage: Stage = Object.create(Stage.prototype);
     stage.getConfiguration = () => configuration;
+    stage.getPublishedConfiguration = () => configuration;
     stage.getSave = () => save;
     const render = () => renderToStaticMarkup(<TooltipProvider><ActorCard actor={actor} stage={() => stage} /></TooltipProvider>);
     return { actor, configuration, save, stage, render };

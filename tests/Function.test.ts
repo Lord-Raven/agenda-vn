@@ -781,6 +781,7 @@ test('automatic guidance preserves the explicit cast, including unscheduled acto
 
 test('configuration updates retain functions independently of stat changes', () => {
     const { stage, configuration, save } = fixture();
+    stage.isOwner = true;
     stage.saveData = { configuration, saves: [save], lastSaveSlot: 0 };
     const fn = gameFunction('return 42;');
     stage.updateConfiguration({ functions: [fn] });

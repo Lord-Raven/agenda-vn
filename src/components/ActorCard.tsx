@@ -62,7 +62,7 @@ const StatValueContainer: FC<{ stat: Stat; control: Control; value: StatValue; s
 export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className = '' }) => {
     const stageInstance = stage();
     const isCalendarMode = stageInstance.getDateMode() === 'calendar';
-    const configuredStats = stageInstance.getConfiguration().actorStats || [];
+    const configuredStats = stageInstance.getConfiguration(stageInstance.getSave()).actorStats || [];
     const statControls = actor ? stageInstance.getVisibleControls('actorCard', actor).flatMap(control => {
         const stat = configuredStats.find(candidate => candidate.id === control.statId);
         return control.type === 'actorStatDisplay' && stat?.name?.trim()
@@ -77,7 +77,7 @@ export const ActorCard: FC<ActorCardProps> = ({ actor, stage, style, className =
         }
 
         const birth = new Date(`${birthDate}T00:00:00Z`);
-        const currentDate = (stage().getSave()?.currentDate || stage().getConfiguration()?.startingDate || new Date().toISOString().slice(0, 10)).trim();
+        const currentDate = (stage().getSave()?.currentDate || stage().getConfiguration(stage().getSave())?.startingDate || new Date().toISOString().slice(0, 10)).trim();
         const current = new Date(`${currentDate}T00:00:00Z`);
 
         if (Number.isNaN(birth.getTime()) || Number.isNaN(current.getTime())) {

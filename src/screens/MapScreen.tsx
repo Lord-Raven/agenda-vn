@@ -44,7 +44,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
     };
 
     const stageInstance = stage();
-    const configuredBackgroundImageUrl = (stageInstance.getConfiguration().backgroundImageUrl || "").trim();
+    const configuredBackgroundImageUrl = (stageInstance.getConfiguration(stageInstance.getSave()).backgroundImageUrl || "").trim();
     const cachedBackgroundImageUrl = useCachedImageUrl(configuredBackgroundImageUrl);
     const screenBackgroundImage = cachedBackgroundImageUrl
         ? `linear-gradient(130deg, var(--agenda-atmosphere-start) 0%, var(--agenda-atmosphere-mid) 48%, var(--agenda-atmosphere-end) 100%), url(${cachedBackgroundImageUrl})`

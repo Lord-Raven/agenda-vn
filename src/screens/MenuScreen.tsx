@@ -26,10 +26,12 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const disableAllButtons = false; // When true, disable all options on this menu, including escape to continue; this is being used to effectively shut down the game at the moment.
     const [showSaveLoad, setShowSaveLoad] = React.useState(false);
+    const [isUpdatingSave, setIsUpdatingSave] = React.useState(false);
     const [saveLoadMode, setSaveLoadMode] = React.useState<'save' | 'load'>('save');
-    const configuredTitle = stage().getConfiguration().title || 'Agenda VN';
-    const configuredTitleImageUrl = (stage().getConfiguration().titleImageUrl || '').trim();
-    const configuredBackgroundImageUrl = (stage().getConfiguration().backgroundImageUrl || '').trim();
+    const menuConfiguration = stage().getPublishedConfiguration();
+    const configuredTitle = menuConfiguration.title || 'Agenda VN';
+    const configuredTitleImageUrl = (menuConfiguration.titleImageUrl || '').trim();
+    const configuredBackgroundImageUrl = (menuConfiguration.backgroundImageUrl || '').trim();
 
     // Check if a save exists
     const saveExists = () => {
@@ -39,7 +41,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     // Handle escape key to continue game if available
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && !disableAllButtons && !showContentManagement) {
+            if (event.key === 'Escape' && !disableAllButtons && !showContentManagement && !isUpdatingSave) {
                 if (showSettings) {
                     handleSettingsCancel();
                 } else if (showSaveLoad) {
@@ -52,7 +54,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [showSettings, showSaveLoad, showContentManagement]);
+    }, [showSettings, showSaveLoad, showContentManagement, isUpdatingSave]);
 
     const handleContinue = () => {
         setScreenType(stage().getCurrentSkit() ? ScreenType.SKIT : ScreenType.MAP);
@@ -470,7 +472,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                                 boxSizing: 'border-box',
                                             }}
                                         >
-                                            {stage().getConfiguration().versionNotes || '2026.09.10 - Initial release of Agenda VN.'}
+                                            {menuConfiguration.versionNotes || '2026.09.10 - Initial release of Agenda VN.'}
                                         </div>
                                     </motion.div>
                                 )}
@@ -495,6 +497,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
             {showSaveLoad && (
                 <SaveLoadScreen
                     stage={stage}
+                    onUpdateStateChange={setIsUpdatingSave}
                     mode={saveLoadMode}
                     onClose={() => setShowSaveLoad(false)}
                     setScreenType={setScreenType}

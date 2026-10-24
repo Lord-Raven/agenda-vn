@@ -124,7 +124,8 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
             return true;
         }
         const target = outcome.type === OutcomeType.ACTOR_STAT ? 'actor' : 'global';
-        const stats = target === 'actor' ? stage().getConfiguration().actorStats : stage().getConfiguration().globalStats;
+        const configuration = stage().getConfiguration(stage().getSave());
+        const stats = target === 'actor' ? configuration.actorStats : configuration.globalStats;
         const stat = stats.find((candidate) => candidate.name === `${outcome.details?.statName || ''}`.trim());
         if (!stat) {
             return false;
@@ -132,7 +133,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
         const actor = target === 'actor' ? resolveActor(outcome.details?.actorId) : undefined;
         const matchesStat = (candidate: Control): boolean =>
             candidate.type === 'statOutcome' && candidate.outcomeStatTarget === target && candidate.statId === stat.id;
-        const hasConfiguredControl = stage().getConfiguration().controls.some(matchesStat);
+        const hasConfiguredControl = configuration.controls.some(matchesStat);
         const control = hasConfiguredControl
             ? stage().getVisibleControls('outcome', actor).find(matchesStat)
             : defaultOutcomeControl;
@@ -154,7 +155,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
         const { stat, control } = match;
         const rawValue = outcome.type === OutcomeType.ACTOR_STAT
             ? actor?.statMap?.[stat.id]
-            : stage().getSave().globalStatValues?.[stat.id] ?? stage().getConfiguration().globalStatValues?.[stat.id];
+            : stage().getSave().globalStatValues?.[stat.id] ?? stage().getConfiguration(stage().getSave()).globalStatValues?.[stat.id];
         const currentValue = stage().readStatValue(rawValue ?? stat.default, stat);
         const nextValue = outcome.details?.absoluteValue !== undefined
             ? stage().readStatValue(outcome.details.absoluteValue, stat)

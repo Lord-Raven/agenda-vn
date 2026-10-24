@@ -35,7 +35,7 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
     const stageInstance = stage();
     const topControls = stageInstance.getVisibleControls('top');
     const save = stageInstance.getSave();
-    const currentDate = save?.currentDate || stageInstance.getConfiguration()?.startingDate || new Date().toISOString().slice(0, 10);
+    const currentDate = save?.currentDate || stageInstance.getConfiguration(save)?.startingDate || new Date().toISOString().slice(0, 10);
     const currentTimeOfDay = save?.currentTimeOfDay || "morning";
     const DateTimeIcon = getDateTimeIcon(currentTimeOfDay);
     const isPhaseMode = stageInstance.getTimeMode() === "phase";

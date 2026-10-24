@@ -1,7 +1,7 @@
 import React, { FC } from 'react';
 import { motion } from 'framer-motion';
-import { Stage, SaveType } from '../Stage';
-import { Save, FolderOpen, Close, Delete } from '@mui/icons-material';
+import { Stage } from '../Stage';
+import { Save, FolderOpen, Close, Delete, SystemUpdateAlt } from '@mui/icons-material';
 import { ScreenType } from './BaseScreen';
 import { useTooltip } from '../components/TooltipContext';
 import { getEmotionImage } from '../content/Actor';
@@ -12,14 +12,61 @@ interface SaveLoadScreenProps {
     mode: 'save' | 'load';
     onClose: () => void;
     setScreenType?: (type: ScreenType) => void;
+    onUpdateStateChange?: (updating: boolean) => void;
 }
 
-export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, setScreenType }) => {
+export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, setScreenType, onUpdateStateChange }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const [hoveredSlot, setHoveredSlot] = React.useState<number | null>(null);
     const [deleteConfirmSlot, setDeleteConfirmSlot] = React.useState<number | null>(null);
+    const [isUpdating, setIsUpdating] = React.useState(false);
+    const [isRefreshing, setIsRefreshing] = React.useState(false);
+    const [refreshFailed, setRefreshFailed] = React.useState(false);
+    const [updateError, setUpdateError] = React.useState<string | null>(null);
+    const updateInProgress = React.useRef(false);
+    const stageInstance = stage();
+    const hasOpenSlot = Array.from({ length: stageInstance.SAVE_SLOT_COUNT }, (_, index) => index)
+        .some(index => !stageInstance.saveData.saves[index]);
+
+    React.useEffect(() => {
+        if (stageInstance.isOwner) return;
+        let mounted = true;
+        setIsRefreshing(true);
+        stageInstance.readStageConfiguration().catch(error => {
+            console.error('Failed to check for save updates', error);
+            if (mounted) {
+                setRefreshFailed(true);
+                setUpdateError('Could not check for updates. Reopen this screen to retry.');
+            }
+        }).finally(() => {
+            if (mounted) setIsRefreshing(false);
+        });
+        return () => { mounted = false; };
+    }, [stageInstance]);
+
+    const handleCloneAndUpdate = async (slotIndex: number) => {
+        if (updateInProgress.current) return;
+        updateInProgress.current = true;
+        setIsUpdating(true);
+        onUpdateStateChange?.(true);
+        setUpdateError(null);
+        try {
+            const targetSlot = await stageInstance.cloneAndUpdateSave(slotIndex);
+            setTooltip(`Updated copy saved to slot ${targetSlot + 1}. Original save kept.`, SystemUpdateAlt, 4000);
+            onClose();
+            setScreenType?.(stageInstance.areEventsEnabled() ? ScreenType.CALENDAR : ScreenType.MAP);
+        } catch (error) {
+            console.error('Failed to clone and update save', error);
+            setUpdateError(error instanceof Error ? error.message : 'Failed to clone and update save.');
+        } finally {
+            updateInProgress.current = false;
+            setIsUpdating(false);
+            onUpdateStateChange?.(false);
+        }
+    };
 
     const handleSlotClick = (slotIndex: number) => {
+        if (isUpdating || isRefreshing) return;
         if (mode === 'save') {
             // Save to this slot
             stage().saveToSlot(slotIndex);
@@ -116,7 +163,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         clearTooltip();
                     }}
                     onClick={() => handleSlotClick(slotIndex)}
-                    disabled={mode === 'load' && isEmpty}
+                    disabled={isUpdating || isRefreshing || (mode === 'load' && isEmpty)}
                     style={{
                         width: '100%',
                         height: '85px',
@@ -151,7 +198,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                                 e.stopPropagation();
                                 clearTooltip();
                             }}
-                            disabled={isCurrentSlot}
+                            disabled={isCurrentSlot || isUpdating || isRefreshing}
                             style={{
                                 position: 'absolute',
                                 top: 0,
@@ -268,6 +315,24 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         </>
                     )}
                 </Button>
+                {stageInstance.canUpdateSave(slotIndex) && (
+                    <Button
+                        variant="menu"
+                        onClick={() => void handleCloneAndUpdate(slotIndex)}
+                        disabled={!hasOpenSlot || isUpdating || isRefreshing || refreshFailed}
+                        onMouseEnter={() => setTooltip(
+                            hasOpenSlot
+                                ? `Copy to an empty slot and apply ${stageInstance.isOwner ? 'the creator draft' : 'published configuration'} and content. The original save is kept.`
+                                : 'Free a save slot to clone and update. The original will not be overwritten.',
+                            SystemUpdateAlt,
+                        )}
+                        onMouseLeave={clearTooltip}
+                        style={{ marginTop: '6px', padding: '6px 12px' }}
+                    >
+                        <SystemUpdateAlt fontSize="small" />
+                        {' '}Clone and Update{!hasOpenSlot ? ' (empty slot required)' : ''}
+                    </Button>
+                )}
             </motion.div>
         );
     };
@@ -288,7 +353,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
             }}
             onClick={(e) => {
                 if (e.target === e.currentTarget) {
-                    onClose();
+                    if (!isUpdating) onClose();
                 }
             }}
         >
@@ -322,6 +387,7 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={onClose}
+                        disabled={isUpdating}
                         onMouseEnter={() => setTooltip('Close', Close)}
                         onMouseLeave={() => clearTooltip()}
                         style={{
@@ -352,6 +418,9 @@ export const SaveLoadScreen: FC<SaveLoadScreenProps> = ({ stage, mode, onClose, 
                         The game will continue to auto-save to your selected slot.
                     </div>
                 )}
+
+                {updateError && <div role="alert" style={{ color: 'var(--agenda-danger-text)', marginBottom: '12px' }}>{updateError}</div>}
+                {isUpdating && <div role="status">Cloning and applying update...</div>}
 
                 {/* Save slots container */}
                 <div style={{

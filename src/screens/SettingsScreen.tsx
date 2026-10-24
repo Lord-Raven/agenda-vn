@@ -42,11 +42,6 @@ interface SettingsData {
     language: string;
 }
 
-const resolveActiveGlobalStats = (stageInstance: Stage): Stat[] => {
-
-    return stageInstance.getConfiguration()?.globalStats || [];
-};
-
 const normalizeGlobalStatValue = (value: unknown, stat: Stat): StatValue => normalizeStatValue(value, stat);
 
 const buildGlobalStatValues = (
@@ -69,7 +64,8 @@ const buildGlobalStatValues = (
 export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onConfirm, isNewGame = false, setScreenType }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const stageInstance = stage();
-    const isCalendarMode = stageInstance.getDateMode() === 'calendar';
+    const configuration = isNewGame ? stageInstance.getPublishedConfiguration() : stageInstance.getConfiguration(stageInstance.getSave());
+    const isCalendarMode = configuration.dateMode !== 'turnBased';
 
     // Common languages for autocomplete
     const commonLanguages = [
@@ -86,7 +82,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         playerName: stageInstance.getPlayerActor()?.name || stageInstance.primaryUser?.name || 'Player',
         playerDescription: stageInstance.getPlayerActor()?.profile || stageInstance.primaryUser?.chatProfile || 'An enigmatic individual.',
         playerColor: resolvePlayerThemeColor(stageInstance.getPlayerActor()?.themeColor || ''),
-        playerFontFamily: stageInstance.getPlayerActor()?.themeFontFamily || stageInstance.getConfiguration()?.uiSettings?.primaryFontFamily || DEFAULT_UI_SETTINGS.primaryFontFamily,
+        playerFontFamily: stageInstance.getPlayerActor()?.themeFontFamily || configuration.uiSettings?.primaryFontFamily || DEFAULT_UI_SETTINGS.primaryFontFamily,
         birthDate: stageInstance.getPlayerActor()?.birthDate || '',
         enableImpersonation: (stageInstance.getSave()?.enableImpersonation ?? true),
         enableFontEffects: (stageInstance.getSave()?.enableFontEffects ?? true),
@@ -96,8 +92,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         language: stageInstance.getSave()?.language || 'English',
     });
 
-    const [globalStats] = useState<Stat[]>(() => resolveActiveGlobalStats(stageInstance));
-    const settingsControls = (stageInstance.getConfiguration().controls || [])
+    const [globalStats] = useState<Stat[]>(() => configuration.globalStats || []);
+    const settingsControls = (configuration.controls || [])
         .filter((control) => control.active !== false && control.type === 'settings' && globalStats.some((stat) => stat.id === control.statId))
         .sort(compareControlPriority);
     const settingsStats = settingsControls
@@ -107,6 +103,24 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         const preferredValues = isNewGame ? {} : stageInstance.getSave()?.globalStatValues || {};
         return buildGlobalStatValues(settingsStats, preferredValues);
     });
+    const settingsStage = useMemo(() => {
+        if (!isNewGame) return stageInstance;
+        // Preview published functions and content without changing the active playthrough's rules or values.
+        const preview: Stage = Object.create(stageInstance);
+        const currentSave = stageInstance.getSave();
+        const previewSave: SaveType = {
+            ...currentSave,
+            configuration,
+            actors: { ...Object.fromEntries(configuration.actors.map(actor => [actor.id, actor])),
+                [currentSave.playerId]: currentSave.actors[currentSave.playerId] },
+            atlas: Object.fromEntries(configuration.locations.map(location => [location.id, location])),
+            inventory: configuration.items,
+            globalStatValues: { ...configuration.globalStatValues, ...globalStatValues },
+        };
+        preview.getConfiguration = () => configuration;
+        preview.getSave = () => previewSave;
+        return preview;
+    }, [isNewGame, stageInstance, configuration, globalStatValues]);
 
     const [languageSuggestions, setLanguageSuggestions] = useState<string[]>([]);
     const [showLanguageSuggestions, setShowLanguageSuggestions] = useState(false);
@@ -120,7 +134,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         }
 
         const birth = new Date(`${birthDate}T00:00:00Z`);
-        const currentDate = (stageInstance.getSave()?.currentDate || stageInstance.getConfiguration()?.startingDate || new Date().toISOString().slice(0, 10)).trim();
+        const currentDate = ((isNewGame ? configuration.startingDate : stageInstance.getSave()?.currentDate)
+            || configuration.startingDate || new Date().toISOString().slice(0, 10)).trim();
         const current = new Date(`${currentDate}T00:00:00Z`);
 
         if (Number.isNaN(birth.getTime()) || Number.isNaN(current.getTime())) {
@@ -136,7 +151,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         }
 
         return age >= 0 ? `Birth Date (${age} years old)` : 'Birth Date';
-    }, [settings.birthDate, stageInstance]);
+    }, [settings.birthDate, stageInstance, configuration.startingDate, isNewGame]);
 
     const handleSave = async () => {
         console.log('Saving settings:', settings);
@@ -485,10 +500,10 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                             return null;
                                         }
                                         const statName = (stat.name || '').trim();
-                                        const controlLabel = processLoreText(resolveText(control.label.trim() || statName), stageInstance);
-                                        const controlDescription = processLoreText(resolveText(control.description), stageInstance).trim();
+                                        const controlLabel = processLoreText(resolveText(control.label.trim() || statName), settingsStage);
+                                        const controlDescription = processLoreText(resolveText(control.description), settingsStage).trim();
                                         const selectedValue = normalizeGlobalStatValue(globalStatValues[stat.id], stat);
-                                        const hasValueSource = isValueReference(selectedValue) || valuePickerOptions(stageInstance.getConfiguration(), stat.type).length > 0;
+                                        const hasValueSource = isValueReference(selectedValue) || valuePickerOptions(configuration, stat.type).length > 0;
                                         const optionEntries = resolveAvailableStatOptions(stat, selectedValue, { sourceStats: globalStats, globalStatValues });
                                         const selectedOptionDescription = stat.type === 'option'
                                             ? resolveText(findStatOptionByValue(stat, selectedValue)?.option.description).trim()
@@ -517,7 +532,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 )}
 
                                                 {hasValueSource ? <StatValueInput stat={stat} value={selectedValue} onChange={value => handleGlobalStatValueChange(stat, value)}
-                                                    stage={stage} actors={Object.values(stageInstance.getSave().actors)} items={stageInstance.getSave().inventory} locations={Object.values(stageInstance.getSave().atlas)} /> : <>
+                                                    stage={settingsStage} actors={Object.values(settingsStage.getSave().actors)} items={settingsStage.getSave().inventory} locations={Object.values(settingsStage.getSave().atlas)}
+                                                    optionContext={{ sourceStats: globalStats, globalStatValues }} /> : <>
                                                 {stat.type === 'option' && optionEntries.length > 0 && (
                                                     <select
                                                         className="input-base"
