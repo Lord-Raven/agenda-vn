@@ -141,6 +141,36 @@ for (const kind of ['actor', 'item', 'location'] as const) {
     });
 }
 
+test('rating controls render their configured icons and reserve width for the pip grid', () => {
+    const control = new Control({
+        type: 'statDisplay',
+        statId: 'health',
+        displayType: 'rating',
+        ratingIconName: 'favorite',
+    });
+    const stage = createStage(control);
+    stage.getConfiguration().globalStats = [cloneStat({
+        id: 'health',
+        name: 'Health',
+        type: 'number',
+        default: 3,
+        max: 5,
+        guidance: '',
+        llmSees: { value: true, conditions: [] },
+        llmMaintained: { value: true, conditions: [] },
+    })];
+    const save = stage.getSave()!;
+    stage.getSave = () => ({
+        ...save,
+        globalStatValues: { health: 3 },
+    });
+
+    const html = renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />);
+    assert.match(html, /data-testid="FavoriteIcon"/);
+    assert.match(html, /aria-label="Health: 3 of 5"/);
+    assert.match(html, /grid-template-columns:repeat\(5,minmax\(0, 1fr\)\);[^}]*width:100%/);
+});
+
 test('text value editors accept global stat references directly and preserve reference-backed stat shapes', () => {
     const stage = createStage(new Control());
     stage.getConfiguration().globalStats = [sourceStat('icon', 'text', 'favorite'), sourceStat('destination', 'location', 'place')];

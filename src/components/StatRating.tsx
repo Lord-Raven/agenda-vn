@@ -938,8 +938,9 @@ export const StatRating: FC<StatRatingProps> = ({
                         display: 'grid',
                         gridTemplateColumns: `repeat(${maxPips}, minmax(0, 1fr))`,
                         gap: '4px',
-                        height: '100%',
+                        width: '100%',
                         maxWidth: '100%',
+                        maxHeight: '100%',
                         aspectRatio: `${maxPips} / 1`,
                     }}
                 >
@@ -967,8 +968,9 @@ export const StatRating: FC<StatRatingProps> = ({
                 display: 'grid',
                 gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))`,
                 gap: '8px',
-                height: '100%',
+                width: '100%',
                 maxWidth: '100%',
+                maxHeight: '100%',
                 aspectRatio: `${groups.length * 3} / 2`,
             }}
         >
