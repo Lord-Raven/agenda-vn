@@ -16,6 +16,7 @@ import { SaveLoadScreen } from '../src/screens/SaveLoadScreen';
 import { MenuScreen } from '../src/screens/MenuScreen';
 import { SettingsScreen } from '../src/screens/SettingsScreen';
 import { ContentManagementScreen } from '../src/screens/ContentManagementScreen';
+import { GameManagementPanel } from '../src/screens/GameManagementPanel';
 
 const numberStat = (id: string, value: number) => cloneStat({
     id, name: id, type: 'number', default: value, guidance: '',
@@ -261,8 +262,9 @@ test('application and persistence errors leave the source and destination slots 
         const { stage, source } = fixture();
         publishUpdate(stage);
         if (failure === 'application') {
-            stage.getPublishedConfiguration().globalStats.push(numberStat('bad', 0));
-            stage.getPublishedConfiguration().globalStatValues.bad = 'function:missing';
+            stage.getPublishedConfiguration().globalStats.push({
+                ...numberStat('bad', 0), default: 'function:missing',
+            });
         } else {
             Object.assign(stage, { messenger: { updateChatState: async () => {
                 if (failure === 'rejected-write') throw new Error('Write rejected');
@@ -310,6 +312,78 @@ test('snapshots survive JSON reload, and menu and new-game settings use the late
         <SettingsScreen stage={() => stage} isNewGame onCancel={() => {}} onConfirm={() => {}} setScreenType={() => {}} />
     </TooltipProvider>);
     assert.match(settings, /Latest setting label/);
+});
+
+for (const isOwner of [false, true]) {
+    test(`legacy configuration values cannot override text defaults or existing saves (creator: ${isOwner})`, () => {
+        const { stage, source, configuration } = fixture();
+        stage.isOwner = isOwner;
+        const id = 'f2755133-d4f6-4937-83fd-5bd3e595b1a3';
+        const staleValue = '51846b84-78ce-45f6-97ae-9c03647989cd';
+        const train = cloneStat({
+            id, name: 'Train Name', type: 'text', default: 'Morient Express',
+            defaultValueRules: [{ id: `default:${id}`, value: 'Morient Express', conditions: [] }],
+        });
+        configuration.globalStats = [train];
+        configuration.controls = [new Control({ type: 'settings', statId: id })];
+        configuration.globalStatValues = { [id]: staleValue };
+        source.configuration = JSON.parse(JSON.stringify(configuration));
+        source.globalStatValues = { [id]: 'Zomboni' };
+
+        const exported = buildPortableGameConfiguration(configuration);
+        assert.equal(Object.hasOwn(exported, 'globalStatValues'), false);
+        assert.equal(JSON.stringify(exported).includes(staleValue), false);
+        assert.equal(exported.globalStats[0].default, 'Morient Express');
+
+        const renderSettings = (isNewGame: boolean) => renderToStaticMarkup(<TooltipProvider>
+            <SettingsScreen stage={() => stage} isNewGame={isNewGame}
+                onCancel={() => {}} onConfirm={() => {}} setScreenType={() => {}} />
+        </TooltipProvider>);
+        assert.match(renderSettings(false), /value="Zomboni"/);
+        assert.match(renderSettings(true), /value="Morient Express"/);
+        assert.equal(source.globalStatValues[id], 'Zomboni');
+        assert.deepEqual(stage.getConfiguration().globalStatValues, {});
+        assert.deepEqual(stage.getPublishedConfiguration().globalStatValues, {});
+        assert.equal(Object.hasOwn(stage['buildPortableConfiguration'](), 'globalStatValues'), false);
+        const gamePanel = renderToStaticMarkup(<GameManagementPanel stage={() => stage} />);
+        assert.equal(gamePanel.includes(staleValue), false);
+
+        // Legacy imports must not seed hidden overrides or replace current player choices.
+        stage.updateConfiguration({ globalStatValues: { [id]: staleValue } }, true);
+        assert.equal(source.globalStatValues[id], 'Zomboni');
+        assert.deepEqual(stage.getPublishedConfiguration().globalStatValues, {});
+        const fresh = stage.generateFreshSave({ name: 'New player', personality: '' });
+        assert.equal(fresh.globalStatValues?.[id], 'Morient Express');
+        const chosen = stage.generateFreshSave({ name: 'New player', personality: '' }, { [id]: 'Chosen name' });
+        assert.equal(chosen.globalStatValues?.[id], 'Chosen name');
+
+        delete source.globalStatValues[id];
+        stage.updateConfiguration({});
+        assert.equal(source.globalStatValues[id], 'Morient Express');
+        source.globalStatValues[id] = staleValue;
+        stage.updateConfiguration({});
+        assert.equal(source.globalStatValues[id], staleValue, 'GUID-shaped saved text is still valid text');
+    });
+}
+
+test('JSON-reloaded legacy overrides do not replace new-game default rules or player choices', () => {
+    const { stage, configuration, source } = fixture();
+    configuration.globalStats = [
+        {
+            ...numberStat('score', 1),
+            defaultValueRules: [{ id: 'initial-score', value: 5, conditions: [] }],
+        },
+        cloneStat({ id: 'train', name: 'Train Name', type: 'text', default: 'Morient Express' }),
+    ];
+    configuration.globalStatValues = { score: 99, train: '51846b84-78ce-45f6-97ae-9c03647989cd' };
+    source.configuration = JSON.parse(JSON.stringify(configuration));
+    source.globalStatValues = { score: 7, train: 'Zomboni' };
+    stage.saveData = JSON.parse(JSON.stringify(stage.saveData));
+    const fresh = stage.generateFreshSave({ name: 'New player', personality: '' });
+    assert.deepEqual(fresh.globalStatValues, { score: 5, train: 'Morient Express' });
+    const chosen = stage.generateFreshSave({ name: 'New player', personality: '' }, { score: 0, train: '' });
+    assert.deepEqual(chosen.globalStatValues, { score: 0, train: '' });
+    assert.deepEqual(stage.getSave().globalStatValues, { score: 7, train: 'Zomboni' });
 });
 
 test('SaveLoadScreen offers clone and update for outdated player and creator saves in both modes', () => {

@@ -135,7 +135,7 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
             if (!stat) {
                 return match;
             }
-            return formatStatValue(stat, save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id]);
+            return formatStatValue(stat, save.globalStatValues?.[stat.id]);
         }
         const tagName = tag?.toLowerCase();
         if (tagName === 'global') {
@@ -143,7 +143,7 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
             if (!stat) {
                 return match;
             }
-            return formatStatValue(stat, save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id]);
+            return formatStatValue(stat, save.globalStatValues?.[stat.id]);
         }
 
         const actor: LoreTextActor | undefined = tagName === 'user' ? player : targetActor;

@@ -129,7 +129,7 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
                     (configuration.controls || []).find((control) => control.type === 'settings' && control.statId === stat.id)?.description,
                     stageInstance,
                 ).trim();
-                const selectedValue = configuration.globalStatValues?.[stat.id] ?? stat.default;
+                const selectedValue = stat.default;
                 const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, selectedValue) : undefined;
                 const valueText = formatStatOptionValueText(stat, selectedValue) || (typeof selectedValue === 'number' ? String(selectedValue) : String(selectedValue || ''));
                 if (!valueText) {

@@ -135,7 +135,7 @@ export type GameConfiguration = {
     itemStats: Stat[], // All custom item stats and defaults (applies to current and new games)
     globalStats: Stat[], // Stats that apply to the game in general (player or world state)
     functions: GameFunction[], // Global scripts invoked by actions or other functions
-    globalStatValues: {[key: string]: StatValue}, // Selected/default values for global stats
+    globalStatValues: {[key: string]: StatValue}, // Legacy configuration field; values now belong only to saves.
     statUpdateRules: StatUpdateRule[], // Conditional actions at new-game startup or as in-game time advances
     controls: Control[], // UI controls displayed in map docks, Settings, outcomes, or actor cards.
     uiSettings: UiSettings, // Default UI styling for new games
@@ -239,6 +239,7 @@ type TimelineEntry = {
 
 // The subset of GameConfiguration that is portable: it is what gets exported as JSON from the GameManagementPanel
 // and is the same content pushed to/pulled from storage so new games (and other owner-hosted chats) stay in sync.
+// Global starting values come from Stat defaults/rules, never from a save's current values.
 export type PortableGameConfiguration = {
     versionId?: string;
     artStyle?: string;
@@ -257,7 +258,6 @@ export type PortableGameConfiguration = {
     globalStats: Stat[];
     functions: GameFunction[];
     statUpdateRules: StatUpdateRule[];
-    globalStatValues: { [key: string]: StatValue };
     actors: Actor[];
     locations: Location[];
     items: Item[];
@@ -292,7 +292,6 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     globalStats: (input.globalStats || []).map(cloneStat),
     functions: (input.functions || []).map(cloneGameFunction),
     statUpdateRules: cloneStatUpdateRules(input.statUpdateRules),
-    globalStatValues: { ...(input.globalStatValues || {}) },
     actors: (input.actors || []).map(actor => cloneActor(actor)),
     locations: (input.locations || []).map(location => cloneLocation(location)),
     items: (input.items || []).map(item => cloneItem(item)),
@@ -310,7 +309,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
 
 const cloneConfiguration = (configuration: GameConfiguration): GameConfiguration => {
     const copy: GameConfiguration = JSON.parse(JSON.stringify(configuration));
-    return { ...copy, ...buildPortableGameConfiguration(copy), artStyle: copy.artStyle,
+    return { ...copy, ...buildPortableGameConfiguration(copy), globalStatValues: {}, artStyle: copy.artStyle,
         universalSchedule: cloneActorSchedule(copy.universalSchedule) };
 };
 
@@ -361,7 +360,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     .find((candidate) => candidate.id === statId);
                 return stat ? { stat } : undefined;
             }
-            return { stat: globalStat, value: save?.globalStatValues?.[statId] ?? configuration?.globalStatValues?.[statId],
+            return { stat: globalStat, value: save?.globalStatValues?.[statId],
                 resolveValue: (value, type) => this.resolveValue(value, type, save) };
         });
         const {
@@ -464,7 +463,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 locationStats: [],
                 itemStats: [],
                 globalStats: [],
-                globalStatValues: { ...(activeSave?.globalStatValues || {}) },
+                globalStatValues: {},
                 statUpdateRules: [],
                 controls: [],
                 uiSettings: cloneUiSettings(activeSave?.uiSettings || {}),
@@ -502,7 +501,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         configuration.itemStats = configuration.itemStats || defaultConfiguration.itemStats;
         configuration.globalStats = configuration.globalStats || defaultConfiguration.globalStats;
         configuration.functions = configuration.functions || defaultConfiguration.functions;
-        configuration.globalStatValues = configuration.globalStatValues || defaultConfiguration.globalStatValues;
+        // Discard legacy tester overrides without touching the save's own stat values.
+        configuration.globalStatValues = {};
         configuration.statUpdateRules = configuration.statUpdateRules || defaultConfiguration.statUpdateRules;
         configuration.controls = (configuration.controls || defaultConfiguration.controls).map((control) => control instanceof Control ? control : cloneControl(control));
         configuration.uiSettings = configuration.uiSettings || defaultConfiguration.uiSettings;
@@ -578,7 +578,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (stack.includes(value) || stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
                 throw new Error(`Maximum value reference depth exceeded or cyclic global stat reference: ${stat.name}`);
             }
-            return this.readStatValue(save.globalStatValues?.[id] ?? configuration.globalStatValues?.[id], stat, save, [...stack, value]);
+            return this.readStatValue(save.globalStatValues?.[id], stat, save, [...stack, value]);
         }
         if (isFunctionReference(value)) {
             const id = functionReferenceId(value);
@@ -701,6 +701,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const next = {
             ...current,
             ...updates,
+            globalStatValues: {},
             actors: (updates.actors ?? current.actors).map(actor => actor instanceof Actor ? actor : cloneActor(actor)),
             locations: (updates.locations ?? current.locations).map(location => location instanceof Location ? location : cloneLocation(location)),
             items: (updates.items ?? current.items).map(item => item instanceof Item ? item : cloneItem(item)),
@@ -715,14 +716,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const affectedSave = usePublished && !this.isOwner ? undefined : currentSave;
         if (updates.globalStats) {
             const configuration = next;
-            configuration.globalStatValues = { ...(configuration.globalStatValues || {}) };
             configuration.globalStats.forEach((stat) => {
                 const previousStat = current.globalStats?.find((candidate) => candidate.id === stat.id);
-                [configuration.globalStatValues, affectedSave?.globalStatValues].forEach((values) => {
-                    if (values && values[stat.id] !== undefined) {
-                        values[stat.id] = includeNewOptionListOptions(values[stat.id], previousStat, stat)!;
-                    }
-                });
+                const values = affectedSave?.globalStatValues;
+                if (values && values[stat.id] !== undefined) {
+                    values[stat.id] = includeNewOptionListOptions(values[stat.id], previousStat, stat)!;
+                }
             });
         }
         if (this.isOwner && affectedSave) {
@@ -741,12 +740,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (updates.uiSettings) affectedSave.uiSettings = cloneUiSettings(next.uiSettings);
         }
         if (affectedSave) {
-            // Preserve the save's own values (e.g. changed in-game via stat update rules); only fill gaps
-            // from configuration so this doesn't clobber player progress with the configured tester defaults.
-            affectedSave.globalStatValues = {
-                ...(next.globalStatValues || {}),
-                ...(affectedSave.globalStatValues || {}),
-            };
             this.syncGlobalStats(affectedSave);
             this.syncActorStats(affectedSave);
             this.syncLocationStats(affectedSave);
@@ -1001,10 +994,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         Object.assign(newSave, saveSettings);
 
         const persistedConfiguration = this.getPublishedConfiguration();
-
-        if (!newSave.globalStatValues) {
-            newSave.globalStatValues = { ...(persistedConfiguration.globalStatValues || {}) };
-        }
 
         if (!newSave.lorebook || newSave.lorebook.length === 0) {
             console.log('Initializing lorebook for new save');
@@ -2443,11 +2432,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 : undefined,
         }));
 
-        save.globalStatValues = {
-            ...(this.getConfiguration(save).globalStatValues || {}),
-            ...(save.globalStatValues || {}),
-        };
-
         this.syncGlobalStats(save);
         this.syncActorStats(save);
         this.syncLocationStats(save);
@@ -3255,14 +3239,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private buildPortableConfiguration(): PortableGameConfiguration {
         const configuration = this.getConfiguration();
 
-        const globalStatValues: { [key: string]: StatValue } = {};
-        (configuration.globalStats || []).forEach((stat) => {
-            if (!stat.id || !(stat.name || '').trim()) {
-                return;
-            }
-            globalStatValues[stat.id] = normalizeStatValue(configuration.globalStatValues?.[stat.id], stat);
-        });
-
         return buildPortableGameConfiguration({
             versionId: configuration.versionId,
             artStyle: configuration.artStyle,
@@ -3281,7 +3257,6 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             globalStats: configuration.globalStats,
             functions: configuration.functions,
             statUpdateRules: configuration.statUpdateRules,
-            globalStatValues,
             actors: (configuration.actors || []).filter(actor => actor.active !== false),
             locations: (configuration.locations || []).filter(location => location.active !== false),
             items: (configuration.items || []).filter(item => item.active !== false),

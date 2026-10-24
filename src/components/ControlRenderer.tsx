@@ -102,7 +102,6 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     }
 
     const rawValue = stageInstance.getSave()?.globalStatValues?.[stat.id]
-        ?? stageInstance.getConfiguration(stageInstance.getSave())?.globalStatValues?.[stat.id]
         ?? stat.default;
     const normalizedValue = control.type === 'statEditor' ? normalizeStatValue(rawValue, stat) : stageInstance.readStatValue(rawValue, stat);
     const StatIcon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;

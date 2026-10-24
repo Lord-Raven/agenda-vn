@@ -1,8 +1,8 @@
-import React, { FC, useCallback, useMemo, useState } from 'react';
+import React, { FC, useCallback, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { v4 as generateUuid } from 'uuid';
 import { Stage } from '../Stage';
-import { Stat, StatValue, cloneStat, includeNewOptionListOptions, normalizeStatValue } from '../content/Stat';
+import { Stat, cloneStat } from '../content/Stat';
 import { StatEntryCategory } from '../components/StatEntryEditor';
 import {
     CategorizedEntrySidebar,
@@ -67,33 +67,15 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const configuration = stageInstance.getConfiguration();
-    const [loadedGlobalStats] = useState(() => (configuration.globalStats || []).map(cloneStat));
     const [stats, setStats] = useState<Record<StatEntryCategory, Stat[]>>(() => ({
         global: (configuration.globalStats || []).map(cloneStat),
         actor: (configuration.actorStats || []).map(cloneStat),
         location: (configuration.locationStats || []).map(cloneStat),
         item: (configuration.itemStats || []).map(cloneStat),
     }));
-    const [globalStatValues, setGlobalStatValues] = useState<Record<string, StatValue>>(() => ({
-        ...configuration.globalStatValues,
-        ...save.globalStatValues,
-    }));
     const [selectedStatId, setSelectedStatId] = useState<string | null>(null);
     const [collapsedSections, setCollapsedSections] = useCachedSidebarCollapseState('stat-management');
     const shouldReduceMotion = useReducedMotion();
-
-    const validGlobalStatValues = useMemo(() => {
-        const nextValues: Record<string, StatValue> = {};
-        stats.global.forEach(stat => {
-            if (!stat.id || !stat.name.trim()) {
-                return;
-            }
-            // Keep the loaded baseline so newly added options survive successive autosaves.
-            const loadedStat = loadedGlobalStats.find(candidate => candidate.id === stat.id);
-            nextValues[stat.id] = normalizeStatValue(includeNewOptionListOptions(globalStatValues[stat.id], loadedStat, stat), stat);
-        });
-        return nextValues;
-    }, [globalStatValues, stats.global, loadedGlobalStats]);
 
     const saveGameConfiguration = useCallback(() => {
         stageInstance.updateConfiguration({
@@ -101,9 +83,8 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
             actorStats: stats.actor,
             locationStats: stats.location,
             itemStats: stats.item,
-            globalStatValues: validGlobalStatValues,
         });
-    }, [stageInstance, stats, validGlobalStatValues]);
+    }, [stageInstance, stats]);
     useDebouncedSave(saveGameConfiguration);
 
     const sections = STAT_CATEGORIES.map(category => ({ ...category, entries: stats[category.id] }));
@@ -213,20 +194,7 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
                         onMove={moveSelectedStat}
                         onRemove={removeSelectedStat}
                         onPatch={patch => updateStat(selectedSection.id, selectedStat.id, patch)}
-                        onNameChange={name => {
-                            updateStat(selectedSection.id, selectedStat.id, { name });
-                            const previousName = selectedStat.name.trim();
-                            const nextName = name.trim();
-                            if (selectedSection.id === 'global' && previousName && nextName && previousName !== nextName) {
-                                setGlobalStatValues(current => {
-                                    const next = { ...current };
-                                    const value = next[previousName];
-                                    delete next[previousName];
-                                    if (value !== undefined) next[nextName] = value;
-                                    return next;
-                                });
-                            }
-                        }}
+                        onNameChange={name => updateStat(selectedSection.id, selectedStat.id, { name })}
                         selfStats={selectedSection.entries}
                         globalStats={stats.global}
                         actorStats={stats.actor}

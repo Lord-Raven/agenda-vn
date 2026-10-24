@@ -69,7 +69,7 @@ const buildActorStatPromptContext = (stage: Stage, save: ReturnType<Stage['getSa
 const buildGlobalStatPromptContext = (stage: Stage, save: ReturnType<Stage['getSave']>): PromptBuilder | string => {
     const configuration = stage.getConfiguration(save);
     const stats = configuration.globalStats || [];
-    const values = { ...(configuration.globalStatValues || {}), ...(save.globalStatValues || {}) };
+    const values = save.globalStatValues || {};
     const optionContext = { sourceStats: stats, globalStatValues: values };
     const conditionContext = stage.getScheduleContext(save);
     const visibleStats = stats.filter(stat => stat?.id && stat.name?.trim() && isStatLlmSeen(stat, conditionContext));
@@ -330,7 +330,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        const value = stage.readStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat, save);
+        const value = stage.readStatValue(save.globalStatValues?.[stat.id], stat, save);
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
         const valueText = formatStatOptionValueText(stat, value) || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {
@@ -359,7 +359,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
             return '';
         }
 
-        const value = stage.readStatValue(save.globalStatValues?.[stat.id] ?? agendaConfig?.globalStatValues?.[stat.id], stat, save);
+        const value = stage.readStatValue(save.globalStatValues?.[stat.id], stat, save);
         const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
         const valueText = formatStatOptionValueText(stat, value) || formatReferenceStatValue(stat, value, stage) || (typeof value === 'number' ? String(value) : String(value || ''));
         if (!valueText) {

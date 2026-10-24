@@ -155,7 +155,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
         const { stat, control } = match;
         const rawValue = outcome.type === OutcomeType.ACTOR_STAT
             ? actor?.statMap?.[stat.id]
-            : stage().getSave().globalStatValues?.[stat.id] ?? stage().getConfiguration(stage().getSave()).globalStatValues?.[stat.id];
+            : stage().getSave().globalStatValues?.[stat.id];
         const currentValue = stage().readStatValue(rawValue ?? stat.default, stat);
         const nextValue = outcome.details?.absoluteValue !== undefined
             ? stage().readStatValue(outcome.details.absoluteValue, stat)

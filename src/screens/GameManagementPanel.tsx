@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { AutoAwesome, Image as ImageIcon } from '@mui/icons-material';
 import { DateMode, Stage, buildPortableGameConfiguration } from '../Stage';
 import { TimeMode } from '../content/CalendarEvent';
-import { Stat, StatType, StatValue, cloneStat, normalizeStatValue } from '../content/Stat';
+import { Stat, cloneStat } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
@@ -48,28 +48,11 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [itemStats, setItemStats] = useState<Stat[]>(() =>
         (configuration.itemStats || []).map(cloneStat),
     );
-    const [globalStatValues, setGlobalStatValues] = useState<{ [key: string]: StatValue }>(() => ({
-        ...configuration.globalStatValues,
-    }));
     const [isCopyingConfigurationJson, setIsCopyingConfigurationJson] = useState(false);
     const [isCopyingCreatorNotesHtml, setIsCopyingCreatorNotesHtml] = useState(false);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
     const saveGameConfigurationRef = useRef<() => void>(() => {});
-
-    const validGlobalStatValues = useMemo(() => {
-        const nextValues: { [key: string]: StatValue } = {};
-
-        globalStats.forEach((stat) => {
-            if (!stat.id || !(stat.name || '').trim()) {
-                return;
-            }
-
-            nextValues[stat.id] = normalizeStatValue(globalStatValues[stat.id], stat);
-        });
-
-        return nextValues;
-    }, [globalStatValues, globalStats]);
 
     const activeActors = useMemo(() => {
         return (configuration.actors || [])
@@ -135,7 +118,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             globalStats,
             functions: configuration.functions,
             statUpdateRules: configuration.statUpdateRules,
-            globalStatValues: validGlobalStatValues,
             actors: activeActors,
             locations: activeLocations,
             items: activeItems,
@@ -169,7 +151,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         itemStats,
         locationStats,
         slideshowLocationIds,
-        validGlobalStatValues,
         configuration.lorebook,
         configuration.controls,
         configuration.functions,
@@ -249,7 +230,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             locationStats,
             itemStats,
             globalStats: globalStats,
-            globalStatValues: validGlobalStatValues,
             uiSettings: configuration.uiSettings,
             title,
             titleImageUrl,
@@ -267,7 +247,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             useEvents,
         });
 
-    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, timeMode, useEvents, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, validGlobalStatValues, versionNotes]);
+    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, timeMode, useEvents, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;

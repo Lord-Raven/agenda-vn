@@ -519,7 +519,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 </Button>
                             </div>
                             <span style={{ color: 'var(--agenda-text-muted)', fontSize: '11px' }}>
-                                Evaluated in order when a new game starts. The first matching rule wins and seeds this stat's starting value. The final Default Value rule is used if no earlier rule matches.
+                                Evaluated in order when a new game starts. The first matching rule wins and seeds this stat's starting value. The final Default Value rule is used if no earlier rule matches. Existing saves keep their own values; edit those in Manage mode or Settings.
                             </span>
                             {valueRules.map((rule, ruleIndex) => (
                                 <div

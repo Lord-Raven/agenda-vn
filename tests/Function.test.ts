@@ -805,7 +805,7 @@ test('bare global stat tags resolve current values, defaults, references and for
     configuration.functions = [typedFunction('summary-function', 'text', 'return `Score: ${get("Score")}`;')];
     configuration.globalStatValues = { fallback: 'Configured text' };
     const source = '{{ score }} / {{sCoRe SuMmArY}} / {{Places}} / {{Choices}} / {{Enabled}} / {{Fallback}}';
-    assert.equal(processLoreText(source, stage), '2 / Score: 2 / Town / Second, First / no / Configured text');
+    assert.equal(processLoreText(source, stage), '2 / Score: 2 / Town / Second, First / no / Default text');
     save.globalStatValues!.Score = 0;
     save.globalStatValues!.fallback = '';
     assert.equal(processLoreText(source, stage), '0 / Score: 0 / Town / Second, First / no / ');
@@ -1257,7 +1257,7 @@ test('global stat picker sources match exact types and remain distinct from func
     assert.deepEqual(valuePickerOptions(undefined, 'text'), []);
 });
 
-test('all global stat source types preserve references and resolve save, configured, and stat defaults', () => {
+test('all global stat source types resolve save values or stat defaults, ignoring legacy configuration overrides', () => {
     const { stage, configuration, save } = fixture();
     const cases: [StatType, StatValue, StatValue][] = [
         ['number', 3, 4], ['text', 'star', 'favorite'], ['checkbox', false, true],
@@ -1280,7 +1280,7 @@ test('all global stat source types preserve references and resolve save, configu
         assert.equal(normalizeStatValue(reference, target), reference, type);
         assert.deepEqual(stage.readStatValue(undefined, target), initial, type);
         configuration.globalStatValues[source.id] = current;
-        assert.deepEqual(stage.resolveValue(reference, type), current, type);
+        assert.deepEqual(stage.resolveValue(reference, type), initial, type);
         save.globalStatValues![source.id] = initial;
         assert.deepEqual(stage.resolveValue(reference, type), initial, type);
         save.globalStatValues![source.id] = current;
@@ -1288,7 +1288,7 @@ test('all global stat source types preserve references and resolve save, configu
         assert.equal(target.default, reference, type);
     }
     const portable = JSON.parse(JSON.stringify(buildPortableGameConfiguration(configuration)));
-    assert.deepEqual(portable.globalStatValues, configuration.globalStatValues);
+    assert.equal(Object.hasOwn(portable, 'globalStatValues'), false);
 });
 
 test('global sources expand scalar and list values alongside functions and literals without mutating storage', () => {

@@ -115,7 +115,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                 [currentSave.playerId]: currentSave.actors[currentSave.playerId] },
             atlas: Object.fromEntries(configuration.locations.map(location => [location.id, location])),
             inventory: configuration.items,
-            globalStatValues: { ...configuration.globalStatValues, ...globalStatValues },
+            globalStatValues: { ...globalStatValues },
         };
         preview.getConfiguration = () => configuration;
         preview.getSave = () => previewSave;

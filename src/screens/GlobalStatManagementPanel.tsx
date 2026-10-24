@@ -19,7 +19,7 @@ export const GlobalStatManagementPanel: FC<GlobalStatManagementPanelProps> = ({ 
     const locations = Object.values(save.atlas || {}).filter(location => location.active !== false);
     const optionContext = {
         sourceStats: globalStats,
-        globalStatValues: { ...configuration.globalStatValues, ...save.globalStatValues },
+        globalStatValues: save.globalStatValues,
     };
 
     return (
@@ -50,7 +50,7 @@ export const GlobalStatManagementPanel: FC<GlobalStatManagementPanelProps> = ({ 
                         <StatValueInput
                             stat={stat}
                             value={normalizeStatValue(
-                                save.globalStatValues?.[stat.id] ?? configuration.globalStatValues?.[stat.id] ?? stat.default,
+                                save.globalStatValues?.[stat.id] ?? stat.default,
                                 stat,
                             )}
                             onChange={value => {
