@@ -181,7 +181,14 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                     stat={stat}
                     display={{ ...control, ratingIconName: control.displayType === 'rating' ? String(stageInstance.resolveValue(control.ratingIconName, 'text')) : control.ratingIconName }}
                     value={Number(normalizedValue)}
-                    style={{ minHeight: isVerticalLayout ? 16 : 20, ...(control.displayType === 'rating' ? { justifyContent: 'flex-start', ...(isVerticalLayout ? { height: 20 } : {}) } : { fontSize }) }}
+                    style={{
+                        minHeight: isVerticalLayout ? 16 : 20,
+                        ...(control.displayType === 'rating' ? {
+                            justifyContent: 'flex-start',
+                            // Percentage-sized pips need a definite height, not just a minimum.
+                            height: isVerticalLayout ? 20 : 32,
+                        } : { fontSize }),
+                    }}
                 />
             ) : (
                 <Typography sx={{ color: control.displayColor || 'var(--agenda-text-primary)', fontSize, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>

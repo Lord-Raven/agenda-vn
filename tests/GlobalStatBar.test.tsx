@@ -137,6 +137,85 @@ for (const placement of ['top', 'bottom'] as const) {
 }
 
 // Set CHROME_BIN to run geometric regression checks with an existing Chromium installation.
+test('rating controls match number and text heights without hiding or stretching icons', { skip: !process.env.CHROME_BIN }, () => {
+    const directory = mkdtempSync(join(tmpdir(), 'agenda-rating-height-'));
+    try {
+        const fixtures: string[] = [];
+        for (const placement of ['top', 'bottom'] as const) {
+            for (const isVerticalLayout of [false, true]) {
+                for (const withButtons of placement === 'top' ? [false, true] : [false]) {
+                    for (const max of [1, 5, 10, 12, 25]) {
+                        for (const widthWeight of [0.5, 1, 2]) {
+                            const stage = createStage();
+                            const configuration = stage.getConfiguration();
+                            configuration.globalStats = [
+                                { id: 'number', name: 'Number', type: 'number' as const, default: 3 },
+                                { id: 'text', name: 'Text', type: 'text' as const, default: 'Text' },
+                                { id: 'rating', name: 'Rating', type: 'number' as const, default: 1, max },
+                            ].map(stat => ({
+                                ...stat, guidance: '',
+                                llmSees: { value: true, conditions: [] },
+                                llmMaintained: { value: true, conditions: [] },
+                            }));
+                            configuration.controls = configuration.globalStats.map(stat => new Control({
+                                placement, type: 'statDisplay', statId: stat.id, widthWeight,
+                                displayType: stat.id === 'rating' ? 'rating' : 'straight',
+                                ratingIconName: 'heart',
+                            }));
+                            const html = renderToStaticMarkup(placement === 'top'
+                                ? <GlobalStatBar stage={() => stage} isVerticalLayout={isVerticalLayout} buttons={withButtons ? <button>Menu</button> : undefined} />
+                                : <ControlDock stage={() => stage} isVerticalLayout={isVerticalLayout} />);
+                            for (const width of [320, 960]) {
+                                fixtures.push(`<main data-compact="${isVerticalLayout}" data-max="${max}" style="width:${width}px">${html}</main>`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        const fixture = join(directory, 'layout.html');
+        writeFileSync(fixture, `<!doctype html><style>
+            :root { --agenda-highlight: #99f; --agenda-panel-border: #ddd; }
+            </style><body style="margin:0;font-size:16px">
+            ${fixtures.join('')}
+            <pre id="result"></pre>
+            <script>
+                const errors = [];
+                function check(value, message) { if (!value) errors.push(message); }
+                document.querySelectorAll('main').forEach((main, index) => {
+                    const compact = main.dataset.compact === 'true';
+                    const rating = main.querySelector('[role="group"][aria-label="Rating"]');
+                    const bounds = rating.getBoundingClientRect();
+                    check(bounds.height <= (compact ? 31 : 65), index + ': rating height is bounded: ' + bounds.height);
+                    ['Number', 'Text'].forEach(label => {
+                        const ordinary = main.querySelector('[role="group"][aria-label="' + label + '"]');
+                        // Container-relative text can exceed the shared minimum value height slightly.
+                        check(Math.abs(bounds.height - ordinary.getBoundingClientRect().height) < 2,
+                            index + ': rating matches ' + label + ' height');
+                    });
+                    const icons = rating.querySelectorAll('[role="img"] svg');
+                    check(icons.length === Number(main.dataset.max), index + ': all icons are present');
+                    icons.forEach((icon, pip) => {
+                        const rect = icon.getBoundingClientRect();
+                        check(rect.width > 0 && rect.height > 0, index + ': pip ' + pip + ' is visible');
+                        check(Math.abs(rect.width - rect.height) < 1, index + ': pip ' + pip + ' stays square');
+                        check(rect.top >= bounds.top && rect.bottom <= bounds.bottom,
+                            index + ': pip ' + pip + ' fits vertically');
+                        check(rect.left >= bounds.left && rect.right <= bounds.right,
+                            index + ': pip ' + pip + ' fits horizontally');
+                    });
+                });
+                document.getElementById('result').textContent = errors.length ? JSON.stringify(errors) : 'PASS';
+            </script>`);
+        const output = execFileSync(process.env.CHROME_BIN!, [
+            '--headless', '--no-sandbox', '--disable-gpu', '--dump-dom', `file://${fixture}`,
+        ], { encoding: 'utf8', timeout: 30000, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+        assert.equal(output.match(/<pre id="result">([^<]*)<\/pre>/)?.[1], 'PASS');
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
 test('content list displays match ordinary control heights without clipping portraits', { skip: !process.env.CHROME_BIN }, () => {
     const directory = mkdtempSync(join(tmpdir(), 'agenda-list-height-'));
     try {

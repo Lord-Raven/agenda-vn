@@ -937,10 +937,9 @@ export const StatRating: FC<StatRatingProps> = ({
                     style={{
                         display: 'grid',
                         gridTemplateColumns: `repeat(${maxPips}, minmax(0, 1fr))`,
-                        gap: '4px',
-                        width: '100%',
+                        gap: 'min(4px, 4%)',
+                        height: '100%',
                         maxWidth: '100%',
-                        maxHeight: '100%',
                         aspectRatio: `${maxPips} / 1`,
                     }}
                 >
@@ -967,10 +966,9 @@ export const StatRating: FC<StatRatingProps> = ({
             style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))`,
-                gap: '8px',
-                width: '100%',
+                gap: 'min(8px, 4%)',
+                height: '100%',
                 maxWidth: '100%',
-                maxHeight: '100%',
                 aspectRatio: `${groups.length * 3} / 2`,
             }}
         >
@@ -992,7 +990,7 @@ export const StatRating: FC<StatRatingProps> = ({
                             style={{
                                 display: 'grid',
                                 gridTemplateColumns: `repeat(${Math.max(1, topPips.length)}, minmax(0, 1fr))`,
-                                gap: '3px',
+                                gap: 'min(3px, 6%)',
                             }}
                         >
                             {topPips.map((pipValue) => renderStatIcon(stat, display, pipValue, filledPips >= pipValue, resolvePipHighlight(pipValue), updateScore))}
@@ -1003,7 +1001,7 @@ export const StatRating: FC<StatRatingProps> = ({
                                 style={{
                                     display: 'grid',
                                     gridTemplateColumns: `repeat(${bottomPips.length}, minmax(0, 1fr))`,
-                                    gap: '3px',
+                                    gap: 'min(3px, 6%)',
                                     width: '72%',
                                     margin: '-2px auto 0',
                                 }}
