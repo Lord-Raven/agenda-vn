@@ -461,6 +461,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                         <div
                                             style={{
                                                 textAlign: 'center',
+                                                whiteSpace: 'pre-line',
                                                 marginTop: 'clamp(8px, 1.5vh, 12px)',
                                                 color: 'rgba(185, 210, 227, 0.72)',
                                                 fontSize: 'clamp(10px, 1.5vw, 12px)',

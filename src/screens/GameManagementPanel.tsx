@@ -185,7 +185,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const creatorNotesHtml = useMemo(
         () => buildCreatorNotesHtml({
             stage: stageInstance,
-            creatorNotes: `${creatorNotes || ''}${versionNotes ? '<br><br><h3>Version Notes</h3><br>' + versionNotes : ''}`.trim(),
+            creatorNotes: `${creatorNotes || ''}${versionNotes ? '<br><br><h3>Version Notes</h3><br>' + versionNotes.replace(/\r\n|\r|\n/g, '<br>') : ''}`.trim(),
             backgroundImageUrl,
             titleImageUrl,
             activeActors,

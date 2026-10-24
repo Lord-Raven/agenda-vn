@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
+import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { TooltipProvider } from '../src/components/TooltipContext';
@@ -7,6 +8,7 @@ import { Map as GameMap } from '../src/content/Map';
 import { Skit } from '../src/content/Skit';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { CalendarScreen } from '../src/screens/CalendarScreen';
+import { GameManagementPanel } from '../src/screens/GameManagementPanel';
 import { MapScreen } from '../src/screens/MapScreen';
 import { MenuScreen } from '../src/screens/MenuScreen';
 import { SkitScreen } from '../src/screens/SkitScreen';
@@ -44,6 +46,34 @@ test('main menu lists Content Management immediately beneath Settings', () => {
     assert.ok(settingsIndex >= 0);
     assert.equal(labels[settingsIndex + 1], 'Content Management');
 });
+
+test('main menu version notes preserve newlines and blank lines as text', () => {
+    const stage = createStage();
+    stage.getConfiguration().versionNotes = 'First release\n\nSecond release\n<em>Plain text</em>';
+    const useState = React.useState;
+    const stateMock = mock.method(React, 'useState', (initial: unknown) =>
+        useState(initial === 'menu' ? 'version' : initial));
+    try {
+        const html = renderToStaticMarkup(
+            <TooltipProvider><MenuScreen stage={() => stage} setScreenType={() => {}} /></TooltipProvider>,
+        );
+        assert.match(html, /white-space:pre-line;[^"]*"[^>]*>First release\n\nSecond release\n&lt;em&gt;Plain text&lt;\/em&gt;<\/div>/);
+    } finally {
+        stateMock.mock.restore();
+    }
+});
+
+for (const newline of ['\n', '\r\n', '\r']) {
+    test(`creator notes export preserves version notes with ${JSON.stringify(newline)} line endings`, () => {
+        const stage = createStage();
+        stage.getConfiguration().creatorNotes = '<strong>Creator introduction</strong>';
+        stage.getConfiguration().versionNotes = `First release${newline}${newline}Second release${newline}Final release`;
+        const html = renderToStaticMarkup(
+            <TooltipProvider><GameManagementPanel stage={() => stage} /></TooltipProvider>,
+        );
+        assert.ok(html.includes('&lt;strong&gt;Creator introduction&lt;/strong&gt;&lt;br&gt;&lt;br&gt;&lt;h3&gt;Version Notes&lt;/h3&gt;&lt;br&gt;First release&lt;br&gt;&lt;br&gt;Second release&lt;br&gt;Final release'));
+    });
+}
 
 for (const isVerticalLayout of [false, true]) {
     for (const screen of ['calendar', 'locations', 'map', 'skit'] as const) {
