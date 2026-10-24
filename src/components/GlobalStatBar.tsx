@@ -98,8 +98,8 @@ export const GlobalStatBar: FC<GlobalStatBarProps> = ({ stage, buttons, onActiva
                         gap: usePhaseSegments ? "2px" : isVerticalLayout ? 0.4 : 0.8,
                         padding: isVerticalLayout ? "4px 6px" : "8px 10px",
                         // Match the stat card's padding, label line, gap, and minimum value height.
-                        minHeight: isVerticalLayout ? 30 : theme => `calc(14px + 0.792rem + ${theme.spacing(0.5)} + 32px)`,
-                        boxSizing: "border-box",
+                        minHeight: isVerticalLayout ? 20 : theme => `calc(14px + 0.792rem + ${theme.spacing(0.5)} + 32px)`,
+                        boxSizing: isVerticalLayout ? "content-box" : "border-box",
                         borderRadius: isVerticalLayout ? "8px" : "12px",
                         border: "1px solid var(--agenda-panel-border)",
                         background: "color-mix(in srgb, var(--agenda-panel-surface) 88%, transparent)",

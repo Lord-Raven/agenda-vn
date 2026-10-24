@@ -316,7 +316,7 @@ test('content list displays match ordinary control heights without clipping port
 test('day and date indicators match stat control heights with the game theme', { skip: !process.env.CHROME_BIN }, () => {
     const directory = mkdtempSync(join(tmpdir(), 'agenda-date-height-'));
     try {
-        const fixtures: string[] = [];
+        const fixtures: { html: string; isVerticalLayout: boolean }[] = [];
         for (const dateMode of ['calendar', 'turnBased'] as const) {
             for (const timeMode of ['timeOfDay', 'phase'] as const) {
                 for (const isVerticalLayout of [false, true]) {
@@ -332,13 +332,13 @@ test('day and date indicators match stat control heights with the game theme', {
                         configuration.controls = [new Control({
                             type: 'statDisplay', statId: 'health', label: 'Health', placement: 'top',
                         })];
-                        fixtures.push(renderToStaticMarkup(<ThemeProvider theme={theme}>
+                        fixtures.push({ isVerticalLayout, html: renderToStaticMarkup(<ThemeProvider theme={theme}>
                             <GlobalStatBar
                                 stage={() => stage}
                                 isVerticalLayout={isVerticalLayout}
                                 buttons={withButtons ? <button>Menu</button> : undefined}
                             />
-                        </ThemeProvider>));
+                        </ThemeProvider>) });
                     }
                 }
             }
@@ -347,11 +347,12 @@ test('day and date indicators match stat control heights with the game theme', {
         writeFileSync(fixture, `<!doctype html><style>
             :root { --agenda-panel-border: #ddd; }
             </style><body style="margin:0;font-size:16px">
-            ${fixtures.map(html => `<main style="width:960px">${html}</main>`).join('')}
+            ${fixtures.map(({ html, isVerticalLayout }) => `<main data-compact="${isVerticalLayout}" style="width:${isVerticalLayout ? 320 : 960}px">${html}</main>`).join('')}
             <pre id="result"></pre>
             <script>
                 const errors = [];
                 document.querySelectorAll('main').forEach((main, index) => {
+                    if (devicePixelRatio !== 1 && main.dataset.compact !== 'true') return;
                     const date = main.querySelector('[title^="Current Date:"]').getBoundingClientRect();
                     const stat = main.querySelector('[role="group"]').getBoundingClientRect();
                     if (Math.abs(date.height - stat.height) > 0.1) {
@@ -360,11 +361,12 @@ test('day and date indicators match stat control heights with the game theme', {
                 });
                 document.getElementById('result').textContent = errors.length ? JSON.stringify(errors) : 'PASS';
             </script>`);
-        for (const width of [640, 1280]) {
+        for (const [width, scale] of [[640, 1], [1280, 1], [390, 1.25], [390, 2], [390, 2.625], [390, 3]]) {
             const output = execFileSync(process.env.CHROME_BIN!, [
-                '--headless', '--no-sandbox', '--disable-gpu', `--window-size=${width},900`, '--dump-dom', `file://${fixture}`,
+                '--headless', '--no-sandbox', '--disable-gpu', `--window-size=${width},900`,
+                `--force-device-scale-factor=${scale}`, '--dump-dom', `file://${fixture}`,
             ], { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
-            assert.equal(output.match(/<pre id="result">([^<]*)<\/pre>/)?.[1], 'PASS', `viewport width: ${width}`);
+            assert.equal(output.match(/<pre id="result">([^<]*)<\/pre>/)?.[1], 'PASS', `viewport width: ${width}, scale: ${scale}`);
         }
     } finally {
         rmSync(directory, { recursive: true, force: true });
@@ -402,7 +404,9 @@ test('vertical Day phase segments stay beneath the label and match compact contr
             }
         }
         const fixture = join(directory, 'layout.html');
-        writeFileSync(fixture, `<!doctype html><body style="margin:0;font-size:16px">
+        writeFileSync(fixture, `<!doctype html><style>
+            :root { --agenda-panel-border: #ddd; }
+            </style><body style="margin:0;font-size:16px">
             ${fixtures.map(html => `<main style="width:320px">${html}</main>`).join('')}
             <pre id="result"></pre>
             <script>
