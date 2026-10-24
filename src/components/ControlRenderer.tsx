@@ -132,7 +132,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                 ...(isVerticalLayout ? { flexDirection: 'row', alignItems: 'center' } : {}),
                 ...(displaysImageList ? {
                     gap: isVerticalLayout ? 0.6 : 0.25,
-                    padding: isVerticalLayout ? '2px 6px' : '2px 10px',
+                    padding: isVerticalLayout ? '1px 6px' : '1px 10px',
                     minWidth: imageListMinWidth,
                     ...(isVerticalLayout ? { borderRadius: '8px' } : {}),
                 } : isVerticalLayout ? { gap: 0.6, padding: '4px 6px', borderRadius: '8px' } : {}),

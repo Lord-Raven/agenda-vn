@@ -11,6 +11,9 @@ import { ControlDock } from '../src/components/ControlDock';
 import { Control } from '../src/content/Control';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { CALENDAR_TIME_OF_DAY_ORDER } from '../src/content/CalendarEvent';
+import { Actor } from '../src/content/Actor';
+import { Item } from '../src/content/Item';
+import { Location } from '../src/content/Location';
 
 const createStage = () => {
     const configuration: GameConfiguration = {
@@ -134,6 +137,101 @@ for (const placement of ['top', 'bottom'] as const) {
 }
 
 // Set CHROME_BIN to run geometric regression checks with an existing Chromium installation.
+test('content list displays match ordinary control heights without clipping portraits', { skip: !process.env.CHROME_BIN }, () => {
+    const directory = mkdtempSync(join(tmpdir(), 'agenda-list-height-'));
+    try {
+        const fixtures: string[] = [];
+        for (const placement of ['top', 'bottom'] as const) {
+            for (const isVerticalLayout of [false, true]) {
+                for (const withButtons of placement === 'top' ? [false, true] : [false]) {
+                    for (const count of [0, 1, 8]) {
+                        const stage = createStage();
+                        const configuration = stage.getConfiguration();
+                        configuration.dateMode = 'turnBased';
+                        configuration.timeMode = 'phase';
+                        configuration.globalStats = [
+                            { id: 'health', name: 'Health', type: 'number' as const, default: 42, guidance: '' },
+                            ...(['actorList', 'itemList', 'locationList'] as const).map(type => ({
+                                id: type, name: type, type, default: Array.from({ length: count }, (_, index) => `${index}`), guidance: '',
+                            })),
+                        ].map(stat => ({
+                            ...stat,
+                            llmSees: { value: true, conditions: [] },
+                            llmMaintained: { value: true, conditions: [] },
+                        }));
+                        configuration.controls = configuration.globalStats.map(stat => new Control({
+                            placement, type: 'statDisplay', statId: stat.id, label: stat.name,
+                        }));
+                        const save = stage.getSave()!;
+                        for (let index = 0; index < count; index++) {
+                            const id = `${index}`;
+                            save.actors[id] = new Actor({ id, name: `Actor ${index}` });
+                            save.inventory.push(new Item({ id, name: `Item ${index}` }));
+                            save.atlas[id] = new Location({ id, name: `Location ${index}` });
+                        }
+                        stage.getSave = () => save;
+                        const html = renderToStaticMarkup(placement === 'top'
+                            ? <GlobalStatBar stage={() => stage} isVerticalLayout={isVerticalLayout} buttons={withButtons ? <button>Menu</button> : undefined} />
+                            : <ControlDock stage={() => stage} isVerticalLayout={isVerticalLayout} />);
+                        for (const width of [320, 960]) {
+                            fixtures.push(`<main data-compact="${isVerticalLayout}" data-count="${count}" style="width:${width}px">${html}</main>`);
+                        }
+                    }
+                }
+            }
+        }
+        const fixture = join(directory, 'layout.html');
+        writeFileSync(fixture, `<!doctype html><style>
+            :root { --agenda-highlight: #99f; --agenda-panel-border: #ddd; }
+            * { transition: none !important; }
+            </style><body style="margin:0;font-size:16px">
+            ${fixtures.join('')}
+            <pre id="result"></pre>
+            <script>
+                const errors = [];
+                function check(value, message) { if (!value) errors.push(message); }
+                document.querySelectorAll('main').forEach((main, index) => {
+                    const compact = main.dataset.compact === 'true';
+                    const ordinary = main.querySelector('[aria-label="Health"]');
+                    const height = ordinary.getBoundingClientRect().height;
+                    check(height <= (compact ? 30.1 : 65), index + ': ordinary height is not inflated');
+                    const day = main.querySelector('[title^="Current Date:"]');
+                    if (day && compact) {
+                        check(Math.abs(day.getBoundingClientRect().height - height) < 1, index + ': matches Day height (' + day.getBoundingClientRect().height + ', ' + height + ')');
+                    }
+                    ['actorList', 'itemList', 'locationList'].forEach(kind => {
+                        const control = main.querySelector('[aria-label="' + kind + '"]');
+                        // Ordinary values can grow slightly with their container-relative font size.
+                        check(Math.abs(control.getBoundingClientRect().height - height) < (compact ? 1 : 2), index + ': ' + kind + ' matches ordinary height (' + control.getBoundingClientRect().height + ', ' + height + ')');
+                        const list = control.querySelector('[role="list"]');
+                        const portraits = list.querySelectorAll('[role="listitem"]');
+                        check(portraits.length === Number(main.dataset.count), index + ': list contents preserved');
+                        [portraits[0], portraits[portraits.length - 1]].filter(Boolean).forEach((portrait, end) => {
+                            const viewport = list.parentElement;
+                            viewport.scrollLeft = end ? viewport.scrollWidth : 0;
+                            portrait.focus({ preventScroll: true });
+                            const style = getComputedStyle(portrait);
+                            const scale = new DOMMatrix(style.transform).a;
+                            const outline = (parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset)) * scale;
+                            const bounds = portrait.getBoundingClientRect();
+                            const clip = viewport.getBoundingClientRect();
+                            check(bounds.top - outline >= clip.top - 0.1 && bounds.bottom + outline <= clip.bottom + 0.1, index + ': focus outline fits vertically');
+                            check(bounds.left - outline >= clip.left - 0.1 && bounds.right + outline <= clip.right + 0.1, index + ': focus outline fits horizontally (' + bounds.left + ', ' + bounds.right + ', ' + outline + ', ' + clip.left + ', ' + clip.right + ')');
+                            portrait.blur();
+                        });
+                    });
+                });
+                document.getElementById('result').textContent = errors.length ? JSON.stringify(errors) : 'PASS';
+            </script>`);
+        const output = execFileSync(process.env.CHROME_BIN!, [
+            '--headless', '--no-sandbox', '--disable-gpu', '--dump-dom', `file://${fixture}`,
+        ], { encoding: 'utf8', timeout: 30000, maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+        assert.equal(output.match(/<pre id="result">([^<]*)<\/pre>/)?.[1], 'PASS');
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
 test('vertical Day phase segments stay beneath the label and match compact control heights', { skip: !process.env.CHROME_BIN }, () => {
     const directory = mkdtempSync(join(tmpdir(), 'agenda-day-segments-'));
     try {

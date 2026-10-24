@@ -25,7 +25,7 @@ const renderPortraits = (size: number, variant: 'carousel' | 'overlay', count: n
     />,
 );
 
-for (const size of [24, 28, 40, 64]) {
+for (const size of [16, 24, 28, 32, 40, 64]) {
     for (const variant of ['carousel', 'overlay'] as const) {
         test(`${variant} portraits reserve space for the scaled icon and outline at size ${size}`, () => {
             const html = renderPortraits(size, variant, 3);
@@ -43,7 +43,7 @@ test('enlarged end portraits and outlines fit inside the scroll viewport', { ski
     const directory = mkdtempSync(join(tmpdir(), 'agenda-list-hover-'));
     try {
         const fixtures: string[] = [];
-        for (const size of [24, 28, 40, 64]) {
+        for (const size of [16, 24, 28, 32, 40, 64]) {
             for (const variant of ['carousel', 'overlay'] as const) {
                 for (const width of [90, 180, 600]) {
                     for (const count of [1, 8]) {

@@ -36,7 +36,8 @@ const PORTRAIT_HOVER_SCALE = 1.1;
 export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label, variant = 'carousel', size = PORTRAIT_SIZE }) => {
     const isOverlay = variant === 'overlay';
     const overlap = isOverlay ? Math.round(size * 0.32) : PORTRAIT_OVERLAP;
-    const hoverPadding = Math.ceil(size * (PORTRAIT_HOVER_SCALE - 1) / 2 + 3 * PORTRAIT_HOVER_SCALE);
+    // Scroll positions round to whole pixels, even when the viewport width is fractional.
+    const hoverPadding = Math.ceil(size * (PORTRAIT_HOVER_SCALE - 1) / 2 + 3 * PORTRAIT_HOVER_SCALE + 0.5);
     const dimension = isOverlay ? size : `clamp(${Math.min(28, size)}px, 28cqi, ${size}px)`;
     const imageStyle = {
         width: dimension,
@@ -192,7 +193,7 @@ export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, 
 
     return (
         <>
-            {carousel && <ContentListPortraits kind={kind} values={resolvedValues} stage={stage} label={label} size={isVerticalLayout ? 24 : PORTRAIT_SIZE} />}
+            {carousel && <ContentListPortraits kind={kind} values={resolvedValues} stage={stage} label={label} size={isVerticalLayout ? 16 : 32} />}
             {(!carousel || onChange) && (
                 <ReferenceMultiSelect
                     kind={kind}
