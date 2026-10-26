@@ -19,6 +19,7 @@ import { OutfitPositioningModal } from '../components/OutfitPositioningModal';
 import { StatValueInput } from '../components/StatValueInput';
 import { isValueReference, valuePickerOptions } from '../content/Function';
 import { isNumericValueExpression } from '../content/ValueExpression';
+import { hasOpaqueImageCorners } from '../utils/ImageTransparency';
 
 interface ActorDetailPanelProps {
     actor: Actor;
@@ -354,6 +355,9 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const [emotionPromptDraft, setEmotionPromptDraft] = useState('');
     const [isImageDropActive, setIsImageDropActive] = useState(false);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [opaqueUploadedImages, setOpaqueUploadedImages] = useState<Set<string>>(new Set());
+    const [isRemovingBackground, setIsRemovingBackground] = useState(false);
+    const imageOperationRef = useRef(false);
     const [outfitsObjectExport, setOutfitsObjectExport] = useState('');
     const [confirmDialog, setConfirmDialog] = useState<{
         open: boolean;
@@ -1414,6 +1418,7 @@ ${indent}}`;
     };
 
     const handleImageFile = async (file: File, target: ImageTarget) => {
+        if (imageOperationRef.current) return;
         if (!file.type.startsWith('image/')) {
             stage().showPriorityMessage('Please select a valid image file.');
             return;
@@ -1424,10 +1429,11 @@ ${indent}}`;
             return;
         }
 
+        imageOperationRef.current = true;
         setIsUploadingImage(true);
         try {
             const uploadedUrl = await stage().uploadFile(`${actor.id}-${selectedOutfitId}-${target}.png`, file);
-            const nextOutfits = editedOutfits.map((outfit) => (
+            const nextOutfits = editedOutfitsRef.current.map((outfit) => (
                 outfit.id === selectedOutfitId
                     ? {
                         ...outfit,
@@ -1439,6 +1445,7 @@ ${indent}}`;
                     }
                     : outfit
             ));
+            editedOutfitsRef.current = nextOutfits;
             setEditedOutfits(nextOutfits);
             actor.outfits = nextOutfits.map((outfit) => ({
                 ...outfit,
@@ -1446,14 +1453,83 @@ ${indent}}`;
                 emotionPack: { ...(outfit.emotionPack || {}) },
             }));
             forceUpdate({});
+            if (target !== 'base') {
+                setOpaqueUploadedImages(previous => {
+                    const next = new Set(previous);
+                    next.delete(uploadedUrl);
+                    return next;
+                });
+                try {
+                    const opaque = await hasOpaqueImageCorners(file);
+                    if (isMountedRef.current) {
+                        setOpaqueUploadedImages(previous => {
+                            const next = new Set(previous);
+                            if (opaque) next.add(uploadedUrl);
+                            else next.delete(uploadedUrl);
+                            return next;
+                        });
+                    }
+                } catch (error) {
+                    console.error('Failed to check uploaded image transparency:', error);
+                    stage().showPriorityMessage('Image uploaded, but its transparency could not be checked. Check console for details.');
+                }
+            }
         } catch (error) {
             console.error(`Failed to upload ${target} image:`, error);
             stage().showPriorityMessage(`Failed to upload ${target} image. Check console for details.`);
         } finally {
+            imageOperationRef.current = false;
             setIsUploadingImage(false);
             if (imageUploadInputRef.current) {
                 imageUploadInputRef.current.value = '';
             }
+        }
+    };
+
+    const handleRemoveEmotionBackground = async () => {
+        const emotion = imageDialog.target;
+        if (!emotion || emotion === 'base' || imageOperationRef.current) return;
+        const outfitId = selectedOutfitId;
+        const imageUrl = getSelectedOutfitImageUrl(emotion);
+        if (!opaqueUploadedImages.has(imageUrl)) return;
+
+        imageOperationRef.current = true;
+        setIsRemovingBackground(true);
+        try {
+            const processedUrl = await stage().removeBackground(imageUrl, { throwOnError: true });
+            const response = await fetch(processedUrl);
+            if (!response.ok) {
+                throw new Error(`Failed to download processed image (${response.status}).`);
+            }
+            const blob = await response.blob();
+            if (!blob.size || !blob.type.startsWith('image/')) {
+                throw new Error('Background removal returned an invalid image.');
+            }
+            const fileName = `${actor.id}-${outfitId}-${emotion}-${generateUuid()}.png`;
+            const uploadedUrl = await stage().uploadFile(fileName, new File([blob], fileName, { type: blob.type }));
+            const nextOutfits = editedOutfitsRef.current.map(outfit => (
+                outfit.id === outfitId && outfit.emotionPack?.[emotion] === imageUrl
+                    ? { ...outfit, emotionPack: { ...outfit.emotionPack, [emotion]: uploadedUrl } }
+                    : outfit
+            ));
+            editedOutfitsRef.current = nextOutfits;
+            actor.outfits = cloneOutfits(nextOutfits);
+            persistActor(editedActorRef.current, nextOutfits, editedStatMapRef.current, editedStatInitialMapRef.current);
+            if (!isCreatorMode) stage().saveGame();
+            if (isMountedRef.current) {
+                setEditedOutfits(nextOutfits);
+                setOpaqueUploadedImages(previous => {
+                    const next = new Set(previous);
+                    next.delete(imageUrl);
+                    return next;
+                });
+            }
+        } catch (error) {
+            console.error(`Failed to remove background from ${emotion} image:`, error);
+            stage().showPriorityMessage(`Failed to remove background from ${emotion} image. Check console for details.`);
+        } finally {
+            imageOperationRef.current = false;
+            if (isMountedRef.current) setIsRemovingBackground(false);
         }
     };
 
@@ -2851,6 +2927,7 @@ ${indent}}`;
                                 ref={imageUploadInputRef}
                                 type="file"
                                 accept="image/*"
+                                disabled={isUploadingImage || isRemovingBackground || isCurrentImageRegenerating}
                                 style={{ display: 'none' }}
                                 onChange={(e) => {
                                     const target = imageDialog.target;
@@ -2860,7 +2937,11 @@ ${indent}}`;
                                 }}
                             />
                             <div
-                                onClick={() => imageUploadInputRef.current?.click()}
+                                onClick={() => {
+                                    if (!isUploadingImage && !isRemovingBackground && !isCurrentImageRegenerating) {
+                                        imageUploadInputRef.current?.click();
+                                    }
+                                }}
                                 onDragOver={(e) => {
                                     e.preventDefault();
                                     setIsImageDropActive(true);
@@ -2876,6 +2957,7 @@ ${indent}}`;
                                 onDrop={(e) => {
                                     e.preventDefault();
                                     setIsImageDropActive(false);
+                                    if (isUploadingImage || isRemovingBackground || isCurrentImageRegenerating) return;
                                     const target = imageDialog.target;
                                     const file = e.dataTransfer.files?.[0];
                                     if (!target || !file) return;
@@ -3113,6 +3195,7 @@ ${indent}}`;
                                         <TextInput
                                             fullWidth
                                             value={currentImageUrl}
+                                            disabled={isUploadingImage || isRemovingBackground || isCurrentImageRegenerating}
                                             onChange={(e) => handleEmotionImageUrlChange(imageDialog.target as Emotion, e.target.value)}
                                             placeholder="https://... or leave empty"
                                         />
@@ -3151,7 +3234,16 @@ ${indent}}`;
                                     </div>
                                 </>
                             )}
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', alignSelf: 'flex-start' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', alignSelf: 'flex-start' }}>
+                                {isDialogEmotionTarget && opaqueUploadedImages.has(currentImageUrl) && (
+                                    <Button
+                                        onClick={handleRemoveEmotionBackground}
+                                        disabled={isUploadingImage || isRemovingBackground || isCurrentImageRegenerating}
+                                        variant="secondary"
+                                    >
+                                        {isRemovingBackground ? 'Removing Background...' : 'Remove Background'}
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={async () => {
                                         const target = imageDialog.target;
@@ -3162,14 +3254,14 @@ ${indent}}`;
                                             handleRegenerateEmotion(target, emotionPromptDraft);
                                         }
                                     }}
-                                    disabled={!imageDialog.target || isCurrentImageRegenerating}
+                                    disabled={!imageDialog.target || isCurrentImageRegenerating || isUploadingImage || isRemovingBackground}
                                 >
                                     {isCurrentImageRegenerating ? 'Generating...' : 'Regenerate Image'}
                                 </Button>
                                 {imageDialog.target && imageDialog.target !== 'base' && (
                                     <Button
                                         onClick={() => handleDeleteEmotionImage(imageDialog.target as Emotion)}
-                                        disabled={!currentImageUrl || isCurrentImageRegenerating || isUploadingImage}
+                                        disabled={!currentImageUrl || isCurrentImageRegenerating || isUploadingImage || isRemovingBackground}
                                         variant="secondary"
                                     >
                                         Delete Image
