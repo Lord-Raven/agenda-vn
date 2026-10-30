@@ -227,5 +227,7 @@ export interface MapLink {
     name?: string;
     iconName?: string;
     actions?: StatUpdateAction[];
-    contentList?: { kind: ReferenceKind; values: string[] };
+    // Entities displayed beneath a button marker. 'mixed' lists may combine actors, items, and locations
+    // (including via function/global-stat references of any content kind).
+    contentList?: { kind: ReferenceKind | 'mixed'; values: string[] };
 }

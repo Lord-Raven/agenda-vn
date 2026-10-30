@@ -11,7 +11,7 @@ import { LocationPortrait } from './LocationPortrait';
 import { ReferenceMultiSelect } from './UiComponents';
 
 interface ContentListControlProps {
-    kind: ReferenceKind;
+    kind?: ReferenceKind; // Omitted for mixed contentList stats, whose ids may be of any content kind.
     values: string[];
     stage: Stage;
     display: ContentListDisplay;
@@ -21,7 +21,7 @@ interface ContentListControlProps {
 }
 
 interface ContentListPortraitsProps {
-    kind: ReferenceKind;
+    kind?: ReferenceKind; // Omitted for mixed lists; each id is probed against every collection.
     values: string[];
     stage: Stage;
     label: string;
@@ -126,10 +126,10 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                 }}>
                     {values.length === 0 && <span style={{ display: 'flex', alignItems: 'center', height: dimension, color: 'var(--agenda-text-muted)', fontSize: imageStyle.fontSize }}>None</span>}
                     {values.map((id, index) => {
-                        const actor = kind === 'actor' ? save.actors?.[id] : undefined;
-                        const item = kind === 'item' ? save.inventory?.find((candidate) => candidate.id === id) : undefined;
-                        const location = kind === 'location' ? save.atlas?.[id] : undefined;
-                        const name = actor ? actor.displayName ?? actor.name : item?.name ?? location?.name ?? `Unknown ${kind}`;
+                        const actor = !kind || kind === 'actor' ? save.actors?.[id] : undefined;
+                        const item = !actor && (!kind || kind === 'item') ? save.inventory?.find((candidate) => candidate.id === id) : undefined;
+                        const location = !actor && !item && (!kind || kind === 'location') ? save.atlas?.[id] : undefined;
+                        const name = actor ? actor.displayName ?? actor.name : item?.name ?? location?.name ?? `Unknown ${kind || 'content'}`;
                         const FallbackIcon = kind === 'actor' ? Person : kind === 'item' ? Inventory2 : Place;
                         const portrait = (
                             <Box
@@ -185,7 +185,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
 
 export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, stage, display, label, isVerticalLayout = false, onChange }) => {
     const save = stage.getSave();
-    const resolvedValues = stage.resolveValue(values, kind === 'actor' ? 'actorList' : kind === 'item' ? 'itemList' : 'locationList') as string[];
+    const resolvedValues = stage.resolveValue(values, kind === 'actor' ? 'actorList' : kind === 'item' ? 'itemList' : kind === 'location' ? 'locationList' : 'contentList') as string[];
     const carousel = display !== 'abbreviated';
     const actors = Object.values(save.actors || {});
     const items = save.inventory || [];

@@ -6,7 +6,7 @@ export type FunctionReturnType = StatType | 'void';
 
 export const FUNCTION_RETURN_TYPES: FunctionReturnType[] = [
     'void', 'number', 'text', 'checkbox', 'option', 'optionList',
-    'actor', 'actorList', 'item', 'itemList', 'location', 'locationList',
+    'actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList',
 ];
 
 // A tagged string fits existing ID pickers and mixed ID lists without converting references into values.
@@ -25,9 +25,14 @@ export const isValueReference = (value: unknown): value is string => isFunctionR
 
 export type FunctionValueResolver = (value: unknown, type: StatType) => StatValue;
 
+// The scalar type of one element of a single-kind list type. The mixed 'contentList' has no single element
+// type and resolves to undefined; use isListValueType to detect every list-valued type.
 export const listElementType = (type: StatType): StatType | undefined => ({
     actorList: 'actor', itemList: 'item', locationList: 'location', optionList: 'option',
 } as Partial<Record<StatType, StatType>>)[type];
+
+// Any type whose value is a string[] of ids, including the mixed 'contentList'.
+export const isListValueType = (type: StatType): boolean => type === 'contentList' || !!listElementType(type);
 
 export const matchesFunctionType = (fn: GameFunction, type: StatType): boolean => fn.returnType === type;
 
@@ -49,7 +54,7 @@ export const validateFunctionResult = (value: unknown, type: FunctionReturnType)
     }
     const valid = type === 'number' ? typeof value === 'number' && Number.isFinite(value)
         : type === 'checkbox' ? typeof value === 'boolean'
-            : listElementType(type) ? Array.isArray(value) && value.every(entry => typeof entry === 'string' && !isValueReference(entry))
+            : isListValueType(type) ? Array.isArray(value) && value.every(entry => typeof entry === 'string' && !isValueReference(entry))
                 : typeof value === 'string' && !isValueReference(value);
     if (!valid) {
         throw new Error(`Expected a ${type} function result, received ${value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value}.`);

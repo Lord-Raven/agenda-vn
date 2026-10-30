@@ -1,7 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emotion';
 import { Stage } from '../Stage';
-import { Stat, StatValue, formatReferenceStatText, isNumericDisplayType, isStatLlmSeen, normalizeLocationListValue, normalizeStatValue, resolveReferenceKind, resolveStatDefault, resolveStatText } from './Stat';
+import { Stat, StatValue, formatReferenceStatText, isNumericDisplayType, isReferenceStatType, isStatLlmSeen, normalizeLocationListValue, normalizeStatValue, resolveStatDefault, resolveStatText } from './Stat';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { createLoreEntry, formatLoreEntriesAsContext, processLoreText, selectConstantLoreEntries } from './Lore';
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
@@ -878,8 +878,8 @@ const formatActorStatValue = (value: StatValue, stat: Stat, atlas?: { [key: stri
     if (stat.type === 'checkbox') {
         return value === true ? 'yes' : 'no';
     }
-    if (resolveReferenceKind(stat.type)) {
-        return formatReferenceStatText(stat, value, { actors, items: inventory, locations: atlas }, (kind) => `unknown ${kind}`);
+    if (isReferenceStatType(stat.type)) {
+        return formatReferenceStatText(stat, value, { actors, items: inventory, locations: atlas }, (kind) => `unknown ${kind || 'content'}`);
     }
     if (isNumericDisplayType(stat.type)) {
         const min = typeof stat.min === 'number' ? stat.min : undefined;

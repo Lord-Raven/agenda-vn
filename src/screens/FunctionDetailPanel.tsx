@@ -19,6 +19,7 @@ export const FUNCTION_RETURN_TYPE_LABELS: Record<FunctionReturnType, string> = {
     itemList: 'Item List',
     location: 'Location',
     locationList: 'Location List',
+    contentList: 'Content List (mixed)',
 };
 
 interface FunctionDetailPanelProps {

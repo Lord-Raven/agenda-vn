@@ -318,7 +318,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
                                     const isInteractive = availability.enabled && Boolean(isButton || linkedMap || canVisitLocation);
                                     const contentValues = isButton && link.contentList
-                                        ? [...new Set(normalizeReferenceListValue(stage().resolveValue(link.contentList.values, `${link.contentList.kind}List`, save)))]
+                                        ? [...new Set(normalizeReferenceListValue(stage().resolveValue(link.contentList.values, link.contentList.kind === 'mixed' ? 'contentList' : `${link.contentList.kind}List`, save)))]
                                         : [];
                                     const contentWidth = Math.min(200, Math.max(0, mapViewportSize.width - 16) || 200, 12 + contentValues.length * actorPortraitSize - Math.max(0, contentValues.length - 1) * Math.round(actorPortraitSize * 0.32));
                                     const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize, contentValues.length ? actorPortraitSize * 5 / 6 + 8 : 0);
@@ -403,7 +403,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                 onMouseLeave={() => setHoveredLink(null)}
                                                 style={{ position: 'absolute', ...markerPosition.style, left: `clamp(${contentWidth / 2 + 8}px, ${markerPosition.style.left}, calc(100% - ${contentWidth / 2 + 8}px))`, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, width: contentWidth, zIndex: isHovered ? 5 : 3 }}
                                             >
-                                                <ContentListPortraits kind={link.contentList.kind} values={contentValues} stage={stage()} label={`${markerName} contents`} variant="overlay" size={actorPortraitSize} />
+                                                <ContentListPortraits kind={link.contentList.kind === 'mixed' ? undefined : link.contentList.kind} values={contentValues} stage={stage()} label={`${markerName} contents`} variant="overlay" size={actorPortraitSize} />
                                             </div>
                                         )}
                                         </Fragment>

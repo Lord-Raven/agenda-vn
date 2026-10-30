@@ -97,20 +97,20 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     }
 
     const referenceKind = resolveReferenceKind(stat.type);
+    if (isReferenceListDisplayType(stat.type)) {
+        return (
+            <ReferenceMultiSelect
+                kind={referenceKind}
+                values={Array.isArray(value) ? value : isValueReference(value) ? [value] : []}
+                onChange={(ids) => onChange(ids)}
+                actors={actors}
+                items={items}
+                locations={locations}
+                stage={stage}
+            />
+        );
+    }
     if (referenceKind) {
-        if (isReferenceListDisplayType(stat.type)) {
-            return (
-                <ReferenceMultiSelect
-                    kind={referenceKind}
-                    values={Array.isArray(value) ? value : isValueReference(value) ? [value] : []}
-                    onChange={(ids) => onChange(ids)}
-                    actors={actors}
-                    items={items}
-                    locations={locations}
-                    stage={stage}
-                />
-            );
-        }
         return (
             <ReferenceSelect
                 kind={referenceKind}

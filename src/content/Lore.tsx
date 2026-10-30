@@ -5,7 +5,7 @@ import { Stage } from '../Stage';
 import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
-import { Stat, StatType, StatValue, formatReferenceStatText, formatStatOptionValueText, resolveReferenceKind } from './Stat';
+import { Stat, StatType, StatValue, formatReferenceStatText, formatStatOptionValueText, isReferenceStatType } from './Stat';
 import { functionReference } from './Function';
 
 // Dynamic entry names loaded from configuration lorebook triggers
@@ -110,8 +110,8 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
         if (type === 'checkbox') {
             return value === true ? 'yes' : 'no';
         }
-        if (resolveReferenceKind(type)) {
-            return formatReferenceStatText({ type }, value, lookup, (kind) => `unknown ${kind}`);
+        if (isReferenceStatType(type)) {
+            return formatReferenceStatText({ type }, value, lookup, (kind) => `unknown ${kind || 'content'}`);
         }
         return Array.isArray(value) ? value.join(', ') : String(value ?? '');
     };

@@ -814,7 +814,7 @@ export const ItemMultiSelect: FC<ItemMultiSelectProps> = ({
 };
 
 interface ReferenceSelectProps {
-	kind: ReferenceKind;
+	kind?: ReferenceKind; // Omitted for mixed contentList references, which offer every content kind.
 	value: string;
 	onChange: (id: string) => void;
 	actors?: ActorLike[];
@@ -825,8 +825,42 @@ interface ReferenceSelectProps {
 	style?: React.CSSProperties;
 }
 
+// Builds mixed picker options spanning every content kind, grouped by kind for readability.
+const buildMixedContentOptions = (
+	actors: ActorLike[],
+	items: ItemLike[],
+	locations: LocationLike[],
+	stage?: Stage | (() => Stage),
+): PickerOption[] => {
+	const playerId = (typeof stage === 'function' ? stage() : stage)?.getSave().playerId;
+	const byName = <T extends { name?: string }>(a: T, b: T) => (a.name || '').localeCompare(b.name || '');
+	return [
+		...actors.filter((actor) => actor.id !== playerId).slice().sort(byName).map((actor): PickerOption => ({
+			key: actor.id,
+			label: actor.name || 'Unnamed actor',
+			category: 'Actors',
+			renderAvatar: (size) => <ActorPortrait actor={toPortraitActor(actor)} stage={stage} size={size} />,
+		})),
+		...items.slice().sort(byName).map((item): PickerOption => ({
+			key: item.id,
+			label: item.name || 'Unnamed item',
+			category: 'Items',
+			renderAvatar: (size, active) => <ItemPortrait item={item} stage={stage} width={size} height={size} highlighted={active} />,
+		})),
+		...locations.slice().sort(byName).map((location): PickerOption => ({
+			key: location.id,
+			label: location.name || 'Unnamed location',
+			category: 'Locations',
+			renderAvatar: (size, active) => <LocationPortrait location={location} stage={stage} width={Math.round(size * 1.34)} height={size} highlighted={active} />,
+		})),
+	];
+};
+
+const missingMixedContentOption = (id: string): PickerOption => ({ key: id, label: 'Unknown content', icon: Place });
+
 // Dispatches to the Actor/Item/Location Select for a given ReferenceKind, so callers that only know a stat's
-// reference kind (see resolveReferenceKind) don't need their own actor/item/location branch.
+// reference kind (see resolveReferenceKind) don't need their own actor/item/location branch. Without a kind,
+// renders a mixed picker across every content kind (for 'contentList' stats).
 export const ReferenceSelect: FC<ReferenceSelectProps> = ({ kind, value, onChange, actors = [], items = [], locations = [], stage, allowClear, style }) => {
 	if (kind === 'actor') {
 		return <ActorSelect value={value} onChange={onChange} actors={actors} stage={stage} allowClear={allowClear} style={style} />;
@@ -834,11 +868,32 @@ export const ReferenceSelect: FC<ReferenceSelectProps> = ({ kind, value, onChang
 	if (kind === 'item') {
 		return <ItemSelect value={value} onChange={onChange} items={items} stage={stage} allowClear={allowClear} style={style} />;
 	}
-	return <LocationSelect value={value} onChange={onChange} locations={locations} stage={stage} allowClear={allowClear} style={style} />;
+	if (kind === 'location') {
+		return <LocationSelect value={value} onChange={onChange} locations={locations} stage={stage} allowClear={allowClear} style={style} />;
+	}
+	const options = buildMixedContentOptions(actors, items, locations, stage);
+	if (value && !options.some((option) => option.key === value)) {
+		options.push(missingMixedContentOption(value));
+	}
+	return (
+		<div style={{ width: '100%', ...style }}>
+			<SearchableOptionPicker
+				value={value || undefined}
+				onChange={(nextValue) => onChange((Array.isArray(nextValue) ? nextValue[0] : nextValue) || '')}
+				options={options}
+				allowClear={allowClear ?? true}
+				emptyLabel="No content"
+				title="Choose content"
+				placeholder="Search content"
+				functionType="contentList"
+				stage={stage}
+			/>
+		</div>
+	);
 };
 
 interface ReferenceMultiSelectProps {
-	kind: ReferenceKind;
+	kind?: ReferenceKind; // Omitted for mixed contentList references, which offer every content kind.
 	values: string[];
 	onChange: (ids: string[]) => void;
 	actors?: ActorLike[];
@@ -858,7 +913,28 @@ export const ReferenceMultiSelect: FC<ReferenceMultiSelectProps> = ({ kind, valu
 	if (kind === 'item') {
 		return <ItemMultiSelect values={values} onChange={onChange} items={items} stage={stage} style={style} renderButton={renderButton} disabled={disabled} />;
 	}
-	return <LocationMultiSelect values={values} onChange={onChange} locations={locations} stage={stage} style={style} renderButton={renderButton} disabled={disabled} />;
+	if (kind === 'location') {
+		return <LocationMultiSelect values={values} onChange={onChange} locations={locations} stage={stage} style={style} renderButton={renderButton} disabled={disabled} />;
+	}
+	const options = buildMixedContentOptions(actors, items, locations, stage);
+	values.filter((id) => id && !options.some((option) => option.key === id)).forEach((id) => options.push(missingMixedContentOption(id)));
+	return (
+		<div style={{ width: '100%', ...style }}>
+			<SearchableOptionPicker
+				multiple
+				values={values}
+				onChange={(nextValue) => onChange(Array.isArray(nextValue) ? nextValue : (nextValue ? [nextValue] : []))}
+				options={options}
+				emptyLabel="No content"
+				title="Choose content"
+				placeholder="Search content"
+				functionType="contentList"
+				stage={stage}
+				renderButton={renderButton}
+				disabled={disabled}
+			/>
+		</div>
+	);
 };
 
 interface ColorPickerInputProps {

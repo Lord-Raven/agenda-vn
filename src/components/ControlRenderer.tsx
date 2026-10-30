@@ -114,8 +114,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         .join('\n\n');
     const referenceKind = resolveReferenceKind(stat.type);
     const displaysImageList = Boolean(
-        referenceKind
-        && isReferenceListDisplayType(stat.type)
+        isReferenceListDisplayType(stat.type)
         && control.contentListDisplay !== 'abbreviated'
         && !(control.type === 'statEditor' && isValueReference(rawValue)),
     );
@@ -150,7 +149,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
             )}
 
             <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, minHeight: isVerticalLayout ? 20 : 32, containerType: 'inline-size' }}>
-            {referenceKind && isReferenceListDisplayType(stat.type) && !(control.type === 'statEditor' && isValueReference(rawValue)) ? (
+            {isReferenceListDisplayType(stat.type) && !(control.type === 'statEditor' && isValueReference(rawValue)) ? (
                 <ContentListControl
                     kind={referenceKind}
                     values={normalizeReferenceListValue(control.type === 'statEditor' ? rawValue : normalizedValue)}

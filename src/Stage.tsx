@@ -5,7 +5,7 @@ import { ConditionContext, evaluateConditionCollections } from "./content/Condit
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
-import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
+import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
@@ -572,7 +572,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (!stat) {
                 throw new Error(`Unknown global stat reference: ${id}`);
             }
-            if (stat.type !== type) {
+            if (stat.type !== type && !(type === 'contentList' && isReferenceStatType(stat.type))) {
                 throw new Error(`Global stat "${stat.name}" has type ${stat.type}, not ${type}.`);
             }
             if (stack.includes(value) || stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
@@ -586,7 +586,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (!fn) {
                 throw new Error(`Unknown function reference: ${id}`);
             }
-            if (fn.returnType !== type) {
+            if (fn.returnType !== type && !(type === 'contentList' && isReferenceStatType(fn.returnType as StatType))) {
                 throw new Error(`Function "${fn.name}" returns ${fn.returnType || 'void'}, not ${type}.`);
             }
             const errors: string[] = [];
@@ -594,7 +594,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (errors.length) {
                 throw new Error(errors.join('\n'));
             }
-            validateFunctionResult(result, type);
+            validateFunctionResult(result, fn.returnType);
             return result as StatValue;
         }
         if (typeof value === 'string' && type === 'number' && value.trim()) {
@@ -613,7 +613,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             });
         }
         const elementType = listElementType(type);
-        if (elementType && Array.isArray(value)) {
+        if ((elementType || type === 'contentList') && Array.isArray(value)) {
             return value.flatMap(entry => {
                 if (!isValueReference(entry)) {
                     return typeof entry === 'string' ? [entry] : [];
@@ -622,7 +622,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 const sourceType = isGlobalStatReference(entry)
                     ? configuration.globalStats.find(candidate => candidate.id === globalStatReferenceId(entry))?.type
                     : configuration.functions.find(candidate => candidate.id === functionReferenceId(entry))?.returnType;
-                const resolved = this.resolveValue(entry, sourceType === type ? type : elementType, save, stack);
+                // Mixed lists accept entries referencing any content kind, scalar or list; single-kind lists
+                // only accept their own list type or their scalar element type.
+                const entryType = type === 'contentList'
+                    ? (sourceType && isReferenceStatType(sourceType as StatType) ? sourceType as StatType : type)
+                    : sourceType === type ? type : elementType!;
+                const resolved = this.resolveValue(entry, entryType, save, stack);
                 return Array.isArray(resolved) ? resolved : [String(resolved)];
             });
         }
@@ -1976,11 +1981,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 return option ? [{ ...option }] : [];
             });
         }
-        const kind = resolveReferenceKind(stat.type)!;
+        // Single-kind lists resolve to one kind; mixed contentList ids are probed against every collection.
+        const statKind = resolveReferenceKind(stat.type);
         const configuration = this.getConfiguration(save);
-        const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
-        const fields = kind === 'actor' ? ACTOR_SCRIPT_FIELDS : kind === 'location' ? LOCATION_SCRIPT_FIELDS : ITEM_SCRIPT_FIELDS;
         return ids.flatMap(id => {
+            const kind = statKind ?? (save.actors?.[id] ? 'actor' : save.atlas?.[id] ? 'location' : save.inventory?.some(item => item.id === id) ? 'item' : undefined);
+            if (!kind) {
+                return [];
+            }
+            const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
+            const fields = kind === 'actor' ? ACTOR_SCRIPT_FIELDS : kind === 'location' ? LOCATION_SCRIPT_FIELDS : ITEM_SCRIPT_FIELDS;
             const entity = kind === 'actor' ? save.actors?.[id]
                 : kind === 'location' ? save.atlas?.[id]
                     : save.inventory?.find(item => item.id === id);
@@ -2926,7 +2936,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
             const value = this.readStatValue(save.globalStatValues?.[stat.id], stat, save);
             const selectedOption = stat.type === 'option' ? findStatOptionByValue(stat, value) : undefined;
-            const valueText = formatStatOptionValueText(stat, value) || (resolveReferenceKind(stat.type)
+            const valueText = formatStatOptionValueText(stat, value) || (isReferenceStatType(stat.type)
                 ? formatReferenceStatText(stat, value, { actors: save.actors, items: save.inventory, locations: save.atlas })
                 : (typeof value === 'string' ? value : (typeof value === 'number' ? String(value) : value)));
 

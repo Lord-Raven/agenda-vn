@@ -111,6 +111,7 @@ export const renderStatTypeOptions = () => (
         <option value="actor">Actor</option>
         <option value="actorList">Actor List</option>
         <option value="checkbox">Checkbox</option>
+        <option value="contentList">Content List</option>
         <option value="item">Item</option>
         <option value="itemList">Item List</option>
         <option value="location">Location</option>

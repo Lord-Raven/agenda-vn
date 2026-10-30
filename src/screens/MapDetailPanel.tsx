@@ -574,17 +574,18 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                                 Content below button (optional)
                                                 <select aria-label="Button content type" style={selectStyle} value={link.contentList?.kind || ''}
                                                     onChange={event => {
-                                                        const kind = CONTENT_TYPES.find(type => type === event.target.value);
+                                                        const kind = event.target.value === 'mixed' ? 'mixed' : CONTENT_TYPES.find(type => type === event.target.value);
                                                         updateLink(index, { contentList: kind ? { kind, values: [] } : undefined });
                                                     }}>
                                                     <option value="">None</option>
                                                     <option value="actor">Actors</option>
                                                     <option value="item">Items</option>
                                                     <option value="location">Locations</option>
+                                                    <option value="mixed">Mixed</option>
                                                 </select>
                                             </label>
                                             {link.contentList && <ReferenceMultiSelect
-                                                kind={link.contentList.kind} values={link.contentList.values}
+                                                kind={link.contentList.kind === 'mixed' ? undefined : link.contentList.kind} values={link.contentList.values}
                                                 onChange={values => {
                                                     if (link.contentList) updateLink(index, { contentList: { ...link.contentList, values } });
                                                 }}
@@ -594,6 +595,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                             />}
                                             <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                                 Choose literal content, a function, or a global stat of the selected content type.
+                                                Mixed lists can combine actors, items, and locations, including via functions or global stats of any content type.
                                                 The list is reevaluated after button actions and displayed beneath the marker.
                                             </span>
                                         </>}

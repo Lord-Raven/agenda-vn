@@ -4,9 +4,9 @@ import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } fr
 import { Actor, buildActorContext, getActorLore, resolveActorSchedule, resolveInitialActorStatValue } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
 import { getLocationDescription, Location } from '../src/content/Location';
-import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, normalizeStatValue, resolveAvailableStatOptions, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
+import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, resolveAvailableStatOptions, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateContext, generateSkitScript, Skit } from '../src/content/Skit';
-import { cloneGameFunction, functionPickerOptions, functionReference, globalStatReference, valuePickerOptions, GameFunction } from '../src/content/Function';
+import { cloneGameFunction, functionPickerOptions, functionReference, globalStatReference, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { evaluateCondition } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
@@ -144,6 +144,52 @@ test('map button lists resolve literal, scalar and list sources dynamically for 
         assert.deepEqual(stage.resolveValue(list.values, type), ['literal', 'single', 'updated', 'another', 'updated', 'another']);
         assert.deepEqual(list.values, ['literal', globalStatReference('Single'), functionReference('list'), globalStatReference('Content')]);
     }
+});
+
+test('mixed content lists accept sources of every kind, format across collections, and support conditions', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.globalStats.push(stat('Mixed', 'contentList'), stat('Favorite', 'item'));
+    save.globalStatValues!.Favorite = 'item';
+    configuration.functions = [
+        { id: 'allies', name: 'Allies', description: '', returnType: 'actorList', script: 'return ["b"];' },
+        { id: 'mixed', name: 'Mixed fn', description: '', returnType: 'contentList', script: 'return ["place", "item"];' },
+    ];
+
+    // Mixed lists flatten literal ids plus scalar/list references of any content kind.
+    const values = ['a', globalStatReference('Favorite'), functionReference('allies'), functionReference('mixed')];
+    assert.deepEqual(stage.resolveValue(values, 'contentList'), ['a', 'item', 'b', 'place', 'item']);
+
+    // contentList-typed global stats resolve their own references too.
+    save.globalStatValues!.Mixed = [globalStatReference('Favorite'), 'place'];
+    assert.deepEqual(stage.resolveValue(globalStatReference('Mixed'), 'contentList'), ['item', 'place']);
+
+    // Single-kind lists still reject cross-kind sources.
+    assert.throws(() => stage.resolveValue([functionReference('mixed')], 'actorList'), /returns contentList, not actor/);
+    assert.throws(() => stage.resolveValue([globalStatReference('Favorite')], 'actorList'), /has type item, not actor/);
+
+    // Function results must be id arrays, validated like any other list.
+    validateFunctionResult(['item'], 'contentList');
+    assert.throws(() => validateFunctionResult('item', 'contentList'), /Expected a contentList function result/);
+
+    // Formatting probes every collection and falls back for unknown ids without a kind.
+    const lookup = { actors: save.actors, items: save.inventory, locations: save.atlas };
+    assert.equal(
+        formatReferenceStatText(stat('Display', 'contentList'), ['a', 'item', 'place', 'missing'], lookup, (kind) => `unknown ${kind || 'content'}`),
+        'Same name, Sword, Town, unknown content');
+
+    // Conditions compare one element of the mixed list, including via scalar references of any kind.
+    const context = stage.getScheduleContext(save);
+    assert.equal(evaluateCondition({ type: 'globalStat', statId: 'Mixed', comparison: 'contains', value: 'place' }, context), true);
+    assert.equal(evaluateCondition({ type: 'globalStat', statId: 'Mixed', comparison: 'contains', value: globalStatReference('Favorite') }, context), true);
+    assert.equal(evaluateCondition({ type: 'globalStat', statId: 'Mixed', comparison: 'contains', value: 'b' }, context), false);
+
+    // getObjects() resolves each mixed id against whichever collection owns it.
+    const objects = stage.testFunction({
+        id: 'objects', name: 'Objects', description: '', returnType: 'contentList',
+        script: 'return getObjects("Mixed").map(entry => entry.kind + ":" + entry.name);',
+    }, configuration.functions);
+    assert.deepEqual(objects.value, ['item:Sword', 'location:Town']);
+    assert.deepEqual(objects.errors, []);
 });
 
 test('map buttons and control skits retain independent outcomes through cloning and portable export', () => {

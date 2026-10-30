@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
-import { findStatOptionByValue, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat, StatType } from '../content/Stat';
+import { findStatOptionByValue, isContentListDisplayType, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat, StatType } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, GlobalStatCondition, variableContentValue } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
@@ -285,7 +285,9 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
 
     const isValidSourceFor = (value: string, type: StatType, previousType?: StatType): boolean => {
         const stageInstance = typeof stage === 'function' ? stage() : stage;
-        return valuePickerOptions(stageInstance?.getConfiguration() || { globalStats }, type).some(option => option.key === value)
+        // Mixed contentList conditions compare one element, which may reference any scalar content kind.
+        const types: StatType[] = type === 'contentList' ? ['actor', 'item', 'location'] : [type];
+        return types.some(candidate => valuePickerOptions(stageInstance?.getConfiguration() || { globalStats }, candidate).some(option => option.key === value))
             || (!stageInstance && isFunctionReference(value) && previousType === type);
     };
 
@@ -307,6 +309,13 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             return typeof value === 'string' && (
                 concreteTargetOptionsFor(type).some(option => option.key === value)
                 || (next.type !== 'contentIdentity' && (value === '' || (variableContentType === type && value === variableContentValue(type))))
+            );
+        }
+        if (type === 'contentList') {
+            return typeof value === 'string' && (
+                value === ''
+                || (['actor', 'item', 'location'] as const).some(kind => concreteTargetOptionsFor(kind).some(option => option.key === value))
+                || (!!variableContentType && value === variableContentValue(variableContentType))
             );
         }
         if (type === 'option' && (next.type === 'globalStat' || next.type === 'contentStat')) {
@@ -395,6 +404,28 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         const stat = condition.type === 'globalStat' || condition.type === 'contentStat'
             ? statsForCondition(condition).find(candidate => candidate.id === condition.statId)
             : undefined;
+        // Mixed contentList conditions compare one id of any content kind; offer every concrete entity
+        // (plus the Variable target when one is bound), grouped by kind.
+        if (stat && isContentListDisplayType(stat.type)) {
+            const options = [
+                ...(variableContentType ? [{ key: variableContentValue(variableContentType), label: 'Variable', icon: SwapHoriz }] : []),
+                ...(['actor', 'item', 'location'] as const).flatMap(kind =>
+                    concreteTargetOptionsFor(kind).map(option => ({ ...option, category: `${CONTENT_TYPE_LABELS[kind]}s` }))),
+            ];
+            return (
+                <SearchableOptionPicker
+                    value={String(condition.value ?? '')}
+                    onChange={(nextValue) => updateValue((Array.isArray(nextValue) ? nextValue[0] : nextValue) || '')}
+                    options={options}
+                    defaultOptionKeys={variableContentType ? [variableContentValue(variableContentType)] : []}
+                    emptyLabel="None"
+                    title="Choose content"
+                    placeholder="Search content"
+                    functionType="contentList"
+                    stage={stage}
+                />
+            );
+        }
         if (stat && !resolveReferenceKind(stat.type)) {
             return <StatValueInput stat={{ ...stat, type: listElementType(stat.type) || stat.type }} value={condition.value}
                 onChange={value => {

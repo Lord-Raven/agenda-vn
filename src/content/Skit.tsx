@@ -38,7 +38,11 @@ const formatReferenceStatValue = (stat: { type: StatType }, value: unknown, stag
         if (kind === 'item') {
             return getItemName(id, stage);
         }
-        return getLocationName(id, stage);
+        if (kind === 'location') {
+            return getLocationName(id, stage);
+        }
+        // Mixed contentList ids carry no kind; probe every collection.
+        return getActorName(id, stage) || getItemName(id, stage) || getLocationName(id, stage);
     })
 );
 

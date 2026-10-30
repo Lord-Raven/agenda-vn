@@ -55,11 +55,14 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     if (functionType) {
+        // Mixed contentList pickers accept sources of every content kind; other pickers accept their own
+        // scalar type plus (when multiple) the matching list type.
+        const scalarTypes: StatType[] = functionType === 'contentList' ? ['actor', 'item', 'location'] : [functionType];
         const listType = functionType === 'actor' ? 'actorList' : functionType === 'item' ? 'itemList' : functionType === 'location' ? 'locationList' : functionType === 'option' ? 'optionList' : undefined;
-        const sourceOptions = [
-            ...valuePickerOptions(stageInstance?.getConfiguration(), functionType),
-            ...(multiple && listType ? valuePickerOptions(stageInstance?.getConfiguration(), listType) : []),
-        ];
+        const listTypes: StatType[] = !multiple ? []
+            : functionType === 'contentList' ? ['actorList', 'itemList', 'locationList', 'contentList']
+                : listType ? [listType] : [];
+        const sourceOptions = [...scalarTypes, ...listTypes].flatMap(type => valuePickerOptions(stageInstance?.getConfiguration(), type));
         options = [...options.filter(option => !isFunctionReference(option.key) && !sourceOptions.some(source => source.key === option.key)), ...sourceOptions];
         const selected = multiple ? values || [] : value ? [value] : [];
         for (const key of selected.filter(isValueReference)) {

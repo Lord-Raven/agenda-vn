@@ -38,7 +38,8 @@ export const resolveConditionalFlag = (flag: ConditionalFlag | undefined, contex
 // Reference stats hold content IDs rather than display values. List variants hold a set of IDs.
 // 'optionList' holds a pool of options (Stat.options) whose value is the list of currently active option ids;
 // 'option' stats may pull their choices from one via Stat.optionSourceStatId.
-export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'checkbox' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList';
+// 'contentList' is a mixed reference list whose ids may point at actors, items, and locations together.
+export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'checkbox' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'contentList';
 export type StatValue = number | string | boolean | string[];
 
 export const isNumericDisplayType = (type: StatType): boolean => type === 'number';
@@ -57,9 +58,15 @@ export const isItemDisplayType = (type: StatType): boolean => type === 'item';
 
 export const isItemListDisplayType = (type: StatType): boolean => type === 'itemList';
 
+export const isContentListDisplayType = (type: StatType): boolean => type === 'contentList';
+
 export const isReferenceDisplayType = (type: StatType): boolean => type === 'actor' || type === 'item' || type === 'location';
 
-export const isReferenceListDisplayType = (type: StatType): boolean => type === 'actorList' || type === 'itemList' || type === 'locationList';
+export const isReferenceListDisplayType = (type: StatType): boolean => type === 'actorList' || type === 'itemList' || type === 'locationList' || type === 'contentList';
+
+// Any stat type whose value holds entity reference id(s): scalar references, single-kind lists, and the
+// mixed 'contentList'.
+export const isReferenceStatType = (type: StatType): boolean => isReferenceDisplayType(type) || isReferenceListDisplayType(type);
 
 // Any stat whose value is a string[] (reference lists and optionLists).
 export const isListStatType = (type: StatType): boolean => isReferenceListDisplayType(type) || isOptionListStatType(type);
@@ -70,7 +77,8 @@ export const normalizeReferenceListValue = (value: unknown): string[] => (
 
 // The kind of content a reference stat (scalar or list) points to; shared by every place that needs to pick
 // per-kind behavior (which entity collection, which UI select component, which portrait, etc.) instead of
-// re-deriving it from a 6-way StatType comparison.
+// re-deriving it from a 6-way StatType comparison. The mixed 'contentList' type has no single kind and
+// resolves to undefined; callers must probe every collection for it.
 export type ReferenceKind = ContentType;
 
 export const resolveReferenceKind = (type: StatType): ReferenceKind | undefined => {
@@ -103,22 +111,29 @@ const findEntityName = (collection: Record<string, { name?: string }> | Array<{ 
 
 // Resolves a reference stat's target id to its entity's display name via whichever collection matches the
 // stat's kind (see resolveReferenceKind); returns undefined (rather than a fallback) so callers can decide
-// what "not found" should look like.
+// what "not found" should look like. Mixed 'contentList' ids are probed against every collection.
 export const resolveReferenceEntityName = (type: StatType, id: string, lookup: ReferenceEntityLookup): string | undefined => {
     const kind = resolveReferenceKind(type);
-    return kind ? findEntityName(lookup[`${kind}s` as keyof ReferenceEntityLookup], id) : undefined;
+    if (kind) {
+        return findEntityName(lookup[`${kind}s` as keyof ReferenceEntityLookup], id);
+    }
+    if (!isContentListDisplayType(type)) {
+        return undefined;
+    }
+    return findEntityName(lookup.actors, id) ?? findEntityName(lookup.items, id) ?? findEntityName(lookup.locations, id);
 };
 
 // Applies `resolveName` to the id(s) held by a reference-typed stat's value - a single id for scalar types,
 // every id (joined with ", ") for list types - so callers only need to supply how to turn one id into text.
-// Non-reference stats pass `value` through as plain text.
+// Non-reference stats pass `value` through as plain text. `kind` is undefined for mixed 'contentList' stats,
+// whose ids must be probed against every collection.
 export const mapReferenceStatValue = (
     stat: { type: StatType },
     value: StatValue,
-    resolveName: (kind: ReferenceKind, id: string) => string,
+    resolveName: (kind: ReferenceKind | undefined, id: string) => string,
 ): string => {
     const kind = resolveReferenceKind(stat.type);
-    if (!kind) {
+    if (!kind && !isContentListDisplayType(stat.type)) {
         return typeof value === 'string' ? value : '';
     }
     if (isReferenceListDisplayType(stat.type)) {
@@ -133,7 +148,7 @@ export const formatReferenceStatText = (
     stat: { type: StatType },
     value: StatValue,
     lookup: ReferenceEntityLookup,
-    fallback: string | ((kind: ReferenceKind) => string) = '',
+    fallback: string | ((kind?: ReferenceKind) => string) = '',
 ): string => (
     mapReferenceStatValue(stat, value, (kind, id) => (
         resolveReferenceEntityName(stat.type, id, lookup) || (typeof fallback === 'function' ? fallback(kind) : fallback)
