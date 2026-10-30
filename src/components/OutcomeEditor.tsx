@@ -4,7 +4,7 @@ import { Add, Delete } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { CONTENT_TYPES } from '../content/Condition';
 import { isValueReference } from '../content/Function';
-import { cloneStatUpdateAction, SkitActionValue, Stat, StatUpdate, StatUpdateAction } from '../content/Stat';
+import { cloneStatUpdateAction, resolveStatDefault, SkitActionValue, Stat, StatUpdate, StatUpdateAction } from '../content/Stat';
 import { Button, LocationSelect, ReferenceMultiSelect, TextInput } from './UiComponents';
 import { buildContentTargetOptions, CONTENT_TYPE_LABELS } from './ConditionEditor';
 import { ItemLike } from './ItemPortrait';
@@ -157,10 +157,18 @@ export const OutcomeEditor: FC<OutcomeEditorProps> = ({ actions, onChange, skitT
                             </span>
                         </> : action.kind === 'function' ? (
                             <div style={{ display: 'grid', gap: 6 }}>
-                                <select aria-label="Function" style={selectStyle} value={action.functionId} onChange={event => updateAction(action.id, { functionId: event.target.value })}>
+                                <select aria-label="Function" style={selectStyle} value={action.functionId} onChange={event => updateAction(action.id, { functionId: event.target.value, args: undefined })}>
                                     <option value="">Select a function...</option>
                                     {functions.map(fn => <option key={fn.id} value={fn.id}>{fn.name}</option>)}
                                 </select>
+                                {(functions.find(fn => fn.id === action.functionId)?.parameters || []).map(parameter => (
+                                    <label key={parameter.id} style={{ display: 'grid', gap: 4, color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                        {parameter.name || '(Unnamed parameter)'}
+                                        <StatValueInput stat={parameter} value={action.args?.[parameter.id] ?? resolveStatDefault(parameter)}
+                                            onChange={value => updateAction(action.id, { args: { ...action.args, [parameter.id]: value } })}
+                                            actors={targetActors} items={items} locations={locations} stage={stage} />
+                                    </label>
+                                ))}
                                 {functions.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>No functions defined. Add one in Functions.</span>}
                             </div>
                         ) : (

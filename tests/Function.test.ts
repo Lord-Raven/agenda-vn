@@ -6,7 +6,7 @@ import { Item } from '../src/content/Item';
 import { getLocationDescription, Location } from '../src/content/Location';
 import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, resolveAvailableStatOptions, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateContext, generateSkitScript, Skit } from '../src/content/Skit';
-import { cloneGameFunction, functionPickerOptions, functionReference, globalStatReference, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
+import { cloneGameFunction, functionPickerOptions, functionReference, functionReferenceArguments, functionReferenceId, functionSignature, globalStatReference, parseFunctionCallText, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { evaluateCondition } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
@@ -247,7 +247,9 @@ test('numeric formulas share precedence, parentheses, decimals, dice, and named 
     assert.equal(stage.resolveValue('- 2', 'number'), -2);
     assert.equal(normalizeStatValue('- 2', stat('Unary', 'number')), '- 2');
     assert.doesNotThrow(() => validateValueExpression('1 / (Bonus() - 1)'));
-    assert.throws(() => validateValueExpression('Bonus(3)'), /functions take no arguments/);
+    assert.doesNotThrow(() => validateValueExpression("Bonus(3, 'hard', 1 + 2)"));
+    assert.throws(() => validateValueExpression('Bonus(3,)'), /Invalid value formula/);
+    assert.throws(() => validateValueExpression('get("Score", 1)'), /single stat name/);
     assert.equal(save.globalStatValues.Score, 2);
     for (const formula of ['Missing()', '2 +', '4 / 0', '1; globalThis.bad = true', '0d6', '101d6', '1d10001', '2 ** 3']) {
         assert.throws(() => stage.resolveValue(formula, 'number'), undefined, formula);
@@ -435,12 +437,13 @@ test('function cloning and portable JSON keep definitions separate from stats', 
     const { configuration } = fixture();
     const fn = { ...gameFunction('return 42;'), description: 'Answer' };
     configuration.functions.push(fn);
+    const cloned = { ...fn, parameters: [] };
     const portable = buildPortableGameConfiguration(configuration);
-    assert.deepEqual(portable.functions, [fn]);
+    assert.deepEqual(portable.functions, [cloned]);
     assert.notEqual(portable.functions?.[0], fn);
-    assert.deepEqual(JSON.parse(JSON.stringify(portable)).functions, [fn]);
+    assert.deepEqual(JSON.parse(JSON.stringify(portable)).functions, [cloned]);
     assert.equal(portable.globalStats.some(stat => stat.id === fn.id), false);
-    assert.deepEqual(Object.keys(cloneGameFunction(fn)), ['id', 'name', 'description', 'script', 'returnType']);
+    assert.deepEqual(Object.keys(cloneGameFunction(fn)), ['id', 'name', 'description', 'script', 'returnType', 'parameters']);
 });
 
 test('function actions clone with only a function reference and survive rules and controls', () => {
@@ -483,6 +486,94 @@ test('syntax, runtime, unknown function, and recursive calls report errors', () 
     assert.match(stage.testFunction(gameFunction('call("Missing");')).errors[0], /Unknown function/);
     assert.match(stage.testFunction(gameFunction('call("Test function");')).errors[0], /Maximum function invocation depth/);
     assert.deepEqual(stage.testFunction(gameFunction('return typeof target;')), { value: 'undefined', errors: [] });
+});
+
+const parameter = (id: string, type: StatType, defaultValue: StatValue, extra: Partial<Stat> = {}): Stat => cloneStat({
+    id, name: id, type, guidance: '', default: defaultValue,
+    llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] }, ...extra,
+});
+
+const scaledFunction = (): GameFunction => ({
+    id: 'scaled', name: 'Scaled', description: '', returnType: 'number',
+    script: "return arg('Amount') * (arg('Double') ? 2 : 1);",
+    parameters: [parameter('amount', 'number', 1), parameter('double', 'checkbox', false)],
+});
+
+test('arg-bearing references carry arguments, expose base ids, and resolve with default fallbacks', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = [scaledFunction()];
+    const reference = functionReference('scaled', { amount: 5, double: true });
+    assert.equal(functionReferenceId(reference), 'scaled');
+    assert.deepEqual(functionReferenceArguments(reference), { amount: 5, double: true });
+    assert.equal(functionReference('scaled'), 'function:scaled');
+    assert.equal(functionReferenceArguments(functionReference('scaled')), undefined);
+    assert.equal(stage.resolveValue(reference, 'number'), 10);
+    assert.equal(stage.resolveValue(functionReference('scaled'), 'number'), 1);
+    assert.equal(stage.resolveValue(functionReference('scaled', { amount: 3 }), 'number'), 3);
+    assert.equal(stage.resolveValue(functionReference('scaled', { amount: globalStatReference('Score') }), 'number'), 2);
+});
+
+test('parameter defaults resolve references through the stat pipeline only when arguments are omitted', () => {
+    const { stage, configuration } = fixture();
+    const fn = scaledFunction();
+    fn.parameters![0] = parameter('amount', 'number', globalStatReference('Score'));
+    configuration.functions = [fn];
+    assert.equal(stage.resolveValue(functionReference('scaled'), 'number'), 2);
+    assert.equal(stage.resolveValue(functionReference('scaled', { amount: 7 }), 'number'), 7);
+});
+
+test('formulas and text calls pass positional literal arguments and leave non-calls untouched', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = [scaledFunction(), {
+        id: 'greet', name: 'Greet', description: '', returnType: 'text',
+        script: "return 'Hello, ' + arg('Who') + (arg('Loud') ? '!' : '.');",
+        parameters: [parameter('who', 'text', 'friend'), parameter('loud', 'checkbox', false)],
+    }];
+    assert.equal(stage.resolveValue('Scaled(3) + 1', 'number'), 4);
+    assert.equal(stage.resolveValue('call("Scaled", 4, 1) * 2', 'number'), 8);
+    assert.equal(stage.resolveValue('Scaled(Scaled(2))', 'number'), 2);
+    assert.throws(() => stage.resolveValue('Scaled(1, 2, 3)', 'number'), /takes 2 arguments, received 3/);
+    assert.equal(stage.resolveValue("Greet('Bob', true)", 'text'), 'Hello, Bob!');
+    assert.equal(stage.resolveValue('Greet()', 'text'), 'Hello, friend.');
+    assert.equal(stage.resolveValue('{{Greet}}', 'text'), 'Hello, friend.');
+    assert.deepEqual(parseFunctionCallText("Greet('a \\'quote\\'', -2.5, false)"), { name: 'Greet', args: ["a 'quote'", -2.5, false] });
+    assert.equal(parseFunctionCallText('Hello (world)'), undefined);
+    assert.equal(parseFunctionCallText('Greet(unquoted)'), undefined);
+    assert.equal(stage.resolveValue('Hello (world)', 'text'), 'Hello (world)');
+});
+
+test('scripts pass named arguments through call and report unknown parameters', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = [scaledFunction()];
+    const outer = (script: string): GameFunction => ({ ...gameFunction(script), returnType: 'number' });
+    assert.deepEqual(stage.testFunction(outer("return call('Scaled', { Amount: 6, Double: true });")), { value: 12, errors: [] });
+    assert.deepEqual(stage.testFunction(outer("return call('Scaled');")), { value: 1, errors: [] });
+    assert.match(stage.testFunction(outer("return call('Scaled', { Missing: 1 });")).errors[0], /no parameter named Missing/);
+    assert.match(stage.testFunction(gameFunction("arg('Nope');")).errors[0], /Unknown function parameter/);
+});
+
+test('function actions preserve stored arguments through cloning and apply them when run', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.functions = [{
+        id: 'adjust', name: 'Adjust', description: '', returnType: 'void',
+        script: "set('Score', get('Score') + arg('Amount'));",
+        parameters: [parameter('amount', 'number', 1)],
+    }];
+    const invocation = { id: 'invoke', kind: 'function', functionId: 'adjust', args: { amount: 3 } } as const;
+    assert.deepEqual(cloneGameAction({ ...invocation, junk: true, args: { amount: 3, bad: {} } }), invocation);
+    stage.saveGame = () => {};
+    stage.runControlActions(new Control({ actions: [invocation] }));
+    assert.equal(save.globalStatValues?.Score, 5);
+    stage.runControlActions(new Control({ actions: [{ id: 'invoke', kind: 'function', functionId: 'adjust' }] }));
+    assert.equal(save.globalStatValues?.Score, 6);
+});
+
+test('picker options label parameterful functions with their signature', () => {
+    const fn = scaledFunction();
+    assert.equal(functionSignature(fn), 'Scaled(amount, double)');
+    assert.equal(functionPickerOptions([fn], 'number')[0].label, 'Scaled(amount, double)');
+    assert.deepEqual(cloneGameFunction(fn).parameters, fn.parameters);
+    assert.notEqual(cloneGameFunction(fn).parameters?.[0], fn.parameters?.[0]);
 });
 
 test('recurring rules invoke a global function once for each matching time period', () => {
@@ -1033,7 +1124,8 @@ test('every declared value type resolves and snapshots its primitive or ID resul
         assert.deepEqual(buildInitialGlobalStatValues([dynamicStat], {}, stage.getScheduleContext(save))[dynamicStat.id], value, type);
         assert.deepEqual(resolveInitialActorStatValue(dynamicStat, undefined, stage.getScheduleContext(save)), value, type);
     }
-    assert.deepEqual(JSON.parse(JSON.stringify(buildPortableGameConfiguration(configuration))).functions, configuration.functions);
+    assert.deepEqual(JSON.parse(JSON.stringify(buildPortableGameConfiguration(configuration))).functions,
+        configuration.functions.map(fn => ({ ...fn, parameters: [] })));
 });
 
 test('mixed lists expand scalar and list functions in order without changing their stored references', () => {

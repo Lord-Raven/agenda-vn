@@ -77,13 +77,20 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         Use <strong>Score()</strong>, <strong>call("Function name")</strong>, or
                         <strong> get("Global Stat")</strong> in formulas; numeric formulas support +, -, *, /, %,
-                        parentheses, and dice (for example, 1d6). In text values, call <strong>Greeting()</strong>
+                        parentheses, dice (for example, 1d6), and positional arguments such as
+                        <strong> Score(2, 'hard')</strong>. In text values, call <strong>Greeting('Bob')</strong>
                         or use <strong>{'{{Greeting}}'}</strong> in lore or descriptions. Names are case-insensitive;
                         duplicate names are ambiguous. Function-backed values are read-only, and Test runs on a
                         copy without saving changes.
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
-                        Functions are global and take no parameters. Use <strong>get(name)</strong> / <strong>set(name, value)</strong> to read or update global stats.
+                        Functions are global and may declare typed parameters. Read an argument with
+                        <strong> arg('Parameter name')</strong>; omitted arguments fall back to the parameter's
+                        default through the normal stat pipeline, so defaults may reference functions or global
+                        stats. Pass arguments to other functions with
+                        <strong> call('Name', {'{'} 'Parameter name': value {'}'})</strong>; value pickers prompt
+                        for arguments when a parameterful function is chosen.
+                        Use <strong>get(name)</strong> / <strong>set(name, value)</strong> to read or update global stats.
                         Use <strong>getActor(name)</strong>, <strong>getLocation(name)</strong>, and
                         <strong>getItem(name)</strong> to resolve another entity by name.
                     </Typography>

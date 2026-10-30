@@ -647,9 +647,20 @@ export const cloneStatUpdate = (update: any): StatUpdate => ({
 
 export const cloneGameAction = (source: unknown): GameAction => {
     const action = source && typeof source === 'object' ? source as Record<string, unknown> : {};
-    return action.kind === 'function'
-        ? { id: typeof action.id === 'string' && action.id ? action.id : generateUuid(), kind: 'function', functionId: typeof action.functionId === 'string' ? action.functionId : '' }
-        : cloneStatUpdate(action);
+    if (action.kind !== 'function') {
+        return cloneStatUpdate(action);
+    }
+    const args = action.args && typeof action.args === 'object' && !Array.isArray(action.args)
+        ? Object.fromEntries(Object.entries(action.args as Record<string, unknown>)
+            .filter(([, value]) => Array.isArray(value) || ['boolean', 'number', 'string'].includes(typeof value))
+            .map(([key, value]) => [key, Array.isArray(value) ? normalizeReferenceListValue(value) : value as StatValue]))
+        : undefined;
+    return {
+        id: typeof action.id === 'string' && action.id ? action.id : generateUuid(),
+        kind: 'function',
+        functionId: typeof action.functionId === 'string' ? action.functionId : '',
+        ...(args && Object.keys(args).length ? { args } : {}),
+    };
 };
 
 const cloneSkitActionValue = (value: unknown, fallback: StatValue): SkitActionValue => {

@@ -2,7 +2,7 @@ export const isNumericValueExpression = (value: unknown): value is string =>
     typeof value === 'string' && /[()+*/%]|\{\{|^\s*=|\d\s*[+-]|^\s*[+-]\s+\d|\d*d\d+/i.test(value);
 
 export type ValueExpressionSources = {
-    call: (name: string) => number;
+    call: (name: string, args?: (number | string)[]) => number;
     get: (name: string) => number;
 };
 
@@ -79,14 +79,30 @@ export const evaluateValueExpression = (source: string, sources: ValueExpression
             if (!name) return fail('expected a number or function call');
             position += name.length;
             if (!consume('(')) return fail('expected a function call');
+            // One positional argument: a quoted string literal or a nested numeric expression.
+            const argumentValue = (): number | string => {
+                consume('');
+                const char = expression[position];
+                return char === '"' || char === "'" ? quotedName() : sum();
+            };
             let result: number;
             if (name === 'get' || name === 'call') {
                 const argument = quotedName();
-                result = name === 'get' ? sources.get(argument) : sources.call(argument);
+                const args: (number | string)[] = [];
+                while (consume(',')) args.push(argumentValue());
+                if (name === 'get' && args.length > 0) return fail('get takes a single stat name');
+                if (!consume(')')) return fail('expected ")"');
+                result = name === 'get' ? sources.get(argument) : sources.call(argument, args);
             } else {
-                result = sources.call(name);
+                const args: (number | string)[] = [];
+                if (!consume(')')) {
+                    do {
+                        args.push(argumentValue());
+                    } while (consume(','));
+                    if (!consume(')')) return fail('expected ")" or ","');
+                }
+                result = sources.call(name, args);
             }
-            if (!consume(')')) return fail('expected ")" (functions take no arguments)');
             return finite(result);
         } finally {
             depth--;

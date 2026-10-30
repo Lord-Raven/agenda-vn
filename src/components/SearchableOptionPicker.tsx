@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { DoNotDisturb } from '@mui/icons-material';
 import { Box } from '@mui/material';
 import type { Stage } from '../Stage';
-import type { StatType } from '../content/Stat';
-import { valuePickerOptions, isFunctionReference, isValueReference } from '../content/Function';
+import { resolveStatDefault, type StatType, type StatValue } from '../content/Stat';
+import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction } from '../content/Function';
+import { StatValueInput } from './StatValueInput';
 
 const MAX_SELECTED_PREVIEW = 6;
 
@@ -54,6 +55,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     stage,
 }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
+    const pickerFunctions: GameFunction[] = functionType ? stageInstance?.getConfiguration().functions || [] : [];
     if (functionType) {
         // Mixed contentList pickers accept sources of every content kind; other pickers accept their own
         // scalar type plus (when multiple) the matching list type.
@@ -67,6 +69,13 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         const selected = multiple ? values || [] : value ? [value] : [];
         for (const key of selected.filter(isValueReference)) {
             if (!options.some(option => option.key === key)) {
+                // Arg-bearing selections of an offered function get their own exact-key entry so active
+                // state, chips, and button previews resolve; truly unknown references fall back to a stub.
+                const fn = isFunctionReference(key) ? pickerFunctions.find(candidate => candidate.id === functionReferenceId(key)) : undefined;
+                if (fn && options.some(option => option.key === functionReference(fn.id))) {
+                    options.push({ key, label: `${fn.name}(…)`, category: 'Functions', description: fn.description });
+                    continue;
+                }
                 const isFunction = isFunctionReference(key);
                 options.push({ key, label: `Missing or incompatible ${isFunction ? 'function' : 'global stat'}`, category: isFunction ? 'Functions' : 'Global Stats' });
             }
@@ -74,6 +83,8 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     }
     const [search, setSearch] = useState(initialSearch);
     const [isOpen, setIsOpen] = useState(false);
+    // Argument entry step shown when a parameterful function is chosen; args are keyed by parameter id.
+    const [parameterEntry, setParameterEntry] = useState<{ fn: GameFunction; args: Record<string, StatValue>; replaceKey?: string } | null>(null);
     const pointerStartedOnBackdrop = useRef(false);
     const optionGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: '8px' };
 
@@ -161,7 +172,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         return <span style={{ fontSize: Math.max(12, size * 0.6), fontWeight: 700, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)', flexShrink: 0 }}>{option.label.slice(0, 2).toUpperCase()}</span>;
     };
 
-    const handleSelect = (nextValue?: string) => {
+    const commitSelect = (nextValue?: string) => {
         if (multiple) {
             const nextSelection = [...(values ?? [])];
             if (!nextValue) {
@@ -179,6 +190,40 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         }
 
         onChange(nextValue);
+        setIsOpen(false);
+    };
+
+    // Choosing a parameterful function routes through the argument entry step instead of committing directly.
+    const handleSelect = (nextValue?: string) => {
+        if (functionType && nextValue && isFunctionReference(nextValue)) {
+            const fn = pickerFunctions.find(candidate => candidate.id === functionReferenceId(nextValue));
+            if (fn && (fn.parameters || []).length) {
+                const storedArgs = functionReferenceArguments(nextValue)
+                    ?? (!multiple && value && isFunctionReference(value) && functionReferenceId(value) === fn.id ? functionReferenceArguments(value) : undefined);
+                const args = Object.fromEntries((fn.parameters || []).map(parameter => [parameter.id, storedArgs?.[parameter.id] ?? resolveStatDefault(parameter)]));
+                setParameterEntry({ fn, args, replaceKey: multiple && (values ?? []).includes(nextValue) ? nextValue : undefined });
+                return;
+            }
+        }
+        commitSelect(nextValue);
+    };
+
+    const confirmParameterEntry = () => {
+        if (!parameterEntry) {
+            return;
+        }
+        const key = functionReference(parameterEntry.fn.id, parameterEntry.args);
+        setParameterEntry(null);
+        if (multiple) {
+            const current = values ?? [];
+            if (parameterEntry.replaceKey !== undefined) {
+                onChange(current.map(entry => entry === parameterEntry.replaceKey ? key : entry));
+            } else if (!current.includes(key)) {
+                onChange([...current, key]);
+            }
+            return;
+        }
+        onChange(key);
         setIsOpen(false);
     };
 
@@ -275,6 +320,38 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         .map((key) => options.find((option) => option.key === key))
         .filter((option): option is PickerOption => Boolean(option));
 
+    const renderParameterForm = (entry: { fn: GameFunction; args: Record<string, StatValue> }) => {
+        const save = stageInstance?.getSave();
+        const parameterActors = Object.values(save?.actors || {}).filter(actor => actor.active !== false);
+        const parameterItems = (save?.inventory || []).filter(item => item.active !== false);
+        const parameterLocations = Object.values(save?.atlas || {}).filter(location => location.active !== false);
+        const actionButtonStyle = { border: '1px solid var(--agenda-line-subtle)', borderRadius: '8px', background: 'var(--agenda-surface-raised)', color: 'var(--agenda-text-primary)', cursor: 'pointer', padding: '6px 12px' };
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ color: 'var(--agenda-text-primary)', fontWeight: 700 }}>{functionSignature(entry.fn)}</div>
+                {entry.fn.description && <div style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>{entry.fn.description}</div>}
+                <div style={{ display: 'grid', gap: 10, maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {(entry.fn.parameters || []).map(parameter => (
+                        <label key={parameter.id} style={{ display: 'grid', gap: 4, color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                            {parameter.name || '(Unnamed parameter)'}
+                            {parameter.guidance && <span style={{ fontSize: 11 }}>{parameter.guidance}</span>}
+                            <StatValueInput stat={parameter} value={entry.args[parameter.id]}
+                                onChange={next => setParameterEntry(current => current && { ...current, args: { ...current.args, [parameter.id]: next } })}
+                                actors={parameterActors} items={parameterItems} locations={parameterLocations} stage={stage} />
+                        </label>
+                    ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button type="button" onClick={() => setParameterEntry(null)} style={actionButtonStyle}>Back</button>
+                    <button type="button" onClick={confirmParameterEntry}
+                        style={{ ...actionButtonStyle, border: '1px solid var(--agenda-highlight)', background: 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' }}>
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     const pickerContent = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {multiple && (
@@ -290,7 +367,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                                     type="button"
                                     aria-label={`Remove ${option.label}`}
                                     title={option.label}
-                                    onClick={() => handleSelect(option.key)}
+                                    onClick={() => commitSelect(option.key)}
                                     style={{
                                         display: 'inline-flex',
                                         alignItems: 'center',
@@ -394,6 +471,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 onClick={() => {
                     setSearch(initialSearch);
                     pointerStartedOnBackdrop.current = false;
+                    setParameterEntry(null);
                     setIsOpen(true);
                 }}
                 style={{
@@ -441,7 +519,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                             <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>{title}</div>
                             <button type="button" onClick={() => setIsOpen(false)} style={{ border: '1px solid var(--agenda-line-subtle)', borderRadius: '8px', background: 'var(--agenda-surface-raised)', color: 'var(--agenda-text-primary)', cursor: 'pointer', padding: '6px 10px' }}>Close</button>
                         </div>
-                        {pickerContent}
+                        {parameterEntry ? renderParameterForm(parameterEntry) : pickerContent}
                     </div>
                 </div>,
                 document.body,

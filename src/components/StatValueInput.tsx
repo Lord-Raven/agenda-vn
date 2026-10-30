@@ -150,7 +150,7 @@ const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'al
     return <div style={{ display: 'grid', gap: 4, minWidth: 0 }}><TextInput fullWidth value={draft}
         aria-invalid={error ? true : undefined}
         placeholder={numeric ? (allowExpression ? 'e.g. 5, -2, 1d6+1, or Score() * 2' : 'e.g. 5 or Score() * 2') : 'Text, Greeting(), or {{Greeting}}'}
-        title={numeric ? 'Arithmetic: +, -, *, /, %, parentheses, dice, Function name(), call("Function name"), get("Global Stat").' : 'Use Function name() or {{Function name}} for text functions. References: function:<id>, globalStat:<id>.'}
+        title={numeric ? 'Arithmetic: +, -, *, /, %, parentheses, dice, Function name(args…), call("Function name", args…), get("Global Stat").' : 'Use Function name(args…) or {{Function name}} for text functions. References: function:<id>, globalStat:<id>.'}
         onChange={event => { setDraft(event.target.value); setError(''); }}
         onBlur={commit}
         onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}

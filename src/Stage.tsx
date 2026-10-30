@@ -6,7 +6,7 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
@@ -553,7 +553,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = []): StatValue {
-        const namedSource = (name: string, kind: 'function' | 'stat', expectedType: StatType): StatValue => {
+        const namedSource = (name: string, kind: 'function' | 'stat', expectedType: StatType, args?: unknown[]): StatValue => {
             const normalizedName = name.trim().toLowerCase();
             const configuration = this.getConfiguration(save);
             const matches = kind === 'function'
@@ -562,7 +562,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (matches.length !== 1) {
                 throw new Error(`${matches.length ? 'Ambiguous' : 'Unknown'} ${kind} name: ${name}`);
             }
-            const reference = kind === 'function' ? functionReference(matches[0].id) : `globalStat:${matches[0].id}`;
+            const reference = kind === 'function'
+                ? functionReference(matches[0].id, positionalFunctionArguments(matches[0] as GameFunction, args))
+                : `globalStat:${matches[0].id}`;
             return this.resolveValue(reference, expectedType, save, stack);
         };
         if (isGlobalStatReference(value)) {
@@ -590,7 +592,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 throw new Error(`Function "${fn.name}" returns ${fn.returnType || 'void'}, not ${type}.`);
             }
             const errors: string[] = [];
-            const result = this.runGameFunction(save, fn, stack.length, message => errors.push(message), { readOnly: true, stack });
+            const result = this.runGameFunction(save, fn, stack.length, message => errors.push(message), { readOnly: true, stack }, functionReferenceArguments(value));
             if (errors.length) {
                 throw new Error(errors.join('\n'));
             }
@@ -599,13 +601,13 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
         if (typeof value === 'string' && type === 'number' && value.trim()) {
             return evaluateValueExpression(value, {
-                call: name => Number(namedSource(name, 'function', 'number')),
+                call: (name, args) => Number(namedSource(name, 'function', 'number', args)),
                 get: name => Number(namedSource(name, 'stat', 'number')),
             });
         }
         if (typeof value === 'string' && type === 'text') {
-            const call = /^\s*([a-z_][a-z0-9_ ]*)\(\s*\)\s*$/i.exec(value);
-            if (call) return namedSource(call[1], 'function', 'text');
+            const call = parseFunctionCallText(value);
+            if (call) return namedSource(call.name, 'function', 'text', call.args);
             return value.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, name: string) => {
                 if (['user', 'char'].includes(name.trim().toLowerCase())) return match;
                 if (!this.getConfiguration(save).functions.some(fn => fn.name.trim().toLowerCase() === name.trim().toLowerCase())) return match;
@@ -1878,7 +1880,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 console.error(`Unknown function: ${update.functionId}`);
                 return;
             }
-            this.runGameFunction(save, fn, 0);
+            this.runGameFunction(save, fn, 0, undefined, { readOnly: false, stack: [] }, update.args);
             return;
         }
         this.applyStatUpdate(save, update, context);
@@ -2094,18 +2096,31 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .map(item => this.buildEntityScriptAccessor(save, item, 'item', itemStats, ITEM_SCRIPT_FIELDS, context));
     }
 
-    private buildFunctionScriptBindings(save: SaveType, depth: number, context: ScriptContext, onError?: (message: string) => void): FunctionScriptBindings {
+    private buildFunctionScriptBindings(save: SaveType, depth: number, context: ScriptContext, onError?: (message: string) => void, fn?: GameFunction, args?: Record<string, StatValue>): FunctionScriptBindings {
         const configuration = this.getConfiguration(save);
-        const call = (name: string): unknown => {
+        const call = (name: string, callArgs?: Record<string, unknown>): unknown => {
             if (depth >= MAX_FUNCTION_INVOCATION_DEPTH) {
                 throw new Error('Maximum function invocation depth exceeded.');
             }
             const normalizedName = `${name || ''}`.trim().toLowerCase();
-            const fn = (configuration.functions || []).find(candidate => candidate.name.trim().toLowerCase() === normalizedName);
-            if (!fn) {
+            const target = (configuration.functions || []).find(candidate => candidate.name.trim().toLowerCase() === normalizedName);
+            if (!target) {
                 throw new Error(`Unknown function: ${name}`);
             }
-            return this.runGameFunction(save, fn, depth + 1, onError, context);
+            return this.runGameFunction(save, target, depth + 1, onError, context, namedFunctionArguments(target, callArgs));
+        };
+        // Arguments resolve lazily (and only once) so unused argument errors don't fail the invocation;
+        // omitted arguments fall back to the parameter's default through the normal stat pipeline.
+        const resolvedArgs = new Map<string, StatValue>();
+        const arg = (name: string): StatValue | undefined => {
+            const parameter = fn && (fn.parameters || []).find(candidate => candidate.name.trim().toLowerCase() === `${name || ''}`.trim().toLowerCase());
+            if (!parameter) {
+                throw new Error(`Unknown function parameter: ${name}`);
+            }
+            if (!resolvedArgs.has(parameter.id)) {
+                resolvedArgs.set(parameter.id, this.readStatValue(args?.[parameter.id], parameter, save, context.stack));
+            }
+            return resolvedArgs.get(parameter.id);
         };
         return {
             ...this.buildGlobalScriptAccessors(save, context),
@@ -2116,10 +2131,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             locations: () => this.buildLocationScriptEntities(save, context),
             items: () => this.buildItemScriptEntities(save, context),
             call,
+            arg,
         };
     }
 
-    private runGameFunction(save: SaveType, fn: GameFunction, depth: number, onError?: (message: string) => void, context: ScriptContext = { readOnly: false, stack: [] }): unknown {
+    private runGameFunction(save: SaveType, fn: GameFunction, depth: number, onError?: (message: string) => void, context: ScriptContext = { readOnly: false, stack: [] }, args?: Record<string, StatValue>): unknown {
         const reference = functionReference(fn.id);
         if (context.stack.includes(reference) || context.stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
             throw new Error(`Maximum function invocation depth exceeded or cyclic function reference: ${fn.name}`);
@@ -2131,7 +2147,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (onError) onError(message);
             else console.error(message);
         };
-        const result = runFunctionScript(fn.script, this.buildFunctionScriptBindings(save, depth, nextContext, reportError), reportError);
+        const result = runFunctionScript(fn.script, this.buildFunctionScriptBindings(save, depth, nextContext, reportError, fn, args), reportError);
         if (!failed) validateFunctionResult(result, fn.returnType || 'void');
         return result;
     }
