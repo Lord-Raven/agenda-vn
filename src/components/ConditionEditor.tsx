@@ -2,14 +2,14 @@ import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
 import { findStatOptionByValue, isContentListDisplayType, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat, StatType } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
-import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, GlobalStatCondition, variableContentValue } from '../content/Condition';
+import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, FunctionCondition, GlobalStatCondition, functionConditionValueType, variableContentValue } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
 import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 import { Stage } from '../Stage';
-import { isFunctionReference, isValueReference, listElementType, valuePickerOptions } from '../content/Function';
+import { functionReference, functionReferenceId, functionSignature, GameFunction, isFunctionReference, isListValueType, isValueReference, listElementType, valuePickerOptions } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
 
 interface ConditionEditorProps {
@@ -72,6 +72,23 @@ const getDefaultComparison = (stat: Stat | undefined, current?: ConditionCompari
     return current && allowed.some(comparison => comparison.value === current) ? current : allowed[0].value;
 };
 
+// Comparisons offered for a function condition, driven by the function's return type: list results compare
+// per-element, and option ids compare like text (a function result carries no option pool).
+const comparisonsForFunctionReturnType = (type?: StatType): Array<{ value: ConditionComparison; label: string }> => {
+    if (!type) {
+        return COMPARISONS;
+    }
+    if (isListValueType(type)) {
+        return LIST_COMPARISONS;
+    }
+    return type === 'text' || type === 'option' ? TEXT_COMPARISONS : COMPARISONS;
+};
+
+const getDefaultFunctionConditionValue = (fn?: GameFunction): string | number | boolean => {
+    const type = functionConditionValueType(fn);
+    return type === 'number' ? 0 : type === 'checkbox' ? false : '';
+};
+
 export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
     actor: 'Actor',
     location: 'Location',
@@ -109,7 +126,7 @@ const iconButtonStyle = {
 const getConditionRowTemplate = (condition: Condition, hasCollectionCategories: boolean) => {
     const parameterColumns = condition.type === 'contentStat'
         ? ['minmax(120px, 1fr)', 'minmax(120px, 1fr)']
-        : condition.type === 'calendar' || condition.type === 'globalStat'
+        : condition.type === 'calendar' || condition.type === 'globalStat' || condition.type === 'function'
             ? ['minmax(120px, 1fr)']
             : [];
     return [
@@ -182,13 +199,31 @@ export const buildContentTargetOptions = (
 const META_TARGET_KEYS = ['variable', 'any', 'none'];
 
 export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], locationStats = [], itemStats = [], actors = [], items = [], locations = [], stage, variableContentType, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true }) => {
-    const playerId = (typeof stage === 'function' ? stage() : stage)?.getSave().playerId;
+    const stageInstance = typeof stage === 'function' ? stage() : stage;
+    const playerId = stageInstance?.getSave().playerId;
     actors = actors.filter(actor => actor.id !== playerId);
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
     const statsByContentType: Record<ContentType, Stat[]> = { actor: actorStats, location: locationStats, item: itemStats };
     const entitiesByContentType: Record<ContentType, ContentTargetEntity[]> = { actor: actors, location: locations, item: items };
     const targetOptionsFor = (contentType: ContentType) => buildContentTargetOptions(contentType, entitiesByContentType[contentType], { allowVariable: variableContentType === contentType });
     const concreteTargetOptionsFor = (contentType: ContentType) => targetOptionsFor(contentType).filter((option) => !META_TARGET_KEYS.includes(option.key));
+    const conditionFunctions = (stageInstance?.getConfiguration().functions || []).filter(fn => fn.returnType !== 'void');
+    const functionOptions = conditionFunctions.map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description }));
+    const conditionFunction = (condition: FunctionCondition): GameFunction | undefined => conditionFunctions.find(fn => fn.id === functionReferenceId(condition.reference));
+    const functionReturnTypeFor = (condition: FunctionCondition): StatType | undefined => {
+        const fn = conditionFunction(condition);
+        return fn && fn.returnType !== 'void' ? fn.returnType : undefined;
+    };
+    // A pseudo-stat letting a function condition's value input reuse the stat value machinery; option results
+    // compare as plain text since a function result carries no option pool.
+    const functionConditionStat = (condition: FunctionCondition): Stat | undefined => {
+        const fn = conditionFunction(condition);
+        if (!fn || fn.returnType === 'void') {
+            return undefined;
+        }
+        const type = fn.returnType === 'option' || fn.returnType === 'optionList' ? 'text' : fn.returnType;
+        return { id: fn.id, name: fn.name, type, default: getDefaultFunctionConditionValue(fn), guidance: fn.description, llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] } };
+    };
 
     const updateCondition = (collectionIndex: number, conditionIndex: number, condition: Condition) => {
         onChange(conditionCollections.map((collection, currentCollectionIndex) => currentCollectionIndex === collectionIndex
@@ -269,6 +304,10 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             const stat = statsByContentType[contentType][0];
             return { type: 'contentStat', contentType, targetId: targetOptionsFor(contentType)[0]?.key || 'any', statId: stat?.id || '', comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) };
         }
+        if (type === 'function') {
+            const fn = conditionFunctions[0];
+            return { type: 'function', reference: fn ? functionReference(fn.id) : '', comparison: comparisonsForFunctionReturnType(fn?.returnType as StatType | undefined)[0].value, value: getDefaultFunctionConditionValue(fn) };
+        }
         return { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' };
     };
 
@@ -279,12 +318,14 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (condition.type === 'contentIdentity') {
             return condition.contentType;
         }
+        if (condition.type === 'function') {
+            return functionConditionValueType(conditionFunction(condition));
+        }
         const stat = statsForCondition(condition).find(candidate => candidate.id === condition.statId);
         return stat ? listElementType(stat.type) || stat.type : undefined;
     };
 
     const isValidSourceFor = (value: string, type: StatType, previousType?: StatType): boolean => {
-        const stageInstance = typeof stage === 'function' ? stage() : stage;
         // Mixed contentList conditions compare one element, which may reference any scalar content kind.
         const types: StatType[] = type === 'contentList' ? ['actor', 'item', 'location'] : [type];
         return types.some(candidate => valuePickerOptions(stageInstance?.getConfiguration() || { globalStats }, candidate).some(option => option.key === value))
@@ -361,6 +402,18 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                 value: typeof previous.value === 'string' && isValidValueFor(previous.value, next, previous) ? previous.value : next.value,
             };
         }
+        if (next.type === 'function') {
+            if (preserveStatId && previous.type === 'function' && conditionFunctions.some(fn => fn.id === functionReferenceId(previous.reference))) {
+                next = { ...next, reference: previous.reference };
+            }
+            const fn = conditionFunction(next);
+            const comparisons = comparisonsForFunctionReturnType(functionReturnTypeFor(next));
+            return {
+                ...next,
+                comparison: comparisons.some(option => option.value === previous.comparison) ? previous.comparison : comparisons[0].value,
+                value: isValidValueFor(previous.value, next, previous) ? previous.value : getDefaultFunctionConditionValue(fn),
+            };
+        }
         return {
             ...next,
             comparison: COMPARISONS.some(option => option.value === previous.comparison) ? previous.comparison : next.comparison,
@@ -403,7 +456,8 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         }
         const stat = condition.type === 'globalStat' || condition.type === 'contentStat'
             ? statsForCondition(condition).find(candidate => candidate.id === condition.statId)
-            : undefined;
+            : condition.type === 'function' ? functionConditionStat(condition)
+                : undefined;
         // Mixed contentList conditions compare one id of any content kind; offer every concrete entity
         // (plus the Variable target when one is bound), grouped by kind.
         if (stat && isContentListDisplayType(stat.type)) {
@@ -511,6 +565,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                 .filter((contentType) => statsByContentType[contentType].length > 0 || conditionKindValue(condition) === `contentStat:${contentType}`)
                                 .map((contentType) => <option key={contentType} value={`contentStat:${contentType}`}>{CONTENT_TYPE_LABELS[contentType]} Stat</option>)}
                             {variableContentType && <option value={`contentIdentity:${variableContentType}`}>{CONTENT_TYPE_LABELS[variableContentType]} Identity</option>}
+                            {(conditionFunctions.length > 0 || condition.type === 'function') && <option value="function">Function</option>}
                         </select>
                         {condition.type === 'calendar' ? (
                             <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 }))}>
@@ -531,6 +586,20 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                     stage={stage}
                                 />
                             </div>
+                        ) : condition.type === 'function' ? (
+                            <SearchableOptionPicker
+                                value={condition.reference}
+                                onChange={(nextValue) => {
+                                    const reference = (Array.isArray(nextValue) ? nextValue[0] : nextValue) || '';
+                                    updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, { ...condition, reference }));
+                                }}
+                                options={functionOptions}
+                                allowClear={false}
+                                emptyLabel="None"
+                                title="Choose function"
+                                placeholder="Search functions"
+                                stage={stage}
+                            />
                         ) : null}
                         {(condition.type === 'globalStat' || condition.type === 'contentStat') && (
                             <select style={selectStyle} value={condition.statId} onChange={(event) => {
@@ -549,7 +618,9 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             <select style={selectStyle} value={condition.comparison} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, comparison: event.target.value as ConditionComparison } as Condition)}>
                                 {(condition.type === 'contentIdentity'
                                     ? IDENTITY_COMPARISONS
-                                    : comparisonsForStat(statsForCondition(condition).find(candidate => candidate.id === condition.statId))
+                                    : condition.type === 'function'
+                                        ? comparisonsForFunctionReturnType(functionReturnTypeFor(condition))
+                                        : comparisonsForStat(statsForCondition(condition).find(candidate => candidate.id === condition.statId))
                                 ).map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
                             </select>
                         )}

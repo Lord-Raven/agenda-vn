@@ -549,6 +549,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     getScheduleContext(save: SaveType): ScheduleContext {
         const configuration = this.getConfiguration(save);
         return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats,
+            functions: configuration.functions,
             resolveValue: (value, type) => this.resolveValue(value, type, save) };
     }
 

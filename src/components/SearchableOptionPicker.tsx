@@ -55,7 +55,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     stage,
 }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
-    const pickerFunctions: GameFunction[] = functionType ? stageInstance?.getConfiguration().functions || [] : [];
+    const pickerFunctions: GameFunction[] = stageInstance?.getConfiguration().functions || [];
     if (functionType) {
         // Mixed contentList pickers accept sources of every content kind; other pickers accept their own
         // scalar type plus (when multiple) the matching list type.
@@ -66,19 +66,23 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 : listType ? [listType] : [];
         const sourceOptions = [...scalarTypes, ...listTypes].flatMap(type => valuePickerOptions(stageInstance?.getConfiguration(), type));
         options = [...options.filter(option => !isFunctionReference(option.key) && !sourceOptions.some(source => source.key === option.key)), ...sourceOptions];
-        const selected = multiple ? values || [] : value ? [value] : [];
-        for (const key of selected.filter(isValueReference)) {
-            if (!options.some(option => option.key === key)) {
-                // Arg-bearing selections of an offered function get their own exact-key entry so active
-                // state, chips, and button previews resolve; truly unknown references fall back to a stub.
-                const fn = isFunctionReference(key) ? pickerFunctions.find(candidate => candidate.id === functionReferenceId(key)) : undefined;
-                if (fn && options.some(option => option.key === functionReference(fn.id))) {
-                    options.push({ key, label: `${fn.name}(…)`, category: 'Functions', description: fn.description });
-                    continue;
-                }
-                const isFunction = isFunctionReference(key);
-                options.push({ key, label: `Missing or incompatible ${isFunction ? 'function' : 'global stat'}`, category: isFunction ? 'Functions' : 'Global Stats' });
+    }
+    const selected = multiple ? values || [] : value ? [value] : [];
+    // Selected references need their own entries whether sources were merged in (functionType) or the caller
+    // offered function options directly (e.g. function conditions), so previews and active state resolve.
+    const unknownReferences = selected.filter(key => isValueReference(key) && !options.some(option => option.key === key));
+    if (unknownReferences.length) {
+        options = [...options];
+        for (const key of unknownReferences) {
+            // Arg-bearing selections of an offered function get their own exact-key entry so active
+            // state, chips, and button previews resolve; truly unknown references fall back to a stub.
+            const fn = isFunctionReference(key) ? pickerFunctions.find(candidate => candidate.id === functionReferenceId(key)) : undefined;
+            if (fn && options.some(option => option.key === functionReference(fn.id))) {
+                options.push({ key, label: `${fn.name}(…)`, category: 'Functions', description: fn.description });
+                continue;
             }
+            const isFunction = isFunctionReference(key);
+            options.push({ key, label: `Missing or incompatible ${isFunction ? 'function' : 'global stat'}`, category: isFunction ? 'Functions' : 'Global Stats' });
         }
     }
     const [search, setSearch] = useState(initialSearch);
@@ -195,7 +199,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 
     // Choosing a parameterful function routes through the argument entry step instead of committing directly.
     const handleSelect = (nextValue?: string) => {
-        if (functionType && nextValue && isFunctionReference(nextValue)) {
+        if (nextValue && isFunctionReference(nextValue)) {
             const fn = pickerFunctions.find(candidate => candidate.id === functionReferenceId(nextValue));
             if (fn && (fn.parameters || []).length) {
                 const storedArgs = functionReferenceArguments(nextValue)

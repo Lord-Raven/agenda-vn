@@ -1,6 +1,6 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
-import { findStatOptionByValue, normalizeStatValue, resolveStatValue, type Stat, type StatValue } from './Stat';
-import { listElementType, type FunctionValueResolver } from './Function';
+import { findStatOptionByValue, normalizeStatValue, resolveStatValue, type Stat, type StatType, type StatValue } from './Stat';
+import { functionReferenceId, listElementType, type FunctionValueResolver, type GameFunction } from './Function';
 
 // 'contains'/'notContains' test list membership for list stats, or substring match for text.
 export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual' | 'contains' | 'notContains';
@@ -44,7 +44,30 @@ export type ContentIdentityCondition = {
     value: string;
 };
 
-export type Condition = CalendarCondition | GlobalStatCondition | ContentStatCondition | ContentIdentityCondition;
+// Evaluates a game function (stored as a 'function:<id>' reference, optionally carrying arguments) and
+// compares its result against the condition value; list results compare per-element via contains/notContains.
+export type FunctionCondition = {
+    type: 'function';
+    reference: string;
+    comparison: ConditionComparison;
+    value: string | number | boolean;
+};
+
+export type Condition = CalendarCondition | GlobalStatCondition | ContentStatCondition | ContentIdentityCondition | FunctionCondition;
+
+// The function a 'function' condition evaluates, looked up from the context's function definitions.
+export const getConditionFunction = (condition: FunctionCondition, context: { functions?: GameFunction[] }): GameFunction | undefined =>
+    context.functions?.find((fn) => fn.id === functionReferenceId(condition.reference));
+
+// The scalar type a function condition's value is compared as: list results compare one element, and option
+// ids compare as plain text (a function result carries no option pool); undefined for missing/void functions.
+export const functionConditionValueType = (fn: GameFunction | undefined): StatType | undefined => {
+    if (!fn || fn.returnType === 'void') {
+        return undefined;
+    }
+    const scalar = listElementType(fn.returnType) || fn.returnType;
+    return scalar === 'option' ? 'text' : scalar;
+};
 
 // A stat condition value that stands in for the id of the bound 'variable' entity of a content type (e.g. a
 // reference-list stat "contains" the actor whose schedule is being evaluated).
@@ -69,6 +92,7 @@ export type ConditionEntityCollection = ConditionEntity[] | Record<string, Condi
 // Field names mirror SaveType (actors/atlas/inventory) so a spread save works as a context directly.
 export type ConditionContext = {
     resolveValue?: FunctionValueResolver;
+    functions?: GameFunction[];
     currentDate?: string;
     currentTimeOfDay?: CalendarTimeOfDay;
     globalStatValues?: Record<string, StatValue>;
@@ -190,8 +214,9 @@ const resolveConditionValue = (condition: Condition, context: ConditionContext):
     const stat = condition.type === 'globalStat' ? context.globalStats?.find(stat => stat.id === condition.statId)
         : condition.type === 'contentStat' ? getContextContentStats(context, condition.contentType).find(stat => stat.id === condition.statId) : undefined;
     const type = condition.type === 'contentIdentity' ? condition.contentType
-        : stat ? listElementType(stat.type) || stat.type
-            : condition.type === 'calendar' && condition.field !== 'dayOfWeek' && condition.field !== 'timeOfDay' ? 'number' : 'text';
+        : condition.type === 'function' ? functionConditionValueType(getConditionFunction(condition, context)) || 'text'
+            : stat ? listElementType(stat.type) || stat.type
+                : condition.type === 'calendar' && condition.field !== 'dayOfWeek' && condition.field !== 'timeOfDay' ? 'number' : 'text';
     const resolved = isDiceNotation(value) ? value : context.resolveValue?.(value, type) ?? value;
     if (Array.isArray(resolved)) {
         throw new Error('A condition comparison requires a scalar function result.');
@@ -299,10 +324,22 @@ export const evaluateContentIdentityCondition = (condition: ContentIdentityCondi
     return !!current && compareValues(current.id, resolveConditionValue(condition, context), condition.comparison);
 };
 
+// Evaluates the condition's function and compares the result; missing or void functions never match (except
+// trivially via notEquals/notContains against an absent result).
+export const evaluateFunctionCondition = (condition: FunctionCondition, context: ConditionContext): boolean => {
+    const fn = getConditionFunction(condition, context);
+    const actual = fn && fn.returnType !== 'void' ? context.resolveValue?.(condition.reference, fn.returnType) : undefined;
+    return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
+};
+
 export const evaluateCondition = (condition: Condition, context: ConditionContext): boolean => {
     if (condition.type === 'calendar') {
         const actual = getCalendarValue(condition, context);
         return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
+    }
+
+    if (condition.type === 'function') {
+        return evaluateFunctionCondition(condition, context);
     }
 
     if (condition.type === 'globalStat') {

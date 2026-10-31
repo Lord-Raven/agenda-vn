@@ -1332,6 +1332,32 @@ test('conditions resolve actual values, comparison values, identity, and content
     assert.equal(evaluateCondition({ type: 'calendar', field: 'dayOfWeek', comparison: 'equals', value: functionReference('weekday') }, context), true);
 });
 
+test('function conditions compare scalar, checkbox, and list results against literal and resolved values', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.functions = [
+        typedFunction('score', 'number', 'return 6;'),
+        typedFunction('tag', 'text', 'return "hero";'),
+        typedFunction('party', 'actorList', 'return ["a", "b"];'),
+        typedFunction('flag', 'checkbox', 'return true;'),
+        { ...typedFunction('offset', 'number', 'return arg("Amount") + 1;'), parameters: [stat('Amount', 'number', { default: 0 })] },
+        { id: 'reset', name: 'Reset', description: '', returnType: 'void', script: '' },
+    ];
+    const context = stage.getScheduleContext(save);
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('score'), comparison: 'greaterThanOrEqual', value: 6 }, context), true);
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('score'), comparison: 'lessThan', value: 6 }, context), false);
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('tag'), comparison: 'contains', value: 'her' }, context), true);
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('party'), comparison: 'contains', value: 'b' }, context), true);
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('party'), comparison: 'notContains', value: 'missing' }, context), true);
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('flag'), comparison: 'equals', value: true }, context), true);
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('offset', { Amount: 4 }), comparison: 'equals', value: 5 }, context), true);
+    // The comparison value may itself resolve a function or global stat reference.
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('score'), comparison: 'equals', value: functionReference('score') }, context), true);
+    // Missing and void functions produce no result, so only the negated comparisons match.
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('missing'), comparison: 'equals', value: 6 }, context), false);
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('reset'), comparison: 'equals', value: 6 }, context), false);
+    assert.equal(evaluateCondition({ type: 'function', reference: functionReference('reset'), comparison: 'notContains', value: 6 }, context), true);
+});
+
 test('schedules resolve direct functions, scalar stats, and mixed list stats', () => {
     const { stage, save, configuration } = fixture();
     configuration.functions = [typedFunction('destination', 'location', 'return "place";')];

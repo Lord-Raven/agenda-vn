@@ -251,3 +251,27 @@ test('calendar fields keep compatible values and reset incompatible choices', ()
     assert.deepEqual(changeConditionSelect({ ...condition, field: 'timeOfDay', value: 'night' }, 'timeOfDay', 'dayOfWeek'),
         { ...condition, field: 'dayOfWeek', value: 'monday' });
 });
+
+const stageWithFunctions = (functions: Array<Record<string, unknown>>) => ({
+    getSave: () => ({ playerId: 'player' }),
+    getConfiguration: () => ({ functions, globalStats: [] }),
+}) as unknown as React.ComponentProps<typeof ConditionEditor>['stage'];
+
+test('function conditions default from the first non-void function and preserve compatible selections', () => {
+    const stage = stageWithFunctions([
+        { id: 'fn-void', name: 'Reset', description: '', script: '', returnType: 'void' },
+        { id: 'fn-number', name: 'Score', description: '', script: '', returnType: 'number' },
+    ]);
+    const condition: Condition = { type: 'globalStat', statId: numberStat.id, comparison: 'greaterThan', value: 5 };
+    const fnCondition: Condition = { type: 'function', reference: 'function:fn-number', comparison: 'greaterThan', value: 5 };
+    assert.deepEqual(changeConditionSelect(condition, 'globalStat', 'function', { globalStats: [numberStat], stage }), fnCondition);
+    assert.deepEqual(changeConditionSelect(fnCondition, 'function', 'globalStat', { globalStats: [numberStat], stage }),
+        { type: 'globalStat', statId: numberStat.id, comparison: 'greaterThan', value: 5 });
+});
+
+test('function conditions reset incompatible comparisons and values for list results', () => {
+    const stage = stageWithFunctions([{ id: 'fn-party', name: 'Party', description: '', script: '', returnType: 'actorList' }]);
+    const condition: Condition = { type: 'globalStat', statId: numberStat.id, comparison: 'greaterThan', value: 5 };
+    assert.deepEqual(changeConditionSelect(condition, 'globalStat', 'function', { globalStats: [numberStat], stage }),
+        { type: 'function', reference: 'function:fn-party', comparison: 'contains', value: '' });
+});
