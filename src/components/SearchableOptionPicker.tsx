@@ -32,6 +32,7 @@ export interface SearchableOptionPickerProps {
     emptyLabel?: string;
     title?: string;
     renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
+    buttonAriaLabel?: string;
     disabled?: boolean;
     functionType?: StatType;
     stage?: Stage | (() => Stage);
@@ -50,6 +51,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     emptyLabel = 'None',
     title = 'Choose option',
     renderButton,
+    buttonAriaLabel,
     disabled = false,
     functionType,
     stage,
@@ -494,9 +496,9 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                     padding: '6px 10px',
                     overflow: 'hidden',
                 }}
-                aria-label={multiple
+                aria-label={buttonAriaLabel ?? (multiple
                     ? (selectedOptions.length > 0 ? `Selected options: ${selectedOptions.map((option) => option.label).join(', ')}` : title)
-                    : (selectedOption ? `Selected option: ${selectedOption.label}` : title)}
+                    : (selectedOption ? `Selected option: ${selectedOption.label}` : title))}
                 title={multiple ? selectedOptions.map((option) => option.label).join(', ') || undefined : selectedOption?.label}
             >
                 {buttonContent}

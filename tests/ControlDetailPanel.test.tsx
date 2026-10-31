@@ -195,7 +195,10 @@ test('text global stats provide icon sources and controls reevaluate their curre
     const reference = globalStatReference('icon');
     assert.equal(resolveIcon(reference, stage), resolveIcon('favorite'));
     const picker = renderToStaticMarkup(<IconPicker value={reference} stage={stage} onChange={() => {}} />);
-    assert.match(picker, /data-testid="BuildIcon"/);
+    assert.match(picker, />GL<\/span>/);
+    assert.match(picker, /Global icon/);
+    assert.match(picker, /aria-label="Selected icon: globalStat:icon"/);
+    assert.doesNotMatch(picker, /data-testid="BuildIcon"/);
     assert.throws(() => resolveIcon(reference), /A stage is required/);
     const control = new Control({ type: 'button', iconName: reference });
     const render = () => renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />);

@@ -1,7 +1,7 @@
-import { FC, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { FC } from 'react';
 import type { Stage } from '../Stage';
-import { valuePickerOptions, isValueReference } from '../content/Function';
+import { isValueReference } from '../content/Function';
+import { SearchableOptionPicker, type PickerOption } from './SearchableOptionPicker';
 import {
     AttachMoney,
     Favorite,
@@ -552,7 +552,7 @@ const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [
     { key: 'subway', labels: ['Subway', 'Train', 'Public Transport', 'Transportation'], icon: Subway },
     { key: 'surfing', labels: ['Surfing', 'Sports', 'Recreation', 'Exercise', 'Activity'], icon: Surfing },
     { key: 'synagogue', labels: ['Synagogue', 'Religion', 'Place of Worship'], icon: Synagogue },
-    { key: 'tag', labels: ['Octothorpe', 'Hash', 'Pound', 'Tag'], icon: Tag },
+    { key: 'octothorpe', labels: ['Octothorpe', 'Hash', 'Pound', 'Tag'], icon: Tag },
     { key: 'takeout-dining', labels: ['Takeout', 'Food', 'Dining', 'Restaurant'], icon: TakeoutDining },
     { key: 'tapas', labels: ['Tapas', 'Food', 'Dining', 'Restaurant'], icon: Tapas },
     { key: 'temple-buddhist', labels: ['Buddhist Temple', 'Temple', 'Buddhist', 'Religion', 'Place of Worship'], icon: TempleBuddhist },
@@ -632,6 +632,15 @@ const resolveIcon = (iconName?: string, stage?: Stage) => {
     return match || Star;
 };
 
+// Secondary labels feed the description so they stay searchable without being displayed.
+const ICON_PICKER_OPTIONS: PickerOption[] = RATING_ICON_OPTIONS.map(option => ({
+    key: option.key,
+    label: option.labels[0],
+    category: 'Icons',
+    icon: option.icon,
+    description: option.labels.slice(1).join(' '),
+}));
+
 interface IconPickerProps {
     stage?: Stage | (() => Stage);
     value?: string;
@@ -641,185 +650,23 @@ interface IconPickerProps {
 }
 
 export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = false, placeholder = 'Search icon', stage }) => {
-    const [search, setSearch] = useState('');
-    const [isOpen, setIsOpen] = useState(false);
-    const stageInstance = typeof stage === 'function' ? stage() : stage;
-    const sourceOptions = valuePickerOptions(stageInstance?.getConfiguration(), 'text');
-    const query = search.trim().toLowerCase();
-    const filteredOptions = [...RATING_ICON_OPTIONS, ...sourceOptions.map(source => ({
-        key: source.key,
-        labels: [source.category === 'Global Stats' ? `Global Stat: ${source.label}` : source.label, source.description],
-        icon: Build,
-    }))].filter(option => !query || option.labels.join(' ').toLowerCase().includes(query) || option.key.toLowerCase().includes(query));
-
-    const selectedValue = value ?? (allowClear ? undefined : 'star');
-    const previewIconName = value ?? (allowClear ? undefined : 'star');
-    const PreviewIcon = isValueReference(previewIconName) ? Build : previewIconName ? resolveIcon(previewIconName) : DoNotDisturb;
-
-    const handleSelect = (nextValue?: string) => {
-        onChange(nextValue);
-        setIsOpen(false);
-    };
-
-    const pickerContent = (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input
-                type="text"
-                className="input-base"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={placeholder}
-                autoFocus
-            />
-            <div
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))',
-                    gap: '8px',
-                    maxHeight: '320px',
-                    overflowY: 'auto',
-                    paddingRight: '4px',
-                }}
-            >
-                {allowClear && (
-                    <button
-                        key="icon-clear"
-                        type="button"
-                        onClick={() => handleSelect(undefined)}
-                        style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            background: selectedValue === undefined ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
-                            border: selectedValue === undefined ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
-                            borderRadius: '8px',
-                            color: 'var(--agenda-text-primary)',
-                            cursor: 'pointer',
-                            padding: '10px 8px',
-                            minHeight: '72px',
-                            fontSize: '11px',
-                            whiteSpace: 'nowrap',
-                        }}
-                    >
-                        <DoNotDisturb style={{ fontSize: 24, color: selectedValue === undefined ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
-                        <span>None</span>
-                    </button>
-                )}
-                {filteredOptions.map((option) => {
-                    const Icon = option.icon;
-                    const active = selectedValue === option.key;
-                    return (
-                        <button
-                            key={`icon-${option.key}`}
-                            type="button"
-                            onClick={() => handleSelect(option.key)}
-                            style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                background: active ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
-                                border: active ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
-                                borderRadius: '8px',
-                                color: 'var(--agenda-text-primary)',
-                                cursor: 'pointer',
-                                padding: '10px 8px',
-                                minHeight: '72px',
-                                fontSize: '11px',
-                                whiteSpace: 'nowrap',
-                            }}
-                        >
-                            <Icon style={{ fontSize: 24, color: active ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)' }} />
-                            <span>{option.labels[0]}</span>
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
+    // Icons sit alongside text-returning functions and global text stats, which SearchableOptionPicker merges in
+    // (functionType="text") with lettered abbreviations and a parameter step for parameterful functions.
+    const options = value && !isValueReference(value) && !ICON_PICKER_OPTIONS.some(option => option.key === value)
+        ? [...ICON_PICKER_OPTIONS, { key: value, label: value, category: 'Icons', icon: resolveIcon(value) }]
+        : ICON_PICKER_OPTIONS;
     return (
-        <>
-            <button
-                type="button"
-                onClick={() => setIsOpen(true)}
-                style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '52px',
-                    minHeight: '38px',
-                    border: '1px solid var(--agenda-line-subtle)',
-                    borderRadius: '8px',
-                    background: 'var(--agenda-surface-raised)',
-                    color: 'var(--agenda-text-primary)',
-                    cursor: 'pointer',
-                    padding: '6px 10px',
-                }}
-                aria-label={value ? `Selected icon: ${value}` : 'Pick an icon'}
-            >
-                {value ? (
-                    <PreviewIcon style={{ fontSize: 22, color: 'var(--agenda-text-primary)' }} />
-                ) : (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', color: 'var(--agenda-text-muted)' }}>
-                        <DoNotDisturb style={{ fontSize: 18 }} />
-                        None
-                    </span>
-                )}
-            </button>
-
-            {isOpen && typeof document !== 'undefined' && createPortal(
-                <div
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        background: 'color-mix(in srgb, var(--agenda-surface-base) 72%, transparent)',
-                        backdropFilter: 'blur(4px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '20px',
-                        zIndex: 2000,
-                    }}
-                    onClick={() => setIsOpen(false)}
-                >
-                    <div
-                        onClick={(event) => event.stopPropagation()}
-                        style={{
-                            width: 'min(560px, 100%)',
-                            background: 'linear-gradient(135deg, var(--agenda-panel-surface) 0%, color-mix(in srgb, var(--agenda-surface-base) 92%, var(--agenda-panel-surface)) 100%)',
-                            border: '1px solid var(--agenda-panel-border)',
-                            borderRadius: '12px',
-                            padding: '18px',
-                            boxShadow: 'var(--agenda-shadow)',
-                        }}
-                    >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
-                            <div style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>Choose icon</div>
-                            <button
-                                type="button"
-                                onClick={() => setIsOpen(false)}
-                                style={{
-                                    border: '1px solid var(--agenda-line-subtle)',
-                                    borderRadius: '8px',
-                                    background: 'var(--agenda-surface-raised)',
-                                    color: 'var(--agenda-text-primary)',
-                                    cursor: 'pointer',
-                                    padding: '6px 10px',
-                                }}
-                            >
-                                Close
-                            </button>
-                        </div>
-                        {pickerContent}
-                    </div>
-                </div>,
-                document.body,
-            )}
-        </>
+        <SearchableOptionPicker
+            value={value}
+            onChange={next => onChange(typeof next === 'string' ? next : undefined)}
+            options={options}
+            allowClear={allowClear}
+            placeholder={placeholder}
+            title="Choose icon"
+            buttonAriaLabel={value ? `Selected icon: ${value}` : 'Pick an icon'}
+            functionType="text"
+            stage={stage}
+        />
     );
 };
 

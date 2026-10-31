@@ -596,6 +596,30 @@ test('text functions drive control label icons and are not evaluated for picker 
     assert.doesNotThrow(() => renderToStaticMarkup(<IconPicker value={functionReference('icon')} onChange={() => {}} stage={stage} />));
 });
 
+test('icon pickers offer text sources like content pickers: lettered abbreviations and parameter entry', () => {
+    const { stage, configuration } = fixture();
+    const mood = cloneStat({
+        id: 'mood', name: 'Mood', type: 'text', guidance: '', default: 'Happy',
+        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+    });
+    configuration.functions = [{ id: 'mood-icon', name: 'Mood icon', description: '', returnType: 'text', script: 'return arg("Mood");', parameters: [mood] }];
+    const onChange = () => {};
+    const element = IconPicker({ value: undefined, onChange, allowClear: true, stage });
+    assert.ok(isValidElement<{ functionType?: string; options: { key: string; label: string; category?: string; icon?: unknown }[] }>(element));
+    assert.equal(element.props.functionType, 'text');
+    const star = element.props.options.find(option => option.key === 'star');
+    assert.equal(star?.label, 'Star');
+    assert.equal(star?.category, 'Icons');
+    assert.ok(star?.icon);
+
+    const reference = functionReference('mood-icon', { mood: 'Broken Heart' });
+    assert.equal(resolveIcon(reference, stage), resolveIcon('heart-broken'));
+    const html = renderToStaticMarkup(<IconPicker value={reference} onChange={onChange} stage={stage} />);
+    assert.match(html, />MO<\/span>/);
+    assert.match(html, /Mood icon\(…\)/);
+    assert.doesNotMatch(html, /BuildIcon|Missing or incompatible/);
+});
+
 test('stat controls display evaluated values while editors keep their function bindings', () => {
     const { stage, configuration } = fixture();
     const stat = valueStat('number');
