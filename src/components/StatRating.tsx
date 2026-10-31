@@ -607,6 +607,20 @@ const RATING_ICON_OPTIONS: { key: string; labels: string[]; icon: any }[] = [
 
 type RatingIconKey = (typeof RATING_ICON_OPTIONS)[number]['key'];
 
+// Maps both the internal key and the primary label (first entry in labels) to each icon, so
+// reference-backed icons (e.g. functions) can return the primary label instead of the key.
+// Keys take precedence over labels; among labels, the first listed option wins.
+const RATING_ICON_LOOKUP = new Map<string, any>();
+for (const option of RATING_ICON_OPTIONS) {
+    RATING_ICON_LOOKUP.set(option.key.toLowerCase(), option.icon);
+}
+for (const option of RATING_ICON_OPTIONS) {
+    const primaryLabel = option.labels[0]?.trim().toLowerCase();
+    if (primaryLabel && !RATING_ICON_LOOKUP.has(primaryLabel)) {
+        RATING_ICON_LOOKUP.set(primaryLabel, option.icon);
+    }
+}
+
 const resolveIcon = (iconName?: string, stage?: Stage) => {
     if (isValueReference(iconName)) {
         if (!stage) {
@@ -614,8 +628,8 @@ const resolveIcon = (iconName?: string, stage?: Stage) => {
         }
         iconName = String(stage.resolveValue(iconName, 'text'));
     }
-    const match = RATING_ICON_OPTIONS.find(option => option.key === iconName);
-    return match?.icon || Star;
+    const match = iconName ? RATING_ICON_LOOKUP.get(iconName.trim().toLowerCase()) : undefined;
+    return match || Star;
 };
 
 interface IconPickerProps {

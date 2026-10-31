@@ -584,6 +584,10 @@ test('text functions drive control label icons and are not evaluated for picker 
     const fn: GameFunction = { id: 'icon', name: 'Dynamic icon', description: '', returnType: 'text', script: 'return "favorite";' };
     configuration.functions = [fn];
     assert.equal(resolveIcon(functionReference('icon'), stage), resolveIcon('favorite'));
+    fn.script = 'return "Broken Heart";';
+    assert.equal(resolveIcon(functionReference('icon'), stage), resolveIcon('heart-broken'));
+    assert.equal(resolveIcon('Favorite'), resolveIcon('favorite'));
+    fn.script = 'return "favorite";';
     const control = new Control({ type: 'button', label: 'Dynamic label', iconName: functionReference('icon') });
     const html = renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />);
     assert.match(html, /Dynamic label/);
