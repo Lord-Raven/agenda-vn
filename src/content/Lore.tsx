@@ -6,7 +6,7 @@ import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
 import { Stat, StatType, StatValue, formatReferenceStatText, formatStatOptionValueText, isReferenceStatType } from './Stat';
-import { functionReference } from './Function';
+import { functionReference, parseFunctionCallText, positionalFunctionArguments } from './Function';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -97,7 +97,8 @@ const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined
     return (stats || []).find((stat) => stat.id === key || (stat.name || '').trim().toLowerCase() === lowerKey);
 };
 
-// Resolves template tags in lore and control text for LLM/display use. Bare names prefer functions, then global stats.
+// Resolves template tags in lore and control text for LLM/display use, including {{Name("text", 2, true)}}.
+// Bare names prefer functions, then global stats; calls use positional arguments and parameter defaults.
 // Unresolvable tags (unknown stat/function, no target actor, void functions) are left untouched.
 // Don't use on text written back to the source.
 export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor): string {
@@ -123,13 +124,17 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
 
     return String(text || '').replace(LORE_TAG_PATTERN, (match, tag: string | undefined, statKey: string | undefined, functionKey: string | undefined) => {
         if (functionKey !== undefined) {
-            const name = functionKey.trim().toLowerCase();
+            const call = parseFunctionCallText(functionKey);
+            const name = (call?.name || functionKey).trim().toLowerCase();
             const fn = (configuration.functions || []).find(candidate => candidate.name.trim().toLowerCase() === name);
             if (fn) {
                 if (!fn.returnType || fn.returnType === 'void') {
                     return match;
                 }
-                return formatValue(fn.returnType, stage.resolveValue(functionReference(fn.id), fn.returnType, save));
+                return formatValue(fn.returnType, stage.resolveValue(functionReference(fn.id, positionalFunctionArguments(fn, call?.args)), fn.returnType, save));
+            }
+            if (call) {
+                return match;
             }
             const stat = findStatByKey(configuration.globalStats, functionKey.trim());
             if (!stat) {

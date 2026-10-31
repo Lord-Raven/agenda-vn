@@ -225,6 +225,8 @@ export interface MapLink {
     conditionCollections?: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
     availabilityModes?: MapLinkAvailabilityMode[]; // Per-collection button requirement; omitted entries default to enabled.
     name?: string;
+    // Read-only template text, e.g. {{Greeting("Alex", 2)}}. Blank labels fall back to name.
+    label?: string;
     iconName?: string;
     actions?: StatUpdateAction[];
     // Entities displayed beneath a button marker. 'mixed' lists may combine actors, items, and locations

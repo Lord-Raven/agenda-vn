@@ -18,6 +18,7 @@ import { CachedBackgroundUrl } from '../components/CachedImage';
 import { resolveIcon } from '../components/StatRating';
 import { ContentListPortraits } from '../components/ContentListControl';
 import { normalizeReferenceListValue } from '../content/Stat';
+import { processLoreText } from '../content/Lore';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -312,7 +313,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     const linkedMapImageUrl = getMapImageUrl(linkedMap, stage());
                                     const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
-                                    const markerName = isButton ? link.name?.trim() || 'Button' : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
+                                    const markerName = isButton ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stage()) : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
                                     const ButtonIcon = isButton && link.iconName ? resolveIcon(link.iconName, stage()) : TouchApp;
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;

@@ -160,6 +160,8 @@ test('map link disclosures start collapsed, expand independently and reset when 
         assert.ok(html.indexOf('aria-label="Button name"') < html.indexOf('aria-label="Link type"'));
         assert.match(html, /Outcomes \(on click\)/);
         assert.match(html, /aria-label="X coordinate"/);
+        assert.match(html, /aria-label="Button label"/);
+        assert.match(html, /Arguments follow parameter order; omitted arguments use defaults/);
 
         click('Expand World');
         html = render();
@@ -224,6 +226,45 @@ test('defined maps show named action icons, fallback icons, disabled conditions 
     assert.doesNotMatch(html, /data-testid="ArrowOutwardIcon"|data-testid="PlayArrowIcon"/);
     stage.getSave().globalStatValues!.places = [];
     assert.doesNotMatch(render(), /aria-label="Rest contents"/);
+});
+
+test('map button labels and control labels resolve parameterized templates while editors keep source text', () => {
+    const { stage, configuration } = fixture();
+    configuration.useEvents = false;
+    configuration.globalStats = [cloneStat({ id: 'score', name: 'Score', type: 'number', default: 2 })];
+    configuration.functions = [{
+        id: 'greeting', name: 'Greeting', description: '', returnType: 'text',
+        script: 'return `${arg("Person")}: ${get("Score")}`;',
+        parameters: [cloneStat({ id: 'person', name: 'Person', type: 'text', default: 'Player' })],
+    }];
+    const label = 'Visit {{Greeting("Alex")}}';
+    const control = new Control({ name: 'Internal control', label });
+    const map = new GameMap({ name: 'World', links: [{
+        type: 'button', parentId: '', childId: '', name: 'Internal button', label,
+        coordinates: { x: .5, y: .5 }, contentList: { kind: 'location', values: ['missing'] },
+    }] });
+    configuration.maps = [map];
+    const renderMap = () => renderToStaticMarkup(<TooltipProvider>
+        <DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={false} />
+    </TooltipProvider>);
+    const renderControl = () => renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} />);
+    assert.match(renderMap(), /aria-label="Visit Alex: 2"/);
+    assert.match(renderMap(), /aria-label="Visit Alex: 2 contents"/);
+    assert.match(renderControl(), /Visit Alex: 2/);
+    const panel = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
+    assert.ok(panel.includes('value="Visit {{Greeting(&quot;Alex&quot;)}}"'));
+    assert.match(panel, /Arguments follow parameter order; omitted arguments use defaults/);
+    const mapPanel = renderToStaticMarkup(<MapDetailPanel map={map} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />);
+    assert.match(mapPanel, /Drag Visit Alex: 2 marker/);
+    stage.getSave().globalStatValues!.score = 7;
+    assert.match(renderMap(), /aria-label="Visit Alex: 7"/);
+    assert.match(renderControl(), /Visit Alex: 7/);
+    assert.equal(map.links[0].label, label);
+    assert.equal(control.label, label);
+    map.links[0].label = ' ';
+    assert.match(renderMap(), /aria-label="Internal button"/);
+    map.links[0].name = '';
+    assert.match(renderMap(), /aria-label="Button"/);
 });
 
 test('function management shows a return-type sidebar and a selection prompt instead of inline editors', () => {

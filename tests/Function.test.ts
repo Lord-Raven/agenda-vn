@@ -932,6 +932,57 @@ const typedFunction = (id: string, returnType: StatType, script: string): GameFu
     id, name: id, description: '', returnType, script,
 });
 
+test('label templates accept positional function arguments and defaults against current state', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.functions = [{
+        ...typedFunction('greeting', 'text', 'return `${arg("Person")}: ${(arg("Double") ? 2 : 1) * arg("Amount") + get("Score")}`;'),
+        name: 'Greeting',
+        parameters: [
+            stat('person', 'text', { name: 'Person', default: 'Player' }),
+            stat('amount', 'number', { name: 'Amount', default: 3 }),
+            stat('double', 'checkbox', { name: 'Double', default: false }),
+        ],
+    }];
+    const source = 'Visit {{ gReEtInG("Alex, Smith", 2, true) }} / {{Greeting(\'Sam\')}} / {{Greeting()}} / {{Greeting}}';
+    assert.equal(processLoreText(source, stage), 'Visit Alex, Smith: 6 / Sam: 5 / Player: 5 / Player: 5');
+    save.globalStatValues!.Score = 8;
+    assert.equal(processLoreText(source, stage), 'Visit Alex, Smith: 12 / Sam: 11 / Player: 11 / Player: 11');
+    assert.equal(source, 'Visit {{ gReEtInG("Alex, Smith", 2, true) }} / {{Greeting(\'Sam\')}} / {{Greeting()}} / {{Greeting}}');
+    assert.equal(processLoreText('{{Missing(2)}} / {{Greeting(unquoted)}} / {{global:Score}}', stage),
+        '{{Missing(2)}} / {{Greeting(unquoted)}} / 8');
+    assert.throws(() => processLoreText('{{Greeting("Alex", 2, true, 4)}}', stage), /takes 3 arguments/);
+});
+
+test('parameterized label functions propagate errors and cannot write game state', () => {
+    const { stage, save, configuration } = fixture();
+    const fn = {
+        ...typedFunction('Label', 'text', 'set("Score", arg("Amount")); return "Done";'),
+        parameters: [stat('amount', 'number', { name: 'Amount', default: 1 })],
+    };
+    configuration.functions = [fn];
+    const before = structuredClone(save);
+    assert.throws(() => processLoreText('{{Label(9)}}', stage), /read-only/);
+    assert.deepEqual(structuredClone(save), before);
+    fn.script = 'throw new Error("Broken label");';
+    assert.throws(() => processLoreText('{{Label(9)}}', stage), /Broken label/);
+    fn.script = 'return arg("Amount");';
+    assert.throws(() => processLoreText('{{Label(9)}}', stage), /Expected a text/);
+});
+
+test('map button labels survive cloning and portable JSON without evaluating source text', () => {
+    const { configuration } = fixture();
+    const label = 'Visit {{Greeting("Alex", 2)}}';
+    const map = new GameMap({ links: [{
+        type: 'button', parentId: '', childId: '', name: 'Visit', label, coordinates: { x: .5, y: .5 },
+    }] });
+    configuration.maps = [map];
+    for (const copy of [new GameMap(map), new GameMap(JSON.parse(JSON.stringify(map))),
+        buildPortableGameConfiguration(configuration).maps[0]]) {
+        assert.equal(copy.links[0].label, label);
+        assert.equal(copy.links[0].name, 'Visit');
+    }
+});
+
 test('bare global stat tags resolve current values, defaults, references and formatted options', () => {
     const { stage, save, configuration } = fixture();
     configuration.globalStats.push(

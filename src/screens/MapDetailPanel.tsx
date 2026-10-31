@@ -13,6 +13,7 @@ import { getLocationName } from '../content/Location';
 import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker, resolveIcon } from '../components/StatRating';
 import { CONTENT_TYPES } from '../content/Condition';
+import { processLoreText } from '../content/Lore';
 
 interface MapDetailPanelProps {
     map: GameMap;
@@ -557,6 +558,11 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                             }} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
                                         </div>
                                         {link.type === 'button' && <>
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }} htmlFor={`map-button-label-${map.id}-${index}`}>Button Label (optional)</label>
+                                            <TextInput fullWidth id={`map-button-label-${map.id}-${index}`} aria-label="Button label" placeholder="Use button name" value={link.label || ''} onChange={event => updateLink(index, { label: event.target.value })} />
+                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                                {'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only. Blank uses the button name.'}
+                                            </span>
                                             <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Button Icon (optional)</label>
                                             <IconPicker stage={stage} value={link.iconName || undefined} allowClear onChange={iconName => updateLink(index, { iconName: iconName || '' })} />
                                             <strong style={{ color: 'var(--agenda-text-primary)' }}>Outcomes (on click)</strong>
@@ -683,7 +689,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                     </div>}
                     {map.links.map((link, index) => {
                         const locationImageUrl = link.type !== 'button' ? activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl : undefined;
-                        const markerName = link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);
+                        const markerName = link.type === 'button' ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stageInstance) : resolveTargetName(link.childId);
                         const MarkerIcon = link.type === 'button' ? (link.iconName ? resolveIcon(link.iconName, stageInstance) : TouchApp) : Place;
                         return (
                             <div

@@ -330,6 +330,9 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))}
                                         placeholder="Text shown on the button"
                                     />
+                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                        {'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only.'}
+                                    </span>
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Label Icon (optional)</label>
@@ -383,6 +386,9 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <label style={labelStyle}>Label (optional)</label>
                                 <TextInput fullWidth value={draft.label} placeholder={selectedStat?.name || 'Use stat name'}
                                     onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))} />
+                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                    {'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only.'}
+                                </span>
                             </div>
                         )}
                         {(draft.type === 'statDisplay' || draft.type === 'statEditor' || draft.type === 'actorStatDisplay' || draft.type === 'settings') && (
