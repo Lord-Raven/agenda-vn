@@ -547,6 +547,14 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
     }
 }
 
+// Trigger words derived from the actor's canonical name and display name; display names only supplement the tags.
+function buildActorNameTriggers(actor: Actor): string[] {
+    return [actor.name, actor.displayName]
+        .filter(Boolean)
+        .flatMap((name) => name.split(' '))
+        .filter(word => word.length > 2 && word.charAt(word.length - 1) !== '.');
+}
+
 export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage, isCreatorMode: boolean = false): void {
     const lorebook = isCreatorMode ? stage.getConfiguration().lorebook : stage.getSave().lorebook;
     lorebook?.forEach((entry) => {
@@ -555,7 +563,8 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
         }
     });
 
-    let loreEntry = getLinkedActorLore(actor, stage, isCreatorMode);
+    // Fall back to matching the old canonical name, since an existing entry will still carry the old title.
+    let loreEntry = getLinkedActorLore(actor, stage, isCreatorMode, oldName);
     // If the actor has no associated lorebook record; create one with the character's name as the title and the profile as the content.
     if (!loreEntry) {
         loreEntry = createLoreEntry({
@@ -575,14 +584,30 @@ export function upsertActorLoreEntry(actor: Actor, oldName: string, stage: Stage
             stage.getSave().lorebook?.push(loreEntry);
         }
     }
+    // Persist the link so later lookups don't depend on name matching.
+    actor.loreId = loreEntry.id;
+    // Lore entries always carry the actor's canonical name as their title.
     loreEntry.title = actor.name;
     loreEntry.content = actor.profile;
-    loreEntry.triggers = [...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)), ...actor.name.split(' ').filter(word => word.length > 2 && word.charAt(word.length - 1) !== '.')];
+    loreEntry.triggers = [...loreEntry.triggers.filter((trigger) => !oldName.includes(trigger)), ...buildActorNameTriggers(actor)];
     // Remove non-distinct entries:
     loreEntry.triggers = Array.from(new Set(loreEntry.triggers));
 
     if (!isCreatorMode) {
         stage.getSave().lorebook = stage.getSave().lorebook || [];
+        stage.saveGame();
+    }
+}
+
+// Adds trigger words for the actor's current names to an existing linked lore entry without creating or retitling
+// anything. Used when only the display name changes, which should merely supplement the entry's tags.
+export function supplementActorLoreTriggers(actor: Actor, stage: Stage, isCreatorMode: boolean = false): void {
+    const loreEntry = getLinkedActorLore(actor, stage, isCreatorMode);
+    if (!loreEntry) {
+        return;
+    }
+    loreEntry.triggers = Array.from(new Set([...loreEntry.triggers, ...buildActorNameTriggers(actor)]));
+    if (!isCreatorMode) {
         stage.saveGame();
     }
 }
@@ -808,7 +833,7 @@ export async function generateEmotionImage(actor: Actor, emotion: Emotion, stage
     return '';
 }
 
-export function getLinkedActorLore(actor: Actor, stage: Stage, isCreatorMode: boolean = false) {
+export function getLinkedActorLore(actor: Actor, stage: Stage, isCreatorMode: boolean = false, fallbackName: string = '') {
     const save = stage.getSave();
     const lorebook = isCreatorMode ? stage.getConfiguration().lorebook : save.lorebook;
     const actors = isCreatorMode ? stage.getConfiguration().actors : Object.values(save.actors);
@@ -821,7 +846,8 @@ export function getLinkedActorLore(actor: Actor, stage: Stage, isCreatorMode: bo
     }
     // Don't pick something that another actor is already linked to; only consider unassociated lore entries.
     const unassociatedLoreEntries = lorebook?.filter(lore => lore.type === 'character' && !actors.some(a => a.loreId === lore.id)) ?? [];
-    const bestMatch = findBestNameMatch(actor.name, unassociatedLoreEntries, ['title']);
+    const bestMatch = findBestNameMatch(actor.name, unassociatedLoreEntries, ['title'])
+        ?? (fallbackName && fallbackName !== actor.name ? findBestNameMatch(fallbackName, unassociatedLoreEntries, ['title']) : null);
     if (bestMatch) {
         actor.loreId = bestMatch.id; // Link the actor to the best matching lore entry
     }

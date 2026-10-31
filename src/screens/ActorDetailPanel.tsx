@@ -4,7 +4,7 @@ import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/mater
 import { Stage } from '../Stage';
 import { isListStatType, isNumericDisplayType, isReferenceDisplayType, Stat, StatValue, normalizeReferenceListValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
-import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, Outfit, getLinkedActorLore, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
+import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, Outfit, getLinkedActorLore, supplementActorLoreTriggers, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ACTOR_VOICES, ACTOR_VOICE_GENDER_LABELS, ActorVoice, formatActorVoiceLabel, getActorVoice, getActorVoiceVolume, normalizeVoiceModulation, VoiceModulation } from '@lord-raven/novel-visualizer';
 import type { NovelVoiceModulation } from '@lord-raven/novel-visualizer';
 import { playVoiceAudio, VoiceAudioPlayback } from '@lord-raven/novel-visualizer';
@@ -530,6 +530,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
         const persistedActor = new Actor(actor);
         const oldName = persistedActor.name;
+        const oldDisplayName = persistedActor.displayName;
         persistedActor.name = nextEditedActor.name;
         persistedActor.displayName = nextEditedActor.displayName.trim() || nextEditedActor.name;
         persistedActor.role = nextEditedActor.role.trim();
@@ -551,7 +552,12 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
 
         if (persistedActor.name !== oldName) {
             upsertActorLoreEntry(persistedActor, oldName, stage(), isCreatorMode);
+        } else if (persistedActor.displayName !== oldDisplayName) {
+            // Display name changes only supplement the lore entry's triggers; they never create or retitle entries.
+            supplementActorLoreTriggers(persistedActor, stage(), isCreatorMode);
         }
+        // Mirror any lore link established above back onto the live actor object, since the panel keeps using it.
+        actor.loreId = persistedActor.loreId;
 
         const activeStatIds = new Set<string>();
         actorStats.forEach((stat) => {
