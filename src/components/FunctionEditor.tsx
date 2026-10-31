@@ -84,7 +84,9 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                         copy without saving changes.
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
-                        Functions are global and may declare typed parameters. Read an argument with
+                        Functions are global and may declare typed parameters. Option and Option List parameters
+                        can use their own options or source the active choices from a global Option List.
+                        Read an argument with
                         <strong> arg('Parameter name')</strong>; omitted arguments fall back to the parameter's
                         default through the normal stat pipeline, so defaults may reference functions or global
                         stats. Pass arguments to other functions with

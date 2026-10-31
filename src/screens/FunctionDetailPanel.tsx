@@ -3,7 +3,7 @@ import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { IconButton } from '@mui/material';
 import { GameFunction, FUNCTION_RETURN_TYPES, FunctionReturnType } from '../content/Function';
-import { cloneStat, Stat, StatType } from '../content/Stat';
+import { cloneStat, isSourcedOptionStat, Stat, StatType } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { FunctionEditor } from '../components/FunctionEditor';
 import { StatValueInput } from '../components/StatValueInput';
@@ -40,6 +40,7 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
     const parameters = fn.parameters || [];
     const parameterTypes = FUNCTION_RETURN_TYPES.filter((type): type is StatType => type !== 'void');
     const save = stage.getSave();
+    const optionListSources = stage.getConfiguration().globalStats.filter(stat => stat.type === 'optionList');
     const parameterActors = Object.values(save.actors || {}).filter(actor => actor.active !== false);
     const parameterItems = (save.inventory || []).filter(item => item.active !== false);
     const parameterLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
@@ -110,6 +111,24 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                                 <TextInput value={parameter.guidance} onChange={event => patchParameter(parameter.id, { guidance: event.target.value })} />
                             </label>
                             {(parameter.type === 'option' || parameter.type === 'optionList') && (
+                                <label style={{ display: 'grid', gap: 4, color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                    Option Source
+                                    <select className="input-base" aria-label="Parameter option source" value={parameter.optionSourceStatId || ''}
+                                        onChange={event => patchParameter(parameter.id, {
+                                            optionSourceStatId: event.target.value || undefined,
+                                            default: parameter.type === 'optionList' ? [] : '',
+                                        })}>
+                                        <option value="">Own options</option>
+                                        {optionListSources.map(source => (
+                                            <option key={source.id} value={source.id}>{source.name?.trim() || 'Unnamed option list'} (global)</option>
+                                        ))}
+                                        {isSourcedOptionStat(parameter) && !optionListSources.some(source => source.id === parameter.optionSourceStatId) && (
+                                            <option value={parameter.optionSourceStatId}>Missing option list</option>
+                                        )}
+                                    </select>
+                                </label>
+                            )}
+                            {(parameter.type === 'option' || parameter.type === 'optionList') && !isSourcedOptionStat(parameter) && (
                                 <div style={{ display: 'grid', gap: 6 }}>
                                     <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Options</span>
                                     {(parameter.options || []).map((option, optionIndex) => (

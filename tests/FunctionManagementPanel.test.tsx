@@ -15,7 +15,7 @@ import { SkitActionInput, StatUpdateRuleEditor } from '../src/components/StatUpd
 import { StatValueInput } from '../src/components/StatValueInput';
 import { LocationSelect, ReferenceMultiSelect } from '../src/components/UiComponents';
 import { IconPicker, resolveIcon } from '../src/components/StatRating';
-import { cloneStat, StatType } from '../src/content/Stat';
+import { cloneStat, Stat, StatType } from '../src/content/Stat';
 import { functionReference, FUNCTION_RETURN_TYPES, GameFunction } from '../src/content/Function';
 import { ControlRenderer } from '../src/components/ControlRenderer';
 import { ConditionEditor } from '../src/components/ConditionEditor';
@@ -293,6 +293,78 @@ test('details show the current function only and preserve reorder availability',
     assert.doesNotMatch(html, /Reward player|Give gold/);
     assert.doesNotMatch(html, /<button(?=[^>]*aria-label="Move function up")(?=[^>]*disabled="")[^>]*>/);
     assert.match(html, /<button(?=[^>]*aria-label="Move function down")(?=[^>]*disabled="")[^>]*>/);
+});
+
+test('option parameters select global list sources, preserve own options and reset defaults on source changes', () => {
+    for (const type of ['option', 'optionList'] as const) {
+        const { stage, configuration } = fixture();
+        const ownOptions = [{ id: 'own', name: 'Own choice', description: '' }];
+        const makeStat = (fields: Partial<Stat>): Stat => cloneStat({
+            id: 'parameter', name: 'Choice', type, guidance: '', default: type === 'option' ? 'own' : ['own'],
+            llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+            ...fields,
+        });
+        configuration.globalStats = [
+            makeStat({ id: 'source', name: 'Available choices', type: 'optionList', options: ownOptions }),
+            makeStat({ id: 'text', name: 'Not a list', type: 'text', default: '' }),
+        ];
+        configuration.actorStats = [makeStat({ id: 'actor-source', name: 'Actor choices', type: 'optionList' })];
+        let fn: GameFunction = { ...configuration.functions[0], parameters: [makeStat({ options: ownOptions })] };
+        const panel = () => FunctionDetailPanel({
+            fn, functions: [fn], stage, onChange: patch => { fn = { ...fn, ...patch }; }, onMove: () => {}, onDelete: () => {},
+        });
+        const changeSource = (value: string) => {
+            let handler: ((event: { target: { value: string } }) => void) | undefined;
+            const visit = (children: ReactNode) => React.Children.forEach(children, child => {
+                if (!isValidElement<{ children?: ReactNode; 'aria-label'?: string; onChange?: typeof handler }>(child)) return;
+                if (child.props['aria-label'] === 'Parameter option source') handler = child.props.onChange;
+                visit(child.props.children);
+            });
+            visit(panel());
+            assert.ok(handler);
+            handler({ target: { value } });
+        };
+        const initial = renderToStaticMarkup(panel());
+        assert.match(initial, /Available choices \(global\)/);
+        assert.doesNotMatch(initial, /Not a list|Actor choices/);
+        assert.match(initial, /Add option/);
+        changeSource('source');
+        assert.equal(fn.parameters![0].optionSourceStatId, 'source');
+        assert.deepEqual(fn.parameters![0].default, type === 'optionList' ? [] : '');
+        assert.deepEqual(fn.parameters![0].options, ownOptions);
+        assert.doesNotMatch(renderToStaticMarkup(panel()), /Add option|aria-label="Option name"/);
+        changeSource('');
+        assert.equal(fn.parameters![0].optionSourceStatId, undefined);
+        assert.match(renderToStaticMarkup(panel()), /Add option/);
+        changeSource('deleted-source');
+        assert.match(renderToStaticMarkup(panel()), /value="deleted-source" selected="">Missing option list/);
+    }
+});
+
+test('sourced parameter inputs offer active global options and retain existing selections', () => {
+    for (const type of ['option', 'optionList'] as const) {
+        const { stage, configuration } = fixture();
+        const parameter = cloneStat({
+            id: 'choice', name: 'Choice', type, guidance: '', default: type === 'option' ? '' : [],
+            optionSourceStatId: 'choices',
+            llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+        });
+        configuration.globalStats = [cloneStat({
+            ...parameter, id: 'choices', type: 'optionList', optionSourceStatId: undefined, default: ['inactive'],
+            options: [
+                { id: 'active', name: 'Active choice', description: 'Available now' },
+                { id: 'inactive', name: 'Inactive choice', description: '' },
+            ],
+        })];
+        stage.getSave().globalStatValues.choices = ['active'];
+        const input = StatValueInput({ stat: parameter, value: parameter.default, onChange: () => {}, stage });
+        assert.ok(isValidElement<{ options: { key: string; label: string }[] }>(input));
+        assert.deepEqual(input.props.options.map(option => option.key), ['active']);
+        assert.equal(input.props.options[0].label, 'Active choice');
+        const selected = StatValueInput({ stat: parameter, value: type === 'option' ? 'inactive' : ['inactive'], onChange: () => {}, stage });
+        assert.ok(isValidElement<{ options: { key: string }[] }>(selected));
+        assert.deepEqual(selected.props.options.map(option => option.key), ['active', 'inactive']);
+    }
 });
 
 test('function editor offers isolated testing without scoped target selectors', () => {

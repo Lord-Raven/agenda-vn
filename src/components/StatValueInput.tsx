@@ -28,7 +28,12 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
         return <FormulaValueInput value={value} onChange={onChange} />;
     }
     if (stageInstance) {
-        optionContext = { ...optionContext, resolveValue: (source, type) => stageInstance.resolveValue(source, type) };
+        optionContext = {
+            sourceStats: stageInstance.getConfiguration().globalStats,
+            globalStatValues: stageInstance.getSave().globalStatValues,
+            ...optionContext,
+            resolveValue: (source, type) => stageInstance.resolveValue(source, type),
+        };
     }
     if (stat.type === 'checkbox') {
         if (valuePickerOptions(stageInstance?.getConfiguration(), stat.type).length || isValueReference(value)) {
