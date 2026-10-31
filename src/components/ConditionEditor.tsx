@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
 import { findStatOptionByValue, isContentListDisplayType, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat, StatType } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
-import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, FunctionCondition, GlobalStatCondition, functionConditionValueType, variableContentValue } from '../content/Condition';
+import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, FunctionCondition, GlobalStatCondition, functionConditionValueType, isListLengthComparison, variableContentValue } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
 import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
@@ -48,14 +48,20 @@ const IDENTITY_COMPARISONS: Array<{ value: ConditionComparison; label: string }>
     { value: 'notEquals', label: 'is not' },
 ];
 
-const LIST_COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
+const MEMBERSHIP_COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
     { value: 'contains', label: 'contains' },
     { value: 'notContains', label: 'does not contain' },
 ];
 
+const LIST_COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
+    ...MEMBERSHIP_COMPARISONS,
+    { value: 'minimumLength', label: 'minimum length' },
+    { value: 'maximumLength', label: 'maximum length' },
+];
+
 const TEXT_COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
     ...IDENTITY_COMPARISONS,
-    ...LIST_COMPARISONS,
+    ...MEMBERSHIP_COMPARISONS,
 ];
 
 const isListStat = (stat?: Stat): boolean => !!stat && (isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type));
@@ -72,8 +78,7 @@ const getDefaultComparison = (stat: Stat | undefined, current?: ConditionCompari
     return current && allowed.some(comparison => comparison.value === current) ? current : allowed[0].value;
 };
 
-// Comparisons offered for a function condition, driven by the function's return type: list results compare
-// per-element, and option ids compare like text (a function result carries no option pool).
+// List results support membership and length checks; option ids compare like text (no option pool).
 const comparisonsForFunctionReturnType = (type?: StatType): Array<{ value: ConditionComparison; label: string }> => {
     if (!type) {
         return COMPARISONS;
@@ -312,6 +317,9 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
     };
 
     const valueTypeFor = (condition: Condition) => {
+        if (isListLengthComparison(condition.comparison)) {
+            return 'number';
+        }
         if (condition.type === 'calendar') {
             return condition.field === 'timeOfDay' || condition.field === 'dayOfWeek' ? 'text' : 'number';
         }
@@ -332,9 +340,15 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             || (!stageInstance && isFunctionReference(value) && previousType === type);
     };
 
-    // Conditions on lists compare a single element, so scalar and list stats share a value type.
+    // Membership checks share the scalar element type; length checks require a numeric threshold.
     const isValidValueFor = (value: Condition['value'], next: Condition, previous: Condition): boolean => {
         const type = valueTypeFor(next);
+        if (isListLengthComparison(next.comparison)) {
+            return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+        }
+        if (isListLengthComparison(previous.comparison) && type !== 'number') {
+            return false;
+        }
         if (isValueReference(value) && type) {
             return isValidSourceFor(value, type, valueTypeFor(previous));
         }
@@ -389,10 +403,10 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             }
             const { statId } = next;
             const stat = statsForCondition(next).find(candidate => candidate.id === statId);
+            next = { ...next, comparison: getDefaultComparison(stat, previous.comparison) };
             return {
                 ...next,
-                comparison: getDefaultComparison(stat, previous.comparison),
-                value: isValidValueFor(previous.value, next, previous) ? previous.value : getDefaultConditionValue(stat),
+                value: isValidValueFor(previous.value, next, previous) ? previous.value : isListLengthComparison(next.comparison) ? 0 : getDefaultConditionValue(stat),
             };
         }
         if (next.type === 'contentIdentity') {
@@ -408,10 +422,10 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             }
             const fn = conditionFunction(next);
             const comparisons = comparisonsForFunctionReturnType(functionReturnTypeFor(next));
+            next = { ...next, comparison: comparisons.some(option => option.value === previous.comparison) ? previous.comparison : comparisons[0].value };
             return {
                 ...next,
-                comparison: comparisons.some(option => option.value === previous.comparison) ? previous.comparison : comparisons[0].value,
-                value: isValidValueFor(previous.value, next, previous) ? previous.value : getDefaultFunctionConditionValue(fn),
+                value: isValidValueFor(previous.value, next, previous) ? previous.value : isListLengthComparison(next.comparison) ? 0 : getDefaultFunctionConditionValue(fn),
             };
         }
         return {
@@ -423,6 +437,17 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
 
     const renderValueInput = (condition: Condition, collectionIndex: number, conditionIndex: number) => {
         const updateValue = (value: string | number | boolean) => updateCondition(collectionIndex, conditionIndex, { ...condition, value } as Condition);
+        if (isListLengthComparison(condition.comparison)) {
+            return <TextInput fullWidth type="number" min={0} max={Number.MAX_SAFE_INTEGER} step={1} required
+                aria-label="List length" placeholder="Number of entries" value={String(condition.value)}
+                onChange={event => {
+                    if (!event.target.validity.valid) {
+                        event.target.reportValidity();
+                        return;
+                    }
+                    updateValue(event.target.valueAsNumber);
+                }} />;
+        }
         if (condition.type === 'calendar') {
             const type = condition.field === 'timeOfDay' || condition.field === 'dayOfWeek' ? 'text' : 'number';
             if (type === 'text') {
@@ -615,7 +640,18 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             </select>
                         )}
                         {condition.type !== 'calendar' && (
-                            <select style={selectStyle} value={condition.comparison} onChange={(event) => updateCondition(collectionIndex, conditionIndex, { ...condition, comparison: event.target.value as ConditionComparison } as Condition)}>
+                            <select style={selectStyle} value={condition.comparison} onChange={(event) => {
+                                const next = { ...condition, comparison: event.target.value as ConditionComparison } as Condition;
+                                const stat = condition.type === 'globalStat' || condition.type === 'contentStat'
+                                    ? statsForCondition(condition).find(candidate => candidate.id === condition.statId) : undefined;
+                                updateCondition(collectionIndex, conditionIndex, {
+                                    ...next,
+                                    value: isValidValueFor(condition.value, next, condition) ? condition.value
+                                        : isListLengthComparison(next.comparison) ? 0
+                                            : condition.type === 'function' ? getDefaultFunctionConditionValue(conditionFunction(condition))
+                                                : condition.type === 'contentIdentity' ? condition.value : getDefaultConditionValue(stat),
+                                } as Condition);
+                            }}>
                                 {(condition.type === 'contentIdentity'
                                     ? IDENTITY_COMPARISONS
                                     : condition.type === 'function'

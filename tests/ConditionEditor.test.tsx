@@ -275,3 +275,87 @@ test('function conditions reset incompatible comparisons and values for list res
     assert.deepEqual(changeConditionSelect(condition, 'globalStat', 'function', { globalStats: [numberStat], stage }),
         { type: 'function', reference: 'function:fn-party', comparison: 'contains', value: '' });
 });
+
+for (const type of ['actorList', 'locationList', 'itemList', 'contentList', 'optionList'] as const) {
+    const listStat = cloneStat({ ...optionStat, id: 'list', type, default: [] });
+    for (const category of ['globalStat', 'contentStat', 'function'] as const) {
+        const condition: Condition = category === 'function'
+            ? { type: 'function', reference: 'function:list', comparison: 'contains', value: 'town' }
+            : category === 'globalStat'
+                ? { type: 'globalStat', statId: listStat.id, comparison: 'contains', value: 'town' }
+                : { type: 'contentStat', contentType: 'actor', targetId: 'any', statId: listStat.id, comparison: 'contains', value: 'town' };
+        const props = {
+            globalStats: [listStat], actorStats: [listStat], locations,
+            stage: stageWithFunctions([{ id: 'list', name: 'List', returnType: type, description: '', script: '' }]),
+        };
+        test(`${category} ${type} offers length checks with a numeric picker`, () => {
+            const length = changeConditionSelect(condition, 'contains', 'minimumLength', props);
+            assert.deepEqual(length, { ...condition, comparison: 'minimumLength', value: 0 });
+            assert.deepEqual(changeConditionSelect({ ...length, value: 3 }, 'minimumLength', 'maximumLength', props),
+                { ...condition, comparison: 'maximumLength', value: 3 });
+            let updated: Condition = length;
+            const tree = ConditionEditor({ ...props, conditionCollections: [[length]], onChange: next => { updated = next[0][0]; } });
+            let input: React.ReactElement<React.InputHTMLAttributes<HTMLInputElement>> | undefined;
+            const visit = (children: ReactNode) => React.Children.forEach(children, child => {
+                if (!isValidElement<React.PropsWithChildren<React.InputHTMLAttributes<HTMLInputElement>>>(child)) return;
+                if (child.props['aria-label'] === 'List length') input = child;
+                visit(child.props.children);
+            });
+            visit(tree);
+            assert.ok(input);
+            assert.equal(input.props.type, 'number');
+            assert.equal(input.props.min, 0);
+            assert.equal(input.props.step, 1);
+            assert.equal(input.props.value, '0');
+            assert.ok(input.props.onChange);
+            input.props.onChange({ target: { validity: { valid: true }, valueAsNumber: 3 } } as React.ChangeEvent<HTMLInputElement>);
+            assert.deepEqual(updated, { ...length, value: 3 });
+            let reported = false;
+            input.props.onChange({ target: {
+                validity: { valid: false }, valueAsNumber: -1, reportValidity: () => { reported = true; },
+            } } as React.ChangeEvent<HTMLInputElement>);
+            assert.equal(reported, true);
+            assert.deepEqual(updated, { ...length, value: 3 });
+        });
+    }
+}
+
+test('length comparisons retain numeric values across list stats and reset when changing back to membership', () => {
+    const list = cloneStat({ ...optionStat, id: 'list', type: 'optionList', default: [] });
+    const next = cloneStat({ ...locationStat, id: 'next', type: 'locationList', default: [] });
+    const condition: Condition = { type: 'globalStat', statId: list.id, comparison: 'minimumLength', value: 3 };
+    const props = { globalStats: [list, next, numberStat], locations };
+    assert.deepEqual(changeConditionSelect(condition, list.id, next.id, props), { ...condition, statId: next.id });
+    assert.deepEqual(changeConditionSelect(condition, 'minimumLength', 'contains', props), { ...condition, comparison: 'contains', value: 'first' });
+    assert.deepEqual(changeConditionSelect(condition, list.id, numberStat.id, props),
+        { ...condition, statId: numberStat.id, comparison: 'equals' });
+    const numericOption = cloneStat({ ...list, options: [
+        { id: 'first', name: 'First', description: '' }, { id: 'three', name: '3', description: '' },
+    ] });
+    assert.deepEqual(changeConditionSelect(condition, 'minimumLength', 'contains', { globalStats: [numericOption] }),
+        { ...condition, comparison: 'contains', value: 'first' });
+});
+
+test('text comparisons do not offer list length checks', () => {
+    const stat = cloneStat({ ...numberStat, type: 'text', default: '' });
+    const markup = renderToStaticMarkup(<ConditionEditor globalStats={[stat]}
+        conditionCollections={[[{ type: 'globalStat', statId: stat.id, comparison: 'contains', value: 'abc' }]]}
+        onChange={() => {}} />);
+    assert.ok(markup.includes('does not contain'));
+    assert.ok(!markup.includes('minimum length'));
+    assert.ok(!markup.includes('maximum length'));
+});
+
+test('list length comparisons survive global, content, and function category changes', () => {
+    const stat = cloneStat({ ...locationStat, id: 'list', type: 'locationList', default: [] });
+    const props = {
+        globalStats: [stat], actorStats: [stat],
+        stage: stageWithFunctions([{ id: 'list', name: 'List', returnType: 'actorList', description: '', script: '' }]),
+    };
+    const global: Condition = { type: 'globalStat', statId: stat.id, comparison: 'maximumLength', value: 4 };
+    const content: Condition = { type: 'contentStat', contentType: 'actor', targetId: 'any', statId: stat.id, comparison: 'maximumLength', value: 4 };
+    const fn: Condition = { type: 'function', reference: 'function:list', comparison: 'maximumLength', value: 4 };
+    assert.deepEqual(changeConditionSelect(global, 'globalStat', 'contentStat:actor', props), content);
+    assert.deepEqual(changeConditionSelect(content, 'contentStat:actor', 'function', props), fn);
+    assert.deepEqual(changeConditionSelect(fn, 'function', 'globalStat', props), global);
+});

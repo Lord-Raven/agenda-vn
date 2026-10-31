@@ -3,7 +3,11 @@ import { findStatOptionByValue, normalizeStatValue, resolveStatValue, type Stat,
 import { functionReferenceId, listElementType, type FunctionValueResolver, type GameFunction } from './Function';
 
 // 'contains'/'notContains' test list membership for list stats, or substring match for text.
-export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual' | 'contains' | 'notContains';
+// 'minimumLength'/'maximumLength' compare list length inclusively against a non-negative integer.
+export type ConditionComparison = 'equals' | 'notEquals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual' | 'contains' | 'notContains' | 'minimumLength' | 'maximumLength';
+
+export const isListLengthComparison = (comparison: ConditionComparison): boolean =>
+    comparison === 'minimumLength' || comparison === 'maximumLength';
 // The kinds of stat-bearing content that conditions, stat updates, reference stats, and scripts can target.
 export type ContentType = 'actor' | 'location' | 'item';
 export const CONTENT_TYPES: ContentType[] = ['actor', 'location', 'item'];
@@ -45,7 +49,7 @@ export type ContentIdentityCondition = {
 };
 
 // Evaluates a game function (stored as a 'function:<id>' reference, optionally carrying arguments) and
-// compares its result against the condition value; list results compare per-element via contains/notContains.
+// compares its result against the condition value; list results support membership and length checks.
 export type FunctionCondition = {
     type: 'function';
     reference: string;
@@ -207,13 +211,14 @@ const buildDiceSeed = (condition: Condition, context: ConditionContext): string 
 // Resolves a condition's target value, rolling dice notation deterministically if present.
 const resolveConditionValue = (condition: Condition, context: ConditionContext): string | number | boolean => {
     const value = (condition as GlobalStatCondition | ContentStatCondition | CalendarCondition).value;
-    const variableContentType = parseVariableContentValue(value);
+    const variableContentType = isListLengthComparison(condition.comparison) ? undefined : parseVariableContentValue(value);
     if (variableContentType) {
         return getContextCurrentContent(context, variableContentType)?.id || '';
     }
     const stat = condition.type === 'globalStat' ? context.globalStats?.find(stat => stat.id === condition.statId)
         : condition.type === 'contentStat' ? getContextContentStats(context, condition.contentType).find(stat => stat.id === condition.statId) : undefined;
-    const type = condition.type === 'contentIdentity' ? condition.contentType
+    const type = isListLengthComparison(condition.comparison) ? 'number'
+        : condition.type === 'contentIdentity' ? condition.contentType
         : condition.type === 'function' ? functionConditionValueType(getConditionFunction(condition, context)) || 'text'
             : stat ? listElementType(stat.type) || stat.type
                 : condition.type === 'calendar' && condition.field !== 'dayOfWeek' && condition.field !== 'timeOfDay' ? 'number' : 'text';
@@ -236,6 +241,12 @@ const normalizeStatConditionValue = (value: string | number | boolean, stat: Sta
 };
 
 const compareValues = (actual: StatValue | undefined, expected: string | number | boolean, comparison: ConditionComparison): boolean => {
+    if (isListLengthComparison(comparison)) {
+        if (typeof expected !== 'number' || !Number.isSafeInteger(expected) || expected < 0) {
+            throw new Error('A list length condition requires a non-negative integer.');
+        }
+        return Array.isArray(actual) && (comparison === 'minimumLength' ? actual.length >= expected : actual.length <= expected);
+    }
     if (comparison === 'contains' || comparison === 'notContains') {
         const needle = String(expected).toLowerCase();
         const found = Array.isArray(actual)
@@ -261,6 +272,7 @@ const compareValues = (actual: StatValue | undefined, expected: string | number 
         case 'greaterThanOrEqual': return left >= right;
         case 'lessThan': return left < right;
         case 'lessThanOrEqual': return left <= right;
+        default: return false;
     }
 };
 
@@ -311,7 +323,8 @@ const resolveConditionContentSubjects = (contentType: ContentType, targetId: Con
 export const evaluateContentStatCondition = (condition: ContentStatCondition, context: ConditionContext): boolean => {
     const { mode, entities } = resolveConditionContentSubjects(condition.contentType, condition.targetId, context);
     const stat = getContextContentStats(context, condition.contentType).find(candidate => candidate.id === condition.statId);
-    const resolvedValue = normalizeStatConditionValue(resolveConditionValue(condition, context), stat);
+    const value = resolveConditionValue(condition, context);
+    const resolvedValue = isListLengthComparison(condition.comparison) ? value : normalizeStatConditionValue(value, stat);
     const matches = (entity: ConditionEntity) => compareValues(stat ? resolveStatValue(entity.statMap?.[stat.id], stat, context) : undefined, resolvedValue, condition.comparison);
 
     if (mode === 'any') return entities.some(matches);
@@ -345,7 +358,8 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
     if (condition.type === 'globalStat') {
         const stat = context.globalStats?.find(candidate => candidate.id === condition.statId);
         const actual = stat ? resolveStatValue(context.globalStatValues?.[condition.statId], stat, context) : undefined;
-        return compareValues(actual, normalizeStatConditionValue(resolveConditionValue(condition, context), stat), condition.comparison);
+        const value = resolveConditionValue(condition, context);
+        return compareValues(actual, isListLengthComparison(condition.comparison) ? value : normalizeStatConditionValue(value, stat), condition.comparison);
     }
 
     if (condition.type === 'contentIdentity') {
