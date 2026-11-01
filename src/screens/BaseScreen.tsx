@@ -12,6 +12,7 @@ import { SkitScreen } from './SkitScreen';
 import { LoadingScreen } from './LoadingScreen';
 import { applyUiSettingsToRoot } from '../content/Style';
 import { collectFontFamilies, FontHandler } from "@lord-raven/novel-visualizer";
+import { ScreenErrorBoundary } from '../components/ScreenErrorBoundary';
 
 /*
  * Base screen management; the Stage class will display this, and this will track the current screen being displayed.
@@ -84,24 +85,26 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
                     transition={{ duration: 0.24, ease: 'easeOut' }}
                     style={{ position: 'absolute', inset: 0 }}
                 >
-                    {screenType === ScreenType.MENU && (
-                        <MenuScreen stage={stage} setScreenType={setScreenType} />
-                    )}
-                    {screenType === ScreenType.CALENDAR && stage().areEventsEnabled() && (
-                        <CalendarScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
-                    )}
-                    {(screenType === ScreenType.MAP || (screenType === ScreenType.CALENDAR && !stage().areEventsEnabled())) && (
-                        <MapScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
-                    )}
-                    {screenType === ScreenType.SKIT && (
-                        <SkitScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
-                    )}
-                    {screenType === ScreenType.LOADING && (
-                        <LoadingScreen
-                            stage={stage}
-                            setScreenType={setScreenType}
-                        />
-                    )}
+                    <ScreenErrorBoundary key={screenType} onReturnToMenu={() => setScreenType(ScreenType.MENU)}>
+                        {screenType === ScreenType.MENU && (
+                            <MenuScreen stage={stage} setScreenType={setScreenType} />
+                        )}
+                        {screenType === ScreenType.CALENDAR && stage().areEventsEnabled() && (
+                            <CalendarScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
+                        )}
+                        {(screenType === ScreenType.MAP || (screenType === ScreenType.CALENDAR && !stage().areEventsEnabled())) && (
+                            <MapScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
+                        )}
+                        {screenType === ScreenType.SKIT && (
+                            <SkitScreen stage={stage} setScreenType={setScreenType} isVerticalLayout={isVerticalLayout} />
+                        )}
+                        {screenType === ScreenType.LOADING && (
+                            <LoadingScreen
+                                stage={stage}
+                                setScreenType={setScreenType}
+                            />
+                        )}
+                    </ScreenErrorBoundary>
                 </motion.div>
             </AnimatePresence>
             {/* Unified tooltip bar that renders over all screens */}
