@@ -26,8 +26,8 @@ interface MapDetailPanelProps {
 const clampCoordinate = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 
 const BUTTON_AVAILABILITY_OPTIONS: Array<{ value: MapLinkAvailabilityMode; label: string }> = [
-    { value: 'enabled', label: 'Enabled (grayed out when unmet)' },
     { value: 'visible', label: 'Visible (hidden when unmet)' },
+    { value: 'enabled', label: 'Enabled (grayed out when unmet)' },
 ];
 
 const selectStyle = {

@@ -91,7 +91,7 @@ const comparisonsForFunctionReturnType = (type?: StatType): Array<{ value: Condi
 
 const getDefaultFunctionConditionValue = (fn?: GameFunction): string | number | boolean => {
     const type = functionConditionValueType(fn);
-    return type === 'number' ? 0 : type === 'checkbox' ? false : '';
+    return type === 'number' ? 0 : type === 'checkbox' ? true : '';
 };
 
 export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {

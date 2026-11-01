@@ -6,6 +6,7 @@ import { ConditionEditor, createDefaultCondition } from '../src/components/Condi
 import { ConditionalFlagEditor } from '../src/components/ConditionalFlagEditor';
 import { StatUpdateRuleEditor } from '../src/components/StatUpdateRuleEditor';
 import { TooltipProvider } from '../src/components/TooltipContext';
+import { SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
 import { Condition, ConditionCollection, GlobalStatCondition } from '../src/content/Condition';
 import { cloneStat, Stat, StatUpdateRule } from '../src/content/Stat';
 
@@ -139,8 +140,12 @@ const changeConditionSelect = (
     });
     let handler: React.ChangeEventHandler<HTMLSelectElement> | undefined;
     const visit = (children: ReactNode) => React.Children.forEach(children, child => {
+        if (isValidElement<React.ComponentProps<typeof SearchableOptionPicker>>(child)
+            && child.type === SearchableOptionPicker && child.props.title === 'Choose function' && child.props.value === selected) {
+            handler = event => child.props.onChange(event.target.value);
+        }
         if (!isValidElement<React.PropsWithChildren<React.SelectHTMLAttributes<HTMLSelectElement>>>(child)) return;
-        if (child.type === 'select' && child.props.value === selected) handler = child.props.onChange;
+        if (!handler && child.type === 'select' && child.props.value === selected) handler = child.props.onChange;
         visit(child.props.children);
     });
     visit(tree);
@@ -274,6 +279,35 @@ test('function conditions reset incompatible comparisons and values for list res
     const condition: Condition = { type: 'globalStat', statId: numberStat.id, comparison: 'greaterThan', value: 5 };
     assert.deepEqual(changeConditionSelect(condition, 'globalStat', 'function', { globalStats: [numberStat], stage }),
         { type: 'function', reference: 'function:fn-party', comparison: 'contains', value: '' });
+});
+
+test('boolean function conditions default to true when choosing the condition kind or function', () => {
+    const booleanFunction = { id: 'fn-ready', name: 'Ready', description: '', script: '', returnType: 'checkbox' };
+    const condition: Condition = { type: 'globalStat', statId: numberStat.id, comparison: 'equals', value: 7 };
+    const expected: Condition = { type: 'function', reference: 'function:fn-ready', comparison: 'equals', value: true };
+    assert.deepEqual(changeConditionSelect(condition, 'globalStat', 'function', {
+        globalStats: [numberStat], stage: stageWithFunctions([booleanFunction]),
+    }), expected);
+    const numberFunction = { id: 'fn-number', name: 'Score', description: '', script: '', returnType: 'number' };
+    const numeric: Condition = { type: 'function', reference: 'function:fn-number', comparison: 'equals', value: 0 };
+    assert.deepEqual(changeConditionSelect(numeric, numeric.reference, expected.reference, {
+        stage: stageWithFunctions([numberFunction, booleanFunction]),
+    }), expected);
+});
+
+test('boolean function conditions retain explicit false comparisons when editing', () => {
+    const stage = stageWithFunctions([
+        { id: 'first', name: 'First', description: '', script: '', returnType: 'checkbox' },
+        { id: 'second', name: 'Second', description: '', script: '', returnType: 'checkbox' },
+    ]);
+    const condition: Condition = { type: 'function', reference: 'function:first', comparison: 'equals', value: false };
+    assert.deepEqual(changeConditionSelect(condition, condition.reference, 'function:second', { stage }),
+        { ...condition, reference: 'function:second' });
+    assert.deepEqual(changeConditionSelect(condition, 'equals', 'notEquals', { stage }),
+        { ...condition, comparison: 'notEquals' });
+    const checkbox = cloneStat({ ...numberStat, type: 'checkbox', default: false });
+    assert.deepEqual(changeConditionSelect({ type: 'globalStat', statId: checkbox.id, comparison: 'equals', value: false },
+        'globalStat', 'function', { globalStats: [checkbox], stage }), condition);
 });
 
 for (const type of ['actorList', 'locationList', 'itemList', 'contentList', 'optionList'] as const) {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { GameConfiguration, Stage } from '../src/Stage';
 import { Actor, ACTOR_SCHEDULE_UNAVAILABLE, resolveActorSchedule } from '../src/content/Actor';
 import { ConditionContext, ContentStatCondition } from '../src/content/Condition';
@@ -12,6 +13,8 @@ import { TooltipProvider } from '../src/components/TooltipContext';
 import { LocationDetailPanel } from '../src/screens/LocationDetailPanel';
 import { getMapLinkAvailability, Map as GameMap, MapLink } from '../src/content/Map';
 import { DefinedMapView } from '../src/screens/DefinedMapView';
+import { MapDetailPanel } from '../src/screens/MapDetailPanel';
+import { ConditionEditor } from '../src/components/ConditionEditor';
 
 const stat = cloneStat({
     id: 'score', name: 'Local Score', type: 'number', default: 0, guidance: '',
@@ -144,6 +147,48 @@ test('legacy map buttons stay visible and use conditions only to enable clicks',
     button.conditionCollections?.push([buttonCondition(5)]);
     assert.deepEqual(getMapLinkAvailability(button, buttonContext), { visible: true, enabled: true });
 });
+
+for (const [isCreatorMode, hasLegacyGroup] of [[false, false], [false, true], [true, false], [true, true]] as const) {
+    test(`new map button conditions default to visible (creator: ${isCreatorMode}, legacy group: ${hasLegacyGroup})`, () => {
+        const stage = createStage(new Location({ id: 'local' }));
+        const map = new GameMap({ id: 'map', links: [createMapButton({
+            conditionCollections: hasLegacyGroup ? [[buttonCondition(10)]] : [],
+        })] });
+        stage.getConfiguration().maps = [map];
+        const save = { ...stage.getSave(), maps: [map] };
+        stage.getSave = () => save;
+        stage.updateConfiguration = mock.fn();
+        stage.saveGame = mock.fn();
+        const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+        Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout } });
+        let renderer: ReactTestRenderer | undefined;
+        try {
+            act(() => {
+                renderer = create(<TooltipProvider><MapDetailPanel map={map} stage={() => stage}
+                    isCreatorMode={isCreatorMode} onChange={() => {}} onDeactivate={() => {}} /></TooltipProvider>);
+            });
+            assert.ok(renderer);
+            act(() => renderer!.root.findByProps({ 'aria-label': 'Expand Links' }).props.onClick());
+            act(() => renderer!.root.findByProps({ 'aria-label': 'Expand Test Button' }).props.onClick());
+            const editor = renderer.root.findAllByType(ConditionEditor).find(node => node.props.collectionCategories);
+            assert.ok(editor);
+            assert.deepEqual(editor.props.collectionCategoryValues, hasLegacyGroup ? ['enabled'] : []);
+            assert.equal(editor.props.collectionCategories[0].value, 'visible');
+            const add = editor.findAllByType('button').find(node => node.children.includes(' Add condition'));
+            assert.ok(add);
+            act(() => add.props.onClick());
+            const expectedModes = hasLegacyGroup ? ['enabled', 'visible'] : ['visible'];
+            assert.deepEqual(map.links[0].availabilityModes, expectedModes);
+            assert.equal(map.links[0].conditionCollections?.length, hasLegacyGroup ? 2 : 1);
+            const restored = new GameMap(JSON.parse(JSON.stringify(map)));
+            assert.deepEqual(restored.links[0].availabilityModes, expectedModes);
+        } finally {
+            if (renderer) act(() => renderer?.unmount());
+            if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+            else Reflect.deleteProperty(globalThis, 'window');
+        }
+    });
+}
 
 test('map buttons evaluate visibility and enabled groups independently', () => {
     for (const enabled of [false, true]) {
