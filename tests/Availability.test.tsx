@@ -15,6 +15,7 @@ import { getMapLinkAvailability, Map as GameMap, MapLink } from '../src/content/
 import { DefinedMapView } from '../src/screens/DefinedMapView';
 import { MapDetailPanel } from '../src/screens/MapDetailPanel';
 import { ConditionEditor } from '../src/components/ConditionEditor';
+import { ReferenceMultiSelect } from '../src/components/UiComponents';
 
 const stat = cloneStat({
     id: 'score', name: 'Local Score', type: 'number', default: 0, guidance: '',
@@ -174,7 +175,7 @@ for (const [isCreatorMode, hasLegacyGroup] of [[false, false], [false, true], [t
             assert.ok(editor);
             assert.deepEqual(editor.props.collectionCategoryValues, hasLegacyGroup ? ['enabled'] : []);
             assert.equal(editor.props.collectionCategories[0].value, 'visible');
-            const add = editor.findAllByType('button').find(node => node.children.includes(' Add condition'));
+            const add = renderer.root.findAllByType('button').find(node => node.props['aria-label'] === 'Add condition');
             assert.ok(add);
             act(() => add.props.onClick());
             const expectedModes = hasLegacyGroup ? ['enabled', 'visible'] : ['visible'];
@@ -188,6 +189,48 @@ for (const [isCreatorMode, hasLegacyGroup] of [[false, false], [false, true], [t
             else Reflect.deleteProperty(globalThis, 'window');
         }
     });
+}
+
+for (const isCreatorMode of [true, false]) {
+    for (const kind of [undefined, 'location', 'mixed'] as const) {
+        test(`map button contents always use the mixed picker (creator: ${isCreatorMode}, kind: ${kind})`, () => {
+            const stage = createStage(new Location({ id: 'local' }));
+            const map = new GameMap({ id: 'map', links: [createMapButton({
+                ...(kind ? { contentList: { kind, values: ['local'] } } : {}),
+            })] });
+            stage.getConfiguration().maps = [map];
+            const save = { ...stage.getSave(), maps: [map] };
+            stage.getSave = () => save;
+            stage.updateConfiguration = mock.fn();
+            stage.saveGame = mock.fn();
+            const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+            Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout } });
+            let renderer: ReactTestRenderer | undefined;
+            try {
+                act(() => {
+                    renderer = create(<TooltipProvider><MapDetailPanel map={map} stage={() => stage}
+                        isCreatorMode={isCreatorMode} onChange={() => {}} onDeactivate={() => {}} /></TooltipProvider>);
+                });
+                assert.ok(renderer);
+                act(() => renderer!.root.findByProps({ 'aria-label': 'Expand Links' }).props.onClick());
+                act(() => renderer!.root.findByProps({ 'aria-label': 'Expand Test Button' }).props.onClick());
+                assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Button content type' }).length, 0);
+                const picker = renderer.root.findByType(ReferenceMultiSelect);
+                assert.equal(picker.props.kind, undefined);
+                assert.deepEqual(picker.props.values, kind ? ['local'] : []);
+                const values = [...picker.props.values, 'actor-id', 'item-id'];
+                act(() => picker.props.onChange(values));
+                assert.deepEqual(map.links[0].contentList, { kind: 'mixed', values });
+                assert.deepEqual(new GameMap(JSON.parse(JSON.stringify(map))).links[0].contentList, { kind: 'mixed', values });
+                act(() => picker.props.onChange([]));
+                assert.deepEqual(map.links[0].contentList, { kind: 'mixed', values: [] });
+            } finally {
+                if (renderer) act(() => renderer?.unmount());
+                if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+                else Reflect.deleteProperty(globalThis, 'window');
+            }
+        });
+    }
 }
 
 test('map buttons evaluate visibility and enabled groups independently', () => {

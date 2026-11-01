@@ -3,16 +3,15 @@ import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, ArrowDownward, ArrowUpward, AutoAwesome, CenterFocusStrong, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place, TouchApp } from '@mui/icons-material';
 import { generateMapAlternativeImage, imageToPreviewCoordinates, Map as GameMap, MapFitMode, MapLink, MapLinkAvailabilityMode, previewToImageCoordinates } from '../content/Map';
 import { Stage } from '../Stage';
-import { buildHexColorSwatches, Button, ColorPickerInput, ReferenceMultiSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, ColorPickerInput, HelpTip, ReferenceMultiSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
-import { ConditionEditor } from '../components/ConditionEditor';
+import { ConditionEditor, createDefaultCondition } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 import { ConditionCollection } from '../content/Condition';
 import { getLocationName } from '../content/Location';
-import { OutcomeEditor } from '../components/OutcomeEditor';
+import { createDefaultStatUpdate, OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker, resolveIcon } from '../components/StatRating';
-import { CONTENT_TYPES } from '../content/Condition';
 import { processLoreText } from '../content/Lore';
 
 interface MapDetailPanelProps {
@@ -39,6 +38,12 @@ const selectStyle = {
     borderRadius: 6,
     padding: '0 8px',
 };
+
+const sectionHeaderRowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 };
+
+const sectionHeaderTitleStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 };
+
+const addNewButtonStyle: React.CSSProperties = { padding: '4px 10px', fontSize: '12px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 };
 
 type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages' | 'fitMode' | 'fillColor'> & { focalX: number; focalY: number; availabilityConditions: ConditionCollection[] };
 
@@ -276,6 +281,26 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         });
     };
 
+    const moveLink = (index: number, offset: -1 | 1) => {
+        const targetIndex = index + offset;
+        if (targetIndex < 0 || targetIndex >= map.links.length) {
+            return;
+        }
+        persist(() => {
+            [map.links[index], map.links[targetIndex]] = [map.links[targetIndex], map.links[index]];
+        });
+        setExpandedLinks(current => current.map(linkIndex => linkIndex === index ? targetIndex : linkIndex === targetIndex ? index : linkIndex));
+    };
+
+    const addLinkCondition = (index: number, link: MapLink) => {
+        updateLink(index, {
+            conditionCollections: [...(link.conditionCollections || []), [createDefaultCondition(stageInstance.getConfiguration().globalStats || [])]],
+            ...(link.type === 'button' ? {
+                availabilityModes: [...(link.conditionCollections || []).map((_, collectionIndex) => link.availabilityModes?.[collectionIndex] || 'enabled'), BUTTON_AVAILABILITY_OPTIONS[0].value],
+            } : {}),
+        });
+    };
+
     const uploadImage = async (file: File) => {
         setIsUploading(true);
         try {
@@ -401,6 +426,17 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         return 'Missing target';
     };
 
+    const resolveTargetTypeLabel = (childId: string) => {
+        childId = String(stageInstance.resolveValue(childId, 'location'));
+        if (activeMaps.some(candidate => candidate.id === childId)) {
+            return 'Map';
+        }
+        if (activeLocations.some(location => location.id === childId)) {
+            return 'Location';
+        }
+        return 'Link';
+    };
+
     const updateLinkFromPointer = (index: number, event: PointerEvent<HTMLElement>) => {
         const previewBounds = previewRef.current?.getBoundingClientRect();
         if (!previewBounds) {
@@ -514,22 +550,51 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                         {map.links.map((link, index) => {
                             const isCollapsed = !expandedLinks.includes(index);
                             const linkName = link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);
+                            const linkTypeLabel = link.type === 'button' ? 'Button' : resolveTargetTypeLabel(link.childId);
                             return (
                                 <div key={index} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
-                                    <button
-                                        type="button"
-                                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${linkName}`}
-                                        aria-expanded={!isCollapsed}
-                                        onClick={() => setExpandedLinks(current => isCollapsed ? [...current, index] : current.filter(linkIndex => linkIndex !== index))}
-                                        style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer', textAlign: 'left' }}
-                                    >
-                                        <ExpandMore style={{ flexShrink: 0, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
-                                        <strong style={{ overflowWrap: 'anywhere' }}>{linkName}</strong>
-                                    </button>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <button
+                                            type="button"
+                                            aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${linkName}`}
+                                            aria-expanded={!isCollapsed}
+                                            onClick={() => setExpandedLinks(current => isCollapsed ? [...current, index] : current.filter(linkIndex => linkIndex !== index))}
+                                            style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer', textAlign: 'left' }}
+                                        >
+                                            <ExpandMore style={{ flexShrink: 0, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
+                                            <strong style={{ overflowWrap: 'anywhere' }}>{linkName} <span style={{ color: 'var(--agenda-text-muted)', fontWeight: 400 }}>({linkTypeLabel})</span></strong>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label={`Move ${linkName} up`}
+                                            title="Move up"
+                                            disabled={index === 0}
+                                            onClick={() => moveLink(index, -1)}
+                                            style={{ display: 'grid', placeItems: 'center', flexShrink: 0, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.35 : 1 }}
+                                        >
+                                            <ArrowUpward fontSize="small" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label={`Move ${linkName} down`}
+                                            title="Move down"
+                                            disabled={index === map.links.length - 1}
+                                            onClick={() => moveLink(index, 1)}
+                                            style={{ display: 'grid', placeItems: 'center', flexShrink: 0, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: index === map.links.length - 1 ? 'default' : 'pointer', opacity: index === map.links.length - 1 ? 0.35 : 1 }}
+                                        >
+                                            <ArrowDownward fontSize="small" />
+                                        </button>
+                                        <Button variant="danger" aria-label={`Delete ${linkName}`} onClick={() => {
+                                            persist(() => map.links.splice(index, 1));
+                                            setExpandedLinks(current => current.filter(linkIndex => linkIndex !== index).map(linkIndex => linkIndex > index ? linkIndex - 1 : linkIndex));
+                                        }} style={{ padding: 7, flexShrink: 0 }}><Delete fontSize="small" /></Button>
+                                    </div>
                                     {!isCollapsed && <>
-                                        {link.type === 'button' ? (
+                                        {link.type === 'button' ? (<>
                                             <TextInput fullWidth aria-label="Button name" placeholder="Button name" value={link.name || ''} onChange={event => updateLink(index, { name: event.target.value })} />
-                                        ) : <SearchableOptionPicker
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }} htmlFor={`map-button-label-${map.id}-${index}`}>Button Label (optional)</label>
+                                            <TextInput fullWidth id={`map-button-label-${map.id}-${index}`} aria-label="Button label" placeholder="Use button name" value={link.label || ''} onChange={event => updateLink(index, { label: event.target.value })} />
+                                        </>) : <SearchableOptionPicker
                                             value={link.childId}
                                             onChange={nextValue => updateLink(index, { childId: (nextValue as string) || link.childId })}
                                             options={[
@@ -541,31 +606,19 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                             functionType="location"
                                             stage={stage}
                                         />}
-                                        <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
-                                            Link Type
-                                            <select aria-label="Link type" style={selectStyle} value={link.type || 'target'}
-                                                onChange={event => updateLink(index, { type: event.target.value === 'button' ? 'button' : 'target' })}>
-                                                <option value="target">Map / location</option>
-                                                <option value="button">Button</option>
-                                            </select>
-                                        </label>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignItems: 'center' }}>
                                             <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
                                             <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
-                                            <Button variant="danger" aria-label={`Delete ${linkName}`} onClick={() => {
-                                                persist(() => map.links.splice(index, 1));
-                                                setExpandedLinks(current => current.filter(linkIndex => linkIndex !== index).map(linkIndex => linkIndex > index ? linkIndex - 1 : linkIndex));
-                                            }} style={{ padding: 7 }}><Delete fontSize="small" /></Button>
                                         </div>
                                         {link.type === 'button' && <>
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }} htmlFor={`map-button-label-${map.id}-${index}`}>Button Label (optional)</label>
-                                            <TextInput fullWidth id={`map-button-label-${map.id}-${index}`} aria-label="Button label" placeholder="Use button name" value={link.label || ''} onChange={event => updateLink(index, { label: event.target.value })} />
-                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                                {'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only. Blank uses the button name.'}
-                                            </span>
                                             <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Button Icon (optional)</label>
                                             <IconPicker stage={stage} value={link.iconName || undefined} allowClear onChange={iconName => updateLink(index, { iconName: iconName || '' })} />
-                                            <strong style={{ color: 'var(--agenda-text-primary)' }}>Outcomes (on click)</strong>
+                                            <div style={sectionHeaderRowStyle}>
+                                                <strong style={{ color: 'var(--agenda-text-primary)' }}>Outcomes (on click)</strong>
+                                                <Button variant="secondary" aria-label="Add outcome" onClick={() => updateLink(index, {
+                                                    actions: [...(link.actions || []), createDefaultStatUpdate(stageInstance.getConfiguration().globalStats || [], stageInstance.getConfiguration().actorStats || [])],
+                                                })} style={addNewButtonStyle}><Add style={{ fontSize: '16px' }} /> New</Button>
+                                            </div>
                                             <OutcomeEditor actions={link.actions || []} onChange={actions => updateLink(index, { actions })}
                                                 globalStats={stageInstance.getConfiguration().globalStats || []}
                                                 actorStats={stageInstance.getConfiguration().actorStats || []}
@@ -575,42 +628,38 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                                 locations={activeLocations}
                                                 items={(isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []).filter(item => item.active !== false)}
                                                 stage={stage}
+                                                showAddActionButton={false}
                                             />
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
-                                                Content below button (optional)
-                                                <select aria-label="Button content type" style={selectStyle} value={link.contentList?.kind || ''}
-                                                    onChange={event => {
-                                                        const kind = event.target.value === 'mixed' ? 'mixed' : CONTENT_TYPES.find(type => type === event.target.value);
-                                                        updateLink(index, { contentList: kind ? { kind, values: [] } : undefined });
-                                                    }}>
-                                                    <option value="">None</option>
-                                                    <option value="actor">Actors</option>
-                                                    <option value="item">Items</option>
-                                                    <option value="location">Locations</option>
-                                                    <option value="mixed">Mixed</option>
-                                                </select>
-                                            </label>
-                                            {link.contentList && <ReferenceMultiSelect
-                                                kind={link.contentList.kind === 'mixed' ? undefined : link.contentList.kind} values={link.contentList.values}
-                                                onChange={values => {
-                                                    if (link.contentList) updateLink(index, { contentList: { ...link.contentList, values } });
-                                                }}
+                                            <div>
+                                                <div style={{ ...sectionHeaderTitleStyle, color: 'var(--agenda-text-muted)', fontSize: 13 }}>
+                                                    <span>Content below button (optional)</span>
+                                                    <HelpTip title="Content below button">
+                                                        Combine actors, items, and locations, including via functions or global stats of any content type.
+                                                        The list is reevaluated after button actions and displayed beneath the marker.
+                                                        Leave the list empty to display no content.
+                                                    </HelpTip>
+                                                </div>
+                                            </div>
+                                            <ReferenceMultiSelect
+                                                values={link.contentList?.values || []}
+                                                onChange={values => updateLink(index, { contentList: { kind: 'mixed', values } })}
                                                 actors={isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})}
                                                 items={isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []}
                                                 locations={activeLocations} stage={stage}
-                                            />}
-                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                                Choose literal content, a function, or a global stat of the selected content type.
-                                                Mixed lists can combine actors, items, and locations, including via functions or global stats of any content type.
-                                                The list is reevaluated after button actions and displayed beneath the marker.
-                                            </span>
+                                            />
                                         </>}
-                                        {link.type === 'button' && (
-                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                                Enabled conditions control whether the button can be clicked. Visible conditions control whether the button and its content list appear.
-                                                At least one group of each configured kind must pass; all conditions within a group must pass.
-                                            </span>
-                                        )}
+                                        <div style={sectionHeaderRowStyle}>
+                                            <div style={sectionHeaderTitleStyle}>
+                                                <strong style={{ color: 'var(--agenda-text-primary)' }}>Conditions</strong>
+                                                {link.type === 'button' && (
+                                                    <HelpTip title="Button conditions">
+                                                        Enabled conditions control whether the button can be clicked. Visible conditions control whether the button and its content list appear.
+                                                        At least one group of each configured kind must pass; all conditions within a group must pass.
+                                                    </HelpTip>
+                                                )}
+                                            </div>
+                                            <Button variant="secondary" aria-label="Add condition" onClick={() => addLinkCondition(index, link)} style={addNewButtonStyle}><Add style={{ fontSize: '16px' }} /> New</Button>
+                                        </div>
                                         <ConditionEditor
                                             conditionCollections={link.conditionCollections || []}
                                             globalStats={stageInstance.getConfiguration().globalStats || []}
@@ -628,6 +677,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                             onCollectionCategoryValuesChange={link.type === 'button' ? (values) => updateLink(index, {
                                                 availabilityModes: values.map(value => value === 'visible' ? 'visible' : 'enabled'),
                                             }) : undefined}
+                                            showAddConditionButton={false}
                                         />
                                     </>}
                                 </div>

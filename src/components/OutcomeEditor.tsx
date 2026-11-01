@@ -28,7 +28,14 @@ interface OutcomeEditorProps extends OutcomeEditorContext {
     onChange: (actions: StatUpdateAction[]) => void;
     skitTiming?: 'afterPeriod' | 'immediate';
     excludePlayerTargets?: boolean;
+    showAddActionButton?: boolean;
 }
+
+export const createDefaultStatUpdate = (globalStats: Stat[], actorStats: Stat[] = []): StatUpdate => ({
+    id: generateUuid(), kind: 'stat',
+    targetType: actorStats.length ? 'actor' : 'global', targetId: 'any',
+    statId: (actorStats[0] || globalStats[0])?.id || '', operation: 'adjust', value: 0,
+});
 
 const selectStyle = {
     minHeight: 38,
@@ -76,18 +83,14 @@ export const SkitActionInput: FC<SkitActionInputProps> = ({ label, type, value, 
     );
 };
 
-export const OutcomeEditor: FC<OutcomeEditorProps> = ({ actions, onChange, skitTiming = 'immediate', excludePlayerTargets = false, ...context }) => {
+export const OutcomeEditor: FC<OutcomeEditorProps> = ({ actions, onChange, skitTiming = 'immediate', excludePlayerTargets = false, showAddActionButton = true, ...context }) => {
     const { globalStats, actorStats, locationStats = [], itemStats = [], actors, items = [], locations, stage } = context;
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const functions = stageInstance?.getConfiguration().functions || [];
     const targetActors = excludePlayerTargets ? actors.filter(actor => actor.id !== stageInstance?.getSave().playerId) : actors;
     const statsByType = { global: globalStats, actor: actorStats, location: locationStats, item: itemStats };
     const entitiesByType = { actor: targetActors, location: locations, item: items };
-    const createUpdate = (): StatUpdate => ({
-        id: generateUuid(), kind: 'stat',
-        targetType: statsByType.actor.length ? 'actor' : 'global', targetId: 'any',
-        statId: (statsByType.actor[0] || globalStats[0])?.id || '', operation: 'adjust', value: 0,
-    });
+    const createUpdate = (): StatUpdate => createDefaultStatUpdate(globalStats, statsByType.actor);
     const updateAction = (id: string, patch: Partial<StatUpdateAction>) =>
         onChange(actions.map(action => action.id === id ? cloneStatUpdateAction({ ...action, ...patch }) : action));
 
@@ -185,9 +188,11 @@ export const OutcomeEditor: FC<OutcomeEditorProps> = ({ actions, onChange, skitT
                     </div>
                 );
             })}
-            <Button variant="secondary" onClick={() => onChange([...actions, createUpdate()])} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifySelf: 'start' }}>
-                <Add fontSize="small" /> Add action
-            </Button>
+            {showAddActionButton && (
+                <Button variant="secondary" onClick={() => onChange([...actions, createUpdate()])} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifySelf: 'start' }}>
+                    <Add fontSize="small" /> Add action
+                </Button>
+            )}
         </div>
     );
 };

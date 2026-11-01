@@ -4,12 +4,12 @@
  * Can use Material UI and Framer Motion, as desired.
  */
 
-import React, { FC, ReactNode } from 'react';
+import React, { FC, ReactNode, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Actor } from '../content/Actor';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HourglassTop, HourglassBottom, Inventory2, Person, Place } from '@mui/icons-material';
-import { Box, lighten, Chip as MuiChip, Popover, Typography } from '@mui/material';
+import { Box, IconButton, lighten, Chip as MuiChip, Popover, Typography } from '@mui/material';
 import { useTooltip } from './TooltipContext';
 import { LocationPortrait, LocationLike } from './LocationPortrait';
 import { ActorPortrait } from './ActorPortrait';
@@ -55,6 +55,55 @@ export const GlassPanel: FC<GlassPanelProps> = ({
 		>
 			{children}
 		</Box>
+	);
+};
+
+/* ===============================================
+   HELP TIP (clickable "?" icon with popover)
+   =============================================== */
+
+interface HelpTipProps {
+	title: string;
+	children: ReactNode;
+}
+
+export const HelpTip: FC<HelpTipProps> = ({ title, children }) => {
+	const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+	return (
+		<>
+			<IconButton
+				size="small"
+				aria-label={title}
+				aria-expanded={Boolean(anchor)}
+				onClick={(event) => setAnchor(event.currentTarget)}
+				style={{
+					width: 20,
+					height: 20,
+					padding: 0,
+					flexShrink: 0,
+					fontSize: 12,
+					borderRadius: '50%',
+					color: 'var(--agenda-text-muted)',
+					border: '1px solid color-mix(in srgb, var(--agenda-text-muted) 45%, transparent)',
+					background: 'transparent',
+				}}
+			>
+				?
+			</IconButton>
+			<Popover
+				open={Boolean(anchor)}
+				anchorEl={anchor}
+				onClose={() => setAnchor(null)}
+				anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+				transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+				slotProps={{ paper: { style: { maxWidth: 420, padding: 12, backgroundColor: 'var(--agenda-surface-base)', color: 'var(--agenda-text-primary)', border: '1px solid color-mix(in srgb, var(--agenda-text-muted) 35%, transparent)' } } }}
+			>
+				<Box style={{ display: 'grid', gap: 8 }}>
+					<Typography variant="subtitle2" style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>{title}</Typography>
+					<Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>{children}</Typography>
+				</Box>
+			</Popover>
+		</>
 	);
 };
 
