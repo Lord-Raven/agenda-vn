@@ -7,7 +7,7 @@ import { getLocationDescription, Location } from '../src/content/Location';
 import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, resolveAvailableStatOptions, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateContext, generateSkitScript, Skit } from '../src/content/Skit';
 import { cloneGameFunction, functionPickerOptions, functionReference, functionReferenceArguments, functionReferenceId, functionSignature, globalStatReference, parseFunctionCallText, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
-import { evaluateCondition } from '../src/content/Condition';
+import { evaluateCondition, variableContentValue } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
 import { Map as GameMap } from '../src/content/Map';
@@ -557,6 +557,61 @@ const scaledFunction = (): GameFunction => ({
     id: 'scaled', name: 'Scaled', description: '', returnType: 'number',
     script: "return arg('Amount') * (arg('Double') ? 2 : 1);",
     parameters: [parameter('amount', 'number', 1), parameter('double', 'checkbox', false)],
+});
+
+test('schedule function parameters bind Variable to each actor for own and universal rules', () => {
+    const { stage, save, configuration } = fixture();
+    const variable = variableContentValue('actor');
+    const fn: GameFunction = {
+        id: 'scheduled-actor', name: 'Scheduled actor', description: '', returnType: 'actor',
+        script: "return arg('Who');",
+        parameters: [parameter('Who', 'actor', '')],
+    };
+    configuration.functions = [fn];
+    const reference = functionReference(fn.id, { Who: variable });
+    const conditions = [[{ type: 'function' as const, reference, comparison: 'equals' as const, value: 'b' }]];
+    for (const universal of [false, true]) {
+        save.universalSchedule = universal ? { place: conditions } : {};
+        for (const actor of [save.actors.a, save.actors.b]) {
+            actor.schedule = universal ? {} : { place: conditions };
+        }
+        const context = stage.getScheduleContext(save);
+        assert.equal(resolveActorSchedule(save.actors.a, context), 'available');
+        assert.equal(resolveActorSchedule(save.actors.b, context), 'place');
+        assert.equal(resolveActorSchedule(save.actors.a, context), 'available');
+    }
+    assert.equal(stage.resolveValue(functionReference(fn.id, { Who: 'a' }), 'actor'), 'a');
+    assert.throws(() => stage.resolveValue(reference, 'actor'), /No actor is bound for Variable/);
+});
+
+test('schedule destinations pass Variable through nested functions, defaults, and actor lists', () => {
+    const { stage, save, configuration } = fixture();
+    const variable = variableContentValue('actor');
+    const identity: GameFunction = {
+        id: 'identity', name: 'Identity', description: '', returnType: 'actor',
+        script: "return arg('Who');",
+        parameters: [parameter('Who', 'actor', variable)],
+    };
+    const destination: GameFunction = {
+        id: 'destination', name: 'Destination', description: '', returnType: 'location',
+        script: "return arg('Who') === 'b' && arg('Group').includes('b') && arg('Mixed').includes('item') ? 'place' : '';",
+        parameters: [
+            parameter('Who', 'actor', ''),
+            parameter('Group', 'actorList', []),
+            parameter('Mixed', 'contentList', []),
+        ],
+    };
+    configuration.functions = [identity, destination];
+    const reference = functionReference(destination.id, {
+        Who: functionReference(identity.id),
+        Group: ['a', variable],
+        Mixed: [variable, 'item'],
+    });
+    save.universalSchedule = { [reference]: [] };
+    const context = stage.getScheduleContext(save);
+    assert.equal(resolveActorSchedule(save.actors.a, context), 'available');
+    assert.equal(resolveActorSchedule(save.actors.b, context), 'place');
+    assert.equal(functionReferenceArguments(reference)?.Who, functionReference(identity.id));
 });
 
 test('arg-bearing references carry arguments, expose base ids, and resolve with default fallbacks', () => {

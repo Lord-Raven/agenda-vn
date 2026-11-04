@@ -4,6 +4,7 @@ import { ActorSchedule, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, AC
 import { Stat, isLocationDisplayType, isLocationListDisplayType } from '../content/Stat';
 import { Button } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
+import { VariableContentContext } from './VariableContentContext';
 import { LocationPortrait, LocationLike } from './LocationPortrait';
 import { ConditionEditor } from './ConditionEditor';
 import { Stage } from '../Stage';
@@ -74,53 +75,55 @@ export const ActorScheduleEditor: FC<ActorScheduleEditorProps> = ({ schedule, lo
     };
 
     return (
-        <div style={{ display: 'grid', gap: 10 }}>
-            {entries.map(([destination, conditionCollections], index) => {
-                // A destination can only be scheduled once, so hide targets already claimed by another entry.
-                const availableTargets = targets.filter(target => target.key === destination || !entries.some(([current]) => current === target.key));
-                return (
-                    <div key={destination} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 6, background: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                                <SearchableOptionPicker
-                                    value={destination}
-                                    onChange={(nextValue) => {
-                                        const nextDestination = (Array.isArray(nextValue) ? nextValue[0] : nextValue) || destination;
-                                        if (nextDestination !== destination) {
-                                            updateEntry(index, nextDestination, conditionCollections);
-                                        }
-                                    }}
-                                    options={availableTargets}
-                                    defaultOptionKeys={[ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE]}
-                                    allowClear={false}
-                                    title="Choose schedule destination"
-                                    placeholder="Search locations"
-                                    functionType="location"
-                                    stage={stage}
-                                />
+        <VariableContentContext.Provider value="actor">
+            <div style={{ display: 'grid', gap: 10 }}>
+                {entries.map(([destination, conditionCollections], index) => {
+                    // A destination can only be scheduled once, so hide targets already claimed by another entry.
+                    const availableTargets = targets.filter(target => target.key === destination || !entries.some(([current]) => current === target.key));
+                    return (
+                        <div key={destination} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 6, background: 'color-mix(in srgb, var(--agenda-surface-base) 68%, transparent)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                                    <SearchableOptionPicker
+                                        value={destination}
+                                        onChange={(nextValue) => {
+                                            const nextDestination = (Array.isArray(nextValue) ? nextValue[0] : nextValue) || destination;
+                                            if (nextDestination !== destination) {
+                                                updateEntry(index, nextDestination, conditionCollections);
+                                            }
+                                        }}
+                                        options={availableTargets}
+                                        defaultOptionKeys={[ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE]}
+                                        allowClear={false}
+                                        title="Choose schedule destination"
+                                        placeholder="Search locations"
+                                        functionType="location"
+                                        stage={stage}
+                                    />
+                                </div>
+                                <Button variant="secondary" disabled={index === 0} onClick={() => moveEntry(index, -1)} aria-label="Move schedule entry up" style={{ minWidth: 34, padding: 6 }}><ArrowUpward fontSize="small" /></Button>
+                                <Button variant="secondary" disabled={index === entries.length - 1} onClick={() => moveEntry(index, 1)} aria-label="Move schedule entry down" style={{ minWidth: 34, padding: 6 }}><ArrowDownward fontSize="small" /></Button>
+                                <Button variant="danger" onClick={() => onChange(cloneSchedule(entries.filter((_, currentIndex) => currentIndex !== index)))} aria-label="Delete schedule entry" style={{ minWidth: 34, padding: 6 }}><Delete fontSize="small" /></Button>
                             </div>
-                            <Button variant="secondary" disabled={index === 0} onClick={() => moveEntry(index, -1)} aria-label="Move schedule entry up" style={{ minWidth: 34, padding: 6 }}><ArrowUpward fontSize="small" /></Button>
-                            <Button variant="secondary" disabled={index === entries.length - 1} onClick={() => moveEntry(index, 1)} aria-label="Move schedule entry down" style={{ minWidth: 34, padding: 6 }}><ArrowDownward fontSize="small" /></Button>
-                            <Button variant="danger" onClick={() => onChange(cloneSchedule(entries.filter((_, currentIndex) => currentIndex !== index)))} aria-label="Delete schedule entry" style={{ minWidth: 34, padding: 6 }}><Delete fontSize="small" /></Button>
+                            <ConditionEditor
+                                conditionCollections={conditionCollections}
+                                globalStats={globalStats}
+                                actorStats={actorStats}
+                                actors={actors}
+                                stage={stage}
+                                locations={locations}
+                                variableContentType="actor"
+                                onChange={collections => updateEntry(index, destination, collections)}
+                            />
+                            {conditionCollections.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Always applies when reached.</span>}
                         </div>
-                        <ConditionEditor
-                            conditionCollections={conditionCollections}
-                            globalStats={globalStats}
-                            actorStats={actorStats}
-                            actors={actors}
-                            stage={stage}
-                            locations={locations}
-                            variableContentType="actor"
-                            onChange={collections => updateEntry(index, destination, collections)}
-                        />
-                        {conditionCollections.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Always applies when reached.</span>}
-                    </div>
-                );
-            })}
-            {entries.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>{emptyLabel}</span>}
-            <Button variant="secondary" disabled={entries.length >= targets.length} onClick={addEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifySelf: 'start' }}>
-                <Add fontSize="small" /> Add schedule entry
-            </Button>
-        </div>
+                    );
+                })}
+                {entries.length === 0 && <span style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>{emptyLabel}</span>}
+                <Button variant="secondary" disabled={entries.length >= targets.length} onClick={addEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifySelf: 'start' }}>
+                    <Add fontSize="small" /> Add schedule entry
+                </Button>
+            </div>
+        </VariableContentContext.Provider>
     );
 };

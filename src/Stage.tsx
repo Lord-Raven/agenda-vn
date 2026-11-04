@@ -1,12 +1,12 @@
 import {ReactElement} from "react";
 import { v4 as uuidv4 } from 'uuid';
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
-import { ConditionContext, createSeededRandom, evaluateConditionCollections, hashString } from "./content/Condition";
+import { ConditionContext, createSeededRandom, evaluateConditionCollections, hashString, parseVariableContentValue } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
@@ -111,7 +111,7 @@ const MAX_STAT_UPDATE_PERIODS = 128;
 
 // Prevent cyclical function calls from recursing indefinitely.
 const MAX_FUNCTION_INVOCATION_DEPTH = 8;
-type ScriptContext = { readOnly: boolean; stack: string[] };
+type ScriptContext = { readOnly: boolean; stack: string[]; variables?: FunctionVariableBindings };
 
 // Simple (string) metadata fields a function script may read/write directly on an actor/location/item via
 // getField/setField, bypassing the Stat system entirely. Deliberately excludes complex fields (schedule,
@@ -550,10 +550,18 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const configuration = this.getConfiguration(save);
         return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats,
             functions: configuration.functions,
-            resolveValue: (value, type) => this.resolveValue(value, type, save) };
+            resolveValue: (value, type, variables) => this.resolveValue(value, type, save, [], variables) };
     }
 
-    resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = []): StatValue {
+    resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {
+        const variableType = parseVariableContentValue(value);
+        if (variableType && type === variableType) {
+            const id = variables?.[variableType];
+            if (!id) {
+                throw new Error(`No ${variableType} is bound for Variable.`);
+            }
+            return id;
+        }
         const namedSource = (name: string, kind: 'function' | 'stat', expectedType: StatType, args?: unknown[]): StatValue => {
             const normalizedName = name.trim().toLowerCase();
             const configuration = this.getConfiguration(save);
@@ -566,7 +574,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             const reference = kind === 'function'
                 ? functionReference(matches[0].id, positionalFunctionArguments(matches[0] as GameFunction, args))
                 : `globalStat:${matches[0].id}`;
-            return this.resolveValue(reference, expectedType, save, stack);
+            return this.resolveValue(reference, expectedType, save, stack, variables);
         };
         if (isGlobalStatReference(value)) {
             const id = globalStatReferenceId(value);
@@ -581,7 +589,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (stack.includes(value) || stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
                 throw new Error(`Maximum value reference depth exceeded or cyclic global stat reference: ${stat.name}`);
             }
-            return this.readStatValue(save.globalStatValues?.[id], stat, save, [...stack, value]);
+            return this.readStatValue(save.globalStatValues?.[id], stat, save, [...stack, value], variables);
         }
         if (isFunctionReference(value)) {
             const id = functionReferenceId(value);
@@ -593,7 +601,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 throw new Error(`Function "${fn.name}" returns ${fn.returnType || 'void'}, not ${type}.`);
             }
             const errors: string[] = [];
-            const result = this.runGameFunction(save, fn, stack.length, message => errors.push(message), { readOnly: true, stack }, functionReferenceArguments(value));
+            const result = this.runGameFunction(save, fn, stack.length, message => errors.push(message), { readOnly: true, stack, variables }, functionReferenceArguments(value));
             if (errors.length) {
                 throw new Error(errors.join('\n'));
             }
@@ -618,6 +626,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const elementType = listElementType(type);
         if ((elementType || type === 'contentList') && Array.isArray(value)) {
             return value.flatMap(entry => {
+                const variableType = parseVariableContentValue(entry);
+                if (variableType && (elementType === variableType || type === 'contentList')) {
+                    return [String(this.resolveValue(entry, variableType, save, stack, variables))];
+                }
                 if (!isValueReference(entry)) {
                     return typeof entry === 'string' ? [entry] : [];
                 }
@@ -630,16 +642,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 const entryType = type === 'contentList'
                     ? (sourceType && isReferenceStatType(sourceType as StatType) ? sourceType as StatType : type)
                     : sourceType === type ? type : elementType!;
-                const resolved = this.resolveValue(entry, entryType, save, stack);
+                const resolved = this.resolveValue(entry, entryType, save, stack, variables);
                 return Array.isArray(resolved) ? resolved : [String(resolved)];
             });
         }
         return value as StatValue;
     }
 
-    readStatValue(value: unknown, stat: Stat, save: SaveType = this.getSave(), stack: string[] = []): StatValue {
+    readStatValue(value: unknown, stat: Stat, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {
         return this.withStatContext(save, () =>
-            resolveStatValue(value, stat, { resolveValue: (source, type) => this.resolveValue(source, type, save, stack) }));
+            resolveStatValue(value, stat, { resolveValue: (source, type) => this.resolveValue(source, type, save, stack, variables) }));
     }
 
     private withStatContext<T>(save: SaveType, action: () => T): T {
@@ -1952,7 +1964,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return {
             get: (name: string) => {
                 const stat = findStat(name);
-                return stat ? this.readStatValue(save.globalStatValues?.[stat.id], stat, save, context.stack) : undefined;
+                return stat ? this.readStatValue(save.globalStatValues?.[stat.id], stat, save, context.stack, context.variables) : undefined;
             },
             getObjects: (name: string) => {
                 const stat = findStat(name);
@@ -1967,7 +1979,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     return;
                 }
                 save.globalStatValues = save.globalStatValues || {};
-                save.globalStatValues[stat.id] = this.readStatValue(value, stat, save, context.stack);
+                save.globalStatValues[stat.id] = this.readStatValue(value, stat, save, context.stack, context.variables);
             },
         };
     }
@@ -1976,7 +1988,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (!stat || !isListStatType(stat.type)) {
             throw new Error(`getObjects("${name}") requires an option list or content list stat.`);
         }
-        const ids = this.readStatValue(value, stat, save, context.stack) as string[];
+        const ids = this.readStatValue(value, stat, save, context.stack, context.variables) as string[];
         if (stat.type === 'optionList') {
             const options = resolveStatOptionPool(stat);
             return ids.flatMap(id => {
@@ -2023,7 +2035,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             kind,
             get: (statName: string) => {
                 const stat = findStat(statName);
-                return stat ? this.readStatValue(statMap[stat.id], stat, save, context.stack) : undefined;
+                return stat ? this.readStatValue(statMap[stat.id], stat, save, context.stack, context.variables) : undefined;
             },
             getObjects: (statName: string) => {
                 const stat = findStat(statName);
@@ -2037,7 +2049,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 if (!stat) {
                     return;
                 }
-                statMap[stat.id] = this.readStatValue(value, stat, save, context.stack);
+                statMap[stat.id] = this.readStatValue(value, stat, save, context.stack, context.variables);
             },
         };
         if (fieldAllowlist) {
@@ -2119,7 +2131,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 throw new Error(`Unknown function parameter: ${name}`);
             }
             if (!resolvedArgs.has(parameter.id)) {
-                resolvedArgs.set(parameter.id, this.readStatValue(args?.[parameter.id], parameter, save, context.stack));
+                resolvedArgs.set(parameter.id, this.readStatValue(args?.[parameter.id], parameter, save, context.stack, context.variables));
             }
             return resolvedArgs.get(parameter.id);
         };

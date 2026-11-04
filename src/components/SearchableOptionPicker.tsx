@@ -1,11 +1,13 @@
-import { FC, ReactNode, useMemo, useRef, useState } from 'react';
+import { FC, ReactNode, useContext, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { DoNotDisturb } from '@mui/icons-material';
+import { DoNotDisturb, SwapHoriz } from '@mui/icons-material';
 import { Box } from '@mui/material';
 import type { Stage } from '../Stage';
 import { resolveStatDefault, type StatType, type StatValue } from '../content/Stat';
 import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
+import { variableContentValue } from '../content/Condition';
+import { VariableContentContext } from './VariableContentContext';
 
 const MAX_SELECTED_PREVIEW = 6;
 
@@ -56,6 +58,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     functionType,
     stage,
 }) => {
+    const variableContentType = useContext(VariableContentContext);
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const pickerFunctions: GameFunction[] = stageInstance?.getConfiguration().functions || [];
     if (functionType) {
@@ -68,6 +71,15 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 : listType ? [listType] : [];
         const sourceOptions = [...scalarTypes, ...listTypes].flatMap(type => valuePickerOptions(stageInstance?.getConfiguration(), type));
         options = [...options.filter(option => !isFunctionReference(option.key) && !sourceOptions.some(source => source.key === option.key)), ...sourceOptions];
+    }
+    if (variableContentType && (functionType === variableContentType || functionType === 'contentList')
+        && !options.some(option => option.key === 'variable')) {
+        const key = variableContentValue(variableContentType);
+        options = [
+            { key, label: 'Variable', icon: SwapHoriz, description: `The ${variableContentType} this schedule rule applies to.` },
+            ...options.filter(option => option.key !== key),
+        ];
+        defaultOptionKeys = [key, ...defaultOptionKeys.filter(value => value !== key)];
     }
     const selected = multiple ? values || [] : value ? [value] : [];
     // Selected references need their own entries whether sources were merged in (functionType) or the caller

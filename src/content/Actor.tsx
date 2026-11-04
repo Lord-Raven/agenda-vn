@@ -135,7 +135,14 @@ const resolveScheduleStatDestination = (destination: string, actor: Pick<Actor, 
 export const resolveActorSchedule = (actor: Pick<Actor, 'id' | 'name' | 'statMap' | 'schedule'>, context: ScheduleContext): string => {
     let destination = '';
     let unavailable = false;
-    const evaluationContext: ScheduleContext = { ...context, currentActor: actor };
+    const resolveValue = context.resolveValue;
+    const evaluationContext: ScheduleContext = {
+        ...context,
+        currentActor: actor,
+        resolveValue: resolveValue
+            ? (value, type) => resolveValue(value, type, { actor: actor.id })
+            : undefined,
+    };
 
     for (const schedule of [actor.schedule, context?.universalSchedule]) {
         for (const [target, conditionCollections] of Object.entries(schedule || {})) {
@@ -156,7 +163,7 @@ export const resolveActorSchedule = (actor: Pick<Actor, 'id' | 'name' | 'statMap
     if (!destination) {
         return ACTOR_SCHEDULE_AVAILABLE;
     }
-    return resolveScheduleStatDestination(destination, actor, context) || ACTOR_SCHEDULE_AVAILABLE;
+    return resolveScheduleStatDestination(destination, actor, evaluationContext) || ACTOR_SCHEDULE_AVAILABLE;
 };
 
 

@@ -12,6 +12,7 @@ export const FUNCTION_RETURN_TYPES: FunctionReturnType[] = [
 
 // A tagged string fits existing ID pickers and mixed ID lists without converting references into values.
 // Arguments ride along after a '?' as JSON keyed by parameter id: function:<id>?{"<paramId>":5}.
+// Context-bound arguments use Variable references, e.g. "variable:actor" for the scheduled actor.
 const FUNCTION_REFERENCE_PREFIX = 'function:';
 export const functionReference = (id: string, args?: Record<string, StatValue>): string =>
     `${FUNCTION_REFERENCE_PREFIX}${id}${args && Object.keys(args).length ? `?${JSON.stringify(args)}` : ''}`;
@@ -43,7 +44,8 @@ export const isGlobalStatReference = (value: unknown): value is string =>
 export const globalStatReferenceId = (value: string): string => value.slice(GLOBAL_STAT_REFERENCE_PREFIX.length);
 export const isValueReference = (value: unknown): value is string => isFunctionReference(value) || isGlobalStatReference(value);
 
-export type FunctionValueResolver = (value: unknown, type: StatType) => StatValue;
+export type FunctionVariableBindings = Partial<Record<ContentType, string>>;
+export type FunctionValueResolver = (value: unknown, type: StatType, variables?: FunctionVariableBindings) => StatValue;
 
 // The scalar type of one element of a single-kind list type. The mixed 'contentList' has no single element
 // type and resolves to undefined; use isListValueType to detect every list-valued type.
