@@ -55,7 +55,7 @@ export const buildCreatorNotesHtml = ({
             const actorSummary = escapeHtml((actor.summary || 'No summary provided.').replace(/\s+/g, ' ').trim());
             const portraitUrl = getEmotionImage(actor, 'neutral', stage, actor.outfitId) || getEmotionImage(actor, 'base', stage, actor.outfitId) || ' ';
             const sourceLink = actor.sourcePath
-                ? `<a class="cast-source" href="${escapeHtml(`https://chub.ai/characters/${actor.sourcePath}`)}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 8H7a4 4 0 0 0 0 8h3m4-8h3a4 4 0 0 1 0 8h-3M8 12h8" /></svg>${escapeHtml(actor.sourcePath.split('/')[0])}</a>`
+                ? `<a class="cast-source" href="${escapeHtml(`https://chub.ai/characters/${actor.sourcePath}`)}" target="_blank" rel="noopener noreferrer">${escapeHtml(actor.sourcePath.split('/')[0])}</a>`
                 : '';
             return `<div class="cast-item" tabindex="0" data-cast-item style="anchor-name: --cast-${index}; --cast-anchor: --cast-${index};"><img src="${escapeHtml(portraitUrl)}" alt="${actorName}" class="cast-portrait" /><span class="cast-name">${actorName}</span>${sourceLink}<div class="cast-tooltip">${actorSummary}</div></div>`;
         })
