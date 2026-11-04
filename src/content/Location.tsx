@@ -14,6 +14,7 @@ import { CalendarTimeOfDay } from './CalendarEvent';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import { AlternativeImage, createAlternativeImage, getMatchingAlternativeImage } from './AlternativeImage';
 import { StatValue } from './Stat';
+import { getImageGenerationSource } from '../utils/ImageSource';
 
 export type CalendarDayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
@@ -194,19 +195,6 @@ const LOCATION_ALTERNATIVE_IMAGE_PROMPT_FIELDS: StructuredFieldDefinition[] = [
 const LOCATION_BASE_IMAGE_PROMPT_FIELDS: StructuredFieldDefinition[] = [
 	{ key: 'artPrompt', label: 'ARTPROMPT', description: 'A concise image-generation prompt describing the base visual composition for this location.' },
 ];
-
-async function getDataUrl(baseImageUrl: string): Promise<string> {
-	if (baseImageUrl && baseImageUrl.startsWith('/assets/')) {
-		const response = await fetch(baseImageUrl);
-		const blob = await response.blob();
-		const reader = new FileReader();
-		reader.readAsDataURL(blob);
-		baseImageUrl = await new Promise<string>((resolve) => {
-			reader.onloadend = () => resolve(reader.result as string);
-		});
-	}
-	return baseImageUrl;
-}
 
 export function getLocationImageUrl(location: Location | undefined, stage?: Stage): string {
 	if (!location) {
@@ -396,7 +384,7 @@ export async function generateLocationAlternativeImage(
 		}
 
 		const imageUrl = await stage.makeImageFromImage({
-			image: await getDataUrl(baseImageUrl),
+			image: await getImageGenerationSource(baseImageUrl),
 			prompt: prompt,
 			remove_background: false,
 			transfer_type: 'edit',

@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Add, Delete, ExpandLess, ExpandMore, Image as ImageIcon, Inventory2 } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import {
+    generateBaseItemImage,
+    generateItemAlternativeImage,
+    generateItemDetails,
     getItemDescription,
     getItemImagePrompt,
     getLinkedItemLore,
@@ -77,13 +80,16 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
     );
     const [expandedStatIds, setExpandedStatIds] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
+    const [generationTarget, setGenerationTarget] = useState<'details' | 'base' | number | null>(null);
+    const generationInProgressRef = useRef(false);
     const editedItemRef = useRef(editedItem);
     const editedStatMapRef = useRef(editedStatMap);
     const autoSaveTimeoutRef = useRef<number | null>(null);
     const didMountRef = useRef(false);
     const isDeactivatingRef = useRef(false);
 
-    const persistItem = (nextItem: typeof editedItem, nextStatMap: { [key: string]: StatValue }) => {
+    const persistItem = (nextItem: typeof editedItem, nextStatMap: { [key: string]: StatValue }, ensureLore = false) => {
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
             autoSaveTimeoutRef.current = null;
@@ -116,7 +122,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         });
 
         Object.assign(item, persistedItem);
-        if (persistedItem.name !== oldName) {
+        if (persistedItem.name !== oldName || ensureLore) {
             upsertItemLoreEntry(item, oldName, stage(), isCreatorMode);
         }
         updateItemDescription(item.id, nextItem.description, stage(), isCreatorMode);
@@ -216,6 +222,50 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
             stage().showPriorityMessage('Failed to upload alternative item image. Check console for details.');
         } finally {
             setIsUploadingAlternativeImages((current) => ({ ...current, [index]: false }));
+        }
+    };
+
+    const handleGenerate = async (target: 'details' | 'base' | number) => {
+        if (generationInProgressRef.current) {
+            return;
+        }
+
+        generationInProgressRef.current = true;
+        setGenerationTarget(target);
+        const label = target === 'details' ? 'item details' : target === 'base' ? 'base item image' : 'alternative item image';
+        try {
+            persistItem(editedItemRef.current, editedStatMapRef.current);
+            // Generate on a snapshot so failed requests and autosaves cannot replace editor data.
+            const source = new Item({ ...item, ...editedItemRef.current });
+            let patch: Partial<typeof editedItem>;
+            if (target === 'details') {
+                patch = await generateItemDetails(source, stage(), isCreatorMode);
+            } else if (target === 'base') {
+                await generateBaseItemImage(source, stage(), true);
+                patch = { imageUrl: source.imageUrl, imagePrompt: source.imagePrompt };
+            } else {
+                const alternative = source.alternativeImages[target];
+                await generateItemAlternativeImage(source, alternative, stage(), true);
+                patch = {
+                    imageUrl: source.imageUrl,
+                    imagePrompt: source.imagePrompt,
+                    alternativeImages: editedItemRef.current.alternativeImages.map((current, index) => index === target
+                        ? { ...current, imageUrl: alternative.imageUrl, imagePrompt: alternative.imagePrompt }
+                        : current),
+                };
+            }
+
+            const nextItem = { ...editedItemRef.current, ...patch };
+            editedItemRef.current = nextItem;
+            setEditedItem(nextItem);
+            persistItem(nextItem, editedStatMapRef.current, target === 'details');
+            stage().showPriorityMessage(`Generated ${label} for ${nextItem.name || 'item'}.`);
+        } catch (error) {
+            console.error(`Failed to generate ${label}:`, error);
+            stage().showPriorityMessage(`Failed to generate ${label}. Check console for details.`);
+        } finally {
+            generationInProgressRef.current = false;
+            setGenerationTarget(null);
         }
     };
 
@@ -337,6 +387,8 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
         fontFamily: 'inherit',
         resize: 'vertical',
     };
+    const isGenerating = generationTarget !== null;
+    const isImageBusy = isGenerating || isUploadingImage || Object.values(isUploadingAlternativeImages).some(Boolean);
 
     return (
         <AnimatePresence>
@@ -497,6 +549,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                 Base Item Image
                             </h2>
                             <ImageUrlUploadField
+                                disabled={isGenerating}
                                 imageUrl={editedItem.imageUrl}
                                 onImageUrlChange={(value) => handleInputChange('imageUrl', value)}
                                 onUploadFile={handleImageUpload}
@@ -511,11 +564,19 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                             <div style={{ marginTop: '12px' }}>
                                 <label style={labelStyle}>Base Image Prompt</label>
                                 <TextArea
+                                    disabled={isGenerating}
                                     value={editedItem.imagePrompt}
                                     onChange={(e) => handleInputChange('imagePrompt', e.target.value)}
                                     placeholder="Describe the base image to generate for this item"
                                     style={textareaStyle}
                                 />
+                                <Button
+                                    onClick={() => handleGenerate('base')}
+                                    disabled={isImageBusy}
+                                    style={{ marginTop: '10px' }}
+                                >
+                                    {generationTarget === 'base' ? 'Generating...' : 'Generate Base Image'}
+                                </Button>
                             </div>
                         </section>
 
@@ -526,6 +587,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                             </h2>
                             <Button
                                 variant="secondary"
+                                disabled={isImageBusy}
                                 onClick={() => {
                                     handleInputChange('alternativeImages', [...editedItem.alternativeImages, createAlternativeImage()]);
                                     setCollapsedAlternativeImages(current => [...current, false]);
@@ -564,6 +626,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                                 </strong>
                                                 <Button
                                                     variant="danger"
+                                                    disabled={isImageBusy}
                                                     onClick={() => {
                                                         handleInputChange('alternativeImages', editedItem.alternativeImages.filter((_, alternativeIndex) => alternativeIndex !== index));
                                                         setCollapsedAlternativeImages(current => current.filter((_, alternativeIndex) => alternativeIndex !== index));
@@ -586,6 +649,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                                         />
                                                     </div>
                                                     <ImageUrlUploadField
+                                                        disabled={isGenerating}
                                                         imageUrl={alternative.imageUrl}
                                                         onImageUrlChange={(imageUrl) => updateAlternative(index, { imageUrl })}
                                                         onUploadFile={(file) => handleAlternativeImageUpload(index, file)}
@@ -600,6 +664,7 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                                     <div>
                                                         <label style={labelStyle}>Image Prompt</label>
                                                         <TextArea
+                                                            disabled={isGenerating}
                                                             value={alternative.imagePrompt}
                                                             onChange={(e) => updateAlternative(index, { imagePrompt: e.target.value })}
                                                             placeholder="Describe this alternative item image"
@@ -619,6 +684,12 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                                                             onChange={(conditionCollections) => updateAlternative(index, { conditionCollections })}
                                                         />
                                                     </div>
+                                                    <Button
+                                                        onClick={() => handleGenerate(index)}
+                                                        disabled={isImageBusy}
+                                                    >
+                                                        {generationTarget === index ? 'Generating...' : 'Generate'}
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>
@@ -641,11 +712,25 @@ export const ItemDetailPanel: FC<ItemDetailPanelProps> = ({ item, stage, isCreat
                         borderTop: '1px solid var(--agenda-line-subtle)',
                         zIndex: 1,
                     }}>
-                        {isCreatorMode && <Button variant="secondary" onClick={handleApplyToSave}>Apply to Save</Button>}
-                        <Button variant="danger" onClick={() => setIsDeleteDialogOpen(true)}>Delete</Button>
+                        {isCreatorMode && <Button variant="secondary" disabled={isGenerating} onClick={handleApplyToSave}>Apply to Save</Button>}
+                        <Button variant="danger" disabled={isGenerating} onClick={() => setIsDeleteDialogOpen(true)}>Delete</Button>
+                        <Button disabled={isImageBusy} onClick={() => setIsGenerateDialogOpen(true)}>
+                            {generationTarget === 'details' ? 'Generating...' : 'Generate'}
+                        </Button>
                     </div>
                 </GlassPanel>
             </motion.div>
+            <ConfirmDialog
+                isOpen={isGenerateDialogOpen}
+                title="Generate Item Details"
+                message="Warning: this will replace the item's name, category, description, and theme color. Images, conditions, and stats will be preserved."
+                confirmText="Generate"
+                onConfirm={() => {
+                    setIsGenerateDialogOpen(false);
+                    void handleGenerate('details');
+                }}
+                onCancel={() => setIsGenerateDialogOpen(false)}
+            />
             <ConfirmDialog
                 isOpen={isDeleteDialogOpen}
                 title={`Delete Item: ${editedItem.name || item.name}`}
