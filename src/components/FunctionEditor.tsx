@@ -97,6 +97,14 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                         <strong>getItem(name)</strong> to resolve another entity by name.
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
+                        <strong>random()</strong> returns a number from 0 (inclusive) to 1 (exclusive).
+                        Each invocation starts a repeatable sequence seeded by this function's ID, resolved
+                        parameter values (including defaults), and the current game date and time period.
+                        Successive calls advance the sequence; invoking again with the same inputs replays it.
+                        Nested functions have independent sequences. For a six-sided die, use
+                        <strong> Math.floor(random() * 6) + 1</strong>. <strong>Math.random()</strong> is not seeded.
+                    </Typography>
+                    <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         <strong>get(name)</strong> returns IDs for lists. Use <strong>getObjects(name)</strong>
                         {' '}(also available on entity accessors) to resolve
                         an option list or actor/item/location list in its stored order. Content entries expose

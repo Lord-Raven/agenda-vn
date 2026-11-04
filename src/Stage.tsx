@@ -1,7 +1,7 @@
 import {ReactElement} from "react";
 import { v4 as uuidv4 } from 'uuid';
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
-import { ConditionContext, evaluateConditionCollections } from "./content/Condition";
+import { ConditionContext, createSeededRandom, evaluateConditionCollections, hashString } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
@@ -2123,6 +2123,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
             return resolvedArgs.get(parameter.id);
         };
+        const date = save.currentDate || this.getStartingDate(save);
+        const timeOfDay = save.currentTimeOfDay || 'morning';
+        let seededRandom: (() => number) | undefined;
+        const random = (): number => {
+            if (!seededRandom) {
+                const parameterValues = (fn?.parameters || []).map(parameter => arg(parameter.name));
+                seededRandom = createSeededRandom(hashString(JSON.stringify([fn?.id, date, timeOfDay, parameterValues])));
+            }
+            return seededRandom();
+        };
         return {
             ...this.buildGlobalScriptAccessors(save, context),
             getActor: (name: string) => this.findActorScriptEntity(save, name, context),
@@ -2133,6 +2143,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             items: () => this.buildItemScriptEntities(save, context),
             call,
             arg,
+            random,
         };
     }
 

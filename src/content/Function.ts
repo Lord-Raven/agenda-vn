@@ -227,6 +227,7 @@ export type FunctionScriptBindings = {
     call: (name: string, args?: Record<string, unknown>) => unknown;
     // Reads one of the current invocation's arguments by parameter name, falling back to the parameter default.
     arg: (name: string) => StatValue | undefined;
+    random: () => number;
 };
 
 export type FunctionScriptTestResult = { value: unknown; errors: string[] };
@@ -238,11 +239,11 @@ export const runFunctionScript = (script: string | undefined, bindings: Function
     }
     try {
         const scriptFunction = new Function(
-            'get', 'set', 'getActor', 'getLocation', 'getItem', 'actors', 'locations', 'items', 'call', 'getObjects', 'arg', body,
+            'get', 'set', 'getActor', 'getLocation', 'getItem', 'actors', 'locations', 'items', 'call', 'getObjects', 'arg', 'random', body,
         );
         return scriptFunction(
             bindings.get, bindings.set, bindings.getActor, bindings.getLocation, bindings.getItem,
-            bindings.actors, bindings.locations, bindings.items, bindings.call, bindings.getObjects, bindings.arg,
+            bindings.actors, bindings.locations, bindings.items, bindings.call, bindings.getObjects, bindings.arg, bindings.random,
         );
     } catch (error) {
         const message = `Function script error: ${error instanceof Error ? error.message : String(error)}`;

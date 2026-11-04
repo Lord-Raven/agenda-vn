@@ -73,6 +73,66 @@ const gameFunction = (script: string): GameFunction => ({
     id: 'test-function', name: 'Test function', description: '', script, returnType: 'void',
 });
 
+test('function random sequences repeat for resolved arguments and game time', context => {
+    const { stage, save, configuration } = fixture();
+    context.mock.method(Math, 'random', () => { throw new Error('Must use seeded randomness'); });
+    const fn = { ...gameFunction('return JSON.stringify([random(), random(), random()]);'), returnType: 'text' as const };
+    const parameters = [stat('Amount', 'number', { default: 3, max: 10 }), stat('Party', 'actorList', { default: ['a', 'b'] })];
+    const parameterized = { ...fn, parameters };
+    configuration.functions = [parameterized];
+    save.currentDate = configuration.startingDate;
+    save.currentTimeOfDay = 'morning';
+    const run = (args?: Record<string, StatValue>): number[] => JSON.parse(stage.resolveValue(functionReference(parameterized.id, args), 'text') as string);
+    const original = run();
+    assert.equal(original.length, 3);
+    assert.ok(original.every(value => value >= 0 && value < 1));
+    assert.equal(new Set(original).size, 3);
+    assert.deepEqual(run(), original);
+    assert.deepEqual(run({ Party: ['a', 'b'], Amount: 3 }), original);
+    save.globalStatValues!.Score = 3;
+    assert.deepEqual(run({ Amount: globalStatReference('Score') }), original);
+    assert.deepEqual(run({ Amount: 99 }), run({ Amount: 10 }));
+    assert.notDeepEqual(run({ Amount: 4 }), original);
+    assert.notDeepEqual(run({ Party: ['b', 'a'] }), original);
+    save.currentDate = '2026-10-09';
+    assert.notDeepEqual(run(), original);
+    save.currentDate = configuration.startingDate;
+    save.currentTimeOfDay = 'afternoon';
+    assert.notDeepEqual(run(), original);
+    save.currentTimeOfDay = 'morning';
+    save.timestamp = 123456;
+    assert.deepEqual(run(), original);
+    assert.deepEqual(stage.testFunction(parameterized), { value: JSON.stringify(original), errors: [] });
+    delete save.currentDate;
+    delete save.currentTimeOfDay;
+    assert.deepEqual(run(), original);
+    parameterized.id = 'other-function';
+    assert.notDeepEqual(run(), original);
+});
+
+test('nested calls and action invocations use independent reproducible random sequences', () => {
+    const { stage, save, configuration } = fixture();
+    const nested: GameFunction = { ...gameFunction('return random();'), id: 'nested', name: 'Nested', returnType: 'number' };
+    configuration.functions = [nested];
+    const fn = gameFunction('return [random(), call("Nested"), call("Nested"), random()];');
+    const first = stage.testFunction(fn);
+    assert.deepEqual(first.errors, []);
+    const values = first.value as number[];
+    assert.equal(values[1], values[2]);
+    assert.notEqual(values[0], values[1]);
+    assert.deepEqual(stage.testFunction(fn), first);
+    assert.deepEqual(stage.testFunction({ ...fn, script: 'return [random(), random()];' }), {
+        value: [values[0], values[3]], errors: [],
+    });
+    configuration.functions.push({ ...fn, script: 'set("Score", random());' });
+    stage.saveGame = () => {};
+    const actions = [{ id: 'invoke', kind: 'function' as const, functionId: fn.id }];
+    stage.runButtonActions(actions);
+    assert.equal(save.globalStatValues!.Score, values[0]);
+    stage.runButtonActions(actions);
+    assert.equal(save.globalStatValues!.Score, values[0]);
+});
+
 test('map and control buttons apply all writes before resolving only the first requested skit', () => {
     for (const source of ['map', 'control'] as const) {
         const { stage, save, configuration } = fixture();
