@@ -394,8 +394,8 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         additionalActionButtons={isTextToSpeechEnabled ? [
                             {
                                 id: 'soundToggle',
-                                label: isAudioEnabled ? 'Unmute' : 'Mute',
-                                content: isAudioEnabled ? <VolumeOff /> : <VolumeUp />,
+                                label: isAudioEnabled ? 'Mute' : 'Unmute',
+                                content: isAudioEnabled ? <VolumeUp /> : <VolumeOff />,
                                 onClick: () => setIsAudioEnabled(prev => !prev)
                             }
                         ] : []}

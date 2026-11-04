@@ -2,8 +2,9 @@ import React, { FC, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
-import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2, Code, Rule } from '@mui/icons-material';
+import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2, Code, Rule, CheckCircle, ErrorOutline } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
+import { useTooltip } from '../components/TooltipContext';
 import { ActorManagementPanel } from './ActorManagementPanel';
 import { LocationManagementPanel } from './LocationManagementPanel';
 import { LorebookManagementPanel } from './LorebookManagementPanel';
@@ -32,7 +33,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
     const isCreatorMode = stage().isOwner && isCreateMode;
     const [publishStatus, setPublishStatus] = useState<'idle' | 'publishing' | 'published' | 'failed'>('idle');
     const [applyStatus, setApplyStatus] = useState<'idle' | 'applying' | 'applied' | 'failed'>('idle');
-    const [applyError, setApplyError] = useState<string | null>(null);
+    const { setPriorityMessage } = useTooltip();
     const applyInProgress = React.useRef(false);
     const isBusy = publishStatus === 'publishing' || applyStatus === 'applying';
     const hasSave = !!stage().saveData.saves[stage().saveData.lastSaveSlot];
@@ -47,7 +48,7 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
     }, [publishStatus]);
 
     useEffect(() => {
-        if (applyStatus !== 'applied') return;
+        if (applyStatus !== 'applied' && applyStatus !== 'failed') return;
         const timeout = window.setTimeout(() => setApplyStatus('idle'), 2500);
         return () => window.clearTimeout(timeout);
     }, [applyStatus]);
@@ -55,16 +56,16 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
     const handleApply = async () => {
         if (applyInProgress.current || isBusy) return;
         applyInProgress.current = true;
-        setApplyError(null);
         try {
             // Unmount editors first so their pending debounced changes flush before taking the draft snapshot.
             flushSync(() => setApplyStatus('applying'));
             await stage().applyConfigurationToSave();
             setApplyStatus('applied');
+            setPriorityMessage('Applied draft configuration and content to the current save.', CheckCircle);
         } catch (error) {
             console.error('Failed to apply creator configuration', error);
             setApplyStatus('failed');
-            setApplyError(error instanceof Error ? error.message : 'Failed to apply configuration.');
+            setPriorityMessage(error instanceof Error ? error.message : 'Failed to apply configuration.', ErrorOutline);
         } finally {
             applyInProgress.current = false;
         }
@@ -269,9 +270,6 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     </motion.button>
                                 </div>
                             </div>
-                            {applyError && <div role="alert" style={{ color: 'var(--agenda-danger-text)', marginBottom: '12px' }}>{applyError}</div>}
-                            {applyStatus === 'applied' && <div role="status">Applied draft configuration and content to the current save.</div>}
-
                             {/* Tab Navigation */}
                             <div style={{
                                 display: 'flex',
