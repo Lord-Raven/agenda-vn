@@ -2401,7 +2401,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         );
         const availableActors = Object.values(save.actors || {}).filter(actor => actor.active !== false);
         const actorIds = actorCandidates
-            .map(name => findBestNameMatch(name, availableActors, ['id', 'name'])?.id)
+            .map(name => findBestNameMatch(name, availableActors, ['id', 'name', 'displayName'])?.id)
             .filter((id): id is string => Boolean(id));
 
         const description = `${source.description ?? source.Description ?? `${eventName} at ${matchedLocation.name}.`}`.trim();
@@ -3158,7 +3158,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 continue;
             }
 
-            const matchedActor = findBestNameMatch(name, candidateActors, ['name']);
+            const matchedActor = findBestNameMatch(name, candidateActors, ['name', 'displayName']);
             if (matchedActor && !matchedActors.some(candidate => candidate.actor === matchedActor)) {
                 matchedActors.push({ actor: matchedActor, guidance });
             }

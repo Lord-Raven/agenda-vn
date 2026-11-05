@@ -555,7 +555,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     console.log('Participants Text:', participantsText);
                     skit.guidance = guidanceText;
                     const selectedActorIds = parseStructuredListValue(participantsText, 'participant')
-                        .map(name => findBestNameMatch(name, availableActors, ['name'])?.id)
+                        .map(name => findBestNameMatch(name, availableActors, ['name', 'displayName'])?.id)
                         .filter(id => id !== undefined) as string[];
                     console.log('Selected Actor IDs:', selectedActorIds);
                     skit.initialActors.splice(0, skit.initialActors.length, ...new Set([...actorsAtLocation.map(actor => actor.id), ...selectedActorIds]));
@@ -712,7 +712,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 for (const expressionMatch of input.matchAll(/<Expression>\s*<Actor>([\s\S]*?)<\/Actor>\s*<Mood>([\s\S]*?)<\/Mood>\s*<\/Expression>/gi)) {
                     const actorName = expressionMatch[1].trim();
                     const moodName = expressionMatch[2].trim();
-                    const matchedActor = findBestNameMatch(actorName, allActors, ['name']);
+                    const matchedActor = findBestNameMatch(actorName, allActors, ['name', 'displayName']);
                     if (!matchedActor) continue;
 
                     const finalEmotion = resolveEmotion(moodName, matchedActor.name);
@@ -776,7 +776,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     });
                 }
 
-                const matchedActor = findBestNameMatch(normalizedActorName, actorPool, ['name']);
+                const matchedActor = findBestNameMatch(normalizedActorName, actorPool, ['name', 'displayName']);
                 const matchedStat = findBestNameMatch(normalizedStatName, stage.getConfiguration(save).actorStats || [], ['name']);
                 if (!matchedActor || !matchedStat) {
                     return undefined;
@@ -934,7 +934,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         .replace(/<[^>]+>/g, '')
                         .trim();
 
-                    const speakerMatch = findBestNameMatch(speakerName, save.actors ? Object.values(save.actors) : [], ['name']);
+                    const speakerMatch = findBestNameMatch(speakerName, save.actors ? Object.values(save.actors) : [], ['name', 'displayName']);
                     const speakerId = speakerMatch ? speakerMatch.id : '';
 
                     const actorEmotions = parseExpressionTags(entryBody);
@@ -945,7 +945,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     for (const outfitMatch of entryBody.matchAll(/<OutfitChange>\s*<Actor>([\s\S]*?)<\/Actor>\s*<Outfit>([\s\S]*?)<\/Outfit>\s*<\/OutfitChange>/gi)) {
                         const actorName = outfitMatch[1].trim();
                         const outfitName = outfitMatch[2].trim();
-                        const matchedActor = findBestNameMatch(actorName, allActors, ['name']);
+                        const matchedActor = findBestNameMatch(actorName, allActors, ['name', 'displayName']);
                         if (!matchedActor) continue;
 
                         const matchedOutfit = findBestNameMatch(outfitName, matchedActor.outfits || []);
@@ -981,7 +981,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         const destinationText = actorMovementMatch[2].trim();
                         const destinationUpper = destinationText.toUpperCase();
 
-                        const matchedActor = findBestNameMatch(moverName, allActors, ['name']);
+                        const matchedActor = findBestNameMatch(moverName, allActors, ['name', 'displayName']);
                         if (!matchedActor) continue;
 
                         const isMoveToCurrentScene = destinationUpper === 'HERE' ||
