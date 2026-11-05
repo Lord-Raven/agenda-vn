@@ -393,3 +393,60 @@ test('list length comparisons survive global, content, and function category cha
     assert.deepEqual(changeConditionSelect(content, 'contentStat:actor', 'function', props), fn);
     assert.deepEqual(changeConditionSelect(fn, 'function', 'globalStat', props), global);
 });
+
+const hasOption = (tree: ReactNode, value: string): boolean => {
+    let found = false;
+    const visit = (children: ReactNode) => React.Children.forEach(children, child => {
+        if (!isValidElement<React.PropsWithChildren<{ value?: string }>>(child)) return;
+        if (child.type === 'option' && child.props.value === value) found = true;
+        visit(child.props.children);
+    });
+    visit(tree);
+    return found;
+};
+
+test('Skit State is only offered when allowed or already selected', () => {
+    const calendar: ConditionCollection[] = [[{ type: 'calendar', field: 'day', comparison: 'equals', value: 1 }]];
+    const skit: ConditionCollection[] = [[{ type: 'skitState', field: 'active', comparison: 'equals', value: true }]];
+    const render = (conditionCollections: ConditionCollection[], allowSkitState?: boolean) =>
+        ConditionEditor({ conditionCollections, globalStats: [], allowSkitState, onChange: () => undefined });
+    assert.equal(hasOption(render(calendar), 'skitState'), false);
+    assert.equal(hasOption(render(calendar, true), 'skitState'), true);
+    assert.equal(hasOption(render(skit), 'skitState'), true);
+    assert.equal(hasOption(render(skit), 'participants'), true);
+    assert.equal(hasOption(render(skit), 'location'), true);
+});
+
+test('choosing Skit State defaults to an active skit check', () => {
+    const condition: Condition = { type: 'calendar', field: 'day', comparison: 'equals', value: 1 };
+    assert.deepEqual(changeConditionSelect(condition, 'calendar', 'skitState', { allowSkitState: true }),
+        { type: 'skitState', field: 'active', comparison: 'equals', value: true });
+});
+
+const skitFieldCases: Array<{ name: string; from: Condition; field: string; expected: Condition }> = [
+    {
+        name: 'active to participants', from: { type: 'skitState', field: 'active', comparison: 'equals', value: true }, field: 'participants',
+        expected: { type: 'skitState', field: 'participants', comparison: 'contains', value: '' },
+    },
+    {
+        name: 'participants to location keeps no actor id', from: { type: 'skitState', field: 'participants', comparison: 'contains', value: 'alice' }, field: 'location',
+        expected: { type: 'skitState', field: 'location', comparison: 'equals', value: '' },
+    },
+    {
+        name: 'location to active', from: { type: 'skitState', field: 'location', comparison: 'notEquals', value: 'town' }, field: 'active',
+        expected: { type: 'skitState', field: 'active', comparison: 'notEquals', value: true },
+    },
+];
+
+for (const { name, from, field, expected } of skitFieldCases) {
+    test(`skit state field changes reset incompatible values: ${name}`, () => {
+        const actors = [{ id: 'alice', name: 'Alice' }] as React.ComponentProps<typeof ConditionEditor>['actors'];
+        assert.deepEqual(changeConditionSelect(from, (from as { field: string }).field, field, { locations, actors }), expected);
+    });
+}
+
+test('skit state location keeps a valid location when changing comparison', () => {
+    const condition: Condition = { type: 'skitState', field: 'location', comparison: 'equals', value: 'town' };
+    assert.deepEqual(changeConditionSelect(condition, 'equals', 'notEquals', { locations }),
+        { type: 'skitState', field: 'location', comparison: 'notEquals', value: 'town' });
+});

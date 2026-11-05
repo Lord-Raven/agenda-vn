@@ -13,7 +13,7 @@ import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
 import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
-import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, Skit } from "./content/Skit";
+import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, getCurrentActors, getCurrentLocation, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
@@ -664,10 +664,26 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
     }
 
+    // The active skit's participants (excluding the player) and location at its current script entry, for
+    // 'skitState' conditions; undefined when no skit is active.
+    getSkitConditionState(): ConditionContext['skitState'] {
+        const skit = this.getCurrentSkit();
+        if (!skit) {
+            return undefined;
+        }
+        const playerId = this.getSave().playerId;
+        const index = Math.min(Math.max(skit.currentIndex || 0, 0), Math.max(skit.script.length - 1, 0));
+        return {
+            participants: getCurrentActors(skit, index).filter(actorId => actorId !== playerId),
+            locationId: getCurrentLocation(skit, index) || '',
+        };
+    }
+
     // Actor-card rules bind "Variable" actor targets to the actor whose card is displayed.
     getVisibleControls(placement: ControlPlacement, actor?: Actor): Control[] {
-        const context = {
+        const context: ConditionContext = {
             ...this.getScheduleContext(this.getSave()),
+            skitState: this.getSkitConditionState(),
             ...(placement === 'actorCard' || placement === 'outcome' ? { currentActor: actor } : {}),
         };
         return (this.getConfiguration(this.getSave()).controls || [])

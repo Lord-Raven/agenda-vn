@@ -13,7 +13,7 @@ import { ContentManagementScreen } from "./ContentManagementScreen";
 import { Outcome } from "../content/Outcome";
 import { OutcomeDisplay } from "../components/OutcomeDisplay";
 import { GlobalStatBar } from "../components/GlobalStatBar";
-
+import { ControlDock } from "../components/ControlDock";
 
 import {
     Send,
@@ -125,6 +125,32 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
     // region starts at a fixed % from the top (1% vertical / 5% horizontal). Shift overlay content so it
     // lands where it did when the visualizer started below the header.
     const overlayTopOffset = headerHeight * (1 - (isVerticalLayout ? 0.01 : 0.05));
+
+    // Bottom controls sit below the visualizer, which shrinks to leave room for them (and its input row).
+    const footerRef = React.useRef<HTMLDivElement>(null);
+    const [footerSpace, setFooterSpace] = React.useState(0);
+    useLayoutEffect(() => {
+        const footer = footerRef.current;
+        if (!footer) return;
+        const updateSpace = () => {
+            const parentHeight = footer.offsetParent instanceof HTMLElement ? footer.offsetParent.clientHeight : 0;
+            setFooterSpace(footer.offsetHeight > 0 ? Math.max(parentHeight - footer.offsetTop, 0) + 8 : 0);
+        };
+        updateSpace();
+        const observer = new ResizeObserver(updateSpace);
+        observer.observe(footer);
+        if (footer.offsetParent) observer.observe(footer.offsetParent);
+        return () => observer.disconnect();
+    }, [isVerticalLayout]);
+
+    // Controls may change stats or start a new skit; refresh the screen and switch to any new skit.
+    const handleControlActivate = useCallback((nextSkit?: Skit | null) => {
+        setSkitRevision(prev => prev + 1);
+        if (nextSkit) {
+            setSkit(nextSkit);
+            setAccumulatedOutcomes([]);
+        }
+    }, []);
 
     
     const onSkitChange = useCallback((newSkit: Skit) => {
@@ -239,12 +265,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                     <GlobalStatBar
                         stage={stage}
                         isVerticalLayout={isVerticalLayout}
-                        onActivate={nextSkit => {
-                            if (nextSkit) {
-                                setSkit(nextSkit);
-                                setAccumulatedOutcomes([]);
-                            }
-                        }}
+                        onActivate={handleControlActivate}
                         buttons={
                             <>
                                 {!isVerticalLayout && (
@@ -307,7 +328,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         }
                     />
                 </div>
-                <div style={{ position: 'absolute', inset: 0 }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: footerSpace }}>
                     <NovelVisualizer
                         skit={skit}
                         loading={isLoading}
@@ -400,6 +421,15 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                             }
                         ] : []}
                     />
+                </div>
+                <div ref={footerRef} style={{
+                    position: 'absolute',
+                    left: isVerticalLayout ? '1%' : 16,
+                    right: isVerticalLayout ? '1%' : 16,
+                    bottom: isVerticalLayout ? '1%' : 12,
+                    zIndex: 10
+                }}>
+                    <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleControlActivate} />
                 </div>
             </div>
 

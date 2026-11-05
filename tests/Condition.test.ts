@@ -88,3 +88,35 @@ test('length thresholds resolve as numbers, without option-list membership norma
     assert.equal(evaluateCondition({ type: 'globalStat', statId: stat.id, comparison: 'minimumLength', value: 2 }, context), true);
     assert.equal(evaluateCondition({ type: 'globalStat', statId: stat.id, comparison: 'maximumLength', value: 'globalStat:threshold' }, context), true);
 });
+
+test('skit state conditions read the active skit, treating no skit as inactive with no participants or location', () => {
+    const skitState = { participants: ['alice', 'bob'], locationId: 'park' };
+    const cases: Array<[Condition, boolean, boolean]> = [
+        [{ type: 'skitState', field: 'active', comparison: 'equals', value: true }, true, false],
+        [{ type: 'skitState', field: 'active', comparison: 'equals', value: false }, false, true],
+        [{ type: 'skitState', field: 'participants', comparison: 'contains', value: 'alice' }, true, false],
+        [{ type: 'skitState', field: 'participants', comparison: 'notContains', value: 'carol' }, true, true],
+        [{ type: 'skitState', field: 'participants', comparison: 'minimumLength', value: 2 }, true, false],
+        [{ type: 'skitState', field: 'participants', comparison: 'maximumLength', value: 0 }, false, true],
+        [{ type: 'skitState', field: 'location', comparison: 'equals', value: 'park' }, true, false],
+        [{ type: 'skitState', field: 'location', comparison: 'notEquals', value: 'park' }, false, true],
+    ];
+    for (const [condition, duringSkit, outsideSkit] of cases) {
+        assert.equal(evaluateCondition(condition, { skitState }), duringSkit, `${JSON.stringify(condition)} during skit`);
+        assert.equal(evaluateCondition(condition, {}), outsideSkit, `${JSON.stringify(condition)} outside skit`);
+    }
+});
+
+test('skit state condition values resolve references as the field type', () => {
+    const types: string[] = [];
+    const context: ConditionContext = {
+        skitState: { participants: ['alice'], locationId: 'park' },
+        resolveValue: (value, type) => {
+            types.push(type);
+            return value === 'stat:friend' ? 'alice' : value === 'stat:place' ? 'park' : value as string;
+        },
+    };
+    assert.equal(evaluateCondition({ type: 'skitState', field: 'participants', comparison: 'contains', value: 'stat:friend' }, context), true);
+    assert.equal(evaluateCondition({ type: 'skitState', field: 'location', comparison: 'equals', value: 'stat:place' }, context), true);
+    assert.deepEqual(types, ['actor', 'location']);
+});

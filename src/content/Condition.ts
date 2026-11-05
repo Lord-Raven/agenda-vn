@@ -57,7 +57,20 @@ export type FunctionCondition = {
     value: string | number | boolean;
 };
 
-export type Condition = CalendarCondition | GlobalStatCondition | ContentStatCondition | ContentIdentityCondition | FunctionCondition;
+// Checks the state of the active skit: whether one is active, its participants (an actor list), or its current
+// location. Each field compares like a stat of the mapped type; with no active skit, participants are empty and
+// location is unset.
+export type SkitStateField = 'active' | 'participants' | 'location';
+export const SKIT_STATE_FIELD_TYPES: Record<SkitStateField, StatType> = { active: 'checkbox', participants: 'actorList', location: 'location' };
+
+export type SkitStateCondition = {
+    type: 'skitState';
+    field: SkitStateField;
+    comparison: ConditionComparison;
+    value: string | number | boolean;
+};
+
+export type Condition = CalendarCondition | GlobalStatCondition | ContentStatCondition | ContentIdentityCondition | FunctionCondition | SkitStateCondition;
 
 // The function a 'function' condition evaluates, looked up from the context's function definitions.
 export const getConditionFunction = (condition: FunctionCondition, context: { functions?: GameFunction[] }): GameFunction | undefined =>
@@ -111,6 +124,8 @@ export type ConditionContext = {
     currentLocation?: ConditionEntity;
     currentItem?: ConditionEntity;
     actorStatValues?: Record<string, Record<string, StatValue>>;
+    // Present only while a skit is active (see SkitStateCondition).
+    skitState?: { participants: string[]; locationId: string };
 };
 
 const CONTENT_CONTEXT_KEYS = {
@@ -220,6 +235,7 @@ const resolveConditionValue = (condition: Condition, context: ConditionContext):
     const type = isListLengthComparison(condition.comparison) ? 'number'
         : condition.type === 'contentIdentity' ? condition.contentType
         : condition.type === 'function' ? functionConditionValueType(getConditionFunction(condition, context)) || 'text'
+        : condition.type === 'skitState' ? listElementType(SKIT_STATE_FIELD_TYPES[condition.field]) || SKIT_STATE_FIELD_TYPES[condition.field]
             : stat ? listElementType(stat.type) || stat.type
                 : condition.type === 'calendar' && condition.field !== 'dayOfWeek' && condition.field !== 'timeOfDay' ? 'number' : 'text';
     const resolved = isDiceNotation(value) ? value : context.resolveValue?.(value, type) ?? value;
@@ -345,7 +361,21 @@ export const evaluateFunctionCondition = (condition: FunctionCondition, context:
     return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
 };
 
+const getSkitStateValue = (condition: SkitStateCondition, context: ConditionContext): StatValue => {
+    const skitState = context.skitState;
+    switch (condition.field) {
+        case 'active': return !!skitState;
+        case 'participants': return skitState ? [...skitState.participants] : [];
+        case 'location': return skitState?.locationId || '';
+        default: return '';
+    }
+};
+
 export const evaluateCondition = (condition: Condition, context: ConditionContext): boolean => {
+    if (condition.type === 'skitState') {
+        return compareValues(getSkitStateValue(condition, context), resolveConditionValue(condition, context), condition.comparison);
+    }
+
     if (condition.type === 'calendar') {
         const actual = getCalendarValue(condition, context);
         return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);

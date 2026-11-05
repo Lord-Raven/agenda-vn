@@ -253,3 +253,29 @@ test('cloning legacy stats drops exposure without creating controls', () => {
     const legacy = { ...makeStat('Legacy'), exposed: { value: true, conditions: [] } };
     assert.equal(Object.hasOwn(cloneStat(legacy), 'exposed'), false);
 });
+
+test('bottom controls can hinge on the active skit, its participants (excluding the player), and its location', () => {
+    const { save, configuration, stage } = fixture();
+    const inSkit = new Control({ availabilityConditions: [[{ type: 'skitState', field: 'active', comparison: 'equals', value: true }]] });
+    const withBob = new Control({ availabilityConditions: [[{ type: 'skitState', field: 'participants', comparison: 'contains', value: 'bob' }]] });
+    const soloWithPlayer = new Control({ availabilityConditions: [[{ type: 'skitState', field: 'participants', comparison: 'maximumLength', value: 1 }]] });
+    const atPark = new Control({ availabilityConditions: [[{ type: 'skitState', field: 'location', comparison: 'equals', value: 'park' }]] });
+    const outsideSkit = new Control({ availabilityConditions: [[{ type: 'skitState', field: 'active', comparison: 'equals', value: false }]] });
+    configuration.controls = [inSkit, withBob, soloWithPlayer, atPark, outsideSkit];
+    const visible = () => stage.getVisibleControls('bottom').map(control => control.id);
+
+    assert.deepEqual(visible(), [soloWithPlayer.id, outsideSkit.id]);
+
+    const skit = {
+        initialActors: ['alice', 'carol'], initialLocationId: 'home', currentIndex: 0, over: false,
+        script: [{}, { updatedActors: ['alice', 'bob'], updatedLocationId: 'park' }],
+    } as unknown as NonNullable<SaveType['timeline']>[number]['skit'];
+    save.timeline = [{ date: '2026-10-08', skit }];
+    assert.deepEqual(visible(), [inSkit.id, soloWithPlayer.id]);
+
+    skit!.currentIndex = 1;
+    assert.deepEqual(visible(), [inSkit.id, withBob.id, soloWithPlayer.id, atPark.id]);
+
+    skit!.over = true;
+    assert.deepEqual(visible(), [soloWithPlayer.id, outsideSkit.id]);
+});

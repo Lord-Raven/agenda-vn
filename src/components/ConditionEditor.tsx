@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
 import { findStatOptionByValue, isContentListDisplayType, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat, StatType } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
-import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, FunctionCondition, GlobalStatCondition, functionConditionValueType, isListLengthComparison, variableContentValue } from '../content/Condition';
+import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, FunctionCondition, GlobalStatCondition, SKIT_STATE_FIELD_TYPES, SkitStateCondition, SkitStateField, functionConditionValueType, isListLengthComparison, variableContentValue } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
 import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
@@ -32,6 +32,9 @@ interface ConditionEditorProps {
     collectionCategoryValues?: string[];
     onCollectionCategoryValuesChange?: (values: string[]) => void;
     showAddConditionButton?: boolean;
+    // Offers 'Skit State' conditions; only meaningful where the evaluation context carries skit state
+    // (e.g. Control availability).
+    allowSkitState?: boolean;
 }
 
 const COMPARISONS: Array<{ value: ConditionComparison; label: string }> = [
@@ -109,6 +112,23 @@ const buildCalendarFields = () => [
     { value: 'year', label: 'Year' },
 ];
 
+const SKIT_STATE_FIELDS: Array<{ value: SkitStateField; label: string }> = [
+    { value: 'active', label: 'Active Skit' },
+    { value: 'participants', label: 'Participants' },
+    { value: 'location', label: 'Location' },
+];
+
+// A pseudo-stat letting skit state conditions reuse the stat comparison and value machinery.
+const skitStateStat = (field: SkitStateField): Stat => ({
+    id: `skitState:${field}`,
+    name: SKIT_STATE_FIELDS.find(option => option.value === field)?.label || field,
+    type: SKIT_STATE_FIELD_TYPES[field],
+    default: field === 'active' ? true : field === 'participants' ? [] : '',
+    guidance: '',
+    llmSees: { value: false, conditions: [] },
+    llmMaintained: { value: false, conditions: [] },
+});
+
 const selectStyle = {
     minHeight: 38,
     width: '100%',
@@ -131,7 +151,7 @@ const iconButtonStyle = {
 const getConditionRowTemplate = (condition: Condition, hasCollectionCategories: boolean) => {
     const parameterColumns = condition.type === 'contentStat'
         ? ['minmax(120px, 1fr)', 'minmax(120px, 1fr)']
-        : condition.type === 'calendar' || condition.type === 'globalStat' || condition.type === 'function'
+        : condition.type === 'calendar' || condition.type === 'globalStat' || condition.type === 'function' || condition.type === 'skitState'
             ? ['minmax(120px, 1fr)']
             : [];
     return [
@@ -166,6 +186,11 @@ const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
 export const createDefaultCondition = (globalStats: Stat[]): GlobalStatCondition => {
     const stat = globalStats[0];
     return { type: 'globalStat', statId: stat?.id || '', comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) };
+};
+
+export const createSkitStateCondition = (field: SkitStateField): SkitStateCondition => {
+    const stat = skitStateStat(field);
+    return { type: 'skitState', field, comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) };
 };
 
 type ContentTargetEntity = { id: string; name: string; category?: string; imageUrl?: string; outfitId?: string; outfits?: Actor['outfits'] };
@@ -203,7 +228,7 @@ export const buildContentTargetOptions = (
 
 const META_TARGET_KEYS = ['variable', 'any', 'none'];
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], locationStats = [], itemStats = [], actors = [], items = [], locations = [], stage, variableContentType, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true }) => {
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], locationStats = [], itemStats = [], actors = [], items = [], locations = [], stage, variableContentType, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true, allowSkitState = false }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const playerId = stageInstance?.getSave().playerId;
     actors = actors.filter(actor => actor.id !== playerId);
@@ -291,6 +316,17 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         condition.type === 'globalStat' ? globalStats : condition.type === 'contentStat' ? statsByContentType[condition.contentType] : []
     );
 
+    // The (pseudo-)stat whose type drives a stat-like condition's comparisons and value input.
+    const statForCondition = (condition: Condition): Stat | undefined => {
+        if (condition.type === 'skitState') {
+            return skitStateStat(condition.field);
+        }
+        if (condition.type === 'globalStat' || condition.type === 'contentStat') {
+            return statsForCondition(condition).find(candidate => candidate.id === condition.statId);
+        }
+        return undefined;
+    };
+
     // Encodes condition type + content type into one select value (e.g. 'contentStat:location').
     const conditionKindValue = (condition: Condition): string => (
         condition.type === 'contentStat' || condition.type === 'contentIdentity' ? `${condition.type}:${condition.contentType}` : condition.type
@@ -313,6 +349,9 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             const fn = conditionFunctions[0];
             return { type: 'function', reference: fn ? functionReference(fn.id) : '', comparison: comparisonsForFunctionReturnType(fn?.returnType as StatType | undefined)[0].value, value: getDefaultFunctionConditionValue(fn) };
         }
+        if (type === 'skitState') {
+            return createSkitStateCondition('active');
+        }
         return { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' };
     };
 
@@ -329,7 +368,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (condition.type === 'function') {
             return functionConditionValueType(conditionFunction(condition));
         }
-        const stat = statsForCondition(condition).find(candidate => candidate.id === condition.statId);
+        const stat = statForCondition(condition);
         return stat ? listElementType(stat.type) || stat.type : undefined;
     };
 
@@ -391,6 +430,17 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
     };
 
     const retainValidSelections = (previous: Condition, next: Condition, preserveStatId = false): Condition => {
+        if (next.type === 'skitState') {
+            if (preserveStatId && previous.type === 'skitState') {
+                next = { ...next, field: previous.field };
+            }
+            const stat = skitStateStat(next.field);
+            next = { ...next, comparison: getDefaultComparison(stat, previous.comparison) };
+            return {
+                ...next,
+                value: isValidValueFor(previous.value, next, previous) ? previous.value : isListLengthComparison(next.comparison) ? 0 : getDefaultConditionValue(stat),
+            };
+        }
         if (next.type === 'globalStat' || next.type === 'contentStat') {
             if (preserveStatId && (previous.type === 'globalStat' || previous.type === 'contentStat')
                 && statsForCondition(next).some(stat => stat.id === previous.statId)) {
@@ -479,10 +529,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                 />
             );
         }
-        const stat = condition.type === 'globalStat' || condition.type === 'contentStat'
-            ? statsForCondition(condition).find(candidate => candidate.id === condition.statId)
-            : condition.type === 'function' ? functionConditionStat(condition)
-                : undefined;
+        const stat = condition.type === 'function' ? functionConditionStat(condition) : statForCondition(condition);
         // Mixed contentList conditions compare one id of any content kind; offer every concrete entity
         // (plus the Variable target when one is bound), grouped by kind.
         if (stat && isContentListDisplayType(stat.type)) {
@@ -591,10 +638,15 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                 .map((contentType) => <option key={contentType} value={`contentStat:${contentType}`}>{CONTENT_TYPE_LABELS[contentType]} Stat</option>)}
                             {variableContentType && <option value={`contentIdentity:${variableContentType}`}>{CONTENT_TYPE_LABELS[variableContentType]} Identity</option>}
                             {(conditionFunctions.length > 0 || condition.type === 'function') && <option value="function">Function</option>}
+                            {(allowSkitState || condition.type === 'skitState') && <option value="skitState">Skit State</option>}
                         </select>
                         {condition.type === 'calendar' ? (
                             <select style={selectStyle} value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, { ...condition, field: event.target.value as typeof condition.field, value: event.target.value === 'timeOfDay' ? 'morning' : event.target.value === 'dayOfWeek' ? 'monday' : 1 }))}>
                                 {buildCalendarFields().map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
+                            </select>
+                        ) : condition.type === 'skitState' ? (
+                            <select style={selectStyle} aria-label="Skit state" value={condition.field} onChange={(event) => updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, createSkitStateCondition(event.target.value as SkitStateField)))}>
+                                {SKIT_STATE_FIELDS.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}
                             </select>
                         ) : condition.type === 'contentStat' ? (
                             <div style={{ display: 'grid', gap: 6 }}>
@@ -642,8 +694,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         {condition.type !== 'calendar' && (
                             <select style={selectStyle} value={condition.comparison} onChange={(event) => {
                                 const next = { ...condition, comparison: event.target.value as ConditionComparison } as Condition;
-                                const stat = condition.type === 'globalStat' || condition.type === 'contentStat'
-                                    ? statsForCondition(condition).find(candidate => candidate.id === condition.statId) : undefined;
+                                const stat = statForCondition(condition);
                                 updateCondition(collectionIndex, conditionIndex, {
                                     ...next,
                                     value: isValidValueFor(condition.value, next, condition) ? condition.value
@@ -656,7 +707,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                                     ? IDENTITY_COMPARISONS
                                     : condition.type === 'function'
                                         ? comparisonsForFunctionReturnType(functionReturnTypeFor(condition))
-                                        : comparisonsForStat(statsForCondition(condition).find(candidate => candidate.id === condition.statId))
+                                        : comparisonsForStat(statForCondition(condition))
                                 ).map(comparison => <option key={comparison.value} value={comparison.value}>{comparison.label}</option>)}
                             </select>
                         )}

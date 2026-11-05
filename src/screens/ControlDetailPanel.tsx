@@ -304,6 +304,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             items={items}
                             locations={locations}
                             variableContentType={usesActorStat ? 'actor' : undefined}
+                            allowSkitState
                             onChange={(availabilityConditions) => setDraft((current) => ({ ...current, availabilityConditions }))}
                         />
                         {draft.availabilityConditions.length === 0 && (
