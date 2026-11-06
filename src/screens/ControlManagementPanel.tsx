@@ -20,6 +20,7 @@ const PLACEMENT_LABELS: Record<Control['placement'], string> = {
     actorCard: 'Actor Card',
     outcome: 'Outcomes',
     settings: 'Settings',
+    popup: 'Pop-ups',
 };
 
 const TYPE_LABELS: Record<Control['type'], string> = {
@@ -29,6 +30,7 @@ const TYPE_LABELS: Record<Control['type'], string> = {
     actorStatDisplay: 'Actor Stat Display',
     statOutcome: 'Stat Outcome',
     settings: 'Settings',
+    popup: 'Pop-up',
 };
 
 export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage }) => {
@@ -72,6 +74,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             { id: 'actorCard', title: PLACEMENT_LABELS.actorCard, entries: controls.filter((control) => control.placement === 'actorCard') },
             { id: 'outcome', title: PLACEMENT_LABELS.outcome, entries: controls.filter((control) => control.placement === 'outcome') },
             { id: 'settings', title: PLACEMENT_LABELS.settings, entries: controls.filter((control) => control.type === 'settings') },
+            { id: 'popup', title: PLACEMENT_LABELS.popup, entries: controls.filter((control) => control.type === 'popup') },
         ];
         return sections;
     }, [controls]);
@@ -98,7 +101,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             active: true,
             name: candidateName,
             placement: sectionId === 'top' ? 'top' : sectionId === 'settings' ? 'settings' : 'bottom',
-            type: sectionId === 'outcome' ? 'statOutcome' : sectionId === 'actorCard' ? 'actorStatDisplay' : sectionId === 'settings' ? 'settings' : 'button',
+            type: sectionId === 'popup' ? 'popup' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'actorCard' ? 'actorStatDisplay' : sectionId === 'settings' ? 'settings' : 'button',
             label: sectionId === 'actorCard' || sectionId === 'outcome' || sectionId === 'settings' ? '' : candidateName,
         });
 

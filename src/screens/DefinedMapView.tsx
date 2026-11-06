@@ -26,6 +26,8 @@ interface DefinedMapViewProps {
     onAction: (skit?: Skit | null) => void;
     setScreenType: (type: ScreenType) => void;
     isVerticalLayout: boolean;
+    embedded?: boolean;
+    initialMapId?: string;
 }
 
 interface MapMarkerButtonProps {
@@ -100,7 +102,7 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
     );
 };
 
-export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction: handleAction, setScreenType, isVerticalLayout }) => {
+export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction: handleAction, setScreenType, isVerticalLayout, embedded = false, initialMapId }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
     const [hoveredLink, setHoveredLink] = useState<string | null>(null);
@@ -121,6 +123,10 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
     }
 
     const preferredMap = useMemo(() => {
+        const initialMap = sortedMaps.find(map => map.id === initialMapId);
+        if (initialMap) {
+            return initialMap;
+        }
         if (latestLocationId) {
             const linkedMap = sortedMaps.find(map => map.links.some(link => link.type !== 'button' && stage().resolveValue(link.childId, 'location') === latestLocationId));
             if (linkedMap) {
@@ -128,7 +134,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
             }
         }
         return sortedMaps[0];
-    }, [latestLocationId, sortedMaps]);
+    }, [initialMapId, latestLocationId, sortedMaps]);
 
     const [displayedMapId, setDisplayedMapId] = useState(preferredMap?.id || '');
 
@@ -224,8 +230,8 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
 
     return (
         <>
-            <Box sx={{ width: '100vw', height: '100dvh', boxSizing: 'border-box', p: { xs: '12px', md: '18px' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'hidden', backgroundImage: screenBackgroundImage, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
-                <Box sx={{ flexShrink: 0 }}>
+            <Box sx={{ width: embedded ? '100%' : '100vw', height: embedded ? '100%' : '100dvh', boxSizing: 'border-box', p: embedded ? 0 : { xs: '12px', md: '18px' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'hidden', backgroundImage: embedded ? undefined : screenBackgroundImage, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
+                {!embedded && <Box sx={{ flexShrink: 0 }}>
                     <GlobalStatBar
                         stage={stage}
                         isVerticalLayout={isVerticalLayout}
@@ -250,7 +256,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                             </>
                         }
                     />
-                </Box>
+                </Box>}
 
                 <Box ref={mapViewportRef} sx={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid var(--agenda-line-strong)', borderRadius: '8px', background: 'color-mix(in srgb, var(--agenda-surface-base) 90%, black 10%)' }}>
                         <AnimatePresence mode="wait">
@@ -342,8 +348,14 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                             setDisplayedMapId(linkedMap.id);
                                             return;
                                         }
-                                        if (linkedLocation && stage().startLocationVisit(linkedLocation.id)) {
-                                            setScreenType(ScreenType.SKIT);
+                                        if (linkedLocation) {
+                                            const skit = stage().startLocationVisit(linkedLocation.id);
+                                            if (skit) {
+                                                if (embedded) {
+                                                    handleAction(skit);
+                                                }
+                                                setScreenType(ScreenType.SKIT);
+                                            }
                                         }
                                     };
 
@@ -414,7 +426,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                         </AnimatePresence>
                 </Box>
 
-                <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleAction} />
+                {!embedded && <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleAction} />}
             </Box>
             {showContentManagement && <ContentManagementScreen stage={stage} onClose={() => { stage().saveGame(); setShowContentManagement(false); handleAction(); }} />}
         </>

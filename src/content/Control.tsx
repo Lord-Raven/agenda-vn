@@ -3,18 +3,19 @@ import { ConditionCollection, ConditionContext, evaluateConditionCollections } f
 import { cloneStatUpdateAction, StatUpdateAction } from './Stat';
 
 // Settings controls render in SettingsScreen; actor stat displays render on actor cards.
-export type ControlPlacement = 'top' | 'bottom' | 'actorCard' | 'outcome' | 'settings';
+// Pop-ups overlay gameplay; only the first available control in priority order is displayed.
+export type ControlPlacement = 'top' | 'bottom' | 'actorCard' | 'outcome' | 'settings' | 'popup';
 
 // 'button' runs outcomes; 'statDisplay'/'statEditor' show/edit a global stat.
 // 'actorStatDisplay' shows a read-only stat belonging to the actor whose card is displayed;
 // 'settings' exposes a global stat as a player-editable setting.
-export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'actorStatDisplay' | 'statOutcome' | 'settings';
+export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'actorStatDisplay' | 'statOutcome' | 'settings' | 'popup';
 export type ContentListDisplay = 'carousel' | 'abbreviated';
 export const STAT_DISPLAY_TYPES = ['straight', 'percentage', 'bar', 'rating', 'letter grade'] as const;
 export type StatDisplayType = typeof STAT_DISPLAY_TYPES[number];
 export type StatDisplaySettings = Pick<Control, 'displayType' | 'displayColor' | 'ratingIconName'>;
 
-export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'actorStatDisplay', 'statOutcome', 'settings'];
+export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'actorStatDisplay', 'statOutcome', 'settings', 'popup'];
 
 export const isControlAvailable = (control: Control, context: ConditionContext): boolean => (
     control.active !== false && evaluateConditionCollections(control.availabilityConditions, context)
@@ -45,6 +46,8 @@ export class Control {
 
     // The global stat shown/edited, or the actor stat shown by 'actorStatDisplay'.
     statId: string = '';
+    // Pop-ups display this map regardless of its normal availability; link conditions still apply.
+    mapId: string = '';
     contentListDisplay: ContentListDisplay = 'carousel';
     displayType: StatDisplayType = 'straight';
     displayColor: string = '';
@@ -60,13 +63,14 @@ export class Control {
         this.priority = Number.isFinite(this.priority) ? this.priority : 0;
         this.widthWeight = Number.isFinite(this.widthWeight) && this.widthWeight > 0 ? this.widthWeight : 1;
         this.type = CONTROL_TYPES.includes(this.type) ? this.type : 'button';
-        this.placement = this.type === 'statOutcome' ? 'outcome' : this.type === 'actorStatDisplay' ? 'actorCard' : this.type === 'settings' ? 'settings' : this.placement === 'top' ? 'top' : 'bottom';
+        this.placement = this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'actorStatDisplay' ? 'actorCard' : this.type === 'settings' ? 'settings' : this.placement === 'top' ? 'top' : 'bottom';
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map((collection) => [...collection]) : [];
         this.label = `${this.label || ''}`;
         this.iconName = `${this.iconName || ''}`;
         this.description = `${this.description || ''}`;
         this.actions = Array.isArray(this.actions) ? this.actions.map(cloneStatUpdateAction) : [];
         this.statId = `${this.statId || ''}`;
+        this.mapId = `${this.mapId || ''}`;
         this.contentListDisplay = this.contentListDisplay === 'abbreviated' ? 'abbreviated' : 'carousel';
         this.displayType = STAT_DISPLAY_TYPES.includes(this.displayType) ? this.displayType : 'straight';
         this.displayColor = `${this.displayColor || ''}`;

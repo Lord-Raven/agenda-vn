@@ -16,6 +16,7 @@ import { useCachedImageUrl } from "../utils/ImageCache";
 import { CachedBackgroundUrl } from "../components/CachedImage";
 import { isMapAvailable } from "../content/Map";
 import { Skit } from "../content/Skit";
+import { PopupControl } from "../components/PopupControl";
 
 interface MapScreenProps {
     stage: () => Stage;
@@ -118,18 +119,22 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
 
     if (availableMaps.length > 0) {
         return (
-            <DefinedMapView
-                stage={stage}
-                maps={availableMaps}
-                onAction={handleAction}
-                setScreenType={setScreenType}
-                isVerticalLayout={isVerticalLayout}
-            />
+            <>
+                <DefinedMapView
+                    stage={stage}
+                    maps={availableMaps}
+                    onAction={handleAction}
+                    setScreenType={setScreenType}
+                    isVerticalLayout={isVerticalLayout}
+                />
+                <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
+            </>
         );
     }
 
     return (
         <>
+            <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
             <Box
                 sx={{
                     width: "100vw",

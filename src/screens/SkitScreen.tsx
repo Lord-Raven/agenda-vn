@@ -14,6 +14,7 @@ import { Outcome } from "../content/Outcome";
 import { OutcomeDisplay } from "../components/OutcomeDisplay";
 import { GlobalStatBar } from "../components/GlobalStatBar";
 import { ControlDock } from "../components/ControlDock";
+import { PopupControl } from "../components/PopupControl";
 
 import {
     Send,
@@ -247,6 +248,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
             imageUrl={locationImageUrl}
             // overlay="linear-gradient(130deg, rgba(5, 24, 34, 0.78) 0%, rgba(18, 47, 32, 0.72) 50%, rgba(37, 24, 57, 0.78) 100%)"
         >
+            <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleControlActivate} />
             <div style={{
                 position: 'absolute',
                 top: 0,

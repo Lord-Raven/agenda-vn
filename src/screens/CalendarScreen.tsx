@@ -22,6 +22,8 @@ import { Actor, getEmotionImage } from "../content/Actor";
 import { GlobalStatBar } from "../components/GlobalStatBar";
 import { useCachedImageUrl } from "../utils/ImageCache";
 import { CachedBackgroundUrl } from "../components/CachedImage";
+import { PopupControl } from "../components/PopupControl";
+import { Skit } from "../content/Skit";
 
 interface CalendarScreenProps {
     stage: () => Stage;
@@ -170,6 +172,11 @@ const groupEventsByDate = (events: CalendarEvent[]) => events.reduce((grouped, e
 export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, isVerticalLayout }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
+    const [, setRevision] = useState(0);
+    const handleAction = (skit?: Skit | null) => {
+        setRevision(current => current + 1);
+        if (skit) setScreenType(ScreenType.SKIT);
+    };
 
     const stageInstance = stage();
     const configuredBackgroundImageUrl = (stageInstance.getConfiguration(stageInstance.getSave()).backgroundImageUrl || '').trim();
@@ -286,6 +293,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, 
 
     return (
         <>
+            <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
             <Box
                 sx={{
                     width: "100vw",
@@ -307,7 +315,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, 
                     <GlobalStatBar
                         stage={stage}
                         isVerticalLayout={isVerticalLayout}
-                        onActivate={skit => { if (skit) setScreenType(ScreenType.SKIT); }}
+                        onActivate={handleAction}
                         buttons={
                             <>
                                 <Button

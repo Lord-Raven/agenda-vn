@@ -25,6 +25,7 @@ type ControlDraft = {
     iconName: string;
     description: string;
     statId: string;
+    mapId: string;
     contentListDisplay: ContentListDisplay;
     displayType: StatDisplayType;
     displayColor: string;
@@ -44,6 +45,7 @@ const createDraft = (control: Control): ControlDraft => ({
     iconName: control.iconName,
     description: control.description,
     statId: control.statId,
+    mapId: control.mapId,
     contentListDisplay: control.contentListDisplay ?? 'carousel',
     displayType: control.displayType,
     displayColor: control.displayColor,
@@ -111,6 +113,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             iconName: nextDraft.iconName,
             description: nextDraft.description,
             statId: nextDraft.statId,
+            mapId: nextDraft.mapId,
             contentListDisplay: nextDraft.contentListDisplay,
             displayType: nextDraft.displayType,
             displayColor: nextDraft.displayColor,
@@ -219,7 +222,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 Lower numbers display first. Equal priorities keep configuration order.
                             </span>
                         </div>
-                        {draft.type !== 'actorStatDisplay' && draft.type !== 'statOutcome' && draft.type !== 'settings' && (
+                        {draft.type !== 'actorStatDisplay' && draft.type !== 'statOutcome' && draft.type !== 'settings' && draft.type !== 'popup' && (
                             <div>
                                 <label htmlFor={`control-width-weight-${control.id}`} style={labelStyle}>Width Weight</label>
                                 <TextInput
@@ -252,7 +255,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.placement}
-                                    disabled={draft.type === 'actorStatDisplay' || draft.type === 'statOutcome' || draft.type === 'settings'}
+                                    disabled={draft.type === 'actorStatDisplay' || draft.type === 'statOutcome' || draft.type === 'settings' || draft.type === 'popup'}
                                     onChange={(e) => setDraft((current) => ({ ...current, placement: e.target.value as ControlPlacement }))}
                                 >
                                     <option value="top">Top (with date/stats)</option>
@@ -260,6 +263,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     {draft.type === 'actorStatDisplay' && <option value="actorCard">Actor Card</option>}
                                     {draft.type === 'statOutcome' && <option value="outcome">Outcomes</option>}
                                     {draft.type === 'settings' && <option value="settings">Settings</option>}
+                                    {draft.type === 'popup' && <option value="popup">Pop-up</option>}
                                 </select>
                             </div>
                             <div>
@@ -273,7 +277,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         setDraft((current) => ({
                                             ...current,
                                             type,
-                                            placement: type === 'statOutcome' ? 'outcome' : type === 'actorStatDisplay' ? 'actorCard' : type === 'settings' ? 'settings' : current.placement === 'actorCard' || current.placement === 'outcome' || current.placement === 'settings' ? 'bottom' : current.placement,
+                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'actorStatDisplay' ? 'actorCard' : type === 'settings' ? 'settings' : current.placement === 'actorCard' || current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' ? 'bottom' : current.placement,
                                             statId: '',
                                         }));
                                     }}
@@ -284,6 +288,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <option value="actorStatDisplay">Actor Stat Display</option>
                                     <option value="statOutcome">Outcome</option>
                                     <option value="settings">Settings</option>
+                                    <option value="popup">Pop-up</option>
                                 </select>
                             </div>
                         </div>
@@ -318,7 +323,32 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                     </section>
                 )}
 
-                {draft.type === 'button' ? (
+                {draft.type === 'popup' ? (
+                    <section>
+                        <h2 style={sectionHeadingStyle}>Pop-up Map</h2>
+                        <label htmlFor={`control-map-${control.id}`} style={labelStyle}>Map</label>
+                        <select
+                            id={`control-map-${control.id}`}
+                            style={selectStyle}
+                            value={draft.mapId}
+                            onChange={(e) => setDraft((current) => ({ ...current, mapId: e.target.value }))}
+                        >
+                            <option value="">Select a map...</option>
+                            {draft.mapId && !(stageInstance.getConfiguration().maps || []).some(map => map.id === draft.mapId) && (
+                                <option value={draft.mapId}>Missing map ({draft.mapId})</option>
+                            )}
+                            {(stageInstance.getConfiguration().maps || []).map(map => (
+                                <option key={map.id} value={map.id}>{map.name || 'Unnamed Map'}</option>
+                            ))}
+                        </select>
+                        <p style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                            Appears over the map, calendar, or skit while its availability conditions pass.
+                            Only one pop-up is shown: lower priority numbers win, with configuration order breaking ties.
+                            It cannot be dismissed; use map button actions to change the visibility conditions.
+                            The selected map ignores its normal availability rules, but links and buttons retain theirs.
+                        </p>
+                    </section>
+                ) : draft.type === 'button' ? (
                     <>
                         <section>
                             <h2 style={sectionHeadingStyle}>Button</h2>

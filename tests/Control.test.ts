@@ -89,9 +89,23 @@ test('actor-card availability binds identity and stat rules to the displayed act
             { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'health', comparison: 'greaterThan', value: 5 },
         ]],
     });
+
     assert.equal(isControlAvailable(control, { currentActor: { id: 'alice', statMap: { health: 6 } } }), true);
     assert.equal(isControlAvailable(control, { currentActor: { id: 'bob', statMap: { health: 6 } } }), false);
     assert.equal(isControlAvailable(control, { currentActor: { id: 'alice', statMap: { health: 5 } } }), false);
     control.active = false;
     assert.equal(isControlAvailable(control, { currentActor: { id: 'alice', statMap: { health: 6 } } }), false);
+});
+
+test('pop-up controls preserve their map selection and always use pop-up placement', () => {
+    for (const placement of [undefined, 'top', 'bottom', 'popup']) {
+        const control = new Control({ type: 'popup', placement, mapId: 'map', priority: -2 });
+        const restored = new Control(JSON.parse(JSON.stringify(control)));
+        assert.equal(restored.type, 'popup');
+        assert.equal(restored.placement, 'popup');
+        assert.equal(restored.mapId, 'map');
+        assert.equal(restored.priority, -2);
+    }
+    assert.equal(new Control({ type: 'button', placement: 'popup' }).placement, 'bottom');
+    assert.equal(new Control({}).mapId, '');
 });
