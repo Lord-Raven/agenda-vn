@@ -4,6 +4,7 @@ import { Children, ComponentProps, isValidElement, ReactElement, ReactNode } fro
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create } from 'react-test-renderer';
 import { BoxProps, PaperProps } from '@mui/material';
+import { AnimatePresence, motion } from 'framer-motion';
 import { GameConfiguration, Stage } from '../src/Stage';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { cloneStat } from '../src/content/Stat';
@@ -46,16 +47,34 @@ const makeStage = () => {
     return { stage, configuration, save };
 };
 
-const popupElement = (stage: Stage) => {
+const overlayElement = (stage: Stage) => {
     const result = PopupControl({ stage: () => stage, isVerticalLayout: false, onAction: () => {}, setScreenType: () => {} });
-    if (!isValidElement<BoxProps>(result) || !isValidElement<PaperProps>(result.props.children)) {
-        throw new Error('Expected a pop-up dialog');
-    }
+    assert.ok(isValidElement<ComponentProps<typeof AnimatePresence>>(result));
+    assert.equal(result.type, AnimatePresence);
     return result.props.children;
 };
 
+const popupElement = (stage: Stage) => {
+    const overlay = overlayElement(stage);
+    if (!isValidElement<BoxProps>(overlay) || !isValidElement<PaperProps>(overlay.props.children)) {
+        throw new Error('Expected a pop-up dialog');
+    }
+    return overlay.props.children;
+};
+
+const popupContent = (dialog: ReactElement<PaperProps>) => {
+    const presence = dialog.props.children;
+    assert.ok(isValidElement<ComponentProps<typeof AnimatePresence>>(presence));
+    assert.equal(presence.type, AnimatePresence);
+    assert.equal(presence.props.initial, false);
+    assert.equal(presence.props.mode, 'wait');
+    const content = presence.props.children;
+    assert.ok(isValidElement<ComponentProps<typeof motion.div>>(content));
+    return content;
+};
+
 const mapElement = (dialog: ReactElement<PaperProps>) => {
-    const content = Children.toArray(dialog.props.children)[1];
+    const content = Children.toArray(popupContent(dialog).props.children)[1];
     if (!isValidElement<{ children: ReactNode }>(content) || !isValidElement<ComponentProps<typeof DefinedMapView>>(content.props.children)) {
         throw new Error('Expected pop-up content');
     }
@@ -65,12 +84,61 @@ const mapElement = (dialog: ReactElement<PaperProps>) => {
 test('popup uses an in-place, content-bounded overlay without a modal or focus trap', () => {
     const { stage, configuration } = makeStage();
     configuration.controls.push(new Control({ type: 'popup' }));
-    const overlay = PopupControl({ stage: () => stage, isVerticalLayout: false, onAction: () => {}, setScreenType: () => {} });
+    const overlay = overlayElement(stage);
     assert.ok(isValidElement<BoxProps>(overlay));
     const html = renderToStaticMarkup(overlay);
     assert.match(html, /position:absolute;inset:0/);
     assert.match(html, /role="dialog" aria-modal="false"/);
     assert.doesNotMatch(html, /MuiModal|MuiBackdrop|aria-hidden|tabindex="-1"|position:fixed/);
+});
+
+test('shell visibility animates independently of keyed, fade-only content changes', () => {
+    const { stage, configuration } = makeStage();
+    const first = new Control({ type: 'popup', mapId: 'first' });
+    const second = new Control({ type: 'popup', mapId: 'second' });
+    configuration.controls.push(first);
+    const overlay = overlayElement(stage);
+    assert.ok(isValidElement<ComponentProps<typeof motion.div>>(overlay));
+    assert.deepEqual(overlay.props.initial, { opacity: 0 });
+    assert.deepEqual(overlay.props.animate, { opacity: 1 });
+    assert.deepEqual(overlay.props.exit, { opacity: 0 });
+    const firstContent = popupContent(popupElement(stage));
+    assert.equal(firstContent.type, motion.div);
+    assert.deepEqual(firstContent.props.initial, { opacity: 0 });
+    assert.deepEqual(firstContent.props.animate, { opacity: 1 });
+    assert.deepEqual(firstContent.props.exit, { opacity: 0 });
+
+    configuration.controls.splice(0, 1, second);
+    const nextOverlay = overlayElement(stage);
+    assert.ok(isValidElement(nextOverlay));
+    assert.equal(nextOverlay.key, overlay.key);
+    const secondContent = popupContent(popupElement(stage));
+    assert.notEqual(secondContent.key, firstContent.key);
+    second.mapId = 'changed-map';
+    assert.notEqual(popupContent(popupElement(stage)).key, secondContent.key);
+
+    configuration.controls.length = 0;
+    assert.equal(overlayElement(stage), undefined);
+});
+
+test('changing popup controls preserves the mounted dialog shell', () => {
+    const { stage, configuration } = makeStage();
+    configuration.controls.push(new Control({ type: 'popup', name: 'First' }));
+    const render = () => <PopupControl stage={() => stage} isVerticalLayout={false} onAction={() => {}} setScreenType={() => {}} />;
+    let renderer: ReturnType<typeof create> | undefined;
+    act(() => { renderer = create(render()); });
+    const mounted = renderer;
+    if (!mounted) {
+        throw new Error('Expected mounted popup');
+    }
+    const shell = mounted.root.findByProps({ role: 'dialog' });
+    try {
+        configuration.controls.splice(0, 1, new Control({ type: 'popup', name: 'Second' }));
+        act(() => mounted.update(render()));
+        assert.equal(mounted.root.findByProps({ role: 'dialog' }), shell);
+    } finally {
+        act(() => mounted.unmount());
+    }
 });
 
 test('only the first eligible pop-up appears, with stable priority ties and live visibility changes', () => {
@@ -94,7 +162,7 @@ test('only the first eligible pop-up appears, with stable priority ties and live
     save.globalStatValues.visible = true;
     assert.equal(popupElement(stage).props['aria-labelledby'], `popup-control-${conditional.id}`);
     configuration.controls.forEach(control => { control.active = false; });
-    assert.equal(PopupControl({ stage: () => stage, isVerticalLayout: false, onAction: () => {}, setScreenType: () => {} }), null);
+    assert.equal(overlayElement(stage), undefined);
     assert.deepEqual(configuration.controls.map(control => control.id), originalOrder);
 });
 
@@ -109,7 +177,7 @@ test('selected maps bypass map visibility and priority; map links still use the 
     assert.equal(dialog.props.role, 'dialog');
     assert.equal(dialog.props['aria-modal'], false);
     const stopPropagation = mock.fn();
-    const overlay = PopupControl({ stage: () => stage, isVerticalLayout: false, onAction: () => {}, setScreenType: () => {} });
+    const overlay = overlayElement(stage);
     assert.ok(isValidElement<BoxProps>(overlay));
     overlay.props.onKeyDown?.({ stopPropagation } as Parameters<NonNullable<BoxProps['onKeyDown']>>[0]);
     assert.equal(stopPropagation.mock.callCount(), 1);
