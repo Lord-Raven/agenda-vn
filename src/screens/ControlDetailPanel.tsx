@@ -343,6 +343,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         </select>
                         <p style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                             Appears over the map, calendar, or skit while its availability conditions pass.
+                            The top and bottom status bars remain visible and usable.
                             Only one pop-up is shown: lower priority numbers win, with configuration order breaking ties.
                             It cannot be dismissed; use map button actions to change the visibility conditions.
                             The selected map ignores its normal availability rules, but links and buttons retain theirs.

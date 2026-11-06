@@ -3,7 +3,7 @@ import { mock, test } from 'node:test';
 import { Children, ComponentProps, isValidElement, ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create } from 'react-test-renderer';
-import { DialogProps } from '@mui/material';
+import { BoxProps, PaperProps } from '@mui/material';
 import { GameConfiguration, Stage } from '../src/Stage';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { cloneStat } from '../src/content/Stat';
@@ -48,19 +48,30 @@ const makeStage = () => {
 
 const popupElement = (stage: Stage) => {
     const result = PopupControl({ stage: () => stage, isVerticalLayout: false, onAction: () => {}, setScreenType: () => {} });
-    if (!isValidElement<DialogProps>(result)) {
+    if (!isValidElement<BoxProps>(result) || !isValidElement<PaperProps>(result.props.children)) {
         throw new Error('Expected a pop-up dialog');
     }
-    return result;
+    return result.props.children;
 };
 
-const mapElement = (dialog: ReactElement<DialogProps>) => {
+const mapElement = (dialog: ReactElement<PaperProps>) => {
     const content = Children.toArray(dialog.props.children)[1];
     if (!isValidElement<{ children: ReactNode }>(content) || !isValidElement<ComponentProps<typeof DefinedMapView>>(content.props.children)) {
         throw new Error('Expected pop-up content');
     }
     return content.props.children;
 };
+
+test('popup uses an in-place, content-bounded overlay without a modal or focus trap', () => {
+    const { stage, configuration } = makeStage();
+    configuration.controls.push(new Control({ type: 'popup' }));
+    const overlay = PopupControl({ stage: () => stage, isVerticalLayout: false, onAction: () => {}, setScreenType: () => {} });
+    assert.ok(isValidElement<BoxProps>(overlay));
+    const html = renderToStaticMarkup(overlay);
+    assert.match(html, /position:absolute;inset:0/);
+    assert.match(html, /role="dialog" aria-modal="false"/);
+    assert.doesNotMatch(html, /MuiModal|MuiBackdrop|aria-hidden|tabindex="-1"|position:fixed/);
+});
 
 test('only the first eligible pop-up appears, with stable priority ties and live visibility changes', () => {
     const { stage, configuration, save } = makeStage();
@@ -95,10 +106,12 @@ test('selected maps bypass map visibility and priority; map links still use the 
     configuration.maps.push(other, hidden, selected);
     configuration.controls.push(new Control({ type: 'popup', mapId: selected.id }));
     const dialog = popupElement(stage);
-    assert.equal(dialog.props.disableEscapeKeyDown, true);
-    assert.equal(dialog.props.onClose, undefined);
+    assert.equal(dialog.props.role, 'dialog');
+    assert.equal(dialog.props['aria-modal'], false);
     const stopPropagation = mock.fn();
-    dialog.props.onKeyDown?.({ stopPropagation } as Parameters<NonNullable<DialogProps['onKeyDown']>>[0]);
+    const overlay = PopupControl({ stage: () => stage, isVerticalLayout: false, onAction: () => {}, setScreenType: () => {} });
+    assert.ok(isValidElement<BoxProps>(overlay));
+    overlay.props.onKeyDown?.({ stopPropagation } as Parameters<NonNullable<BoxProps['onKeyDown']>>[0]);
     assert.equal(stopPropagation.mock.callCount(), 1);
     const element = mapElement(dialog);
     assert.equal(element.type, DefinedMapView);
@@ -127,6 +140,7 @@ test('pop-up editor exposes maps, hides stat and width settings, and explains vi
     assert.match(html, /value="popup" selected="">Pop-up/);
     assert.match(html, /value="map" selected="">Map Choice/);
     assert.match(html, /cannot be dismissed/);
+    assert.match(html, /top and bottom status bars remain visible and usable/);
     assert.doesNotMatch(html, /Width Weight|Select a stat/);
 });
 

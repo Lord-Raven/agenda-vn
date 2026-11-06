@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { Map as GameMap } from '../src/content/Map';
+import { Control } from '../src/content/Control';
 import { Skit } from '../src/content/Skit';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { CalendarScreen } from '../src/screens/CalendarScreen';
@@ -76,6 +77,36 @@ for (const newline of ['\n', '\r\n', '\r']) {
 }
 
 for (const isVerticalLayout of [false, true]) {
+    for (const screen of ['calendar', 'turn-calendar', 'locations', 'map', 'skit'] as const) {
+        test(`${screen} keeps bar controls outside the non-modal popup in ${isVerticalLayout ? 'vertical' : 'horizontal'} layout`, () => {
+            const stage = createStage(screen === 'map');
+            const configuration = stage.getConfiguration();
+            if (screen === 'turn-calendar') configuration.dateMode = 'turnBased';
+            const popupMap = new GameMap({ id: 'popup-map', name: 'Popup map', active: false });
+            stage.getSave().maps.push(popupMap);
+            configuration.controls.push(
+                new Control({ type: 'popup', name: 'Popup content', mapId: popupMap.id }),
+                new Control({ type: 'button', placement: 'top', label: 'Top Bar Action' }),
+                new Control({ type: 'button', placement: 'bottom', label: 'Bottom Bar Action' }),
+            );
+            const props = { stage: () => stage, setScreenType: () => {}, isVerticalLayout };
+            const content = screen === 'calendar' || screen === 'turn-calendar' ? <CalendarScreen {...props} />
+                : screen === 'skit' ? <SkitScreen {...props} />
+                    : <MapScreen {...props} />;
+            const html = renderToStaticMarkup(<TooltipProvider>{content}</TooltipProvider>);
+            assert.equal((html.match(/data-popup-control-overlay="true"/g) || []).length, 1);
+            assert.match(html, /role="dialog" aria-modal="false"/);
+            assert.doesNotMatch(html, /MuiModal-root|MuiBackdrop-root/);
+            const overlayIndex = html.indexOf('data-popup-control-overlay="true"');
+            assert.ok(html.indexOf('Top Bar Action') < overlayIndex);
+            if (screen !== 'calendar' && screen !== 'turn-calendar') {
+                assert.ok(html.indexOf('Bottom Bar Action') > overlayIndex);
+            }
+            assert.match(html, /position:absolute;inset:0;z-index:20;pointer-events:auto/);
+            assert.match(html, /isolation:isolate/);
+        });
+    }
+
     for (const screen of ['calendar', 'locations', 'map', 'skit'] as const) {
         test(`${screen} ${isVerticalLayout ? 'hides' : 'retains'} the content shortcut in ${isVerticalLayout ? 'vertical' : 'horizontal'} layout`, () => {
             const stage = createStage(screen === 'map');

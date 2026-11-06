@@ -293,7 +293,6 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, 
 
     return (
         <>
-            <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
             <Box
                 sx={{
                     width: "100vw",
@@ -379,6 +378,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, 
                     />
                 </Box>
 
+                <Box sx={{ position: 'relative', isolation: 'isolate', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 {!isTurnBased && (
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                         <Box
@@ -709,6 +709,8 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, 
                         </Box>
                     </GlassPanel>
                 )}
+                <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
+                </Box>
             </Box>
 
             <AnimatePresence>

@@ -28,6 +28,7 @@ interface DefinedMapViewProps {
     isVerticalLayout: boolean;
     embedded?: boolean;
     initialMapId?: string;
+    overlay?: ReactNode;
 }
 
 interface MapMarkerButtonProps {
@@ -102,7 +103,7 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
     );
 };
 
-export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction: handleAction, setScreenType, isVerticalLayout, embedded = false, initialMapId }) => {
+export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction: handleAction, setScreenType, isVerticalLayout, embedded = false, initialMapId, overlay }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
     const [hoveredLink, setHoveredLink] = useState<string | null>(null);
@@ -258,7 +259,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                     />
                 </Box>}
 
-                <Box ref={mapViewportRef} sx={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid var(--agenda-line-strong)', borderRadius: '8px', background: 'color-mix(in srgb, var(--agenda-surface-base) 90%, black 10%)' }}>
+                <Box ref={mapViewportRef} sx={{ position: 'relative', isolation: 'isolate', flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid var(--agenda-line-strong)', borderRadius: '8px', background: 'color-mix(in srgb, var(--agenda-surface-base) 90%, black 10%)' }}>
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={`${displayedMap.id}-label`}
@@ -424,6 +425,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                 })}
                             </motion.div>
                         </AnimatePresence>
+                    {overlay}
                 </Box>
 
                 {!embedded && <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleAction} />}

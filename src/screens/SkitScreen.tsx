@@ -248,7 +248,6 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
             imageUrl={locationImageUrl}
             // overlay="linear-gradient(130deg, rgba(5, 24, 34, 0.78) 0%, rgba(18, 47, 32, 0.72) 50%, rgba(37, 24, 57, 0.78) 100%)"
         >
-            <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleControlActivate} />
             <div style={{
                 position: 'absolute',
                 top: 0,
@@ -423,6 +422,9 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                             }
                         ] : []}
                     />
+                </div>
+                <div style={{ position: 'absolute', top: headerHeight, left: 0, right: 0, bottom: footerSpace, isolation: 'isolate', zIndex: 9, pointerEvents: 'none' }}>
+                    <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleControlActivate} />
                 </div>
                 <div ref={footerRef} style={{
                     position: 'absolute',

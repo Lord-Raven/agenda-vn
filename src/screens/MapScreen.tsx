@@ -126,15 +126,14 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                     onAction={handleAction}
                     setScreenType={setScreenType}
                     isVerticalLayout={isVerticalLayout}
+                    overlay={<PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />}
                 />
-                <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
             </>
         );
     }
 
     return (
         <>
-            <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
             <Box
                 sx={{
                     width: "100vw",
@@ -195,6 +194,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                     />
                 </Box>
 
+                <Box sx={{ position: 'relative', isolation: 'isolate', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                     <Box
                         sx={{
@@ -451,6 +451,8 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                         </AnimatePresence>
                     </Box>
                 </GlassPanel>
+                <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
+                </Box>
 
                 <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleAction} />
             </Box>
