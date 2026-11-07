@@ -3,7 +3,7 @@ import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { IconButton } from '@mui/material';
 import { GameFunction, FUNCTION_RETURN_TYPES, FunctionReturnType } from '../content/Function';
-import { cloneStat, isSourcedOptionStat, Stat, StatType } from '../content/Stat';
+import { cloneStat, isListStatType, isSourcedOptionStat, Stat, StatType } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { FunctionEditor } from '../components/FunctionEditor';
 import { StatValueInput } from '../components/StatValueInput';
@@ -54,7 +54,7 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                 return parameter;
             }
             if (patch.type && patch.type !== parameter.type) {
-                const next = normalizeStatShape({ ...parameter, ...patch });
+                const next = normalizeStatShape({ ...parameter, ...patch, max: isListStatType(patch.type) === isListStatType(parameter.type) ? parameter.max : undefined });
                 return { ...next, default: resolveStatDefaultValue(next) };
             }
             return { ...parameter, ...patch };

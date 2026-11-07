@@ -1,5 +1,5 @@
 import { CSSProperties, FC, useEffect, useState } from 'react';
-import { findStatOptionByValue, isNumericDisplayType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, Stat, StatUpdate, StatValue, getStatOptionValue } from '../content/Stat';
+import { findStatOptionByValue, isNumericDisplayType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, statListMaxLength, Stat, StatUpdate, StatValue, getStatOptionValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
@@ -72,7 +72,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
             : isValueReference(value) ? [value] : [];
         const pool = resolveAvailableStatOptions(stat, value, optionContext);
         if (valuePickerOptions(stageInstance?.getConfiguration(), 'option').length || valuePickerOptions(stageInstance?.getConfiguration(), 'optionList').length || selectedIds.some(isValueReference)) {
-            return <SearchableOptionPicker multiple values={selectedIds} onChange={next => onChange(Array.isArray(next) ? next : [])}
+            return <SearchableOptionPicker multiple values={selectedIds} maxSelections={statListMaxLength(stat)} onChange={next => onChange(Array.isArray(next) ? next : [])}
                 options={pool.map(option => ({ key: option.id!, label: option.name, description: option.description }))}
                 functionType="option" stage={stage} title="Choose active options" />;
         }
@@ -86,6 +86,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
                         <input
                             type="checkbox"
                             checked={selectedIds.includes(option.id!)}
+                            disabled={!selectedIds.includes(option.id!) && statListMaxLength(stat) !== undefined && selectedIds.length >= statListMaxLength(stat)!}
                             onChange={(e) => onChange(e.target.checked
                                 ? [...selectedIds, option.id!]
                                 : selectedIds.filter((id) => id !== option.id))}
@@ -107,6 +108,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
             <ReferenceMultiSelect
                 kind={referenceKind}
                 values={Array.isArray(value) ? value : isValueReference(value) ? [value] : []}
+                maxSelections={statListMaxLength(stat)}
                 onChange={(ids) => onChange(ids)}
                 actors={actors}
                 items={items}

@@ -25,6 +25,7 @@ export interface SearchableOptionPickerProps {
     value?: string;
     values?: string[];
     multiple?: boolean;
+    maxSelections?: number;
     onChange: (value: string | string[] | undefined) => void;
     options: PickerOption[];
     allowClear?: boolean;
@@ -44,6 +45,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     value,
     values,
     multiple = false,
+    maxSelections,
     onChange,
     options,
     allowClear = false,
@@ -203,7 +205,9 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 return;
             }
 
-            onChange([...nextSelection, nextValue]);
+            if (maxSelections === undefined || nextSelection.length < maxSelections) {
+                onChange([...nextSelection, nextValue]);
+            }
             return;
         }
 
@@ -213,6 +217,8 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 
     // Choosing a parameterful function routes through the argument entry step instead of committing directly.
     const handleSelect = (nextValue?: string) => {
+        if (multiple && nextValue && !(values ?? []).includes(nextValue)
+            && maxSelections !== undefined && (values ?? []).length >= maxSelections) return;
         if (nextValue && isFunctionReference(nextValue)) {
             const fn = pickerFunctions.find(candidate => candidate.id === functionReferenceId(nextValue));
             if (fn && (fn.parameters || []).length) {
@@ -236,7 +242,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
             const current = values ?? [];
             if (parameterEntry.replaceKey !== undefined) {
                 onChange(current.map(entry => entry === parameterEntry.replaceKey ? key : entry));
-            } else if (!current.includes(key)) {
+            } else if (!current.includes(key) && (maxSelections === undefined || current.length < maxSelections)) {
                 onChange([...current, key]);
             }
             return;
@@ -277,11 +283,13 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 
     const renderOptionButton = (option: PickerOption) => {
         const active = multiple ? selectedValues.includes(option.key) : selectedValue === option.key;
+        const atLimit = multiple && !active && maxSelections !== undefined && selectedValues.length >= maxSelections;
         const selectionIndex = multiple && active ? selectedValues.indexOf(option.key) : -1;
         return (
             <button
                 key={`picker-option-${option.key}`}
                 type="button"
+                disabled={atLimit}
                 onClick={() => handleSelect(option.key)}
                 style={{
                     position: 'relative',
@@ -294,7 +302,8 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                     border: active ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
                     borderRadius: '8px',
                     color: 'var(--agenda-text-primary)',
-                    cursor: 'pointer',
+                    cursor: atLimit ? 'not-allowed' : 'pointer',
+                    opacity: atLimit ? 0.5 : 1,
                     padding: '10px 8px',
                     minHeight: '88px',
                     fontSize: '11px',
@@ -375,7 +384,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
             {multiple && (
                 <div role="group" aria-label="Current elements" style={{ display: 'grid', gap: 6 }}>
                     <div style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                        Current elements ({selectedOptions.length})
+                        Current elements ({selectedOptions.length}{maxSelections === undefined ? '' : ` / ${maxSelections}`})
                     </div>
                     {selectedOptions.length > 0
                         ? <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>

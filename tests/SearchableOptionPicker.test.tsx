@@ -81,6 +81,19 @@ test('empty list picker shows its empty label above search', () => {
     assert.match(currentElements, /No actors/);
 });
 
+test('list picker disables new selections at the limit while allowing removal', () => {
+    const changes: Array<string | string[] | undefined> = [];
+    const html = renderOpenPicker({
+        multiple: true, maxSelections: 1, values: ['first'],
+        options: [{ key: 'first', label: 'First' }, { key: 'second', label: 'Second' }],
+        onChange: value => changes.push(value),
+    });
+    assert.match(html, /Current elements \(1 \/ 1\)/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>.*?Second<\/span>/);
+    assert.doesNotMatch(html, /<button[^>]*disabled=""[^>]*>.*?Selection 1/);
+    assert.deepEqual(changes, []);
+});
+
 test('clicking a current element removes only that element', () => {
     const changes: Array<string | string[] | undefined> = [];
     let remove: (() => void) | undefined;

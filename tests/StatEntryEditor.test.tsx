@@ -7,9 +7,9 @@ import { TooltipProvider } from '../src/components/TooltipContext';
 import { cloneStat } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 
-const renderOptions = (type: 'option' | 'optionList', category: StatEntryCategory) => {
+const renderOptions = (type: 'option' | 'optionList', category: StatEntryCategory, max?: number) => {
     const stat = cloneStat({
-        id: 'setting', name: 'Setting', type, guidance: '',
+        id: 'setting', name: 'Setting', type, guidance: '', max,
         default: type === 'option' ? 'first-option' : ['first-option'],
         options: [
             { id: 'first-option', name: 'First option', description: 'First description' },
@@ -66,6 +66,14 @@ for (const category of ['global', 'actor', 'location', 'item'] as const) {
                 assert.doesNotMatch(html, /Default Value Rules/);
                 assert.match(html, type === 'option' ? /Default Option/ : /Initially Active/);
             }
+
+            test('list stats expose an optional maximum length and disable unchecked options at the limit', () => {
+                const html = renderOptions('optionList', 'actor', 1);
+                assert.match(html, /Maximum Length/);
+                assert.match(html, /aria-label="Maximum Length"[^>]*placeholder="Unlimited"[^>]*value="1"/);
+                assert.match(html, /type="checkbox" disabled=""/);
+                assert.doesNotMatch(renderOptions('option', 'actor'), /Maximum Length/);
+            });
         });
     }
 }

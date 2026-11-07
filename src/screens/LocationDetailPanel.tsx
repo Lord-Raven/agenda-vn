@@ -853,7 +853,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                                             </label>
                                                         )}
 
-                                                        {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type)) && (
+                                                        {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || stat.type === 'optionList') && (
                                                             <div style={{ maxWidth: '220px', width: '100%' }}>
                                                                 <StatValueInput
                                                                     stat={stat}

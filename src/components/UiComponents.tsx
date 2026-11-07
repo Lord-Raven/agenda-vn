@@ -604,6 +604,7 @@ interface LocationMultiSelectProps {
 	className?: string;
 	renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
 	disabled?: boolean;
+	maxSelections?: number;
 }
 
 export const LocationMultiSelect: FC<LocationMultiSelectProps> = ({
@@ -616,6 +617,7 @@ export const LocationMultiSelect: FC<LocationMultiSelectProps> = ({
 	style,
 	renderButton,
 	disabled,
+	maxSelections,
 }) => {
 	const sortedLocations = [...locations].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 	// Keep dangling ids (e.g. a deleted location) selectable so saving does not silently drop them.
@@ -651,6 +653,7 @@ export const LocationMultiSelect: FC<LocationMultiSelectProps> = ({
 				stage={stage}
 				renderButton={renderButton}
 				disabled={disabled}
+				maxSelections={maxSelections}
 			/>
 		</div>
 	);
@@ -717,6 +720,7 @@ interface ActorMultiSelectProps {
 	style?: React.CSSProperties;
 	renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
 	disabled?: boolean;
+	maxSelections?: number;
 }
 
 export const ActorMultiSelect: FC<ActorMultiSelectProps> = ({
@@ -729,6 +733,7 @@ export const ActorMultiSelect: FC<ActorMultiSelectProps> = ({
 	style,
 	renderButton,
 	disabled,
+	maxSelections,
 }) => {
 	const playerId = (typeof stage === 'function' ? stage() : stage)?.getSave().playerId;
 	const sortedActors = actors.filter(actor => actor.id !== playerId).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -755,6 +760,7 @@ export const ActorMultiSelect: FC<ActorMultiSelectProps> = ({
 				stage={stage}
 				renderButton={renderButton}
 				disabled={disabled}
+				maxSelections={maxSelections}
 			/>
 		</div>
 	);
@@ -820,6 +826,7 @@ interface ItemMultiSelectProps {
 	style?: React.CSSProperties;
 	renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
 	disabled?: boolean;
+	maxSelections?: number;
 }
 
 export const ItemMultiSelect: FC<ItemMultiSelectProps> = ({
@@ -832,6 +839,7 @@ export const ItemMultiSelect: FC<ItemMultiSelectProps> = ({
 	style,
 	renderButton,
 	disabled,
+	maxSelections,
 }) => {
 	const sortedItems = [...items].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 	const missingIds = values.filter((id) => id && !sortedItems.some((item) => item.id === id));
@@ -857,6 +865,7 @@ export const ItemMultiSelect: FC<ItemMultiSelectProps> = ({
 				stage={stage}
 				renderButton={renderButton}
 				disabled={disabled}
+				maxSelections={maxSelections}
 			/>
 		</div>
 	);
@@ -952,18 +961,19 @@ interface ReferenceMultiSelectProps {
 	style?: React.CSSProperties;
 	renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
 	disabled?: boolean;
+	maxSelections?: number;
 }
 
 // MultiSelect counterpart to ReferenceSelect (see resolveReferenceListDisplayType-style list stats).
-export const ReferenceMultiSelect: FC<ReferenceMultiSelectProps> = ({ kind, values, onChange, actors = [], items = [], locations = [], stage, style, renderButton, disabled }) => {
+export const ReferenceMultiSelect: FC<ReferenceMultiSelectProps> = ({ kind, values, onChange, actors = [], items = [], locations = [], stage, style, renderButton, disabled, maxSelections }) => {
 	if (kind === 'actor') {
-		return <ActorMultiSelect values={values} onChange={onChange} actors={actors} stage={stage} style={style} renderButton={renderButton} disabled={disabled} />;
+		return <ActorMultiSelect values={values} onChange={onChange} actors={actors} stage={stage} style={style} renderButton={renderButton} disabled={disabled} maxSelections={maxSelections} />;
 	}
 	if (kind === 'item') {
-		return <ItemMultiSelect values={values} onChange={onChange} items={items} stage={stage} style={style} renderButton={renderButton} disabled={disabled} />;
+		return <ItemMultiSelect values={values} onChange={onChange} items={items} stage={stage} style={style} renderButton={renderButton} disabled={disabled} maxSelections={maxSelections} />;
 	}
 	if (kind === 'location') {
-		return <LocationMultiSelect values={values} onChange={onChange} locations={locations} stage={stage} style={style} renderButton={renderButton} disabled={disabled} />;
+		return <LocationMultiSelect values={values} onChange={onChange} locations={locations} stage={stage} style={style} renderButton={renderButton} disabled={disabled} maxSelections={maxSelections} />;
 	}
 	const options = buildMixedContentOptions(actors, items, locations, stage);
 	values.filter((id) => id && !options.some((option) => option.key === id)).forEach((id) => options.push(missingMixedContentOption(id)));
@@ -981,6 +991,7 @@ export const ReferenceMultiSelect: FC<ReferenceMultiSelectProps> = ({ kind, valu
 				stage={stage}
 				renderButton={renderButton}
 				disabled={disabled}
+				maxSelections={maxSelections}
 			/>
 		</div>
 	);

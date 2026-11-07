@@ -4,8 +4,8 @@ import { Add, Delete, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-mate
 import { Stage } from '../Stage';
 import {
     Stat, StatValue, StatValueRule,
-    findStatOptionByValue, getStatOptionValue, isNumericDisplayType, isOptionListStatType,
-    isReferenceDisplayType, isReferenceListDisplayType, isSourcedOptionStat, normalizeReferenceListValue,
+    findStatOptionByValue, getStatOptionValue, isListStatType, isNumericDisplayType, isOptionListStatType,
+    isReferenceDisplayType, isReferenceListDisplayType, isSourcedOptionStat, normalizeReferenceListValue, normalizeStatValue,
     resolveStatDefault,
 } from '../content/Stat';
 import { Button, TextArea, TextInput } from './UiComponents';
@@ -39,7 +39,7 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             ...stat,
             default: stat.type === 'optionList' ? normalizeReferenceListValue(stat.default) : typeof stat.default === 'string' ? stat.default : '',
             min: undefined,
-            max: undefined,
+            max: stat.type === 'optionList' ? stat.max : undefined,
         };
     }
 
@@ -56,7 +56,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
                     ? normalizeReferenceListValue(stat.default).filter(id => isValueReference(id) || optionIds.has(id))
                     : options.map(option => option.id),
                 min: undefined,
-                max: undefined,
             };
         }
         const defaultValue = findStatOptionByValue({ ...stat, options }, stat.default)?.value || (options[0] ? getStatOptionValue(options[0], 0) : '');
@@ -75,7 +74,6 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
             default: normalizeReferenceListValue(stat.default),
             options: [],
             min: undefined,
-            max: undefined,
         };
     }
 
@@ -225,7 +223,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                 return;
             }
             const activeIds = Array.isArray(stat.default) ? normalizeReferenceListValue(stat.default) : [];
-            patchStat({ options, default: [...activeIds, options[options.length - 1].id!] });
+            patchStat({ options, default: normalizeStatValue([...activeIds, options[options.length - 1].id!], { ...stat, options }) });
             return;
         }
         patchStat({
@@ -308,7 +306,10 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             <select
                                 className="input-base"
                                 value={normalizedStat.type}
-                                onChange={(e) => patchStat(normalizeStatShape({ ...stat, type: e.target.value as Stat['type'] }))}
+                                onChange={(e) => {
+                                    const type = e.target.value as Stat['type'];
+                                    patchStat(normalizeStatShape({ ...stat, type, max: isListStatType(type) === isListStatType(stat.type) ? stat.max : undefined }));
+                                }}
                             >
                                 {renderStatTypeOptions()}
                             </select>
@@ -483,6 +484,25 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                             <div style={compactChipLabelStyle}>Default</div>
                                             {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                                         </div>
+                                    )}
+                                    {isListStatType(normalizedStat.type) && (
+                                        <label style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                            <span style={fieldLabelStyle}>Maximum Length</span>
+                                            <TextInput
+                                                fullWidth
+                                                type="number"
+                                                min={0}
+                                                step={1}
+                                                aria-label="Maximum Length"
+                                                placeholder="Unlimited"
+                                                value={typeof normalizedStat.max === 'number' ? String(normalizedStat.max) : ''}
+                                                onChange={(e) => {
+                                                    const value = e.target.valueAsNumber;
+                                                    if (e.target.value === '') onPatch({ max: undefined });
+                                                    else if (Number.isFinite(value)) onPatch({ max: Math.max(0, Math.floor(value)) });
+                                                }}
+                                            />
+                                        </label>
                                     )}
                                     <div>
                                         <div style={compactChipLabelStyle}>Min</div>

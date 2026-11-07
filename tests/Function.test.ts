@@ -4,7 +4,7 @@ import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } fr
 import { Actor, buildActorContext, getActorLore, resolveActorSchedule, resolveInitialActorStatValue } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
 import { getLocationDescription, Location } from '../src/content/Location';
-import { buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, resolveAvailableStatOptions, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
+import { applyStatUpdateValue, buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateContext, generateSkitScript, Skit } from '../src/content/Skit';
 import { cloneGameFunction, functionPickerOptions, functionReference, functionReferenceArguments, functionReferenceId, functionSignature, globalStatReference, parseFunctionCallText, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { evaluateCondition, variableContentValue } from '../src/content/Condition';
@@ -71,6 +71,50 @@ const fixture = () => {
 
 const gameFunction = (script: string): GameFunction => ({
     id: 'test-function', name: 'Test function', description: '', script, returnType: 'void',
+});
+
+test('list stat maximum truncates defaults and values while preserving unlimited and zero limits', () => {
+    for (const type of ['actorList', 'itemList', 'locationList', 'contentList', 'optionList'] as const) {
+        const options = ['a', 'b', 'c'].map(id => ({ id, name: id, description: '' }));
+        const list = stat(type, type, { default: ['c', 'a', 'b'], options, max: 2 });
+        assert.deepEqual(normalizeStatValue(['a', 'b', 'c'], list), ['a', 'b'], type);
+        assert.deepEqual(resolveStatDefault(list), ['c', 'a'], type);
+        assert.deepEqual(normalizeStatValue(undefined, list), ['c', 'a'], type);
+        assert.deepEqual(normalizeStatValue(['a', 'b'], { ...list, max: 0 }), [], type);
+        assert.deepEqual(normalizeStatValue(['a', 'b', 'c'], { ...list, max: undefined }), ['a', 'b', 'c'], type);
+        assert.equal(normalizeStatShape(list).max, 2, type);
+    }
+    const list = stat('choices', 'optionList', {
+        options: ['a', 'b', 'c'].map(id => ({ id, name: id, description: '' })), max: 2,
+    });
+    assert.deepEqual(normalizeStatValue('c, a, b', list), ['c', 'a']);
+    assert.deepEqual(resolveStatDefault({ ...list, default: 0 }), ['a', 'b']);
+    assert.deepEqual(normalizeStatValue(['a', 'b', 'c'], { ...list, max: 1.8 }), ['a']);
+    assert.deepEqual(normalizeStatValue(['a'], { ...list, max: -1 }), []);
+});
+
+test('option list updates limit final values without truncating remove operands', () => {
+    const list = stat('choices', 'optionList', {
+        options: ['a', 'b', 'c'].map(id => ({ id, name: id, description: '' })), max: 1,
+    });
+    const update = { id: 'update', targetType: 'global' as const, targetId: 'any', statId: list.id, operation: 'set' as const, value: ['a', 'b'] };
+    assert.deepEqual(applyStatUpdateValue([], update, list), ['a']);
+    assert.deepEqual(applyStatUpdateValue(['a'], { ...update, operation: 'adjust', value: ['b', 'c'] }, list), ['a']);
+    assert.deepEqual(applyStatUpdateValue(['b'], { ...update, operation: 'remove' }, list), []);
+});
+
+test('stage enforces list limits after expanding references and on global and entity writes', () => {
+    const { stage, configuration, save } = fixture();
+    const party = configuration.globalStats.find(entry => entry.id === 'Party')!;
+    party.max = 2;
+    configuration.globalStats.push(stat('source', 'actorList', { default: ['a', 'b', 'c'] }));
+    save.globalStatValues!.source = ['a', 'b', 'c'];
+    assert.deepEqual(stage.readStatValue([globalStatReference('source'), 'last'], party), ['a', 'b']);
+    stage.saveGame = () => {};
+    stage.setGlobalStatValue('Party', ['a', 'b', 'c']);
+    assert.deepEqual(save.globalStatValues!.Party, ['a', 'b']);
+    stage.runButtonActions([{ id: 'set', targetType: 'actor', targetId: 'b', statId: 'Party', operation: 'set', value: ['c', 'b', 'a'] }]);
+    assert.deepEqual(save.actors.b.statMap.Party, ['c', 'b']);
 });
 
 test('function random sequences repeat for resolved arguments and game time', context => {

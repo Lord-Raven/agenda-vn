@@ -71,6 +71,14 @@ export const isReferenceStatType = (type: StatType): boolean => isReferenceDispl
 // Any stat whose value is a string[] (reference lists and optionLists).
 export const isListStatType = (type: StatType): boolean => isReferenceListDisplayType(type) || isOptionListStatType(type);
 
+export const statListMaxLength = (stat: Stat): number | undefined => (
+    isListStatType(stat.type) && typeof stat.max === 'number' && Number.isFinite(stat.max)
+        ? Math.max(0, Math.floor(stat.max))
+        : undefined
+);
+
+const limitStatList = (values: string[], stat: Stat): string[] => values.slice(0, statListMaxLength(stat));
+
 export const normalizeReferenceListValue = (value: unknown): string[] => (
     Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 );
@@ -348,7 +356,7 @@ export type Stat = {
     // For 'option' and 'optionList': id of an 'optionList' stat to take options from instead of `options`.
     optionSourceStatId?: string;
     min?: number;
-    max?: number;
+    max?: number; // Numeric maximum, or maximum length for list stats; omitted means unlimited.
 };
 
 type StatTextContext = {
@@ -416,13 +424,13 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
 
     if (isOptionListStatType(stat.type)) {
         // No explicit default list means every option starts active.
-        return Array.isArray(stat.default)
+        return limitStatList(Array.isArray(stat.default)
             ? normalizeOptionListIds(stat.default, stat)
-            : resolveStatOptionPool(stat).map((option) => option.id!);
+            : resolveStatOptionPool(stat).map((option) => option.id!), stat);
     }
 
     if (isReferenceListDisplayType(stat.type)) {
-        return normalizeReferenceListValue(stat.default);
+        return limitStatList(normalizeReferenceListValue(stat.default), stat);
     }
 
     if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
@@ -466,13 +474,13 @@ export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValu
     if (isOptionListStatType(stat.type)) {
         if (typeof value === 'string') {
             // e.g. an LLM outcome value like "Wealth, Fame"
-            return normalizeOptionListIds(value.split(',').map((entry) => entry.trim()).filter(Boolean), stat);
+            return limitStatList(normalizeOptionListIds(value.split(',').map((entry) => entry.trim()).filter(Boolean), stat), stat);
         }
-        return Array.isArray(value) ? normalizeOptionListIds(value, stat) : resolveStatDefault(stat, options);
+        return Array.isArray(value) ? limitStatList(normalizeOptionListIds(value, stat), stat) : resolveStatDefault(stat, options);
     }
 
     if (isReferenceListDisplayType(stat.type)) {
-        return Array.isArray(value) ? normalizeReferenceListValue(value) : normalizeReferenceListValue(resolveStatDefault(stat, options));
+        return limitStatList(Array.isArray(value) ? normalizeReferenceListValue(value) : normalizeReferenceListValue(resolveStatDefault(stat, options)), stat);
     }
 
     if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
@@ -709,14 +717,14 @@ export const applyStatUpdateValue = (currentValue: StatValue | undefined, update
         return update.value;
     }
     if (isOptionListStatType(stat.type)) {
-        const changed = normalizeStatValue(Array.isArray(update.value) ? update.value : [update.value], stat) as string[];
+        const changed = normalizeStatValue(Array.isArray(update.value) ? update.value : [update.value], { ...stat, max: undefined }) as string[];
         if (update.operation === 'set') {
-            return changed;
+            return limitStatList(changed, stat);
         }
         const current = normalizeStatValue(currentValue, stat) as string[];
         return update.operation === 'remove'
             ? current.filter((id) => !changed.includes(id))
-            : Array.from(new Set([...current, ...changed]));
+            : limitStatList(Array.from(new Set([...current, ...changed])), stat);
     }
 
     if (!isNumericDisplayType(stat.type)) {

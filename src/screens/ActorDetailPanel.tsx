@@ -2,7 +2,7 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { isListStatType, isNumericDisplayType, isReferenceDisplayType, Stat, StatValue, normalizeReferenceListValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
+import { isListStatType, isNumericDisplayType, isReferenceDisplayType, Stat, StatValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, Outfit, getLinkedActorLore, supplementActorLoreTriggers, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ACTOR_VOICES, ACTOR_VOICE_GENDER_LABELS, ActorVoice, formatActorVoiceLabel, getActorVoice, getActorVoiceVolume, normalizeVoiceModulation, VoiceModulation } from '@lord-raven/novel-visualizer';
@@ -138,7 +138,7 @@ const normalizeActorStatModifierAmount = (stat: Stat, amount: unknown): StatValu
         return typeof amount === 'string' ? amount : String(resolveStatDefault(stat));
     }
     if (isListStatType(stat.type)) {
-        return Array.isArray(amount) ? normalizeReferenceListValue(amount) : normalizeReferenceListValue(resolveStatDefault(stat));
+        return normalizeStatValue(amount, stat);
     }
     if (stat.type === 'checkbox') {
         return typeof amount === 'boolean' ? amount : Boolean(resolveStatDefault(stat));
@@ -834,7 +834,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         if (isListStatType(stat.type)) {
             setEditedStatMap((prev) => ({
                 ...prev,
-                [stat.id]: Array.isArray(value) ? normalizeReferenceListValue(value) : [],
+                [stat.id]: normalizeStatValue(value, stat),
             }));
             return;
         }
@@ -867,7 +867,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
         if (isListStatType(stat.type)) {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
-                [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: Array.isArray(value) ? normalizeReferenceListValue(value) : [] },
+                [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: normalizeStatValue(value, stat) },
             }));
             return;
         }
