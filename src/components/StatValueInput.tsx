@@ -1,11 +1,11 @@
-import { CSSProperties, FC, useEffect, useState } from 'react';
+import { CSSProperties, FC, useContext, useEffect, useState } from 'react';
 import { findStatOptionByValue, isNumericDisplayType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, statListMaxLength, Stat, StatUpdate, StatValue, getStatOptionValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 import { valuePickerOptions, isValueReference } from '../content/Function';
-import { SearchableOptionPicker } from './SearchableOptionPicker';
+import { PickerAllowedOptionsContext, SearchableOptionPicker } from './SearchableOptionPicker';
 import { validateValueExpression } from '../content/ValueExpression';
 
 interface StatValueInputProps {
@@ -24,6 +24,7 @@ interface StatValueInputProps {
 
 export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, optionContext }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
+    const allowedOptions = useContext(PickerAllowedOptionsContext);
     if (!stat) {
         return <FormulaValueInput value={value} onChange={onChange} />;
     }
@@ -70,14 +71,15 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
         const selectedIds = Array.isArray(value)
             ? Array.from(new Set(value.map(entry => isValueReference(entry) ? entry : findStatOptionByValue(stat, entry, optionContext)?.value || entry)))
             : isValueReference(value) ? [value] : [];
-        const pool = resolveAvailableStatOptions(stat, value, optionContext);
+        const pool = resolveAvailableStatOptions(stat, value, optionContext)
+            .filter(option => !allowedOptions || allowedOptions.has(option.id!) || selectedIds.includes(option.id!));
         if (valuePickerOptions(stageInstance?.getConfiguration(), 'option').length || valuePickerOptions(stageInstance?.getConfiguration(), 'optionList').length || selectedIds.some(isValueReference)) {
             return <SearchableOptionPicker multiple values={selectedIds} maxSelections={statListMaxLength(stat)} onChange={next => onChange(Array.isArray(next) ? next : [])}
                 options={pool.map(option => ({ key: option.id!, label: option.name, description: option.description }))}
                 functionType="option" stage={stage} title="Choose active options" />;
         }
         if (pool.length === 0) {
-            return <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>No options defined.</span>;
+            return <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>{allowedOptions ? 'No options available.' : 'No options defined.'}</span>;
         }
         return (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>

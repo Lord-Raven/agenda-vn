@@ -3,7 +3,7 @@ import { mock, test } from 'node:test';
 import React, { ReactNode } from 'react';
 import ReactDOM from 'react-dom';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SearchableOptionPicker, SearchableOptionPickerProps } from '../src/components/SearchableOptionPicker';
+import { filterPickerOptions, PickerAllowedOptionsContext, SearchableOptionPicker, SearchableOptionPickerProps } from '../src/components/SearchableOptionPicker';
 
 const renderOpenPicker = (props: SearchableOptionPickerProps, inspectPortal?: (children: ReactNode) => void) => {
     const useState = React.useState;
@@ -27,6 +27,25 @@ const renderOpenPicker = (props: SearchableOptionPickerProps, inspectPortal?: (c
         }
     }
 };
+
+test('restricted pickers offer only source options and retain current selections for removal', () => {
+    const options = [
+        { key: 'crew', label: 'Crew' },
+        { key: 'outsider', label: 'Outsider' },
+        { key: 'old', label: 'Old selection' },
+    ];
+    assert.deepEqual(filterPickerOptions(options, new Set(['crew']), ['old']).map(option => option.key), ['crew', 'old']);
+    assert.deepEqual(filterPickerOptions(options, new Set(['crew']), []).map(option => option.key), ['crew']);
+    assert.deepEqual(filterPickerOptions(options, new Set(), []), []);
+    assert.deepEqual(filterPickerOptions(options, undefined, []), options);
+    const render = (allowed: string[]) => renderToStaticMarkup(
+        <PickerAllowedOptionsContext.Provider value={new Set(allowed)}>
+            <SearchableOptionPicker options={options} onChange={() => {}} />
+        </PickerAllowedOptionsContext.Provider>,
+    );
+    assert.match(render(['crew']), /Selected option: Crew/);
+    assert.match(render(['other']), /Choose option/);
+});
 
 test('list picker shows every current element in selection order above search, independently of filtering', () => {
     const options = Array.from({ length: 8 }, (_, index) => ({

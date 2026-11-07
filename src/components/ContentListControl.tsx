@@ -18,6 +18,7 @@ interface ContentListControlProps {
     label: string;
     isVerticalLayout?: boolean;
     onChange?: (values: string[]) => void;
+    maxSelections?: number;
 }
 
 interface ContentListPortraitsProps {
@@ -183,7 +184,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
     );
 };
 
-export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, stage, display, label, isVerticalLayout = false, onChange }) => {
+export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, stage, display, label, isVerticalLayout = false, onChange, maxSelections }) => {
     const save = stage.getSave();
     const resolvedValues = stage.resolveValue(values, kind === 'actor' ? 'actorList' : kind === 'item' ? 'itemList' : kind === 'location' ? 'locationList' : 'contentList') as string[];
     const carousel = display !== 'abbreviated';
@@ -204,6 +205,7 @@ export const ContentListControl: FC<ContentListControlProps> = ({ kind, values, 
                     locations={locations.filter((location) => location.active !== false)}
                     stage={stage}
                     disabled={!onChange}
+                    maxSelections={maxSelections}
                     renderButton={carousel ? () => <span style={{ fontSize: 12 }}>Edit {label}</span> : undefined}
                 />
             )}

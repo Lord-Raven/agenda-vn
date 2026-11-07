@@ -22,6 +22,16 @@ test('width weight survives cloning and JSON export/import', () => {
     assert.equal(new Control(JSON.parse(JSON.stringify(original))).widthWeight, 2.5);
 });
 
+test('picker sources preserve an empty restriction and dynamic references through export', () => {
+    assert.equal(new Control({}).pickerSource, undefined);
+    for (const pickerSource of [[], ['crew', 'globalStat:crew-list', 'function:available']]) {
+        const original = new Control({ pickerSource });
+        const restored = new Control(JSON.parse(JSON.stringify(original)));
+        assert.deepEqual(restored.pickerSource, pickerSource);
+        assert.notEqual(restored.pickerSource, pickerSource);
+    }
+});
+
 test('new and legacy controls default to priority zero', () => {
     assert.equal(new Control({}).priority, 0);
     assert.equal(new Control({ name: 'Legacy control' }).priority, 0);

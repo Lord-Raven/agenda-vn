@@ -1,4 +1,4 @@
-import { FC, ReactNode, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, FC, ReactNode, useContext, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DoNotDisturb, SwapHoriz } from '@mui/icons-material';
 import { Box } from '@mui/material';
@@ -11,6 +11,8 @@ import { VariableContentContext } from './VariableContentContext';
 
 const MAX_SELECTED_PREVIEW = 6;
 
+export const PickerAllowedOptionsContext = createContext<ReadonlySet<string> | undefined>(undefined);
+
 export type PickerOption = {
     key: string;
     label: string;
@@ -20,6 +22,9 @@ export type PickerOption = {
     description?: string;
     renderAvatar?: (size: number, active: boolean) => ReactNode;
 };
+
+export const filterPickerOptions = (options: PickerOption[], allowed: ReadonlySet<string> | undefined, selected: string[]): PickerOption[] =>
+    allowed ? options.filter(option => allowed.has(option.key) || selected.includes(option.key)) : options;
 
 export interface SearchableOptionPickerProps {
     value?: string;
@@ -61,6 +66,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     stage,
 }) => {
     const variableContentType = useContext(VariableContentContext);
+    const allowedOptions = useContext(PickerAllowedOptionsContext);
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const pickerFunctions: GameFunction[] = stageInstance?.getConfiguration().functions || [];
     if (functionType) {
@@ -101,6 +107,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
             options.push({ key, label: `Missing or incompatible ${isFunction ? 'function' : 'global stat'}`, category: isFunction ? 'Functions' : 'Global Stats' });
         }
     }
+    options = filterPickerOptions(options, allowedOptions, selected);
     const [search, setSearch] = useState(initialSearch);
     const [isOpen, setIsOpen] = useState(false);
     // Argument entry step shown when a parameterful function is chosen; args are keyed by parameter id.
@@ -362,9 +369,11 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                         <label key={parameter.id} style={{ display: 'grid', gap: 4, color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                             {parameter.name || '(Unnamed parameter)'}
                             {parameter.guidance && <span style={{ fontSize: 11 }}>{parameter.guidance}</span>}
-                            <StatValueInput stat={parameter} value={entry.args[parameter.id]}
-                                onChange={next => setParameterEntry(current => current && { ...current, args: { ...current.args, [parameter.id]: next } })}
-                                actors={parameterActors} items={parameterItems} locations={parameterLocations} stage={stage} />
+                            <PickerAllowedOptionsContext.Provider value={undefined}>
+                                <StatValueInput stat={parameter} value={entry.args[parameter.id]}
+                                    onChange={next => setParameterEntry(current => current && { ...current, args: { ...current.args, [parameter.id]: next } })}
+                                    actors={parameterActors} items={parameterItems} locations={parameterLocations} stage={stage} />
+                            </PickerAllowedOptionsContext.Provider>
                         </label>
                     ))}
                 </div>

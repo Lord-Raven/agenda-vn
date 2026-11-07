@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { act, create } from 'react-test-renderer';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Stage, GameConfiguration } from '../src/Stage';
 import { Control, ControlType, STAT_DISPLAY_TYPES } from '../src/content/Control';
@@ -8,7 +9,7 @@ import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
 import { ControlRenderer } from '../src/components/ControlRenderer';
 import { cloneStat, StatType } from '../src/content/Stat';
 import { globalStatReference } from '../src/content/Function';
-import { SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
+import { PickerAllowedOptionsContext, SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
 import { StatValueInput } from '../src/components/StatValueInput';
 import { normalizeStatShape } from '../src/components/StatEntryEditor';
 import { IconPicker, resolveIcon } from '../src/components/StatRating';
@@ -18,6 +19,7 @@ import { ItemPortrait } from '../src/components/ItemPortrait';
 import { LocationPortrait } from '../src/components/LocationPortrait';
 import { Actor } from '../src/content/Actor';
 import { getThumbnailUrl } from '../src/utils/ImageCache';
+import { ReferenceMultiSelect } from '../src/components/UiComponents';
 
 const createStage = (control: Control) => {
     const configuration: GameConfiguration = {
@@ -47,6 +49,79 @@ const renderPanel = (type: ControlType, iconName: string, widthWeight = 1) => {
 const sourceStat = (id: string, type: StatType, value: string | string[] = '') => cloneStat({
     id, name: `Global ${id}`, type, default: value, guidance: '',
     llmSees: { value: true, conditions: [] }, llmMaintained: { value: true, conditions: [] },
+});
+
+test('stat editor picker sources are configured and saved independently of the edited stat', () => {
+    const control = new Control({ type: 'statEditor', statId: 'target' });
+    const stage = createStage(control);
+    const configuration = stage.getConfiguration();
+    configuration.globalStats = [sourceStat('target', 'actorList'), sourceStat('crew', 'actorList')];
+    stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout } });
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+        act(() => { renderer = create(<ControlDetailPanel control={control} stage={() => stage} />); });
+        const root = renderer!.root;
+        const checkbox = root.findByProps({ id: `control-picker-source-${control.id}` });
+        act(() => checkbox.props.onChange({ target: { checked: true } }));
+        const picker = root.findByType(ReferenceMultiSelect);
+        act(() => picker.props.onChange([globalStatReference('crew')]));
+        act(() => renderer!.unmount());
+        renderer = undefined;
+        assert.deepEqual(configuration.controls[0].pickerSource, [globalStatReference('crew')]);
+        assert.equal(configuration.controls[0].statId, 'target');
+    } finally {
+        if (renderer) act(() => renderer?.unmount());
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else Reflect.deleteProperty(globalThis, 'window');
+    }
+});
+
+test('stat editor resolves its source against current in-game global values', () => {
+    const control = new Control({ type: 'statEditor', statId: 'target', pickerSource: [globalStatReference('crew')], contentListDisplay: 'abbreviated' });
+    const stage = createStage(control);
+    const configuration = stage.getConfiguration();
+    configuration.globalStats = [sourceStat('target', 'actorList', []), sourceStat('crew', 'actorList', ['first'])];
+    const save = stage.getSave();
+    stage.getSave = () => save;
+    const resolveValue = stage.resolveValue.bind(stage);
+    const resolved: unknown[] = [];
+    stage.resolveValue = (value, type, ...rest) => {
+        const result = resolveValue(value, type, ...rest);
+        if (value === control.pickerSource) resolved.push(result);
+        return result;
+    };
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+        act(() => { renderer = create(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />); });
+        assert.deepEqual(resolved.at(-1), ['first']);
+        save.globalStatValues.crew = ['second'];
+        act(() => renderer!.update(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />));
+        assert.deepEqual(resolved.at(-1), ['second']);
+    } finally {
+        if (renderer) act(() => renderer?.unmount());
+    }
+});
+
+test('option list inputs honor restrictions while retaining selected options', () => {
+    const stat = sourceStat('choices', 'optionList', []);
+    stat.options = [
+        { id: 'crew', name: 'Crew' },
+        { id: 'old', name: 'Old choice' },
+        { id: 'other', name: 'Other choice' },
+    ];
+    const render = (value: string[], allowed: string[]) => renderToStaticMarkup(
+        <PickerAllowedOptionsContext.Provider value={new Set(allowed)}>
+            <StatValueInput stat={stat} value={value} onChange={() => {}} />
+        </PickerAllowedOptionsContext.Provider>,
+    );
+    const html = render(['old'], ['crew']);
+    assert.match(html, /Crew/);
+    assert.match(html, /Old choice/);
+    assert.doesNotMatch(html, /Other choice/);
+    assert.doesNotMatch(render([], ['crew']), /Old choice/);
+    assert.match(render([], []), /No options available/);
 });
 
 test('selected list previews space text fallbacks and overlap only adjacent image avatars', () => {

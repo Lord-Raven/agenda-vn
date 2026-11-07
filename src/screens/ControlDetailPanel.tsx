@@ -2,11 +2,12 @@ import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Stage } from '../Stage';
 import { ContentListDisplay, Control, ControlPlacement, ControlType, StatDisplayType } from '../content/Control';
 import { ConditionCollection } from '../content/Condition';
-import { isReferenceListDisplayType, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
-import { Button, ColorPickerInput, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
+import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
+import { Button, ColorPickerInput, GlassPanel, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker } from '../components/StatRating';
+import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 
 interface ControlDetailPanelProps {
     control: Control;
@@ -25,6 +26,7 @@ type ControlDraft = {
     iconName: string;
     description: string;
     statId: string;
+    pickerSource?: string[];
     mapId: string;
     contentListDisplay: ContentListDisplay;
     displayType: StatDisplayType;
@@ -45,6 +47,7 @@ const createDraft = (control: Control): ControlDraft => ({
     iconName: control.iconName,
     description: control.description,
     statId: control.statId,
+    pickerSource: control.pickerSource ? [...control.pickerSource] : undefined,
     mapId: control.mapId,
     contentListDisplay: control.contentListDisplay ?? 'carousel',
     displayType: control.displayType,
@@ -113,6 +116,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             iconName: nextDraft.iconName,
             description: nextDraft.description,
             statId: nextDraft.statId,
+            pickerSource: nextDraft.pickerSource ? [...nextDraft.pickerSource] : undefined,
             mapId: nextDraft.mapId,
             contentListDisplay: nextDraft.contentListDisplay,
             displayType: nextDraft.displayType,
@@ -279,6 +283,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             type,
                                             placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'actorStatDisplay' ? 'actorCard' : type === 'settings' ? 'settings' : current.placement === 'actorCard' || current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' ? 'bottom' : current.placement,
                                             statId: '',
+                                            pickerSource: undefined,
                                         }));
                                     }}
                                 >
@@ -408,12 +413,38 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <select
                                 style={selectStyle}
                                 value={draft.statId}
-                                onChange={(e) => setDraft((current) => ({ ...current, statId: e.target.value }))}
+                                onChange={(e) => setDraft((current) => ({ ...current, statId: e.target.value, pickerSource: undefined }))}
                             >
                                 <option value="">Select a stat...</option>
                                 {selectableStats.map((stat) => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
                             </select>
                         </div>
+                        {draft.type === 'statEditor' && selectedStat && (isReferenceStatType(selectedStat.type) || selectedStat.type === 'option' || selectedStat.type === 'optionList') && (
+                            <div style={{ marginTop: 15 }}>
+                                <label style={labelStyle}>
+                                    <input id={`control-picker-source-${control.id}`} type="checkbox" checked={draft.pickerSource !== undefined}
+                                        onChange={(e) => setDraft(current => ({ ...current, pickerSource: e.target.checked ? [] : undefined }))} />
+                                    {' '}Limit picker options
+                                </label>
+                                {draft.pickerSource !== undefined && (
+                                    <>
+                                        {isReferenceStatType(selectedStat.type) ? (
+                                            <ReferenceMultiSelect kind={resolveReferenceKind(selectedStat.type)}
+                                                values={draft.pickerSource} onChange={pickerSource => setDraft(current => ({ ...current, pickerSource }))}
+                                                actors={actors} items={items} locations={locations} stage={stage} />
+                                        ) : (
+                                            <SearchableOptionPicker multiple values={draft.pickerSource}
+                                                onChange={value => setDraft(current => ({ ...current, pickerSource: Array.isArray(value) ? value : [] }))}
+                                                options={resolveStatOptionPool(selectedStat, { sourceStats: globalStats }).map(option => ({ key: option.id!, label: option.name, description: option.description }))}
+                                                functionType="option" stage={stage} title="Choose source options" />
+                                        )}
+                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                            Choose individual options or global stats and functions. Their current values determine the available choices in-game. Existing selections remain until removed.
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                        )}
                         {draft.type !== 'settings' && (
                             <div style={{ marginTop: 15 }}>
                                 <label style={labelStyle}>Label (optional)</label>

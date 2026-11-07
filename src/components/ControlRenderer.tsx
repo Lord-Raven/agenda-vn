@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Stage } from '../Stage';
 import { Control } from '../content/Control';
-import { findStatOptionByValue, formatStatOptionValueText, isReferenceListDisplayType, normalizeReferenceListValue, normalizeStatValue, resolveReferenceKind, resolveStatText, Stat } from '../content/Stat';
+import { findStatOptionByValue, formatStatOptionValueText, isReferenceListDisplayType, normalizeReferenceListValue, normalizeStatValue, resolveReferenceKind, resolveStatText, statListMaxLength, Stat, StatType } from '../content/Stat';
 import { resolveIcon } from './StatRating';
 import { StatValueDisplay } from './StatDisplay';
 import { StatValueInput } from './StatValueInput';
@@ -11,6 +11,7 @@ import { ContentListControl } from './ContentListControl';
 import { isValueReference } from '../content/Function';
 import { Skit } from '../content/Skit';
 import { processLoreText } from '../content/Lore';
+import { PickerAllowedOptionsContext } from './SearchableOptionPicker';
 
 interface ControlRendererProps {
     control: Control;
@@ -119,6 +120,13 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         && !(control.type === 'statEditor' && isValueReference(rawValue)),
     );
     const imageListMinWidth = isVerticalLayout ? 150 : 180;
+    const sourceType: StatType | undefined = stat.type === 'actor' ? 'actorList'
+        : stat.type === 'item' ? 'itemList' : stat.type === 'location' ? 'locationList'
+            : stat.type === 'option' ? 'optionList'
+                : isReferenceListDisplayType(stat.type) || stat.type === 'optionList' ? stat.type : undefined;
+    const allowedOptions = control.type === 'statEditor' && control.pickerSource && sourceType
+        ? new Set(stageInstance.resolveValue(control.pickerSource, sourceType) as string[])
+        : undefined;
 
     return (
         <Box
@@ -149,6 +157,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
             )}
 
             <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, minHeight: isVerticalLayout ? 20 : 32, containerType: 'inline-size' }}>
+            <PickerAllowedOptionsContext.Provider value={allowedOptions}>
             {isReferenceListDisplayType(stat.type) && !(control.type === 'statEditor' && isValueReference(rawValue)) ? (
                 <ContentListControl
                     kind={referenceKind}
@@ -157,6 +166,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                     display={control.contentListDisplay}
                     label={label}
                     isVerticalLayout={isVerticalLayout}
+                    maxSelections={statListMaxLength(stat)}
                     onChange={control.type === 'statEditor' ? (nextValue) => {
                         stageInstance.setGlobalStatValue(stat.id, nextValue);
                         onActivate();
@@ -194,6 +204,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                     {resolveDisplayValue(stat, normalizedValue, stageInstance.getSave()?.atlas)}
                 </Typography>
             )}
+            </PickerAllowedOptionsContext.Provider>
             </Box>
         </Box>
     );

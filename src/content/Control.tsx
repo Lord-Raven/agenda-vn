@@ -46,6 +46,8 @@ export class Control {
 
     // The global stat shown/edited, or the actor stat shown by 'actorStatDisplay'.
     statId: string = '';
+    // Undefined uses the normal picker options; an array is resolved as a list of allowed option IDs.
+    pickerSource?: string[];
     // Pop-ups display this map regardless of its normal availability; link conditions still apply.
     mapId: string = '';
     contentListDisplay: ContentListDisplay = 'carousel';
@@ -70,6 +72,7 @@ export class Control {
         this.description = `${this.description || ''}`;
         this.actions = Array.isArray(this.actions) ? this.actions.map(cloneStatUpdateAction) : [];
         this.statId = `${this.statId || ''}`;
+        this.pickerSource = Array.isArray(this.pickerSource) ? this.pickerSource.filter((entry): entry is string => typeof entry === 'string') : undefined;
         this.mapId = `${this.mapId || ''}`;
         this.contentListDisplay = this.contentListDisplay === 'abbreviated' ? 'abbreviated' : 'carousel';
         this.displayType = STAT_DISPLAY_TYPES.includes(this.displayType) ? this.displayType : 'straight';
