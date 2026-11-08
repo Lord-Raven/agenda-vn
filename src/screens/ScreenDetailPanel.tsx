@@ -496,10 +496,15 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                         Name
                         <TextInput fullWidth value={draft.name} onChange={event => updateDraft('name', event.target.value)} />
                     </label>
-                    <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
-                        Priority
-                        <TextInput fullWidth type="number" value={draft.priority} onChange={event => updateDraft('priority', Number(event.target.value))} />
-                    </label>
+                    <div>
+                        <div style={{ ...sectionHeaderTitleStyle, color: 'var(--agenda-text-muted)', fontSize: '13px', marginBottom: 4 }}>
+                            <label htmlFor={`screen-priority-${map.id}`}>Priority</label>
+                            <HelpTip title="Screen priority">
+                                Lower priority numbers display first; equal priorities use configuration order.
+                            </HelpTip>
+                        </div>
+                        <TextInput id={`screen-priority-${map.id}`} fullWidth type="number" value={draft.priority} onChange={event => updateDraft('priority', Number(event.target.value))} />
+                    </div>
                 </div>
             </div>
             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
@@ -510,9 +515,6 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                     <option value="list">List</option>
                 </select>
             </label>
-            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                Lower priority numbers display first; equal priorities use configuration order.
-            </span>
             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
                 Category
                 <TextInputWithOptions
