@@ -16,6 +16,7 @@ import { GameManagementPanel } from '../src/screens/GameManagementPanel';
 import { MapScreen } from '../src/screens/MapScreen';
 import { MenuScreen } from '../src/screens/MenuScreen';
 import { SkitScreen } from '../src/screens/SkitScreen';
+import { ScreenDetailPanel } from '../src/screens/ScreenDetailPanel';
 
 const createStage = (withMap = false) => {
     const configuration: GameConfiguration = {
@@ -59,6 +60,23 @@ const addListScreen = (stage: Stage, priority = 0) => {
 const renderMapScreen = (stage: Stage) => renderToStaticMarkup(
     <TooltipProvider><MapScreen stage={() => stage} setScreenType={() => {}} isVerticalLayout={false} /></TooltipProvider>,
 );
+
+for (const type of ['list', 'map'] as const) {
+    test(`${type} Screen details keep grid rows top-aligned with consistent spacing`, () => {
+        const stage = createStage();
+        const screen = new GameMap({ type, name: 'Test Screen' });
+        stage.getConfiguration().screens.push(screen);
+        const html = renderToStaticMarkup(
+            <ScreenDetailPanel screen={screen} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />,
+        );
+        const panelStyle = html.match(/^<div style="([^"]+)"/)?.[1];
+        assert.ok(panelStyle);
+        assert.match(panelStyle, /display:grid/);
+        assert.match(panelStyle, /align-content:start/);
+        assert.match(panelStyle, /gap:10px/);
+        assert.match(panelStyle, /min-height:100%/);
+    });
+}
 
 test('a List Screen replaces the default location list and shares its paged cards', () => {
     const stage = createStage();
