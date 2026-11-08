@@ -6,7 +6,7 @@ import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
 import { Stat, StatType, StatValue, formatReferenceStatText, formatStatOptionValueText, isReferenceStatType } from './Stat';
-import { functionReference, parseFunctionCallText, positionalFunctionArguments } from './Function';
+import { functionReference, isStatReturnType, parseFunctionCallText, positionalFunctionArguments } from './Function';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -128,10 +128,14 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
             const name = (call?.name || functionKey).trim().toLowerCase();
             const fn = (configuration.functions || []).find(candidate => candidate.name.trim().toLowerCase() === name);
             if (fn) {
-                if (!fn.returnType || fn.returnType === 'void') {
+                const reference = functionReference(fn.id, positionalFunctionArguments(fn, call?.args));
+                if (fn.returnType === 'textList') {
+                    return stage.resolveTextList(reference, save).join(', ');
+                }
+                if (!isStatReturnType(fn.returnType)) {
                     return match;
                 }
-                return formatValue(fn.returnType, stage.resolveValue(functionReference(fn.id, positionalFunctionArguments(fn, call?.args)), fn.returnType, save));
+                return formatValue(fn.returnType, stage.resolveValue(reference, fn.returnType, save));
             }
             if (call) {
                 return match;

@@ -16,7 +16,7 @@ import { StatValueInput } from '../src/components/StatValueInput';
 import { LocationSelect, ReferenceMultiSelect } from '../src/components/UiComponents';
 import { IconPicker, resolveIcon } from '../src/components/StatRating';
 import { cloneStat, Stat, StatType } from '../src/content/Stat';
-import { functionReference, FUNCTION_RETURN_TYPES, GameFunction } from '../src/content/Function';
+import { functionReference, FUNCTION_RETURN_TYPES, GameFunction, isStatReturnType } from '../src/content/Function';
 import { ControlRenderer } from '../src/components/ControlRenderer';
 import { ConditionEditor } from '../src/components/ConditionEditor';
 import { OutcomeEditor } from '../src/components/OutcomeEditor';
@@ -519,7 +519,7 @@ test('every stat input uses a single input or picker and preserves references wi
         id: returnType, name: `${returnType} function`, description: '', returnType, script: 'throw new Error("Do not evaluate while editing");',
     }));
     for (const returnType of FUNCTION_RETURN_TYPES) {
-        if (returnType === 'void') continue;
+        if (!isStatReturnType(returnType)) continue;
         const html = renderToStaticMarkup(<StatValueInput stat={valueStat(returnType)} value={functionReference(returnType)} onChange={() => {}} stage={stage} />);
         assert.doesNotMatch(html, /aria-label="Value source"|<select/, returnType);
         if (returnType === 'number' || returnType === 'text') {

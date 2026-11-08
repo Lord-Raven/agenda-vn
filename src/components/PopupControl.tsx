@@ -1,8 +1,12 @@
 import { FC } from 'react';
-import { Box, DialogContent, DialogTitle, Paper } from '@mui/material';
+import { Box, DialogContent, DialogTitle, Paper, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Stage } from '../Stage';
+import { ResolvedPopupCardDetail, Stage } from '../Stage';
+import { Control } from '../content/Control';
 import { isMapAvailable } from '../content/Map';
+import { formatStatOptionValueText, resolveReferenceKind } from '../content/Stat';
+import { ContentCardList, ContentCardPage } from './ContentCardList';
+import { ContentListPortraits } from './ContentListControl';
 import { Skit } from '../content/Skit';
 import { ScreenType } from '../screens/BaseScreen';
 import { DefinedMapView } from '../screens/DefinedMapView';
@@ -58,7 +62,7 @@ export const PopupControl: FC<PopupControlProps> = ({ stage, isVerticalLayout, s
                     >
                         <AnimatePresence initial={false} mode="wait">
                             <motion.div
-                                key={JSON.stringify([control.id, control.mapId])}
+                                key={JSON.stringify([control.id, control.popupDisplay, control.mapId])}
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
@@ -67,7 +71,9 @@ export const PopupControl: FC<PopupControlProps> = ({ stage, isVerticalLayout, s
                             >
                                 <DialogTitle id={`popup-control-${control.id}`}>{control.name || 'Pop-up'}</DialogTitle>
                                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, p: { xs: 1, md: 2 } }}>
-                                    {selectedMap ? (
+                                    {control.popupDisplay === 'list' ? (
+                                        <PopupContentList stage={stage} control={control} isVerticalLayout={isVerticalLayout} onAction={onAction} />
+                                    ) : selectedMap ? (
                                         <DefinedMapView
                                             key={`${control.id}-${control.mapId}`}
                                             stage={stage}
@@ -90,5 +96,84 @@ export const PopupControl: FC<PopupControlProps> = ({ stage, isVerticalLayout, s
                 </Box>
             )}
         </AnimatePresence>
+    );
+};
+
+interface PopupContentListProps {
+    stage: () => Stage;
+    control: Control;
+    isVerticalLayout: boolean;
+    onAction: (skit?: Skit | null) => void;
+}
+
+export const buildPopupContentPages = (stageInstance: Stage, control: Control, onAction: (skit?: Skit | null) => void, isVerticalLayout = false): ContentCardPage[] =>
+    stageInstance.resolvePopupSections(control).map(page => ({
+        key: page.key,
+        title: page.header,
+        cards: page.ids.map(id => {
+            const details = (page.section.details || [])
+                .map(detail => stageInstance.resolvePopupCardDetail(detail, page.kind, id, page.header))
+                .filter((detail): detail is ResolvedPopupCardDetail => !!detail);
+            return {
+                key: id,
+                kind: page.kind,
+                id,
+                // Only sections with click actions produce clickable cards.
+                onClick: page.section.actions.length ? () => onAction(stageInstance.runPopupCardActions(page.section, page.kind, id, page.header)) : undefined,
+                trailing: details.length ? (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.75 }}>
+                        {details.map(detail => <PopupCardDetail key={detail.key} detail={detail} stage={stageInstance} isVerticalLayout={isVerticalLayout} />)}
+                    </Box>
+                ) : undefined,
+            };
+        }),
+    }));
+
+const PopupContentList: FC<PopupContentListProps> = ({ stage, control, isVerticalLayout, onAction }) => (
+    <ContentCardList
+        stage={stage}
+        pages={buildPopupContentPages(stage(), control, onAction, isVerticalLayout)}
+        isVerticalLayout={isVerticalLayout}
+        emptyTitle={control.name || 'Pop-up'}
+        emptyMessage={control.popupSections.length ? 'Nothing to show right now.' : 'No headers configured for this pop-up. Add headers in Controls.'}
+    />
+);
+
+const formatDetailText = (detail: ResolvedPopupCardDetail): string => {
+    if (detail.stat && (detail.type === 'option' || detail.type === 'optionList')) {
+        return formatStatOptionValueText(detail.stat, detail.value) ?? '';
+    }
+    if (detail.type === 'checkbox') {
+        return detail.value ? 'Yes' : 'No';
+    }
+    return Array.isArray(detail.value) ? detail.value.join(', ') : String(detail.value ?? '');
+};
+
+// Compact labelled chip for a card's right end; content references render as overlapping portraits.
+export const PopupCardDetail: FC<{ detail: ResolvedPopupCardDetail; stage: Stage; isVerticalLayout: boolean }> = ({ detail, stage, isVerticalLayout }) => {
+    const isReference = ['actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList'].includes(detail.type);
+    if (isReference) {
+        const values = (Array.isArray(detail.value) ? detail.value : [detail.value]).map(String).filter(Boolean);
+        return values.length ? (
+            <Box data-popup-card-detail={detail.key} title={detail.label} sx={{ display: 'flex' }}>
+                <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={detail.label} variant="overlay" size={isVerticalLayout ? 30 : 36} />
+            </Box>
+        ) : null;
+    }
+    return (
+        <Box
+            data-popup-card-detail={detail.key}
+            sx={{
+                display: 'flex', alignItems: 'baseline', gap: 0.5, px: 1, py: 0.4, borderRadius: '999px',
+                border: '1px solid var(--agenda-line-subtle)',
+                background: 'color-mix(in srgb, var(--agenda-surface-base) 70%, transparent)',
+                maxWidth: 220, minWidth: 0,
+            }}
+        >
+            <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{detail.label}</Typography>
+            <Typography component="span" sx={{ color: 'var(--agenda-text-primary)', fontSize: '0.8rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {formatDetailText(detail)}
+            </Typography>
+        </Box>
     );
 };

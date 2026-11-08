@@ -1,6 +1,6 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
 import { findStatOptionByValue, normalizeStatValue, resolveStatValue, type Stat, type StatType, type StatValue } from './Stat';
-import { functionReferenceId, listElementType, type FunctionValueResolver, type GameFunction } from './Function';
+import { functionReferenceId, isStatReturnType, listElementType, type FunctionValueResolver, type GameFunction } from './Function';
 
 // 'contains'/'notContains' test list membership for list stats, or substring match for text.
 // 'minimumLength'/'maximumLength' compare list length inclusively against a non-negative integer.
@@ -79,7 +79,7 @@ export const getConditionFunction = (condition: FunctionCondition, context: { fu
 // The scalar type a function condition's value is compared as: list results compare one element, and option
 // ids compare as plain text (a function result carries no option pool); undefined for missing/void functions.
 export const functionConditionValueType = (fn: GameFunction | undefined): StatType | undefined => {
-    if (!fn || fn.returnType === 'void') {
+    if (!fn || !isStatReturnType(fn.returnType)) {
         return undefined;
     }
     const scalar = listElementType(fn.returnType) || fn.returnType;
@@ -357,7 +357,7 @@ export const evaluateContentIdentityCondition = (condition: ContentIdentityCondi
 // trivially via notEquals/notContains against an absent result).
 export const evaluateFunctionCondition = (condition: FunctionCondition, context: ConditionContext): boolean => {
     const fn = getConditionFunction(condition, context);
-    const actual = fn && fn.returnType !== 'void' ? context.resolveValue?.(condition.reference, fn.returnType) : undefined;
+    const actual = fn && isStatReturnType(fn.returnType) ? context.resolveValue?.(condition.reference, fn.returnType) : undefined;
     return compareValues(actual, resolveConditionValue(condition, context), condition.comparison);
 };
 

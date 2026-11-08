@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { IconButton } from '@mui/material';
-import { GameFunction, FUNCTION_RETURN_TYPES, FunctionReturnType } from '../content/Function';
+import { GameFunction, FUNCTION_RETURN_TYPES, FunctionReturnType, isStatReturnType } from '../content/Function';
 import { cloneStat, isListStatType, isSourcedOptionStat, Stat, StatType } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
 import { FunctionEditor } from '../components/FunctionEditor';
@@ -14,6 +14,7 @@ export const FUNCTION_RETURN_TYPE_LABELS: Record<FunctionReturnType, string> = {
     void: 'Void (action only)',
     number: 'Number',
     text: 'String',
+    textList: 'String List',
     checkbox: 'Checkbox',
     option: 'Option',
     optionList: 'Option List',
@@ -38,7 +39,7 @@ interface FunctionDetailPanelProps {
 export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, functions, stage, onChange, onMove, onDelete }) => {
     const index = functions.findIndex(candidate => candidate.id === fn.id);
     const parameters = fn.parameters || [];
-    const parameterTypes = FUNCTION_RETURN_TYPES.filter((type): type is StatType => type !== 'void');
+    const parameterTypes = FUNCTION_RETURN_TYPES.filter(isStatReturnType);
     const save = stage.getSave();
     const optionListSources = stage.getConfiguration().globalStats.filter(stat => stat.type === 'optionList');
     const parameterActors = Object.values(save.actors || {}).filter(actor => actor.active !== false);

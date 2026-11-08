@@ -4,10 +4,10 @@ import { DoNotDisturb, SwapHoriz } from '@mui/icons-material';
 import { Box } from '@mui/material';
 import type { Stage } from '../Stage';
 import { resolveStatDefault, type StatType, type StatValue } from '../content/Stat';
-import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction } from '../content/Function';
+import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction, HEADER_VARIABLE_VALUE } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
 import { variableContentValue } from '../content/Condition';
-import { VariableContentContext } from './VariableContentContext';
+import { HeaderVariableContext, VariableContentContext } from './VariableContentContext';
 
 const MAX_SELECTED_PREVIEW = 6;
 
@@ -44,6 +44,8 @@ export interface SearchableOptionPickerProps {
     disabled?: boolean;
     functionType?: StatType;
     stage?: Stage | (() => Stage);
+    // Newly chosen functions default their first matching parameter to the bound Variable / header.
+    bindVariableParameters?: boolean;
 }
 
 export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
@@ -64,8 +66,10 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     disabled = false,
     functionType,
     stage,
+    bindVariableParameters = false,
 }) => {
     const variableContentType = useContext(VariableContentContext);
+    const headerVariableAvailable = useContext(HeaderVariableContext);
     const allowedOptions = useContext(PickerAllowedOptionsContext);
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const pickerFunctions: GameFunction[] = stageInstance?.getConfiguration().functions || [];
@@ -231,7 +235,13 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
             if (fn && (fn.parameters || []).length) {
                 const storedArgs = functionReferenceArguments(nextValue)
                     ?? (!multiple && value && isFunctionReference(value) && functionReferenceId(value) === fn.id ? functionReferenceArguments(value) : undefined);
-                const args = Object.fromEntries((fn.parameters || []).map(parameter => [parameter.id, storedArgs?.[parameter.id] ?? resolveStatDefault(parameter)]));
+                const parameters = fn.parameters || [];
+                const variableParameter = bindVariableParameters && variableContentType ? parameters.find(parameter => parameter.type === variableContentType) : undefined;
+                const headerParameter = bindVariableParameters && headerVariableAvailable ? parameters.find(parameter => parameter.type === 'text') : undefined;
+                const boundDefault = (parameter: typeof parameters[number]): StatValue | undefined =>
+                    parameter === variableParameter && variableContentType ? variableContentValue(variableContentType)
+                        : parameter === headerParameter ? HEADER_VARIABLE_VALUE : undefined;
+                const args = Object.fromEntries(parameters.map(parameter => [parameter.id, storedArgs?.[parameter.id] ?? boundDefault(parameter) ?? resolveStatDefault(parameter)]));
                 setParameterEntry({ fn, args, replaceKey: multiple && (values ?? []).includes(nextValue) ? nextValue : undefined });
                 return;
             }

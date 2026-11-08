@@ -1,18 +1,18 @@
 import {ReactElement} from "react";
 import { v4 as uuidv4 } from 'uuid';
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
-import { ConditionContext, createSeededRandom, evaluateConditionCollections, hashString, parseVariableContentValue } from "./content/Condition";
+import { ConditionContext, ContentType, createSeededRandom, evaluateConditionCollections, hashString, parseVariableContentValue } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult, HEADER_VARIABLE_VALUE, isStatReturnType } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
-import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
+import { compareControlPriority, Control, ControlPlacement, isControlAvailable, parseContentStatReference, PopupSection, popupContentKind, POPUP_CONTENT_LIST_TYPES } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, getCurrentActors, getCurrentLocation, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Map as GameMap } from "./content/Map";
@@ -112,6 +112,9 @@ const MAX_STAT_UPDATE_PERIODS = 128;
 // Prevent cyclical function calls from recursing indefinitely.
 const MAX_FUNCTION_INVOCATION_DEPTH = 8;
 type ScriptContext = { readOnly: boolean; stack: string[]; variables?: FunctionVariableBindings };
+
+export type ResolvedPopupSection = { key: string; section: PopupSection; header: string; kind: ContentType; ids: string[] };
+export type ResolvedPopupCardDetail = { key: string; label: string; type: StatType; value: StatValue; stat?: Stat };
 
 // Simple (string) metadata fields a function script may read/write directly on an actor/location/item via
 // getField/setField, bypassing the Stat system entirely. Deliberately excludes complex fields (schedule,
@@ -554,6 +557,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {
+        if (value === HEADER_VARIABLE_VALUE && type === 'text') {
+            if (variables?.header === undefined) {
+                throw new Error('No header is bound for Variable.');
+            }
+            return variables.header;
+        }
         const variableType = parseVariableContentValue(value);
         if (variableType && type === variableType) {
             const id = variables?.[variableType];
@@ -649,6 +658,88 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return value as StatValue;
     }
 
+    // Resolves a source to a list of strings: a textList function yields its entries; anything else resolves
+    // as a single text value (text functions/global stats, or literal text with {{Function}} tags).
+    resolveTextList(value: unknown, save: SaveType = this.getSave(), variables?: FunctionVariableBindings): string[] {
+        if (isFunctionReference(value)) {
+            const fn = this.getConfiguration(save).functions.find(candidate => candidate.id === functionReferenceId(value));
+            if (fn?.returnType === 'textList') {
+                const errors: string[] = [];
+                const result = this.runGameFunction(save, fn, 0, message => errors.push(message), { readOnly: true, stack: [], variables }, functionReferenceArguments(value));
+                if (errors.length) {
+                    throw new Error(errors.join('\n'));
+                }
+                validateFunctionResult(result, 'textList');
+                return result as string[];
+            }
+        }
+        return [String(this.resolveValue(value, 'text', save, [], variables))];
+    }
+
+    // Expands a list pop-up's header entries into pages: one per resolved header string, each listing the
+    // active content its contentSource returns for that header. Pages without content are omitted, and a
+    // failing entry is logged and skipped so the rest of the pop-up still renders.
+    resolvePopupSections(control: Control, save: SaveType = this.getSave()): ResolvedPopupSection[] {
+        const configuration = this.getConfiguration(save);
+        return (control.popupSections || []).flatMap(section => {
+            try {
+                const kind = popupContentKind(configuration, section.contentSource);
+                if (!kind) {
+                    return [];
+                }
+                const headers = this.resolveTextList(section.headerSource.trim() ? section.headerSource : section.header, save)
+                    .map(header => header.trim());
+                return headers.flatMap((header, index) => {
+                    const ids = this.resolveValue(section.contentSource, POPUP_CONTENT_LIST_TYPES[kind], save, [], { header }) as string[];
+                    const activeIds = [...new Set(ids)].filter(id => this.getActiveContent(kind, id, save));
+                    return activeIds.length ? [{ key: `${section.id}:${index}:${header}`, section, header, kind, ids: activeIds }] : [];
+                });
+            } catch (error) {
+                console.error(`Pop-up "${control.name}" header could not be resolved: ${error instanceof Error ? error.message : String(error)}`);
+                return [];
+            }
+        });
+    }
+
+    private getActiveContent(kind: ContentType, id: string, save: SaveType): Actor | Location | Item | undefined {
+        const entity = kind === 'actor' ? save.actors?.[id] : kind === 'location' ? save.atlas?.[id] : save.inventory?.find(item => item.id === id);
+        return entity && entity.active !== false ? entity : undefined;
+    }
+
+    // Resolves one card detail: a content stat of the card's entity, or a function evaluated with
+    // "variable:<kind>" bound to the card and the header variable bound to its page's header.
+    resolvePopupCardDetail(detail: string, kind: ContentType, id: string, header: string, save: SaveType = this.getSave()): ResolvedPopupCardDetail | undefined {
+        try {
+            const configuration = this.getConfiguration(save);
+            const statReference = parseContentStatReference(detail);
+            if (statReference) {
+                const stats = statReference.kind === 'actor' ? configuration.actorStats : statReference.kind === 'location' ? configuration.locationStats : configuration.itemStats;
+                const stat = (stats || []).find(candidate => candidate.id === statReference.statId);
+                const entity = statReference.kind === kind ? this.getActiveContent(kind, id, save) : undefined;
+                if (!stat || !entity) {
+                    return undefined;
+                }
+                const raw = entity.statMap?.[stat.id];
+                return { key: detail, label: stat.name, type: stat.type, value: this.readStatValue(raw === undefined || raw === null || raw === '' ? stat.default : raw, stat, save), stat };
+            }
+            if (isFunctionReference(detail)) {
+                const fn = configuration.functions.find(candidate => candidate.id === functionReferenceId(detail));
+                if (!fn || !isStatReturnType(fn.returnType)) {
+                    return undefined;
+                }
+                return { key: detail, label: fn.name, type: fn.returnType, value: this.resolveValue(detail, fn.returnType, save, [], { [kind]: id, header }) };
+            }
+        } catch (error) {
+            console.error(`Pop-up card detail could not be resolved: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        return undefined;
+    }
+
+    // Runs a list pop-up section's click actions for one card.
+    runPopupCardActions(section: PopupSection, kind: ContentType, id: string, header: string): Skit | null {
+        return this.runButtonActions(section.actions || [], { [kind]: id, header });
+    }
+
     readStatValue(value: unknown, stat: Stat, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {
         return this.withStatContext(save, () =>
             resolveStatValue(value, stat, { resolveValue: (source, type) => this.resolveValue(source, type, save, stack, variables) }));
@@ -695,23 +786,25 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return this.runButtonActions(control.actions || []);
     }
 
-    // Resolve the first skit only after every stat/function action has finished.
-    runButtonActions(actions: StatUpdateAction[]): Skit | null {
+    // Resolve the first skit only after every stat/function action has finished. Variables bind
+    // "variable:<kind>" references (and the bare 'variable' actor target) for context-bound actions.
+    runButtonActions(actions: StatUpdateAction[], variables?: FunctionVariableBindings): Skit | null {
         const save = this.getSave();
-        const skit = this.applyActions(save, actions);
+        const skit = this.applyActions(save, actions, variables);
         this.saveGame();
         return skit;
     }
 
-    private applyActions(save: SaveType, actions: StatUpdateAction[]): Skit | null {
-        const context = this.getScheduleContext(save);
+    private applyActions(save: SaveType, actions: StatUpdateAction[], variables?: FunctionVariableBindings): Skit | null {
+        const currentActor = variables?.actor ? save.actors?.[variables.actor] : undefined;
+        const context: ConditionContext = { ...this.getScheduleContext(save), ...(currentActor ? { currentActor } : {}) };
         for (const action of actions) {
             if (action.kind !== 'skit') {
-                this.applyStatUpdateAction(save, action, context);
+                this.applyStatUpdateAction(save, action, context, variables);
             }
         }
         const skitAction = actions.find((action): action is StartSkitAction => action.kind === 'skit');
-        const skit = skitAction ? this.createStatUpdateSkit(save, skitAction) : null;
+        const skit = skitAction ? this.createStatUpdateSkit(save, skitAction, variables) : null;
         if (skit) {
             save.timeline.push({ date: save.currentDate || this.getStartingDate(save), skit });
         }
@@ -1847,7 +1940,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return nextSkit;
     }
 
-    private resolveSkitActionValue(save: SaveType, source: SkitActionValue, type: StatType): StatValue {
+    private resolveSkitActionValue(save: SaveType, source: SkitActionValue, type: StatType, variables?: FunctionVariableBindings): StatValue {
         if (typeof source !== 'object' || Array.isArray(source)) {
             if (type === 'text' && typeof source === 'string' && source.trim()) {
                 const name = source.trim().toLowerCase();
@@ -1856,7 +1949,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     source = functionReference(fn.id);
                 }
             }
-            const value = this.resolveValue(source, type, save);
+            const value = this.resolveValue(source, type, save, [], variables);
             validateFunctionResult(value, type);
             return value;
         }
@@ -1880,10 +1973,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return this.readStatValue(entity.statMap?.[stat.id], stat, save);
     }
 
-    private createStatUpdateSkit(save: SaveType, action: StartSkitAction): Skit {
-        const locationId = this.resolveSkitActionValue(save, action.locationId, 'location');
-        const actorIds = this.resolveSkitActionValue(save, action.actorIds, 'actorList');
-        const guidance = action.guidance === undefined ? '' : this.resolveSkitActionValue(save, action.guidance, 'text');
+    private createStatUpdateSkit(save: SaveType, action: StartSkitAction, variables?: FunctionVariableBindings): Skit {
+        const locationId = this.resolveSkitActionValue(save, action.locationId, 'location', variables);
+        const actorIds = this.resolveSkitActionValue(save, action.actorIds, 'actorList', variables);
+        const guidance = action.guidance === undefined ? '' : this.resolveSkitActionValue(save, action.guidance, 'text', variables);
         if (typeof locationId !== 'string' || !save.atlas[locationId] || save.atlas[locationId].active === false) {
             throw new Error(`Unknown skit action location: ${locationId}`);
         }
@@ -1902,17 +1995,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Applies a single StatUpdateRule action: a direct stat write ('stat' kind, the original behavior) or a
     // global function invocation ('function' kind).
-    private applyStatUpdateAction(save: SaveType, update: GameAction, context: ConditionContext) {
+    private applyStatUpdateAction(save: SaveType, update: GameAction, context: ConditionContext, variables?: FunctionVariableBindings) {
         if (update.kind === 'function') {
             const fn = this.getConfiguration(save).functions.find(candidate => candidate.id === update.functionId);
             if (!fn) {
                 console.error(`Unknown function: ${update.functionId}`);
                 return;
             }
-            this.runGameFunction(save, fn, 0, undefined, { readOnly: false, stack: [] }, update.args);
+            this.runGameFunction(save, fn, 0, undefined, { readOnly: false, stack: [], variables }, update.args);
             return;
         }
-        this.applyStatUpdate(save, update, context);
+        this.applyStatUpdate(save, update, context, variables);
     }
 
     // Resolves the actor(s) an update targets for a given ContentTarget: the 'any'/'none'
@@ -1961,9 +2054,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // The entity instances (with statMaps) a non-global update targets, per its targetType.
-    private resolveUpdateTargetEntities(save: SaveType, update: StatUpdate, context: ConditionContext): Array<Actor | Location | Item> {
+    private resolveUpdateTargetEntities(save: SaveType, update: StatUpdate, context: ConditionContext, variables?: FunctionVariableBindings): Array<Actor | Location | Item> {
         if (update.targetType !== 'global') {
-            update = { ...update, targetId: String(this.resolveValue(update.targetId, update.targetType, save)) };
+            update = { ...update, targetId: String(this.resolveValue(update.targetId, update.targetType, save, [], variables)) };
         }
         switch (update.targetType) {
             case 'location': return this.resolveUpdateTargetLocations(save, update.targetId);
@@ -2208,7 +2301,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
     }
 
-    private applyStatUpdate(save: SaveType, update: StatUpdate, context: ConditionContext = {}) {
+    private applyStatUpdate(save: SaveType, update: StatUpdate, context: ConditionContext = {}, variables?: FunctionVariableBindings) {
         const stat = this.getStatsForUpdateTarget(update.targetType, save).find(candidate => candidate.id === update.statId);
         if (!stat) {
             return;
@@ -2216,28 +2309,28 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         if (update.targetType === 'global') {
             save.globalStatValues = save.globalStatValues || {};
-            save.globalStatValues[stat.id] = this.applyResolvedStatUpdate(save.globalStatValues[stat.id], update, stat, save);
+            save.globalStatValues[stat.id] = this.applyResolvedStatUpdate(save.globalStatValues[stat.id], update, stat, save, variables);
             return;
         }
 
 
-        this.resolveUpdateTargetEntities(save, update, context).forEach(entity => {
+        this.resolveUpdateTargetEntities(save, update, context, variables).forEach(entity => {
             entity.statMap = entity.statMap || {};
-            entity.statMap[stat.id] = this.applyResolvedStatUpdate(entity.statMap[stat.id], update, stat, save);
+            entity.statMap[stat.id] = this.applyResolvedStatUpdate(entity.statMap[stat.id], update, stat, save, variables);
         });
     }
 
-    private applyResolvedStatUpdate(current: StatValue | undefined, update: StatUpdate, stat: Stat, save: SaveType): StatValue {
+    private applyResolvedStatUpdate(current: StatValue | undefined, update: StatUpdate, stat: Stat, save: SaveType, variables?: FunctionVariableBindings): StatValue {
         if (update.operation === 'set' || (stat.type !== 'number' && stat.type !== 'optionList')) {
             return this.readStatValue(applyStatUpdateValue(current, {
-                ...update, value: this.resolveValue(update.value, stat.type, save),
+                ...update, value: this.resolveValue(update.value, stat.type, save, [], variables),
             }, stat), stat, save);
         }
         const currentValue = this.readStatValue(current, stat, save);
         const operand = stat.type === 'optionList' && !Array.isArray(update.value)
             ? [update.value] : update.value;
         return applyStatUpdateValue(currentValue, {
-            ...update, value: this.resolveValue(operand, stat.type, save),
+            ...update, value: this.resolveValue(operand, stat.type, save, [], variables),
         }, { ...stat, default: currentValue });
     }
 

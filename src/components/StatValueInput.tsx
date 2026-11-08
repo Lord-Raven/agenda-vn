@@ -4,7 +4,8 @@ import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
-import { valuePickerOptions, isValueReference } from '../content/Function';
+import { HEADER_VARIABLE_VALUE, valuePickerOptions, isValueReference } from '../content/Function';
+import { HeaderVariableContext } from './VariableContentContext';
 import { PickerAllowedOptionsContext, SearchableOptionPicker } from './SearchableOptionPicker';
 import { validateValueExpression } from '../content/ValueExpression';
 
@@ -101,7 +102,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     }
 
     if (stat.type === 'text') {
-        return <FormulaValueInput value={value} onChange={onChange} />;
+        return <HeaderTextInput value={value} onChange={onChange} />;
     }
 
     const referenceKind = resolveReferenceKind(stat.type);
@@ -134,6 +135,29 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     }
 
     return <FormulaValueInput numeric value={value} onChange={onChange} allowExpression={allowExpression} />;
+};
+
+// Text input that, inside a list pop-up, can instead bind to the current page's header.
+const HeaderTextInput: FC<Pick<StatValueInputProps, 'value' | 'onChange'>> = ({ value, onChange }) => {
+    const headerAvailable = useContext(HeaderVariableContext);
+    const buttonStyle = { border: '1px solid var(--agenda-line-subtle)', borderRadius: '8px', background: 'var(--agenda-surface-raised)', color: 'var(--agenda-text-primary)', cursor: 'pointer', padding: '4px 10px', whiteSpace: 'nowrap' as const };
+    if (value === HEADER_VARIABLE_VALUE) {
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ padding: '4px 10px', borderRadius: '999px', border: '1px solid var(--agenda-highlight)', color: 'var(--agenda-text-primary)', fontSize: 12 }}>Header</span>
+                <button type="button" style={buttonStyle} onClick={() => onChange('')}>Replace</button>
+            </div>
+        );
+    }
+    if (!headerAvailable) {
+        return <FormulaValueInput value={value} onChange={onChange} />;
+    }
+    return (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0 }}><FormulaValueInput value={value} onChange={onChange} /></div>
+            <button type="button" style={buttonStyle} title="Use the pop-up page's header text" onClick={() => onChange(HEADER_VARIABLE_VALUE)}>Use Header</button>
+        </div>
+    );
 };
 
 const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'allowExpression'> & { numeric?: boolean }> = ({ value, onChange, numeric = false, allowExpression }) => {

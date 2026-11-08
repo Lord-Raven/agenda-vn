@@ -3,12 +3,17 @@ import type { ContentType } from './Condition';
 import type { Stat, StatOption, StatType, StatValue } from './Stat';
 import { cloneStat } from './Stat';
 
-export type FunctionReturnType = StatType | 'void';
+// 'textList' is function-only (no stat or parameter has it); it supplies multiple strings, e.g. pop-up headers.
+export type FunctionReturnType = StatType | 'textList' | 'void';
 
 export const FUNCTION_RETURN_TYPES: FunctionReturnType[] = [
-    'void', 'number', 'text', 'checkbox', 'option', 'optionList',
+    'void', 'number', 'text', 'textList', 'checkbox', 'option', 'optionList',
     'actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList',
 ];
+
+// Narrows a return type to a StatType usable with stat machinery (resolveValue, value inputs, conditions).
+export const isStatReturnType = (type: FunctionReturnType | undefined): type is StatType =>
+    !!type && type !== 'void' && type !== 'textList';
 
 // A tagged string fits existing ID pickers and mixed ID lists without converting references into values.
 // Arguments ride along after a '?' as JSON keyed by parameter id: function:<id>?{"<paramId>":5}.
@@ -44,7 +49,9 @@ export const isGlobalStatReference = (value: unknown): value is string =>
 export const globalStatReferenceId = (value: string): string => value.slice(GLOBAL_STAT_REFERENCE_PREFIX.length);
 export const isValueReference = (value: unknown): value is string => isFunctionReference(value) || isGlobalStatReference(value);
 
-export type FunctionVariableBindings = Partial<Record<ContentType, string>>;
+// Content variables bind "variable:<kind>" to an id; 'header' binds HEADER_VARIABLE_VALUE to a pop-up header.
+export type FunctionVariableBindings = Partial<Record<ContentType, string>> & { header?: string };
+export const HEADER_VARIABLE_VALUE = 'variable:header';
 export type FunctionValueResolver = (value: unknown, type: StatType, variables?: FunctionVariableBindings) => StatValue;
 
 // The scalar type of one element of a single-kind list type. The mixed 'contentList' has no single element
@@ -79,6 +86,7 @@ export const validateFunctionResult = (value: unknown, type: FunctionReturnType)
     }
     const valid = type === 'number' ? typeof value === 'number' && Number.isFinite(value)
         : type === 'checkbox' ? typeof value === 'boolean'
+            : type === 'textList' ? Array.isArray(value) && value.every(entry => typeof entry === 'string')
             : isListValueType(type) ? Array.isArray(value) && value.every(entry => typeof entry === 'string' && !isValueReference(entry))
                 : typeof value === 'string' && !isValueReference(value);
     if (!valid) {

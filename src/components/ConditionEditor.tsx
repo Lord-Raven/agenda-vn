@@ -9,7 +9,7 @@ import { SearchableOptionPicker } from './SearchableOptionPicker';
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 import { Stage } from '../Stage';
-import { functionReference, functionReferenceId, functionSignature, GameFunction, isFunctionReference, isListValueType, isValueReference, listElementType, valuePickerOptions } from '../content/Function';
+import { functionReference, functionReferenceId, functionSignature, GameFunction, isFunctionReference, isListValueType, isStatReturnType, isValueReference, listElementType, valuePickerOptions } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
 
 interface ConditionEditorProps {
@@ -237,18 +237,18 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
     const entitiesByContentType: Record<ContentType, ContentTargetEntity[]> = { actor: actors, location: locations, item: items };
     const targetOptionsFor = (contentType: ContentType) => buildContentTargetOptions(contentType, entitiesByContentType[contentType], { allowVariable: variableContentType === contentType });
     const concreteTargetOptionsFor = (contentType: ContentType) => targetOptionsFor(contentType).filter((option) => !META_TARGET_KEYS.includes(option.key));
-    const conditionFunctions = (stageInstance?.getConfiguration().functions || []).filter(fn => fn.returnType !== 'void');
+    const conditionFunctions = (stageInstance?.getConfiguration().functions || []).filter(fn => isStatReturnType(fn.returnType));
     const functionOptions = conditionFunctions.map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description }));
     const conditionFunction = (condition: FunctionCondition): GameFunction | undefined => conditionFunctions.find(fn => fn.id === functionReferenceId(condition.reference));
     const functionReturnTypeFor = (condition: FunctionCondition): StatType | undefined => {
         const fn = conditionFunction(condition);
-        return fn && fn.returnType !== 'void' ? fn.returnType : undefined;
+        return fn && isStatReturnType(fn.returnType) ? fn.returnType : undefined;
     };
     // A pseudo-stat letting a function condition's value input reuse the stat value machinery; option results
     // compare as plain text since a function result carries no option pool.
     const functionConditionStat = (condition: FunctionCondition): Stat | undefined => {
         const fn = conditionFunction(condition);
-        if (!fn || fn.returnType === 'void') {
+        if (!fn || !isStatReturnType(fn.returnType)) {
             return undefined;
         }
         const type = fn.returnType === 'option' || fn.returnType === 'optionList' ? 'text' : fn.returnType;
