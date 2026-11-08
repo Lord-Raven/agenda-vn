@@ -112,7 +112,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
     const [mapImageSize, setMapImageSize] = useState({ width: 0, height: 0 });
     const save = stage().getSave();
     const sortedMaps = useMemo(() => [...maps]
-        .sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name)), [maps]);
+        .sort((left, right) => left.priority - right.priority), [maps]);
 
     let latestLocationId = '';
     for (let index = save.timeline.length - 1; index >= 0; index -= 1) {

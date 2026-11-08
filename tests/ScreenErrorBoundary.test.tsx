@@ -11,7 +11,7 @@ import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 
 const fixture = () => {
     const configuration: GameConfiguration = {
-        actors: [], items: [], locations: [], maps: [], universalSchedule: {},
+        actors: [], items: [], locations: [], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: [], itemStats: [], locationStats: [],
         globalStats: [], globalStatValues: {}, statUpdateRules: [], controls: [],
         functions: [{
@@ -24,7 +24,7 @@ const fixture = () => {
         dateMode: 'calendar', timeMode: 'timeOfDay', useEvents: true,
     };
     const save: SaveType = {
-        playerId: '', actors: {}, atlas: {}, inventory: [], maps: [],
+        playerId: '', actors: {}, atlas: {}, inventory: [], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {},
     };
     const stage: Stage = Object.create(Stage.prototype);

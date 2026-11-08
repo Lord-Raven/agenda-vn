@@ -11,9 +11,10 @@ import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { ActorScheduleEditor } from '../src/components/ActorScheduleEditor';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { LocationDetailPanel } from '../src/screens/LocationDetailPanel';
-import { getMapLinkAvailability, Map as GameMap, MapLink } from '../src/content/Map';
+import { getMapLinkAvailability, MapLink } from '../src/content/Map';
+import { Screen as GameMap } from '../src/content/Screen';
 import { DefinedMapView } from '../src/screens/DefinedMapView';
-import { MapDetailPanel } from '../src/screens/MapDetailPanel';
+import { ScreenDetailPanel } from '../src/screens/ScreenDetailPanel';
 import { ConditionEditor } from '../src/components/ConditionEditor';
 import { ReferenceMultiSelect } from '../src/components/UiComponents';
 
@@ -86,7 +87,7 @@ test('actor schedule availability already evaluates Variable against the schedul
 
 const createStage = (location: Location): Stage => {
     const configuration: GameConfiguration = {
-        actors: [], items: [], locations: [location], maps: [], universalSchedule: {},
+        actors: [], items: [], locations: [location], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: [stat], itemStats: [], locationStats: [stat],
         globalStats: [], functions: [], globalStatValues: {}, statUpdateRules: [], controls: [],
         uiSettings: DEFAULT_UI_SETTINGS, title: '', titleImageUrl: '', titleImagePrompt: '',
@@ -97,7 +98,7 @@ const createStage = (location: Location): Stage => {
     const stage: Stage = Object.create(Stage.prototype);
     stage.getConfiguration = () => configuration;
     stage.getSave = () => ({
-        playerId: '', actors: {}, atlas: { [location.id]: location }, inventory: [], maps: [],
+        playerId: '', actors: {}, atlas: { [location.id]: location }, inventory: [], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {},
     });
     return stage;
@@ -155,8 +156,8 @@ for (const [isCreatorMode, hasLegacyGroup] of [[false, false], [false, true], [t
         const map = new GameMap({ id: 'map', links: [createMapButton({
             conditionCollections: hasLegacyGroup ? [[buttonCondition(10)]] : [],
         })] });
-        stage.getConfiguration().maps = [map];
-        const save = { ...stage.getSave(), maps: [map] };
+        stage.getConfiguration().screens = [map];
+        const save = { ...stage.getSave(), screens: [map] };
         stage.getSave = () => save;
         stage.updateConfiguration = mock.fn();
         stage.saveGame = mock.fn();
@@ -165,7 +166,7 @@ for (const [isCreatorMode, hasLegacyGroup] of [[false, false], [false, true], [t
         let renderer: ReactTestRenderer | undefined;
         try {
             act(() => {
-                renderer = create(<TooltipProvider><MapDetailPanel map={map} stage={() => stage}
+                renderer = create(<TooltipProvider><ScreenDetailPanel screen={map} stage={() => stage}
                     isCreatorMode={isCreatorMode} onChange={() => {}} onDeactivate={() => {}} /></TooltipProvider>);
             });
             assert.ok(renderer);
@@ -198,8 +199,8 @@ for (const isCreatorMode of [true, false]) {
             const map = new GameMap({ id: 'map', links: [createMapButton({
                 ...(kind ? { contentList: { kind, values: ['local'] } } : {}),
             })] });
-            stage.getConfiguration().maps = [map];
-            const save = { ...stage.getSave(), maps: [map] };
+            stage.getConfiguration().screens = [map];
+            const save = { ...stage.getSave(), screens: [map] };
             stage.getSave = () => save;
             stage.updateConfiguration = mock.fn();
             stage.saveGame = mock.fn();
@@ -208,7 +209,7 @@ for (const isCreatorMode of [true, false]) {
             let renderer: ReactTestRenderer | undefined;
             try {
                 act(() => {
-                    renderer = create(<TooltipProvider><MapDetailPanel map={map} stage={() => stage}
+                    renderer = create(<TooltipProvider><ScreenDetailPanel screen={map} stage={() => stage}
                         isCreatorMode={isCreatorMode} onChange={() => {}} onDeactivate={() => {}} /></TooltipProvider>);
                 });
                 assert.ok(renderer);

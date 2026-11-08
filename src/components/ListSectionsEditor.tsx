@@ -1,16 +1,16 @@
 import { CSSProperties, FC } from 'react';
 import { Stage } from '../Stage';
 import { ContentType } from '../content/Condition';
-import { contentStatReference, createPopupSection, PopupSection, popupContentKind } from '../content/Control';
+import { contentStatReference, createListSection, ListSection, listContentKind } from '../content/Screen';
 import { functionReference, functionSignature, isStatReturnType, valuePickerOptions } from '../content/Function';
 import { OutcomeEditor, OutcomeEditorContext } from './OutcomeEditor';
 import { PickerOption, SearchableOptionPicker } from './SearchableOptionPicker';
 import { Button, TextInput } from './UiComponents';
 import { HeaderVariableContext, VariableContentContext } from './VariableContentContext';
 
-interface PopupSectionsEditorProps extends Omit<OutcomeEditorContext, 'stage'> {
-    sections: PopupSection[];
-    onChange: (sections: PopupSection[]) => void;
+interface ListSectionsEditorProps extends Omit<OutcomeEditorContext, 'stage'> {
+    sections: ListSection[];
+    onChange: (sections: ListSection[]) => void;
     stage: () => Stage;
 }
 
@@ -20,7 +20,7 @@ const labelStyle: CSSProperties = { display: 'block', color: 'var(--agenda-highl
 const helpStyle: CSSProperties = { color: 'var(--agenda-text-muted)', fontSize: 12 };
 
 // Header sources: text values (one header) or String List functions (one header per string).
-export const popupHeaderSourceOptions = (stage: Stage): PickerOption[] => {
+export const listHeaderSourceOptions = (stage: Stage): PickerOption[] => {
     const configuration = stage.getConfiguration();
     return [
         ...(configuration.functions || []).filter(fn => fn.returnType === 'textList').map(fn => ({
@@ -30,13 +30,13 @@ export const popupHeaderSourceOptions = (stage: Stage): PickerOption[] => {
     ];
 };
 
-export const popupContentSourceOptions = (stage: Stage): PickerOption[] => {
+export const listContentSourceOptions = (stage: Stage): PickerOption[] => {
     const configuration = stage.getConfiguration();
     return [...valuePickerOptions(configuration, 'actorList'), ...valuePickerOptions(configuration, 'itemList'), ...valuePickerOptions(configuration, 'locationList')];
 };
 
 // Card details for a content kind: value functions taking a parameter of that kind, and that kind's stats.
-export const popupDetailOptions = (stage: Stage, kind: ContentType): PickerOption[] => {
+export const listDetailOptions = (stage: Stage, kind: ContentType): PickerOption[] => {
     const configuration = stage.getConfiguration();
     const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
     return [
@@ -47,12 +47,12 @@ export const popupDetailOptions = (stage: Stage, kind: ContentType): PickerOptio
     ];
 };
 
-export const PopupSectionsEditor: FC<PopupSectionsEditorProps> = ({ sections, onChange, stage, ...outcomeContext }) => {
+export const ListSectionsEditor: FC<ListSectionsEditorProps> = ({ sections, onChange, stage, ...outcomeContext }) => {
     const stageInstance = stage();
     const configuration = stageInstance.getConfiguration();
-    const headerOptions = popupHeaderSourceOptions(stageInstance);
-    const contentOptions = popupContentSourceOptions(stageInstance);
-    const update = (id: string, patch: Partial<PopupSection>) => onChange(sections.map(section => section.id === id ? { ...section, ...patch } : section));
+    const headerOptions = listHeaderSourceOptions(stageInstance);
+    const contentOptions = listContentSourceOptions(stageInstance);
+    const update = (id: string, patch: Partial<ListSection>) => onChange(sections.map(section => section.id === id ? { ...section, ...patch } : section));
     const move = (index: number, offset: number) => {
         const next = [...sections];
         const [section] = next.splice(index, 1);
@@ -62,9 +62,9 @@ export const PopupSectionsEditor: FC<PopupSectionsEditorProps> = ({ sections, on
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-            {sections.length === 0 && <span style={helpStyle}>No headers yet. Add a header to list content in this pop-up.</span>}
+            {sections.length === 0 && <span style={helpStyle}>No headers yet. Add a header to list content on this Screen.</span>}
             {sections.map((section, index) => {
-                const kind = popupContentKind(configuration, section.contentSource);
+                const kind = listContentKind(configuration, section.contentSource);
                 return (
                     <div key={section.id} data-popup-section={section.id}
                         style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12, borderRadius: 10, border: '1px solid var(--agenda-line-subtle)', background: 'var(--agenda-surface-raised)' }}>
@@ -97,7 +97,7 @@ export const PopupSectionsEditor: FC<PopupSectionsEditorProps> = ({ sections, on
                                     value={section.contentSource || undefined} options={contentOptions}
                                     onChange={value => {
                                         const contentSource = typeof value === 'string' ? value : '';
-                                        const sameKind = popupContentKind(configuration, contentSource) === kind;
+                                        const sameKind = listContentKind(configuration, contentSource) === kind;
                                         update(section.id, { contentSource, details: sameKind ? section.details : [] });
                                     }} />
                             </HeaderVariableContext.Provider>
@@ -109,7 +109,7 @@ export const PopupSectionsEditor: FC<PopupSectionsEditorProps> = ({ sections, on
                                     <div>
                                         <label style={labelStyle}>Card Details</label>
                                         <SearchableOptionPicker stage={stage} multiple bindVariableParameters title="Choose card details"
-                                            values={section.details} options={popupDetailOptions(stageInstance, kind)}
+                                            values={section.details} options={listDetailOptions(stageInstance, kind)}
                                             onChange={value => update(section.id, { details: Array.isArray(value) ? value : [] })} />
                                         <span style={helpStyle}>{`Shown at each card's right end: ${CONTENT_LABELS[kind]} stats, or functions taking ${kind === 'actor' ? 'an' : 'a'} ${CONTENT_LABELS[kind]} parameter (Variable is the card's ${kind}).`}</span>
                                     </div>
@@ -127,7 +127,7 @@ export const PopupSectionsEditor: FC<PopupSectionsEditorProps> = ({ sections, on
                 );
             })}
             <div>
-                <Button variant="secondary" onClick={() => onChange([...sections, createPopupSection()])}>Add Header</Button>
+                <Button variant="secondary" onClick={() => onChange([...sections, createListSection()])}>Add Header</Button>
             </div>
         </div>
     );

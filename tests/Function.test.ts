@@ -10,7 +10,7 @@ import { cloneGameFunction, functionPickerOptions, functionReference, functionRe
 import { evaluateCondition, variableContentValue } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
-import { Map as GameMap } from '../src/content/Map';
+import { Screen as GameMap } from '../src/content/Screen';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { createLoreEntry, formatLoreEntriesAsContext, processLoreText } from '../src/content/Lore';
 import { buildPrompt } from '../src/utils/PromptBuilder';
@@ -50,11 +50,11 @@ const fixture = () => {
     const location = new Location({ id: 'place', name: 'Town', description: 'Busy', statMap: { ...values } });
     const save: SaveType = {
         playerId: 'a', actors: Object.fromEntries(actors.map(actor => [actor.id, actor])),
-        atlas: { place: location }, inventory: [item], maps: [], universalSchedule: {},
+        atlas: { place: location }, inventory: [item], screens: [], universalSchedule: {},
         timeline: [], timestamp: 0, globalStatValues: { ...values },
     };
     const configuration: GameConfiguration = {
-        actors, items: [item], locations: [location], maps: [], universalSchedule: {},
+        actors, items: [item], locations: [location], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: stats, itemStats: stats,
         locationStats: stats, globalStats: stats, globalStatValues: {}, statUpdateRules: [],
         functions: [],
@@ -311,10 +311,10 @@ test('map buttons and control skits retain independent outcomes through cloning 
                 conditionCollections: [[{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'night' }]] },
         ],
     });
-    configuration.maps = [map];
+    configuration.screens = [map];
     configuration.controls = [new Control({ actions: map.links[1].actions })];
     const exported = buildPortableGameConfiguration(configuration);
-    for (const copy of [new GameMap(map), new GameMap(JSON.parse(JSON.stringify(map))), exported.maps[0]]) {
+    for (const copy of [new GameMap(map), new GameMap(JSON.parse(JSON.stringify(map))), exported.screens[0]]) {
         assert.equal(copy.links[0].type, undefined);
         assert.equal(copy.links[0].childId, 'place');
         const link = copy.links[1];
@@ -334,7 +334,7 @@ test('map buttons and control skits retain independent outcomes through cloning 
     }
     assert.equal(exported.controls[0].actions[2].kind, 'skit');
     assert.equal(new Control(JSON.parse(JSON.stringify(exported.controls[0]))).actions[2].kind, 'skit');
-    exported.maps[0].links[1].contentList!.values.push('other');
+    exported.screens[0].links[1].contentList!.values.push('other');
     assert.deepEqual(map.links[1].contentList!.values, [globalStatReference('Party')]);
 });
 
@@ -1134,9 +1134,9 @@ test('map button labels survive cloning and portable JSON without evaluating sou
     const map = new GameMap({ links: [{
         type: 'button', parentId: '', childId: '', name: 'Visit', label, coordinates: { x: .5, y: .5 },
     }] });
-    configuration.maps = [map];
+    configuration.screens = [map];
     for (const copy of [new GameMap(map), new GameMap(JSON.parse(JSON.stringify(map))),
-        buildPortableGameConfiguration(configuration).maps[0]]) {
+        buildPortableGameConfiguration(configuration).screens[0]]) {
         assert.equal(copy.links[0].label, label);
         assert.equal(copy.links[0].name, 'Visit');
     }

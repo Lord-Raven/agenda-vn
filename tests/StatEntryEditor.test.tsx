@@ -19,7 +19,7 @@ const renderOptions = (type: 'option' | 'optionList', category: StatEntryCategor
         llmMaintained: { value: true, conditions: [] },
     });
     const configuration: GameConfiguration = {
-        actors: [], items: [], locations: [], maps: [], universalSchedule: {},
+        actors: [], items: [], locations: [], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: [], itemStats: [], locationStats: [],
         globalStats: [stat], functions: [], globalStatValues: {}, statUpdateRules: [], controls: [],
         uiSettings: DEFAULT_UI_SETTINGS, title: '', titleImageUrl: '', titleImagePrompt: '',
@@ -30,7 +30,7 @@ const renderOptions = (type: 'option' | 'optionList', category: StatEntryCategor
     const stage: Stage = Object.create(Stage.prototype);
     stage.getConfiguration = () => configuration;
     stage.getSave = () => ({
-        playerId: '', actors: {}, atlas: {}, inventory: [], maps: [],
+        playerId: '', actors: {}, atlas: {}, inventory: [], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {},
     });
     return renderToStaticMarkup(

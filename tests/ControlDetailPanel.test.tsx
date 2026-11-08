@@ -23,7 +23,7 @@ import { ReferenceMultiSelect } from '../src/components/UiComponents';
 
 const createStage = (control: Control) => {
     const configuration: GameConfiguration = {
-        actors: [], items: [], locations: [], maps: [], universalSchedule: {},
+        actors: [], items: [], locations: [], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: [], itemStats: [], locationStats: [],
         globalStats: [], functions: [], globalStatValues: {}, statUpdateRules: [], controls: [control],
         uiSettings: DEFAULT_UI_SETTINGS, title: '', titleImageUrl: '', titleImagePrompt: '',
@@ -34,7 +34,7 @@ const createStage = (control: Control) => {
     const stage: Stage = Object.create(Stage.prototype);
     stage.getConfiguration = () => configuration;
     stage.getSave = () => ({
-        playerId: '', actors: {}, atlas: {}, inventory: [], maps: [],
+        playerId: '', actors: {}, atlas: {}, inventory: [], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {},
     });
     return stage;

@@ -9,7 +9,8 @@ import { GameConfiguration, Stage } from '../src/Stage';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { cloneStat } from '../src/content/Stat';
 import { Control } from '../src/content/Control';
-import { Map as GameMap, MapLink } from '../src/content/Map';
+import { MapLink } from '../src/content/Map';
+import { Screen as GameMap } from '../src/content/Screen';
 import { Location } from '../src/content/Location';
 import { Actor } from '../src/content/Actor';
 import { Skit } from '../src/content/Skit';
@@ -18,10 +19,13 @@ import { TooltipProvider } from '../src/components/TooltipContext';
 import { DefinedMapView } from '../src/screens/DefinedMapView';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
 import { ScreenType } from '../src/screens/BaseScreen';
+import { createListSection } from '../src/content/Screen';
+import { globalStatReference } from '../src/content/Function';
+import { ListScreenView } from '../src/screens/ListScreenView';
 
 const makeStage = () => {
     const configuration: GameConfiguration = {
-        controls: [], maps: [],
+        controls: [], screens: [],
         actors: [], locations: [], items: [], globalStats: [cloneStat({
             id: 'visible', name: 'Visible', type: 'checkbox', default: true, guidance: '',
             llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
@@ -34,8 +38,9 @@ const makeStage = () => {
         timeMode: 'timeOfDay', useEvents: true,
     };
     const atlas: Record<string, Location> = {};
+    const actors: Record<string, Actor> = {};
     const save = {
-        maps: configuration.maps, atlas, actors: {}, timeline: [],
+        screens: configuration.screens, atlas, actors, timeline: [],
         globalStatValues: { visible: true }, playerId: '', inventory: [],
         universalSchedule: {}, timestamp: 0,
     };
@@ -73,9 +78,9 @@ const popupContent = (dialog: ReactElement<PaperProps>) => {
     return content;
 };
 
-const mapElement = (dialog: ReactElement<PaperProps>) => {
+const mapElement = <T extends object = ComponentProps<typeof DefinedMapView>,>(dialog: ReactElement<PaperProps>) => {
     const content = Children.toArray(popupContent(dialog).props.children)[1];
-    if (!isValidElement<{ children: ReactNode }>(content) || !isValidElement<ComponentProps<typeof DefinedMapView>>(content.props.children)) {
+    if (!isValidElement<{ children: ReactNode }>(content) || !isValidElement<T>(content.props.children)) {
         throw new Error('Expected pop-up content');
     }
     return content.props.children;
@@ -94,8 +99,8 @@ test('popup uses an in-place, content-bounded overlay without a modal or focus t
 
 test('shell visibility animates independently of keyed, fade-only content changes', () => {
     const { stage, configuration } = makeStage();
-    const first = new Control({ type: 'popup', mapId: 'first' });
-    const second = new Control({ type: 'popup', mapId: 'second' });
+    const first = new Control({ type: 'popup', screenId: 'first' });
+    const second = new Control({ type: 'popup', screenId: 'second' });
     configuration.controls.push(first);
     const overlay = overlayElement(stage);
     assert.ok(isValidElement<ComponentProps<typeof motion.div>>(overlay));
@@ -114,7 +119,7 @@ test('shell visibility animates independently of keyed, fade-only content change
     assert.equal(nextOverlay.key, overlay.key);
     const secondContent = popupContent(popupElement(stage));
     assert.notEqual(secondContent.key, firstContent.key);
-    second.mapId = 'changed-map';
+    second.screenId = 'changed-map';
     assert.notEqual(popupContent(popupElement(stage)).key, secondContent.key);
 
     configuration.controls.length = 0;
@@ -144,16 +149,16 @@ test('changing popup controls preserves the mounted dialog shell', () => {
 test('only the first eligible pop-up appears, with stable priority ties and live visibility changes', () => {
     const { stage, configuration, save } = makeStage();
     const map = new GameMap({ id: 'map' });
-    configuration.maps.push(map);
+    configuration.screens.push(map);
     const conditional = new Control({
-        name: 'Conditional', type: 'popup', mapId: 'map', priority: -1,
+        name: 'Conditional', type: 'popup', screenId: 'map', priority: -1,
         availabilityConditions: [[{ type: 'globalStat', statId: 'visible', comparison: 'equals', value: true }]],
     });
-    const first = new Control({ name: 'First tie', type: 'popup', mapId: 'map' });
+    const first = new Control({ name: 'First tie', type: 'popup', screenId: 'map' });
     configuration.controls.push(
-        new Control({ type: 'popup', mapId: 'map', active: false, priority: -100 }),
+        new Control({ type: 'popup', screenId: 'map', active: false, priority: -100 }),
         new Control({ type: 'button', priority: -100 }),
-        first, new Control({ name: 'Second tie', type: 'popup', mapId: 'map' }), conditional,
+        first, new Control({ name: 'Second tie', type: 'popup', screenId: 'map' }), conditional,
     );
     const originalOrder = configuration.controls.map(control => control.id);
     assert.equal(popupElement(stage).props['aria-labelledby'], `popup-control-${conditional.id}`);
@@ -168,11 +173,12 @@ test('only the first eligible pop-up appears, with stable priority ties and live
 
 test('selected maps bypass map visibility and priority; map links still use the shared renderer', () => {
     const { stage, configuration } = makeStage();
-    const selected = new GameMap({ id: 'selected', name: 'Selected Map', active: false, priority: 100 });
+    const selected = new GameMap({ id: 'selected', name: 'Selected Map', priority: 100,
+        availabilityConditions: [[{ type: 'globalStat', statId: 'visible', comparison: 'equals', value: false }]] });
     const other = new GameMap({ id: 'other', name: 'Other Map', priority: -100 });
     const hidden = new GameMap({ id: 'hidden', active: false });
-    configuration.maps.push(other, hidden, selected);
-    configuration.controls.push(new Control({ type: 'popup', mapId: selected.id }));
+    configuration.screens.push(other, hidden, selected);
+    configuration.controls.push(new Control({ type: 'popup', screenId: selected.id }));
     const dialog = popupElement(stage);
     assert.equal(dialog.props.role, 'dialog');
     assert.equal(dialog.props['aria-modal'], false);
@@ -193,17 +199,44 @@ test('selected maps bypass map visibility and priority; map links still use the 
 
 test('missing and unselected maps show explicit configuration errors', () => {
     const { stage, configuration } = makeStage();
-    const control = new Control({ type: 'popup', mapId: 'missing' });
+    const control = new Control({ type: 'popup', screenId: 'missing' });
     configuration.controls.push(control);
     assert.match(renderToStaticMarkup(mapElement(popupElement(stage))), /role="alert".*missing/);
-    control.mapId = '';
-    assert.match(renderToStaticMarkup(mapElement(popupElement(stage))), /No map selected/);
+    control.screenId = '';
+    assert.match(renderToStaticMarkup(mapElement(popupElement(stage))), /No Screen selected/);
+});
+
+test('pop-up Controls reuse List Screens and ignore Screen conditions', () => {
+    const { stage, configuration, save } = makeStage();
+    configuration.globalStats.push(cloneStat({
+        id: 'crew', name: 'Crew', type: 'actorList', default: ['actor'], guidance: '',
+        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+    }));
+    save.actors = { actor: new Actor({ id: 'actor', name: 'List Actor' }) };
+    Object.assign(save.globalStatValues, { crew: ['actor'] });
+    const screen = new GameMap({
+        type: 'list', name: 'Reusable List',
+        availabilityConditions: [[{ type: 'globalStat', statId: 'visible', comparison: 'equals', value: false }]],
+        sections: [{ ...createListSection(), header: 'Crew Header', contentSource: globalStatReference('crew') }],
+    });
+    configuration.screens.push(screen);
+    configuration.controls.push(new Control({ type: 'popup', screenId: screen.id }));
+    const element = mapElement<ComponentProps<typeof ListScreenView>>(popupElement(stage));
+    assert.equal(element.type, ListScreenView);
+    assert.equal(element.props.screen, screen);
+    const html = renderToStaticMarkup(<TooltipProvider>{element}</TooltipProvider>);
+    assert.match(html, /Crew Header/);
+    assert.match(html, /List Actor/);
+    configuration.controls.splice(0, 1, new Control({ type: 'popup', screenId: screen.id }));
+    assert.equal(mapElement<ComponentProps<typeof ListScreenView>>(popupElement(stage)).props.screen, screen);
+    screen.active = false;
+    assert.match(renderToStaticMarkup(mapElement(popupElement(stage))), /missing or inactive/);
 });
 
 test('pop-up editor exposes maps, hides stat and width settings, and explains visibility behavior', () => {
     const { stage, configuration } = makeStage();
-    configuration.maps.push(new GameMap({ id: 'map', name: 'Map Choice' }));
-    const control = new Control({ type: 'popup', mapId: 'map' });
+    configuration.screens.push(new GameMap({ id: 'map', name: 'Map Choice' }));
+    const control = new Control({ type: 'popup', screenId: 'map' });
     const html = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
     assert.match(html, /value="popup" selected="">Pop-up/);
     assert.match(html, /value="map" selected="">Map Choice/);
@@ -222,7 +255,7 @@ test('embedded map buttons refresh visibility, and map links navigate within the
         button, { type: 'target', parentId: 'map', childId: 'next', coordinates: { x: 0.7, y: 0.5 }, conditionCollections: [] },
     ] });
     const next = new GameMap({ id: 'next', name: 'Next Map', links: [{ ...button, name: 'Arrived', label: 'Arrived' }] });
-    configuration.maps.push(map, next);
+    configuration.screens.push(map, next);
     const onAction = mock.fn();
     stage.resolveValue = value => String(value);
     stage.runButtonActions = mock.fn(() => null);
@@ -294,9 +327,9 @@ test('embedded maps preserve button conditions and location visits can replace a
 
 test('map selection is autosaved and survives switching away from the editor', () => {
     const { stage, configuration } = makeStage();
-    const control = new Control({ type: 'popup', mapId: 'first' });
+    const control = new Control({ type: 'popup', screenId: 'first' });
     configuration.controls.push(control);
-    configuration.maps.push(new GameMap({ id: 'first' }), new GameMap({ id: 'second' }));
+    configuration.screens.push(new GameMap({ id: 'first' }), new GameMap({ id: 'second' }));
     stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
     const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
     Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout } });
@@ -309,10 +342,10 @@ test('map selection is autosaved and survives switching away from the editor', (
         if (!mounted) {
             throw new Error('Expected mounted control editor');
         }
-        act(() => mounted.root.findByProps({ id: `control-map-${control.id}` }).props.onChange({ target: { value: 'second' } }));
+        act(() => mounted.root.findByProps({ id: `control-screen-${control.id}` }).props.onChange({ target: { value: 'second' } }));
         act(() => mounted.unmount());
         renderer = undefined;
-        assert.equal(configuration.controls[0].mapId, 'second');
+        assert.equal(configuration.controls[0].screenId, 'second');
         assert.equal(configuration.controls[0].type, 'popup');
         assert.equal(configuration.controls[0].placement, 'popup');
     } finally {

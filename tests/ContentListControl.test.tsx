@@ -10,7 +10,7 @@ import { ContentListPortraits } from '../src/components/ContentListControl';
 
 const stage: Stage = Object.create(Stage.prototype);
 stage.getSave = () => ({
-    playerId: '', actors: {}, atlas: {}, inventory: [], maps: [],
+    playerId: '', actors: {}, atlas: {}, inventory: [], screens: [],
     universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {},
 });
 

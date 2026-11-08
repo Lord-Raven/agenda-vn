@@ -12,7 +12,7 @@ const fixture = () => {
     const item = new Item({ id: 'item', name: 'Old name', loreId: 'lore' });
     const lore = { ...createLoreEntry({ type: 'item', title: item.name, content: 'Description' }), id: 'lore' };
     const configuration: GameConfiguration = {
-        actors: [], items: [new Item(item)], locations: [], maps: [], universalSchedule: {},
+        actors: [], items: [new Item(item)], locations: [], screens: [], universalSchedule: {},
         lorebook: [{ ...lore }], calendarEvents: [], actorStats: [], itemStats: [], locationStats: [],
         globalStats: [], globalStatValues: {}, statUpdateRules: [], controls: [], functions: [],
         uiSettings: DEFAULT_UI_SETTINGS, title: '', titleImageUrl: '', titleImagePrompt: '',
@@ -21,7 +21,7 @@ const fixture = () => {
         dateMode: 'calendar', timeMode: 'timeOfDay', useEvents: true,
     };
     const save: SaveType = {
-        playerId: '', actors: {}, atlas: {}, inventory: [new Item(item)], maps: [],
+        playerId: '', actors: {}, atlas: {}, inventory: [new Item(item)], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {},
         lorebook: [{ ...lore }],
     };

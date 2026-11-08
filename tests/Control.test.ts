@@ -109,13 +109,13 @@ test('actor-card availability binds identity and stat rules to the displayed act
 
 test('pop-up controls preserve their map selection and always use pop-up placement', () => {
     for (const placement of [undefined, 'top', 'bottom', 'popup']) {
-        const control = new Control({ type: 'popup', placement, mapId: 'map', priority: -2 });
+        const control = new Control({ type: 'popup', placement, screenId: 'map', priority: -2 });
         const restored = new Control(JSON.parse(JSON.stringify(control)));
         assert.equal(restored.type, 'popup');
         assert.equal(restored.placement, 'popup');
-        assert.equal(restored.mapId, 'map');
+        assert.equal(restored.screenId, 'map');
         assert.equal(restored.priority, -2);
     }
     assert.equal(new Control({ type: 'button', placement: 'popup' }).placement, 'bottom');
-    assert.equal(new Control({}).mapId, '');
+    assert.equal(new Control({}).screenId, '');
 });

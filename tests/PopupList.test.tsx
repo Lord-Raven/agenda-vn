@@ -1,20 +1,23 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { Actor } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
 import { Location } from '../src/content/Location';
 import { cloneStat, Stat, StatType, StatValue } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
-import { clonePopupSection, contentStatReference, Control, createPopupSection, parseContentStatReference, popupContentKind } from '../src/content/Control';
+import { cloneListSection, contentStatReference, Screen, createListSection, parseContentStatReference, listContentKind } from '../src/content/Screen';
 import { functionReference, globalStatReference, HEADER_VARIABLE_VALUE, GameFunction } from '../src/content/Function';
 import { variableContentValue } from '../src/content/Condition';
-import { buildPopupContentPages } from '../src/components/PopupControl';
+import { buildListContentPages } from '../src/screens/ListScreenView';
 import { ContentCardList } from '../src/components/ContentCardList';
-import { popupContentSourceOptions, popupDetailOptions, popupHeaderSourceOptions } from '../src/components/PopupSectionsEditor';
+import { listContentSourceOptions, listDetailOptions, listHeaderSourceOptions } from '../src/components/ListSectionsEditor';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
+import { Control } from '../src/content/Control';
+import { ScreenDetailPanel } from '../src/screens/ScreenDetailPanel';
 import { StatValueInput } from '../src/components/StatValueInput';
 import { HeaderVariableContext } from '../src/components/VariableContentContext';
 
@@ -47,7 +50,7 @@ const fixture = () => {
     ];
     const actorStats = [stat('Mood', 'number', 0), stat('Team', 'text', '')];
     const configuration: GameConfiguration = {
-        actors, items: [item], locations: [location], maps: [], universalSchedule: {},
+        actors, items: [item], locations: [location], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats, itemStats: [], locationStats: [],
         globalStats: [stat('Title', 'text', 'Squad'), stat('Crew', 'actorList', ['bob'])],
         globalStatValues: {}, statUpdateRules: [], functions,
@@ -58,7 +61,7 @@ const fixture = () => {
     };
     const save: SaveType = {
         playerId: '', actors: Object.fromEntries(actors.map(actor => [actor.id, actor])),
-        atlas: { park: location }, inventory: [item], maps: [], universalSchedule: {},
+        atlas: { park: location }, inventory: [item], screens: [], universalSchedule: {},
         timeline: [], timestamp: 0, globalStatValues: { Title: 'Squad', Crew: ['bob'] },
     };
     const stage: Stage = Object.create(Stage.prototype);
@@ -72,16 +75,16 @@ const fixture = () => {
 
 const membersByHeader = functionReference('members', { Team: HEADER_VARIABLE_VALUE });
 
-test('pop-up controls default to map display and deep-clone list sections', () => {
-    const plain = new Control({ type: 'popup' });
-    assert.equal(plain.popupDisplay, 'map');
-    assert.deepEqual(plain.popupSections, []);
-    const section = { ...createPopupSection(), header: 'Team', details: ['actorStat:Mood'] };
-    const control = new Control({ type: 'popup', popupDisplay: 'list', popupSections: [section] });
-    assert.equal(control.popupDisplay, 'list');
-    assert.deepEqual(control.popupSections, [section]);
-    assert.notEqual(control.popupSections[0], section);
-    const clone = clonePopupSection(section);
+test('Screens default to Map and deep-clone List sections', () => {
+    const plain = new Screen();
+    assert.equal(plain.type, 'map');
+    assert.deepEqual(plain.sections, []);
+    const section = { ...createListSection(), header: 'Team', details: ['actorStat:Mood'] };
+    const control = new Screen({ type: 'list', sections: [section] });
+    assert.equal(control.type, 'list');
+    assert.deepEqual(control.sections, [section]);
+    assert.notEqual(control.sections[0], section);
+    const clone = cloneListSection(section);
     clone.details.push('x');
     assert.deepEqual(section.details, ['actorStat:Mood']);
     assert.deepEqual(parseContentStatReference(contentStatReference('item', 'Weight')), { kind: 'item', statId: 'Weight' });
@@ -90,19 +93,19 @@ test('pop-up controls default to map display and deep-clone list sections', () =
 
 test('content kinds come from list function and global stat return types', () => {
     const { configuration } = fixture();
-    assert.equal(popupContentKind(configuration, membersByHeader), 'actor');
-    assert.equal(popupContentKind(configuration, globalStatReference('Crew')), 'actor');
-    assert.equal(popupContentKind(configuration, globalStatReference('Title')), undefined);
-    assert.equal(popupContentKind(configuration, ''), undefined);
+    assert.equal(listContentKind(configuration, membersByHeader), 'actor');
+    assert.equal(listContentKind(configuration, globalStatReference('Crew')), 'actor');
+    assert.equal(listContentKind(configuration, globalStatReference('Title')), undefined);
+    assert.equal(listContentKind(configuration, ''), undefined);
 });
 
 test('list sections expand String List headers, bind the header variable, and hide empty or inactive content', () => {
     const { stage } = fixture();
-    const dynamic = { ...createPopupSection(), headerSource: functionReference('teams'), contentSource: membersByHeader };
-    const literal = { ...createPopupSection(), header: 'Crew', contentSource: globalStatReference('Crew') };
-    const empty = { ...createPopupSection(), header: 'Nobody', contentSource: '' };
-    const control = new Control({ type: 'popup', popupDisplay: 'list', popupSections: [dynamic, literal, empty] });
-    const pages = stage.resolvePopupSections(control);
+    const dynamic = { ...createListSection(), headerSource: functionReference('teams'), contentSource: membersByHeader };
+    const literal = { ...createListSection(), header: 'Crew', contentSource: globalStatReference('Crew') };
+    const empty = { ...createListSection(), header: 'Nobody', contentSource: '' };
+    const control = new Screen({ type: 'list', sections: [dynamic, literal, empty] });
+    const pages = stage.resolveListSections(control);
     assert.deepEqual(pages.map(page => [page.header, page.kind, page.ids]), [
         ['red', 'actor', ['alice']],
         ['blue', 'actor', ['bob']],
@@ -118,11 +121,11 @@ test('a failing header source is skipped without hiding other sections', () => {
     configuration.functions.push({ id: 'broken', name: 'Broken', description: '', returnType: 'textList', script: 'throw new Error("nope");' });
     const errors = mock.method(console, 'error', () => {});
     try {
-        const control = new Control({ type: 'popup', popupDisplay: 'list', popupSections: [
-            { ...createPopupSection(), headerSource: functionReference('broken'), contentSource: globalStatReference('Crew') },
-            { ...createPopupSection(), header: 'Crew', contentSource: globalStatReference('Crew') },
+        const control = new Screen({ type: 'list', sections: [
+            { ...createListSection(), headerSource: functionReference('broken'), contentSource: globalStatReference('Crew') },
+            { ...createListSection(), header: 'Crew', contentSource: globalStatReference('Crew') },
         ] });
-        assert.deepEqual(stage.resolvePopupSections(control).map(page => page.header), ['Crew']);
+        assert.deepEqual(stage.resolveListSections(control).map(page => page.header), ['Crew']);
         assert.equal(errors.mock.callCount(), 1);
     } finally {
         errors.mock.restore();
@@ -131,21 +134,21 @@ test('a failing header source is skipped without hiding other sections', () => {
 
 test('card details resolve content stats and functions bound to the card and header', () => {
     const { stage } = fixture();
-    const mood = stage.resolvePopupCardDetail(contentStatReference('actor', 'Mood'), 'actor', 'alice', 'red');
+    const mood = stage.resolveListCardDetail(contentStatReference('actor', 'Mood'), 'actor', 'alice', 'red');
     assert.equal(mood?.label, 'Mood');
     assert.equal(mood?.value, 3);
-    const label = stage.resolvePopupCardDetail(functionReference('label', { Who: variableContentValue('actor'), Team: HEADER_VARIABLE_VALUE }), 'actor', 'bob', 'blue');
+    const label = stage.resolveListCardDetail(functionReference('label', { Who: variableContentValue('actor'), Team: HEADER_VARIABLE_VALUE }), 'actor', 'bob', 'blue');
     assert.equal(label?.value, 'blue:bob');
-    assert.equal(stage.resolvePopupCardDetail(contentStatReference('item', 'Mood'), 'actor', 'alice', 'red'), undefined);
+    assert.equal(stage.resolveListCardDetail(contentStatReference('item', 'Mood'), 'actor', 'alice', 'red'), undefined);
 });
 
 test('card click actions bind Variable to the clicked content', () => {
     const { stage, save } = fixture();
     const section = {
-        ...createPopupSection(), header: 'Crew', contentSource: globalStatReference('Crew'),
+        ...createListSection(), header: 'Crew', contentSource: globalStatReference('Crew'),
         actions: [{ id: 'bump', kind: 'stat' as const, targetType: 'actor' as const, targetId: 'variable', statId: 'Mood', operation: 'adjust' as const, value: 2 }],
     };
-    assert.equal(stage.runPopupCardActions(section, 'actor', 'bob', 'Crew'), null);
+    assert.equal(stage.runListCardActions(section, 'actor', 'bob', 'Crew'), null);
     assert.equal(save.actors.bob.statMap.Mood, 7);
     assert.equal(save.actors.alice.statMap.Mood, 3);
 });
@@ -153,13 +156,13 @@ test('card click actions bind Variable to the clicked content', () => {
 test('pop-up pages render shared cards with details, and only sections with actions are clickable', () => {
     const { stage } = fixture();
     const clickable = {
-        ...createPopupSection(), headerSource: functionReference('teams'), contentSource: membersByHeader,
+        ...createListSection(), headerSource: functionReference('teams'), contentSource: membersByHeader,
         details: [contentStatReference('actor', 'Mood')],
         actions: [{ id: 'bump', kind: 'stat' as const, targetType: 'actor' as const, targetId: 'variable', statId: 'Mood', operation: 'adjust' as const, value: 1 }],
     };
-    const passive = { ...createPopupSection(), header: 'Crew', contentSource: globalStatReference('Crew') };
+    const passive = { ...createListSection(), header: 'Crew', contentSource: globalStatReference('Crew') };
     const onAction = mock.fn();
-    const pages = buildPopupContentPages(stage, new Control({ type: 'popup', popupDisplay: 'list', popupSections: [clickable, passive] }), onAction);
+    const pages = buildListContentPages(stage, new Screen({ type: 'list', sections: [clickable, passive] }), onAction);
     assert.deepEqual(pages.map(page => page.title), ['red', 'blue', 'Crew']);
     const [red, , crew] = pages;
     assert.equal(crew.cards[0].onClick, undefined);
@@ -192,29 +195,100 @@ test('content card lists hide empty pages and show an empty state', () => {
 
 test('editor pickers offer header, content, and kind-filtered detail sources', () => {
     const { stage } = fixture();
-    const headers = popupHeaderSourceOptions(stage).map(option => option.key);
+    const headers = listHeaderSourceOptions(stage).map(option => option.key);
     assert.ok(headers.includes(functionReference('teams')));
     assert.ok(headers.includes(functionReference('label')));
     assert.ok(headers.includes(globalStatReference('Title')));
     assert.ok(!headers.includes(functionReference('members')));
-    assert.deepEqual(popupContentSourceOptions(stage).map(option => option.key), [functionReference('members'), globalStatReference('Crew')]);
-    assert.deepEqual(popupDetailOptions(stage, 'actor').map(option => option.key), [functionReference('label'), 'actorStat:Mood', 'actorStat:Team']);
-    assert.deepEqual(popupDetailOptions(stage, 'item'), []);
+    assert.deepEqual(listContentSourceOptions(stage).map(option => option.key), [functionReference('members'), globalStatReference('Crew')]);
+    assert.deepEqual(listDetailOptions(stage, 'actor').map(option => option.key), [functionReference('label'), 'actorStat:Mood', 'actorStat:Team']);
+    assert.deepEqual(listDetailOptions(stage, 'item'), []);
 });
 
-test('pop-up editor switches between map and list displays', () => {
-    const { stage } = fixture();
-    const section = { ...createPopupSection(), header: 'Crew', contentSource: globalStatReference('Crew') };
-    const list = renderToStaticMarkup(<ControlDetailPanel stage={() => stage}
-        control={new Control({ type: 'popup', popupDisplay: 'list', popupSections: [section] })} />);
+test('Screen editor switches between Map and List options; Controls only select Screens', () => {
+    const { stage, configuration } = fixture();
+    const section = { ...createListSection(), header: 'Crew', contentSource: globalStatReference('Crew') };
+    const screen = new Screen({ name: 'Crew List', type: 'list', sections: [section] });
+    configuration.screens.push(screen, new Screen({ name: 'World Map' }));
+    const props = { stage: () => stage, isCreatorMode: true, onChange: () => {}, onDeactivate: () => {} };
+    const list = renderToStaticMarkup(<ScreenDetailPanel {...props} screen={screen} />);
     assert.match(list, /value="list" selected="">List/);
     assert.match(list, /Add Header/);
     assert.match(list, /Card Details/);
     assert.match(list, /Card Click Actions/);
-    assert.doesNotMatch(list, /Select a map/);
-    const map = renderToStaticMarkup(<ControlDetailPanel stage={() => stage} control={new Control({ type: 'popup' })} />);
-    assert.match(map, /Select a map/);
+    assert.doesNotMatch(list, /Map Image URL|Add Link/);
+    const map = renderToStaticMarkup(<ScreenDetailPanel {...props} screen={configuration.screens[1]} />);
+    assert.match(map, /Map Image URL|Add Link/);
     assert.doesNotMatch(map, /Add Header/);
+    const control = renderToStaticMarkup(<ControlDetailPanel stage={() => stage} control={new Control({ type: 'popup', screenId: screen.id })} />);
+    assert.match(control, /Crew List \(List\)/);
+    assert.match(control, /World Map \(Map\)/);
+    assert.doesNotMatch(control, /Add Header|Card Details|control-popup-display/);
+});
+
+for (const isCreatorMode of [true, false]) {
+    test(`Screen type and List rules persist on editor exit (creator: ${isCreatorMode})`, () => {
+        const { stage, configuration, save } = fixture();
+        const section = { ...createListSection(), header: 'Crew', contentSource: globalStatReference('Crew') };
+        const screen = new Screen({ name: 'Switchable', sections: [section], imageUrl: '' });
+        configuration.screens = [screen];
+        save.screens = [new Screen(screen)];
+        stage.updateConfiguration = updates => Object.assign(configuration, updates);
+        const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+        Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout } });
+        let renderer: ReactTestRenderer | undefined;
+        try {
+            act(() => {
+                renderer = create(<TooltipProvider><ScreenDetailPanel screen={isCreatorMode ? screen : save.screens[0]}
+                    stage={() => stage} isCreatorMode={isCreatorMode} onChange={() => {}} onDeactivate={() => {}} /></TooltipProvider>);
+            });
+            assert.ok(renderer);
+            const addButton = renderer.root.findAllByType('button').find(button =>
+                button.children.some(child => typeof child === 'string' && child.includes('Add Button')));
+            assert.ok(addButton);
+            act(() => addButton.props.onClick());
+            act(() => renderer!.root.findByProps({ 'aria-label': 'Screen Type' }).props.onChange({ target: { value: 'list' } }));
+            assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Expand Links' }).length, 0);
+            act(() => renderer!.unmount());
+            renderer = undefined;
+            const saved = (isCreatorMode ? configuration : save).screens[0];
+            assert.equal(saved.type, 'list');
+            assert.deepEqual(saved.sections, [section]);
+        } finally {
+            if (renderer) act(() => renderer?.unmount());
+            if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+            else Reflect.deleteProperty(globalThis, 'window');
+        }
+    });
+}
+
+test('Apply immediately flushes a pending Screen type edit into the active save', () => {
+    const { stage, configuration, save } = fixture();
+    const screen = new Screen({ name: 'Switchable', sections: [{ ...createListSection(), header: 'Crew' }] });
+    configuration.screens = [screen];
+    stage.updateConfiguration = updates => Object.assign(configuration, updates);
+    stage.showPriorityMessage = () => {};
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout } });
+    let renderer: ReactTestRenderer | undefined;
+    try {
+        act(() => {
+            renderer = create(<TooltipProvider><ScreenDetailPanel screen={screen} stage={() => stage}
+                isCreatorMode onChange={() => {}} onDeactivate={() => {}} /></TooltipProvider>);
+        });
+        assert.ok(renderer);
+        act(() => renderer!.root.findByProps({ 'aria-label': 'Screen Type' }).props.onChange({ target: { value: 'list' } }));
+        const apply = renderer.root.findAllByType('button').find(button => button.children.includes('Apply'));
+        assert.ok(apply);
+        act(() => apply.props.onClick());
+        assert.equal(save.screens[0].type, 'list');
+        assert.equal(save.screens[0].sections[0].header, 'Crew');
+        assert.equal(save.screens[0].links.length, 1);
+    } finally {
+        if (renderer) act(() => renderer?.unmount());
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else Reflect.deleteProperty(globalThis, 'window');
+    }
 });
 
 test('text inputs offer the header variable only inside list pop-up contexts', () => {

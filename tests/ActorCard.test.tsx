@@ -23,7 +23,7 @@ const makeStat = (id: string, extra: Partial<Stat> = {}): Stat => cloneStat({
 const fixture = () => {
     const actor = new Actor({ id: 'alice', name: 'Alice', statMap: { Health: 7 } });
     const configuration: GameConfiguration = {
-        actors: [actor], items: [], locations: [], maps: [], universalSchedule: {},
+        actors: [actor], items: [], locations: [], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: [makeStat('Health'), makeStat('Energy')],
         itemStats: [], locationStats: [], globalStats: [], globalStatValues: {}, statUpdateRules: [],
         controls: [], uiSettings: DEFAULT_UI_SETTINGS, title: '', titleImageUrl: '', titleImagePrompt: '',
@@ -32,7 +32,7 @@ const fixture = () => {
         dateMode: 'calendar', timeMode: 'timeOfDay', useEvents: true,
     };
     const save: SaveType = {
-        playerId: actor.id, actors: { [actor.id]: actor }, atlas: {}, inventory: [], maps: [],
+        playerId: actor.id, actors: { [actor.id]: actor }, atlas: {}, inventory: [], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {},
     };
     const stage: Stage = Object.create(Stage.prototype);

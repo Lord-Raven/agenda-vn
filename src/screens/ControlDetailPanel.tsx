@@ -1,6 +1,6 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Stage } from '../Stage';
-import { clonePopupSection, ContentListDisplay, Control, ControlPlacement, ControlType, PopupDisplay, PopupSection, StatDisplayType } from '../content/Control';
+import { ContentListDisplay, Control, ControlPlacement, ControlType, StatDisplayType } from '../content/Control';
 import { ConditionCollection } from '../content/Condition';
 import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
 import { Button, ColorPickerInput, GlassPanel, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
@@ -8,7 +8,6 @@ import { ConditionEditor } from '../components/ConditionEditor';
 import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker } from '../components/StatRating';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
-import { PopupSectionsEditor } from '../components/PopupSectionsEditor';
 
 interface ControlDetailPanelProps {
     control: Control;
@@ -28,9 +27,7 @@ type ControlDraft = {
     description: string;
     statId: string;
     pickerSource?: string[];
-    mapId: string;
-    popupDisplay: PopupDisplay;
-    popupSections: PopupSection[];
+    screenId: string;
     contentListDisplay: ContentListDisplay;
     displayType: StatDisplayType;
     displayColor: string;
@@ -51,9 +48,7 @@ const createDraft = (control: Control): ControlDraft => ({
     description: control.description,
     statId: control.statId,
     pickerSource: control.pickerSource ? [...control.pickerSource] : undefined,
-    mapId: control.mapId,
-    popupDisplay: control.popupDisplay,
-    popupSections: (control.popupSections || []).map(clonePopupSection),
+    screenId: control.screenId,
     contentListDisplay: control.contentListDisplay ?? 'carousel',
     displayType: control.displayType,
     displayColor: control.displayColor,
@@ -122,9 +117,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             description: nextDraft.description,
             statId: nextDraft.statId,
             pickerSource: nextDraft.pickerSource ? [...nextDraft.pickerSource] : undefined,
-            mapId: nextDraft.mapId,
-            popupDisplay: nextDraft.popupDisplay,
-            popupSections: nextDraft.popupSections.map(clonePopupSection),
+            screenId: nextDraft.screenId,
             contentListDisplay: nextDraft.contentListDisplay,
             displayType: nextDraft.displayType,
             displayColor: nextDraft.displayColor,
@@ -338,57 +331,28 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                 {draft.type === 'popup' ? (
                     <section>
                         <h2 style={sectionHeadingStyle}>Pop-up</h2>
-                        <label htmlFor={`control-popup-display-${control.id}`} style={labelStyle}>Display</label>
+                        <label htmlFor={`control-screen-${control.id}`} style={labelStyle}>Screen</label>
                         <select
-                            id={`control-popup-display-${control.id}`}
-                            style={{ ...selectStyle, marginBottom: 15 }}
-                            value={draft.popupDisplay}
-                            onChange={(e) => setDraft((current) => ({ ...current, popupDisplay: e.target.value as PopupDisplay }))}
+                            id={`control-screen-${control.id}`}
+                            style={selectStyle}
+                            value={draft.screenId}
+                            onChange={(e) => setDraft((current) => ({ ...current, screenId: e.target.value }))}
                         >
-                            <option value="map">Map</option>
-                            <option value="list">List</option>
+                            <option value="">Select a Screen...</option>
+                            {draft.screenId && !(stageInstance.getConfiguration().screens || []).some(screen => screen.id === draft.screenId && screen.active !== false) && (
+                                <option value={draft.screenId}>Missing or inactive Screen ({draft.screenId})</option>
+                            )}
+                            {(stageInstance.getConfiguration().screens || []).filter(screen => screen.active !== false).map(screen => (
+                                <option key={screen.id} value={screen.id}>{screen.name || 'Unnamed Screen'} ({screen.type === 'list' ? 'List' : 'Map'})</option>
+                            ))}
                         </select>
-                        {draft.popupDisplay === 'list' ? (
-                            <PopupSectionsEditor
-                                sections={draft.popupSections}
-                                onChange={popupSections => setDraft(current => ({ ...current, popupSections }))}
-                                stage={stage}
-                                globalStats={globalStats}
-                                actorStats={actorStats}
-                                locationStats={updatableLocationStats}
-                                itemStats={updatableItemStats}
-                                actors={actors.filter(actor => actor.active !== false)}
-                                items={items.filter(item => item.active !== false)}
-                                locations={locations.filter(location => location.active !== false)}
-                            />
-                        ) : (
-                            <>
-                                <label htmlFor={`control-map-${control.id}`} style={labelStyle}>Map</label>
-                                <select
-                                    id={`control-map-${control.id}`}
-                                    style={selectStyle}
-                                    value={draft.mapId}
-                                    onChange={(e) => setDraft((current) => ({ ...current, mapId: e.target.value }))}
-                                >
-                                    <option value="">Select a map...</option>
-                                    {draft.mapId && !(stageInstance.getConfiguration().maps || []).some(map => map.id === draft.mapId) && (
-                                        <option value={draft.mapId}>Missing map ({draft.mapId})</option>
-                                    )}
-                                    {(stageInstance.getConfiguration().maps || []).map(map => (
-                                        <option key={map.id} value={map.id}>{map.name || 'Unnamed Map'}</option>
-                                    ))}
-                                </select>
-                            </>
-                        )}
                         <p style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                             Appears over the map, calendar, or skit while its availability conditions pass.
                             The top and bottom status bars remain visible and usable.
                             Pop-ups animate in and out; switching pop-ups fades only their contents.
                             Only one pop-up is shown: lower priority numbers win, with configuration order breaking ties.
                             It cannot be dismissed; use map button or card click actions to change the visibility conditions.
-                            {draft.popupDisplay === 'list'
-                                ? ' List pop-ups show one header page at a time with arrows to switch pages, like the location list on the map screen.'
-                                : ' The selected map ignores its normal availability rules, but links and buttons retain theirs.'}
+                            {' The selected Screen ignores its normal availability rules, but map links and buttons retain theirs. Define reusable Map and List content in Screens.'}
                         </p>
                     </section>
                 ) : draft.type === 'button' ? (

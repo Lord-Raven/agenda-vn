@@ -12,10 +12,10 @@ import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
-import { compareControlPriority, Control, ControlPlacement, isControlAvailable, parseContentStatReference, PopupSection, popupContentKind, POPUP_CONTENT_LIST_TYPES } from "./content/Control";
+import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, getCurrentActors, getCurrentLocation, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
-import { Map as GameMap } from "./content/Map";
+import { Screen, ListSection, parseContentStatReference, listContentKind, LIST_CONTENT_TYPES } from "./content/Screen";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
 import { Lore, updateLoreEntry } from "./content/Lore";
@@ -48,7 +48,7 @@ export type SaveType = {
     playerId: string;
     actors: {[key: string]: Actor};
     atlas: {[key: string]: Location};
-    maps: GameMap[];
+    screens: Screen[];
     universalSchedule: ActorSchedule;
     inventory: Item[];
     timeline: TimelineEntry[];
@@ -113,8 +113,8 @@ const MAX_STAT_UPDATE_PERIODS = 128;
 const MAX_FUNCTION_INVOCATION_DEPTH = 8;
 type ScriptContext = { readOnly: boolean; stack: string[]; variables?: FunctionVariableBindings };
 
-export type ResolvedPopupSection = { key: string; section: PopupSection; header: string; kind: ContentType; ids: string[] };
-export type ResolvedPopupCardDetail = { key: string; label: string; type: StatType; value: StatValue; stat?: Stat };
+export type ResolvedListSection = { key: string; section: ListSection; header: string; kind: ContentType; ids: string[] };
+export type ResolvedListCardDetail = { key: string; label: string; type: StatType; value: StatValue; stat?: Stat };
 
 // Simple (string) metadata fields a function script may read/write directly on an actor/location/item via
 // getField/setField, bypassing the Stat system entirely. Deliberately excludes complex fields (schedule,
@@ -129,7 +129,7 @@ export type GameConfiguration = {
     actors: Actor[], // All defined actors for a new game
     locations: Location[], // All defined locations for a new game
     items: Item[], // All defined items for a new game
-    maps: GameMap[], // All defined maps for a new game
+    screens: Screen[], // All defined screens for a new game
     universalSchedule: ActorSchedule, // Universal schedule for all actors (applies to current and new games)
     lorebook: Lore[], // Lore entries to seed into new games
     calendarEvents: CalendarEvent[], // Calendar event series definitions to seed into new games
@@ -201,7 +201,7 @@ const cloneControl = (control: Control): Control => new Control({
     actions: (control.actions || []).map(cloneStatUpdateAction),
 });
 
-const cloneMap = (map: GameMap): GameMap => new GameMap({
+const cloneScreen = (map: Screen): Screen => new Screen({
     ...map,
     focalPoint: map.focalPoint ? { ...map.focalPoint } : undefined,
     availabilityConditions: (map.availabilityConditions || []).map((collection) => [...collection]),
@@ -264,7 +264,7 @@ export type PortableGameConfiguration = {
     actors: Actor[];
     locations: Location[];
     items: Item[];
-    maps: GameMap[];
+    screens: Screen[];
     lorebook: Lore[];
     calendarEvents: CalendarEvent[];
     uiSettings: UiSettings;
@@ -298,7 +298,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     actors: (input.actors || []).map(actor => cloneActor(actor)),
     locations: (input.locations || []).map(location => cloneLocation(location)),
     items: (input.items || []).map(item => cloneItem(item)),
-    maps: (input.maps || []).map(cloneMap),
+    screens: (input.screens || []).map(cloneScreen),
     lorebook: (input.lorebook || []).map(cloneLore),
     calendarEvents: (input.calendarEvents || []).map(cloneCalendarEvent),
     uiSettings: cloneUiSettings(input.uiSettings || DEFAULT_UI_SETTINGS),
@@ -404,7 +404,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actors: [],
             locations: [],
             items: [],
-            maps: [],
+            screens: [],
             universalSchedule: {},
             lorebook: [],
             calendarEvents: [],
@@ -448,7 +448,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         this.saveData.saves.forEach((save) => {
             if (save) {
-                save.maps = (save.maps || []).map(map => map instanceof GameMap ? map : cloneMap(map));
+                save.screens = (save.screens || []).map(map => map instanceof Screen ? map : cloneScreen(map));
             }
         });
 
@@ -458,7 +458,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 actors: [],
                 locations: [],
                 items: [],
-                maps: (activeSave?.maps || []).map(cloneMap),
+                screens: (activeSave?.screens || []).map(cloneScreen),
                 universalSchedule: cloneActorSchedule(activeSave?.universalSchedule),
                 lorebook: (activeSave?.lorebook || []).map(cloneLore),
                 calendarEvents: [],
@@ -495,7 +495,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         configuration.actors = (configuration.actors || defaultConfiguration.actors).map(actor => actor instanceof Actor ? actor : cloneActor(actor));
         configuration.locations = (configuration.locations || defaultConfiguration.locations).map(location => location instanceof Location ? location : cloneLocation(location));
         configuration.items = (configuration.items || defaultConfiguration.items).map(item => item instanceof Item ? item : cloneItem(item));
-        configuration.maps = (configuration.maps || defaultConfiguration.maps).map(map => map instanceof GameMap ? map : cloneMap(map));
+        configuration.screens = (configuration.screens || defaultConfiguration.screens).map(map => map instanceof Screen ? map : cloneScreen(map));
         configuration.universalSchedule = configuration.universalSchedule || defaultConfiguration.universalSchedule;
         configuration.lorebook = configuration.lorebook || defaultConfiguration.lorebook;
         configuration.calendarEvents = configuration.calendarEvents || defaultConfiguration.calendarEvents;
@@ -676,26 +676,26 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return [String(this.resolveValue(value, 'text', save, [], variables))];
     }
 
-    // Expands a list pop-up's header entries into pages: one per resolved header string, each listing the
+    // Expands a List Screen's header entries into pages: one per resolved header string, each listing the
     // active content its contentSource returns for that header. Pages without content are omitted, and a
-    // failing entry is logged and skipped so the rest of the pop-up still renders.
-    resolvePopupSections(control: Control, save: SaveType = this.getSave()): ResolvedPopupSection[] {
+    // failing entry is logged and skipped so the rest of the Screen still renders.
+    resolveListSections(screen: Screen, save: SaveType = this.getSave()): ResolvedListSection[] {
         const configuration = this.getConfiguration(save);
-        return (control.popupSections || []).flatMap(section => {
+        return (screen.sections || []).flatMap(section => {
             try {
-                const kind = popupContentKind(configuration, section.contentSource);
+                const kind = listContentKind(configuration, section.contentSource);
                 if (!kind) {
                     return [];
                 }
                 const headers = this.resolveTextList(section.headerSource.trim() ? section.headerSource : section.header, save)
                     .map(header => header.trim());
                 return headers.flatMap((header, index) => {
-                    const ids = this.resolveValue(section.contentSource, POPUP_CONTENT_LIST_TYPES[kind], save, [], { header }) as string[];
+                    const ids = this.resolveValue(section.contentSource, LIST_CONTENT_TYPES[kind], save, [], { header }) as string[];
                     const activeIds = [...new Set(ids)].filter(id => this.getActiveContent(kind, id, save));
                     return activeIds.length ? [{ key: `${section.id}:${index}:${header}`, section, header, kind, ids: activeIds }] : [];
                 });
             } catch (error) {
-                console.error(`Pop-up "${control.name}" header could not be resolved: ${error instanceof Error ? error.message : String(error)}`);
+                console.error(`Screen "${screen.name}" header could not be resolved: ${error instanceof Error ? error.message : String(error)}`);
                 return [];
             }
         });
@@ -708,7 +708,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Resolves one card detail: a content stat of the card's entity, or a function evaluated with
     // "variable:<kind>" bound to the card and the header variable bound to its page's header.
-    resolvePopupCardDetail(detail: string, kind: ContentType, id: string, header: string, save: SaveType = this.getSave()): ResolvedPopupCardDetail | undefined {
+    resolveListCardDetail(detail: string, kind: ContentType, id: string, header: string, save: SaveType = this.getSave()): ResolvedListCardDetail | undefined {
         try {
             const configuration = this.getConfiguration(save);
             const statReference = parseContentStatReference(detail);
@@ -736,7 +736,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // Runs a list pop-up section's click actions for one card.
-    runPopupCardActions(section: PopupSection, kind: ContentType, id: string, header: string): Skit | null {
+    runListCardActions(section: ListSection, kind: ContentType, id: string, header: string): Skit | null {
         return this.runButtonActions(section.actions || [], { [kind]: id, header });
     }
 
@@ -834,7 +834,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actors: (updates.actors ?? current.actors).map(actor => actor instanceof Actor ? actor : cloneActor(actor)),
             locations: (updates.locations ?? current.locations).map(location => location instanceof Location ? location : cloneLocation(location)),
             items: (updates.items ?? current.items).map(item => item instanceof Item ? item : cloneItem(item)),
-            maps: (updates.maps ?? current.maps).map(map => map instanceof GameMap ? map : cloneMap(map)),
+            screens: (updates.screens ?? current.screens).map(map => map instanceof Screen ? map : cloneScreen(map)),
         };
 
         if (!usePublished && !this.isOwner && currentSave) {
@@ -861,7 +861,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 actors: snapshot.actors,
                 locations: snapshot.locations,
                 items: snapshot.items,
-                maps: snapshot.maps,
+                screens: snapshot.screens,
                 lorebook: snapshot.lorebook,
                 calendarEvents: snapshot.calendarEvents,
                 versionId: snapshot.versionId,
@@ -878,7 +878,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         this.syncUniversalSchedule();
     }
 
-    // Copies an actor/location/map/lore entry from the canon configuration into the current save,
+    // Copies an actor/location/Screen/lore entry from the canon configuration into the current save,
     // replacing an existing entry or adding it when the current save does not contain it yet.
     applyConfigurationActorToSave(actorId: string): boolean {
         const configuredActor = (this.getConfiguration().actors || []).find(actor => actor.id === actorId);
@@ -921,17 +921,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return true;
     }
 
-    applyConfigurationMapToSave(mapId: string): boolean {
-        const configuredMap = (this.getConfiguration().maps || []).find(map => map.id === mapId);
+    applyConfigurationScreenToSave(mapId: string): boolean {
+        const configuredMap = (this.getConfiguration().screens || []).find(map => map.id === mapId);
         const save = this.getSave();
-        const index = (save.maps || []).findIndex(map => map.id === mapId);
+        const index = (save.screens || []).findIndex(map => map.id === mapId);
         if (!configuredMap) {
             return false;
         }
         if (index === -1) {
-            save.maps = [...(save.maps || []), cloneMap(configuredMap)];
+            save.screens = [...(save.screens || []), cloneScreen(configuredMap)];
         } else {
-            save.maps[index] = cloneMap(configuredMap);
+            save.screens[index] = cloneScreen(configuredMap);
         }
         this.saveGame();
         return true;
@@ -1068,7 +1068,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             playerId: this.primaryUser.anonymizedId,
             actors,
             atlas,
-            maps: (configuration.maps || []).filter(map => map.active !== false).map(cloneMap),
+            screens: (configuration.screens || []).filter(map => map.active !== false).map(cloneScreen),
             universalSchedule: cloneActorSchedule(configuration.universalSchedule),
             inventory,
             timeline: [],
@@ -1094,7 +1094,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             playerId: this.primaryUser.anonymizedId,
             actors,
             atlas,
-            maps: (configuration.maps || []).filter(map => map.active !== false).map(cloneMap),
+            screens: (configuration.screens || []).filter(map => map.active !== false).map(cloneScreen),
             universalSchedule: cloneActorSchedule(configuration.universalSchedule),
             inventory: inventory.map(item => cloneItem(item, true)),
             timeline: [],
@@ -1130,8 +1130,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             console.log(newSave.lorebook);
         }
 
-        if (!newSave.maps || newSave.maps.length === 0) {
-            newSave.maps = persistedConfiguration.maps.map(cloneMap);
+        if (!newSave.screens || newSave.screens.length === 0) {
+            newSave.screens = persistedConfiguration.screens.map(cloneScreen);
         }
 
         if (!newSave.upcomingEvents || newSave.upcomingEvents.length === 0) {
@@ -1276,10 +1276,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (index < 0) copy.inventory.push(cloneItem(item, true));
             else copy.inventory[index] = cloneItem(item, true);
         });
-        configuration.maps.forEach(map => {
-            const index = copy.maps.findIndex(candidate => candidate.id === map.id);
-            if (index < 0) copy.maps.push(cloneMap(map));
-            else copy.maps[index] = cloneMap(map);
+        configuration.screens.forEach(map => {
+            const index = copy.screens.findIndex(candidate => candidate.id === map.id);
+            if (index < 0) copy.screens.push(cloneScreen(map));
+            else copy.screens[index] = cloneScreen(map);
         });
         const lorebook = copy.lorebook ??= [];
         configuration.lorebook.forEach(entry => {
@@ -1302,7 +1302,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         copy.universalSchedule = cloneActorSchedule(configuration.universalSchedule);
         copy.uiSettings = cloneUiSettings(configuration.uiSettings);
         this.ensureCalendarState(copy);
-        copy.maps = copy.maps.map(cloneMap);
+        copy.screens = copy.screens.map(cloneScreen);
         copy.timestamp = Date.now();
 
         // Persist an isolated candidate first: a rejected write must not consume a slot or switch games.
@@ -1614,7 +1614,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return Boolean(this.getCurrentLocationEvent(locationId)) || isLocationAvailable(location, this.getScheduleContext(save));
     }
 
-    // Disabled locations don't exist yet/anymore and should never appear on maps.
+    // Disabled locations don't exist yet/anymore and should never appear on screens.
     isLocationVisible(locationId: string): boolean {
         const save = this.getSave();
         const location = save.atlas?.[locationId];
@@ -3425,7 +3425,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             actors: (configuration.actors || []).filter(actor => actor.active !== false),
             locations: (configuration.locations || []).filter(location => location.active !== false),
             items: (configuration.items || []).filter(item => item.active !== false),
-            maps: (configuration.maps || []).filter(map => map.active !== false),
+            screens: (configuration.screens || []).filter(map => map.active !== false),
             lorebook: configuration.lorebook || [],
             calendarEvents: configuration.calendarEvents || [],
             uiSettings: configuration.uiSettings,

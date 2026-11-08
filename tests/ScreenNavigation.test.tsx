@@ -4,7 +4,10 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { TooltipProvider } from '../src/components/TooltipContext';
-import { Map as GameMap } from '../src/content/Map';
+import { Screen as GameMap, createListSection } from '../src/content/Screen';
+import { Actor } from '../src/content/Actor';
+import { cloneStat } from '../src/content/Stat';
+import { globalStatReference } from '../src/content/Function';
 import { Control } from '../src/content/Control';
 import { Skit } from '../src/content/Skit';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
@@ -16,7 +19,7 @@ import { SkitScreen } from '../src/screens/SkitScreen';
 
 const createStage = (withMap = false) => {
     const configuration: GameConfiguration = {
-        actors: [], items: [], locations: [], maps: [], universalSchedule: {},
+        actors: [], items: [], locations: [], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: [], itemStats: [], locationStats: [],
         globalStats: [], functions: [], globalStatValues: {}, statUpdateRules: [], controls: [],
         uiSettings: DEFAULT_UI_SETTINGS, title: '', titleImageUrl: '', titleImagePrompt: '',
@@ -26,7 +29,7 @@ const createStage = (withMap = false) => {
     };
     const save: SaveType = {
         playerId: '', actors: {}, atlas: {}, inventory: [], universalSchedule: {},
-        maps: withMap ? [new GameMap({ name: 'Test map' })] : [],
+        screens: withMap ? [new GameMap({ name: 'Test map' })] : [],
         timeline: [], timestamp: 0, globalStatValues: {}, currentDate: '2026-10-23',
     };
     const stage: Stage = Object.create(Stage.prototype);
@@ -36,6 +39,86 @@ const createStage = (withMap = false) => {
     stage.saveData = { configuration, saves: [save, undefined], lastSaveSlot: 0 };
     return stage;
 };
+
+const addListScreen = (stage: Stage, priority = 0) => {
+    const actor = new Actor({ id: 'listed-actor', name: 'Listed Actor' });
+    stage.getSave().actors[actor.id] = actor;
+    stage.getConfiguration().globalStats.push(cloneStat({
+        id: 'screen-content', name: 'Screen Content', type: 'actorList', default: [actor.id], guidance: '',
+        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+    }));
+    stage.getSave().globalStatValues!['screen-content'] = [actor.id];
+    const screen = new GameMap({
+        type: 'list', name: 'Reusable List', priority,
+        sections: [{ ...createListSection(), header: 'Custom Header', contentSource: globalStatReference('screen-content') }],
+    });
+    stage.getSave().screens.push(screen);
+    return screen;
+};
+
+const renderMapScreen = (stage: Stage) => renderToStaticMarkup(
+    <TooltipProvider><MapScreen stage={() => stage} setScreenType={() => {}} isVerticalLayout={false} /></TooltipProvider>,
+);
+
+test('a List Screen replaces the default location list and shares its paged cards', () => {
+    const stage = createStage();
+    addListScreen(stage);
+    const html = renderMapScreen(stage);
+    assert.match(html, /Custom Header/);
+    assert.match(html, /Listed Actor/);
+    assert.doesNotMatch(html, /No Locations/);
+});
+
+for (const listWins of [true, false]) {
+    test(`Screen priorities select ${listWins ? 'List' : 'Map'} across types`, () => {
+        const stage = createStage(true);
+        const map = stage.getSave().screens[0];
+        map.name = 'Priority Map';
+        map.priority = listWins ? 10 : -10;
+        addListScreen(stage);
+        const html = renderMapScreen(stage);
+        assert.equal(html.includes('Custom Header'), listWins);
+        assert.equal(html.includes('Priority Map'), !listWins);
+    });
+}
+
+test('equal Screen priorities use configuration order, not names', () => {
+    const stage = createStage();
+    const list = addListScreen(stage);
+    const map = new GameMap({ name: 'A Map' });
+    stage.getSave().screens.push(map);
+    assert.match(renderMapScreen(stage), /Custom Header/);
+    stage.getSave().screens = [map, list];
+    assert.doesNotMatch(renderMapScreen(stage), /Custom Header/);
+    assert.match(renderMapScreen(stage), /A Map/);
+});
+
+test('no Screens, inactive Screens, and unavailable Screens retain the default List fallback', () => {
+    const stage = createStage();
+    assert.match(renderMapScreen(stage), /No Locations/);
+    const screen = addListScreen(stage);
+    screen.active = false;
+    assert.match(renderMapScreen(stage), /No Locations/);
+    screen.active = true;
+    stage.getConfiguration().globalStats.push(cloneStat({
+        id: 'qualifies', name: 'Qualifies', type: 'checkbox', default: false, guidance: '',
+        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+    }));
+    stage.getSave().globalStatValues!.qualifies = false;
+    screen.availabilityConditions = [[{ type: 'globalStat', statId: 'qualifies', comparison: 'equals', value: true }]];
+    assert.match(renderMapScreen(stage), /No Locations/);
+    stage.getSave().globalStatValues!.qualifies = true;
+    assert.match(renderMapScreen(stage), /Custom Header/);
+});
+
+test('an available empty List Screen shows its own empty state, not the default fallback', () => {
+    const stage = createStage();
+    stage.getSave().screens.push(new GameMap({ type: 'list', name: 'Empty Screen' }));
+    const html = renderMapScreen(stage);
+    assert.match(html, /Empty Screen/);
+    assert.match(html, /No headers configured for this Screen/);
+    assert.doesNotMatch(html, /No Locations/);
+});
 
 test('main menu lists Content Management immediately beneath Settings', () => {
     const stage = createStage();
@@ -83,9 +166,9 @@ for (const isVerticalLayout of [false, true]) {
             const configuration = stage.getConfiguration();
             if (screen === 'turn-calendar') configuration.dateMode = 'turnBased';
             const popupMap = new GameMap({ id: 'popup-map', name: 'Popup map', active: false });
-            stage.getSave().maps.push(popupMap);
+            stage.getSave().screens.push(popupMap);
             configuration.controls.push(
-                new Control({ type: 'popup', name: 'Popup content', mapId: popupMap.id }),
+                new Control({ type: 'popup', name: 'Popup content', screenId: popupMap.id }),
                 new Control({ type: 'button', placement: 'top', label: 'Top Bar Action' }),
                 new Control({ type: 'button', placement: 'bottom', label: 'Bottom Bar Action' }),
             );

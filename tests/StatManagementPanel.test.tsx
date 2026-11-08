@@ -12,7 +12,7 @@ import { TooltipProvider } from '../src/components/TooltipContext';
 
 const fixture = () => {
     const configuration: GameConfiguration = {
-        actors: [], items: [], locations: [], maps: [], universalSchedule: {},
+        actors: [], items: [], locations: [], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [],
         globalStats: [cloneStat({ id: 'weather', name: 'Weather', type: 'text', default: 'Sunny' })],
         actorStats: [cloneStat({ id: 'health', name: 'Health', type: 'number', default: 50 })],
@@ -25,7 +25,7 @@ const fixture = () => {
         dateMode: 'calendar', timeMode: 'timeOfDay', useEvents: false,
     };
     const save: SaveType = {
-        playerId: '', actors: {}, atlas: {}, inventory: [], maps: [],
+        playerId: '', actors: {}, atlas: {}, inventory: [], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: { weather: 'Rainy' },
     };
     const stage: Stage = Object.create(Stage.prototype);

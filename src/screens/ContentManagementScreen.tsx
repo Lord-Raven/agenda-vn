@@ -11,7 +11,7 @@ import { LorebookManagementPanel } from './LorebookManagementPanel';
 import { StyleManagementPanel } from './StyleManagementPanel';
 import { GameManagementPanel } from './GameManagementPanel';
 import { CalendarEventManagementPanel } from './CalendarEventManagementPanel';
-import { MapManagementPanel } from './MapManagementPanel';
+import { ScreenManagementPanel } from './ScreenManagementPanel';
 import { StatManagementPanel } from './StatManagementPanel';
 import { RulesManagementPanel } from './RulesManagementPanel';
 import { ItemManagementPanel } from './ItemManagementPanel';
@@ -23,9 +23,9 @@ interface ContentManagementScreenProps {
     onClose: () => void;
 }
 
-type TabType = 'game' | 'style' | 'stats' | 'rules' | 'functions' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'maps' | 'calendarEvents';
+type TabType = 'game' | 'style' | 'stats' | 'rules' | 'functions' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'screens' | 'calendarEvents';
 const tabStorageKey = 'contentManagement.activeTab';
-const tabs: TabType[] = ['game', 'style', 'stats', 'rules', 'functions', 'controls', 'lorebook', 'actors', 'locations', 'items', 'maps', 'calendarEvents'];
+const tabs: TabType[] = ['game', 'style', 'stats', 'rules', 'functions', 'controls', 'lorebook', 'actors', 'locations', 'items', 'screens', 'calendarEvents'];
 const creatorTabs: TabType[] = ['game', 'style', 'rules', 'functions', 'controls'];
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
@@ -406,12 +406,12 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     Locations ({(isCreatorMode ? stage().getConfiguration().locations : locations).filter(location => location.active !== false).length})
                                 </Button>
                                 <Button
-                                    onClick={() => setActiveTab('maps')}
-                                    variant={activeTab === 'maps' ? 'primary' : 'secondary'}
-                                    style={{ display: 'flex', alignItems: 'center', flex: '0 0 auto', gap: '8px', opacity: activeTab === 'maps' ? 1 : 0.6, whiteSpace: 'nowrap' }}
+                                    onClick={() => setActiveTab('screens')}
+                                    variant={activeTab === 'screens' ? 'primary' : 'secondary'}
+                                    style={{ display: 'flex', alignItems: 'center', flex: '0 0 auto', gap: '8px', opacity: activeTab === 'screens' ? 1 : 0.6, whiteSpace: 'nowrap' }}
                                 >
                                     <MapIcon />
-                                    Maps ({(isCreatorMode ? stage().getConfiguration().maps : stage().getSave().maps)?.filter(map => map.active !== false).length || 0})
+                                    Screens ({(isCreatorMode ? stage().getConfiguration().screens : stage().getSave().screens)?.filter(map => map.active !== false).length || 0})
                                 </Button>
                                 <Button
                                     onClick={() => setActiveTab('items')}
@@ -484,9 +484,9 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     <ItemManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 
-                                {/* Maps Tab */}
-                                {activeTab === 'maps' && (
-                                    <MapManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
+                                {/* Screens Tab */}
+                                {activeTab === 'screens' && (
+                                    <ScreenManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
                                 )}
 
                                 {/* Stats Tab */}

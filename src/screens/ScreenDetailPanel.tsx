@@ -1,7 +1,7 @@
 import { FC, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
 import { Add, ArrowDownward, ArrowUpward, AutoAwesome, CenterFocusStrong, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place, TouchApp } from '@mui/icons-material';
-import { generateMapAlternativeImage, imageToPreviewCoordinates, Map as GameMap, MapFitMode, MapLink, MapLinkAvailabilityMode, previewToImageCoordinates } from '../content/Map';
+import { generateMapAlternativeImage, imageToPreviewCoordinates, MapFitMode, MapLink, MapLinkAvailabilityMode, previewToImageCoordinates } from '../content/Map';
 import { Stage } from '../Stage';
 import { buildHexColorSwatches, Button, ColorPickerInput, HelpTip, ReferenceMultiSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
@@ -13,9 +13,11 @@ import { getLocationName } from '../content/Location';
 import { createDefaultStatUpdate, OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker, resolveIcon } from '../components/StatRating';
 import { processLoreText } from '../content/Lore';
+import { Screen, cloneListSection, ScreenType } from '../content/Screen';
+import { ListSectionsEditor } from '../components/ListSectionsEditor';
 
-interface MapDetailPanelProps {
-    map: GameMap;
+interface ScreenDetailPanelProps {
+    screen: Screen;
     stage: () => Stage;
     isCreatorMode: boolean;
     onChange: () => void;
@@ -45,9 +47,11 @@ const sectionHeaderTitleStyle: React.CSSProperties = { display: 'flex', alignIte
 
 const addNewButtonStyle: React.CSSProperties = { padding: '4px 10px', fontSize: '12px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 };
 
-type MapDraft = Pick<GameMap, 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages' | 'fitMode' | 'fillColor'> & { focalX: number; focalY: number; availabilityConditions: ConditionCollection[] };
+type ScreenDraft = Pick<Screen, 'type' | 'sections' | 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages' | 'fitMode' | 'fillColor'> & { focalX: number; focalY: number; availabilityConditions: ConditionCollection[] };
 
-const createMapDraft = (map: GameMap): MapDraft => ({
+const createScreenDraft = (map: Screen): ScreenDraft => ({
+    type: map.type,
+    sections: map.sections.map(cloneListSection),
     name: map.name,
     description: map.description,
     priority: map.priority,
@@ -62,7 +66,7 @@ const createMapDraft = (map: GameMap): MapDraft => ({
     fillColor: map.fillColor || '',
 });
 
-export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorMode, onChange, onDeactivate }) => {
+export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, stage, isCreatorMode, onChange, onDeactivate }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [collapsedAlternativeImages, setCollapsedAlternativeImages] = useState<boolean[]>(() =>
@@ -73,7 +77,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
     const [previewSelection, setPreviewSelection] = useState<'base' | number>('base');
     const [isLinksCollapsed, setIsLinksCollapsed] = useState(true);
     const [expandedLinks, setExpandedLinks] = useState<number[]>([]);
-    const [draft, setDraft] = useState<MapDraft>(() => createMapDraft(map));
+    const [draft, setDraft] = useState<ScreenDraft>(() => createScreenDraft(map));
     const [baseImageSize, setBaseImageSize] = useState<{ width: number; height: number } | null>(null);
     const draftRef = useRef(draft);
     const previewRef = useRef<HTMLDivElement>(null);
@@ -83,16 +87,17 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
     const didMountRef = useRef(false);
     const stageInstance = stage();
     const save = stageInstance.getSave();
-    const configuredMaps = stageInstance.getConfiguration().maps || [];
+    const configuredMaps = stageInstance.getConfiguration().screens || [];
     const configuredLocations = stageInstance.getConfiguration().locations || [];
-    const sourceMaps = isCreatorMode ? configuredMaps : save.maps || [];
-    const activeMaps = sourceMaps.filter(candidate => candidate.active !== false && candidate.id !== map.id);
+    const sourceMaps = isCreatorMode ? configuredMaps : save.screens || [];
+    const activeScreens = sourceMaps.filter(candidate => candidate.active !== false && candidate.id !== map.id);
+    const activeMaps = activeScreens.filter(candidate => candidate.type === 'map');
     const activeLocations = (isCreatorMode ? configuredLocations : Object.values(save.atlas || {})).filter(location => location.active !== false);
     const categoryOptions = useMemo(() => {
         const seenCategories = new Set<string>();
         let hasUncategorized = false;
 
-        activeMaps.forEach((candidate) => {
+        activeScreens.forEach((candidate) => {
             const normalizedCategory = (candidate.category || '').trim();
             if (!normalizedCategory) {
                 hasUncategorized = true;
@@ -107,11 +112,11 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
             ...(hasUncategorized ? [{ value: '', label: 'Uncategorized' }] : []),
             ...values.map((category) => ({ value: category })),
         ];
-    }, [activeMaps]);
+    }, [activeScreens]);
 
     const syncConfiguration = () => {
         if (isCreatorMode) {
-            stageInstance.updateConfiguration({ maps: sourceMaps });
+            stageInstance.updateConfiguration({ screens: sourceMaps });
         } else {
             stageInstance.saveGame();
         }
@@ -134,10 +139,12 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         }, 300);
     };
 
-    const persistDraft = (nextDraft: MapDraft) => {
-        const latestMaps = isCreatorMode ? stageInstance.getConfiguration().maps || [] : stageInstance.getSave().maps || [];
+    const persistDraft = (nextDraft: ScreenDraft) => {
+        const latestMaps = isCreatorMode ? stageInstance.getConfiguration().screens || [] : stageInstance.getSave().screens || [];
         const currentMap = latestMaps.find(candidate => candidate.id === map.id) || map;
-        const persistedMap = new GameMap(currentMap);
+        const persistedMap = new Screen(currentMap);
+        persistedMap.type = nextDraft.type;
+        persistedMap.sections = nextDraft.sections.map(cloneListSection);
         persistedMap.name = nextDraft.name;
         persistedMap.description = nextDraft.description;
         persistedMap.category = nextDraft.category.trim();
@@ -150,14 +157,10 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         persistedMap.fillColor = nextDraft.fillColor.trim();
 
         const nextPriority = Number.isFinite(nextDraft.priority) ? nextDraft.priority : 0;
-        const conflict = latestMaps.find(candidate => candidate.id !== persistedMap.id && candidate.active !== false && candidate.priority === nextPriority);
-        if (conflict) {
-            conflict.priority = persistedMap.priority;
-        }
         persistedMap.priority = nextPriority;
         if (isCreatorMode) {
             stageInstance.updateConfiguration({
-                maps: latestMaps.map((candidate) => candidate.id === persistedMap.id ? persistedMap : candidate),
+                screens: latestMaps.map((candidate) => candidate.id === persistedMap.id ? persistedMap : candidate),
             });
         } else {
             Object.assign(currentMap, persistedMap);
@@ -191,13 +194,13 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
     }, [draft]);
 
     useEffect(() => () => {
-        if (autoSaveTimeoutRef.current) {
-            clearTimeout(autoSaveTimeoutRef.current);
-            persistDraft(draftRef.current);
-        }
         if (structuralSaveTimeoutRef.current) {
             clearTimeout(structuralSaveTimeoutRef.current);
             structuralSyncRef.current();
+        }
+        if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+            persistDraft(draftRef.current);
         }
     }, []);
 
@@ -248,7 +251,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
         updateDraft('fitMode', nextFitMode);
     };
 
-    const updateDraft = <K extends keyof MapDraft>(field: K, value: MapDraft[K]) => {
+    const updateDraft = <K extends keyof ScreenDraft>(field: K, value: ScreenDraft[K]) => {
         setDraft(current => ({ ...current, [field]: value }));
     };
 
@@ -401,7 +404,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
             if (!imageUrl) {
                 throw new Error('Failed to generate alternative map image.');
             }
-            setDraft(createMapDraft(map));
+            setDraft(createScreenDraft(map));
             stageInstance.showPriorityMessage('Generated alternative map image.');
         } catch (error) {
             console.error('Failed to generate alternative map image:', error);
@@ -482,7 +485,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
             <div style={{ display: 'grid', gap: '8px' }}>
                 <div>
                     <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
-                        Map Details: {draft.name}
+                        Screen Details: {draft.name}
                     </Title>
                     <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', marginTop: 4, overflowWrap: 'anywhere' }}>
                         ID: {map.id}
@@ -499,6 +502,17 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                     </label>
                 </div>
             </div>
+            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
+                Screen Type
+                <select aria-label="Screen Type" style={selectStyle} value={draft.type}
+                    onChange={event => updateDraft('type', event.target.value as ScreenType)}>
+                    <option value="map">Map</option>
+                    <option value="list">List</option>
+                </select>
+            </label>
+            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                Lower priority numbers display first; equal priorities use configuration order.
+            </span>
             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
                 Category
                 <TextInputWithOptions
@@ -519,12 +533,33 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                 <ConditionEditor
                     conditionCollections={draft.availabilityConditions}
                     globalStats={stageInstance.getConfiguration().globalStats || []}
-                    actors={Object.values(save.actors || {})}
+                    actorStats={stageInstance.getConfiguration().actorStats || []}
+                    locationStats={stageInstance.getConfiguration().locationStats || []}
+                    itemStats={stageInstance.getConfiguration().itemStats || []}
+                    actors={isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})}
+                    locations={activeLocations}
+                    items={isCreatorMode ? stageInstance.getConfiguration().items : save.inventory}
+                    allowSkitState
                     stage={stage}
                     onChange={(availabilityConditions) => updateDraft('availabilityConditions', availabilityConditions)}
                 />
             </section>
 
+            {draft.type === 'list' ? (
+                <ListSectionsEditor
+                    sections={draft.sections}
+                    onChange={sections => updateDraft('sections', sections)}
+                    stage={stage}
+                    globalStats={stageInstance.getConfiguration().globalStats || []}
+                    actorStats={stageInstance.getConfiguration().actorStats || []}
+                    locationStats={stageInstance.getConfiguration().locationStats || []}
+                    itemStats={stageInstance.getConfiguration().itemStats || []}
+                    actors={(isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})).filter(actor => actor.active !== false)}
+                    locations={activeLocations}
+                    items={(isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []).filter(item => item.active !== false)}
+                />
+            ) : (
+            <>
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <button
@@ -602,7 +637,7 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                                                 ...activeMaps.map(candidate => ({ key: candidate.id, label: candidate.name, category: candidate.category?.trim() || 'Uncategorized', imageUrl: candidate.imageUrl, icon: MapIcon, description: 'Map' })),
                                             ]}
                                             title="Choose link target"
-                                            placeholder="Search locations and maps"
+                                            placeholder="Search locations and screens"
                                             functionType="location"
                                             stage={stage}
                                         />}
@@ -904,6 +939,8 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                 </div>
             </div>
 
+            </>
+            )}
             <div style={{
                 position: 'sticky',
                 bottom: 0,
@@ -922,16 +959,26 @@ export const MapDetailPanel: FC<MapDetailPanelProps> = ({ map, stage, isCreatorM
                     <Button
                         variant="secondary"
                         onClick={() => {
-                            const applied = stageInstance.applyConfigurationMapToSave(map.id);
+                            if (structuralSaveTimeoutRef.current) {
+                                clearTimeout(structuralSaveTimeoutRef.current);
+                                structuralSaveTimeoutRef.current = null;
+                                structuralSyncRef.current();
+                            }
+                            if (autoSaveTimeoutRef.current) {
+                                clearTimeout(autoSaveTimeoutRef.current);
+                                autoSaveTimeoutRef.current = null;
+                                persistDraft(draftRef.current);
+                            }
+                            const applied = stageInstance.applyConfigurationScreenToSave(map.id);
                             stageInstance.showPriorityMessage(applied
-                                ? `${map.name || 'Map'} applied to the active save.`
-                                : `${map.name || 'Map'} does not exist in the active save yet.`);
+                                ? `${draft.name || 'Screen'} applied to the active save.`
+                                : `${draft.name || 'Screen'} does not exist in configuration.`);
                         }}
                     >
                         Apply
                     </Button>
                 )}
-                <Button variant="danger" onClick={() => persist(() => { map.active = false; onDeactivate(); })}>Deactivate Map</Button>
+                <Button variant="danger" onClick={() => persist(() => { map.active = false; onDeactivate(); })}>Deactivate Screen</Button>
             </div>
         </div>
     );

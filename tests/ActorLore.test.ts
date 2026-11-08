@@ -7,7 +7,7 @@ import { Stage, GameConfiguration, SaveType } from '../src/Stage';
 const fixture = (lorebook: Lore[] = [], actorProps: Partial<Actor> = {}) => {
     const actor = new Actor({ id: 'actor', name: 'Alexandra Smith', displayName: '', profile: 'Profile text.', ...actorProps });
     const save: SaveType = {
-        playerId: '', actors: { [actor.id]: actor }, atlas: {}, inventory: [], maps: [],
+        playerId: '', actors: { [actor.id]: actor }, atlas: {}, inventory: [], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {}, lorebook,
     } as SaveType;
     const configuration = { actors: [actor], lorebook: [] } as unknown as GameConfiguration;

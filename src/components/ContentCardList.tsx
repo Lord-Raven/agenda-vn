@@ -61,7 +61,7 @@ const cardTitleSx = {
 };
 
 // A paged vertical column of horizontal content cards: one header page at a time with previous/next
-// navigation. Pages without cards are hidden. Shared by MapScreen's location list and list pop-ups.
+// navigation. Pages without cards are hidden. Shared by the default location list and List Screens.
 export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVerticalLayout, emptyTitle = 'Nothing Here', emptyMessage = 'Nothing is available yet.' }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const reduceMotion = useReducedMotion();

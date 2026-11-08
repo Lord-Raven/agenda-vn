@@ -13,9 +13,10 @@ import { GlobalStatBar } from "../components/GlobalStatBar";
 import { ControlDock } from "../components/ControlDock";
 import { useCachedImageUrl } from "../utils/ImageCache";
 import { ContentCardList, ContentCardPage } from "../components/ContentCardList";
-import { isMapAvailable } from "../content/Map";
+import { compareScreenPriority, isScreenAvailable } from "../content/Screen";
 import { Skit } from "../content/Skit";
 import { PopupControl } from "../components/PopupControl";
+import { ListScreenView } from "./ListScreenView";
 
 interface MapScreenProps {
     stage: () => Stage;
@@ -50,7 +51,9 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
     const save = stageInstance.getSave();
     const currentTimeOfDay = save.currentTimeOfDay || "morning";
     const scheduleContext = stageInstance.getScheduleContext(save);
-    const availableMaps = (save.maps || []).filter(map => isMapAvailable(map, scheduleContext));
+    const availableScreens = (save.screens || []).filter(screen => isScreenAvailable(screen, scheduleContext)).sort(compareScreenPriority);
+    const selectedScreen = availableScreens[0];
+    const availableMaps = availableScreens.filter(screen => screen.type === 'map');
 
     const activeLocations = useMemo(
         () => Object.values(save.atlas || {})
@@ -107,12 +110,14 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [setScreenType]);
 
-    if (availableMaps.length > 0) {
+    if (selectedScreen?.type === 'map') {
         return (
             <>
                 <DefinedMapView
                     stage={stage}
                     maps={availableMaps}
+                    initialMapId={selectedScreen.id}
+                    key={selectedScreen.id}
                     onAction={handleAction}
                     setScreenType={setScreenType}
                     isVerticalLayout={isVerticalLayout}
@@ -186,6 +191,9 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
 
                 <Box sx={{ position: 'relative', isolation: 'isolate', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                    {selectedScreen?.type === 'list' ? (
+                        <ListScreenView key={selectedScreen.id} stage={stage} screen={selectedScreen} isVerticalLayout={isVerticalLayout} onAction={handleAction} />
+                    ) : (
                     <ContentCardList
                         stage={stage}
                         pages={pages}
@@ -193,6 +201,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                         emptyTitle="No Locations"
                         emptyMessage="No active locations are available yet."
                     />
+                    )}
                 </GlassPanel>
                 <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
                 </Box>

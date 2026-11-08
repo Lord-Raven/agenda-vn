@@ -15,7 +15,7 @@ const fixture = () => {
         outfits: [{ id: 'outfit', name: 'Original', description: '', prompts: {}, emotionPack: {} }],
     });
     const configuration: GameConfiguration = {
-        actors: [actor], items: [], locations: [], maps: [], universalSchedule: {},
+        actors: [actor], items: [], locations: [], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: [], itemStats: [], locationStats: [],
         globalStats: [], globalStatValues: {}, statUpdateRules: [], controls: [], functions: [],
         uiSettings: DEFAULT_UI_SETTINGS, title: '', titleImageUrl: '', titleImagePrompt: '',
@@ -24,7 +24,7 @@ const fixture = () => {
         dateMode: 'calendar', timeMode: 'timeOfDay', useEvents: true,
     };
     const save: SaveType = {
-        playerId: '', actors: { [actor.id]: actor }, atlas: {}, inventory: [], maps: [],
+        playerId: '', actors: { [actor.id]: actor }, atlas: {}, inventory: [], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {},
     };
     const stage: Stage = Object.create(Stage.prototype);

@@ -89,11 +89,11 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         }));
     }, [activeLocations, stageInstance]);
 
-    const activeMaps = useMemo(() => {
-        return (configuration.maps || [])
+    const activeScreens = useMemo(() => {
+        return (configuration.screens || [])
             .filter(map => map.active !== false)
             .map(map => JSON.parse(JSON.stringify(map)));
-    }, [configuration.maps]);
+    }, [configuration.screens]);
 
     const managedCalendarEvents = useMemo(() => {
         return (configuration.calendarEvents || []).map(event => JSON.parse(JSON.stringify(event)));
@@ -121,7 +121,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             actors: activeActors,
             locations: activeLocations,
             items: activeItems,
-            maps: activeMaps,
+            screens: activeScreens,
             lorebook: configuration.lorebook || [],
             calendarEvents: managedCalendarEvents,
             uiSettings: stageInstance.getUiSettings(),
@@ -136,7 +136,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         activeActors,
         activeItems,
         activeLocations,
-        activeMaps,
+        activeScreens,
         actorStats,
         artStyle,
         backgroundImagePrompt,
@@ -223,7 +223,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             actors: activeActors,
             locations: activeLocations,
             items: activeItems,
-            maps: activeMaps,
+            screens: activeScreens,
             lorebook: (configuration.lorebook || []).map(entry => JSON.parse(JSON.stringify(entry))),
             calendarEvents: managedCalendarEvents,
             actorStats,
@@ -247,7 +247,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             useEvents,
         });
 
-    }, [activeActors, activeItems, activeLocations, activeMaps, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, timeMode, useEvents, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, versionNotes]);
+    }, [activeActors, activeItems, activeLocations, activeScreens, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, timeMode, useEvents, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;

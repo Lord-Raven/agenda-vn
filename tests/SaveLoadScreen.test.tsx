@@ -8,7 +8,7 @@ import { CalendarEvent, getActiveTimeMode } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
 import { Item } from '../src/content/Item';
 import { Location } from '../src/content/Location';
-import { Map as GameMap } from '../src/content/Map';
+import { Screen as GameMap, createListSection } from '../src/content/Screen';
 import { createLoreEntry } from '../src/content/Lore';
 import { cloneStat } from '../src/content/Stat';
 import { TooltipProvider } from '../src/components/TooltipContext';
@@ -38,7 +38,7 @@ const fixture = () => {
         actors: [new Actor({ id: 'actor', name: 'Old actor', statMap: { health: 1 } })],
         locations: [new Location({ id: 'place', name: 'Old place' })],
         items: [new Item({ id: 'item', name: 'Old item' })],
-        maps: [new GameMap({ id: 'map', name: 'Old map' })],
+        screens: [new GameMap({ id: 'map', name: 'Old map' })],
         globalStats: [numberStat('score', 1)], actorStats: [numberStat('health', 1)],
         globalStatValues: { score: 1 },
     });
@@ -51,7 +51,7 @@ const fixture = () => {
         },
         atlas: { place: new Location({ id: 'place', name: 'Old place' }), extra: new Location({ id: 'extra' }) },
         inventory: [new Item({ id: 'item', name: 'Old item' }), new Item({ id: 'extra' })],
-        maps: [new GameMap({ id: 'map', name: 'Old map' }), new GameMap({ id: 'extra' })],
+        screens: [new GameMap({ id: 'map', name: 'Old map' }), new GameMap({ id: 'extra' })],
         universalSchedule: {}, timeline: [{ date: '2026-10-23', calendarEventId: 'completed' }],
         lorebook: [lore('lore', 'Old lore'), lore('extra')],
         upcomingEvents: [event('event', 'Old event'), event('extra')],
@@ -74,6 +74,32 @@ const fixture = () => {
     return { stage, source, configuration, persisted };
 };
 
+test('Screen types, List rules, and Control selections survive portable export and save normalization', () => {
+    const { stage } = fixture();
+    stage.isOwner = true;
+    const section = { ...createListSection(), header: 'Crew', details: ['actorStat:health'] };
+    const screen = new GameMap({ id: 'list-screen', type: 'list', sections: [section], priority: -2 });
+    const control = new Control({ type: 'popup', screenId: screen.id });
+    stage.updateConfiguration({ screens: [screen], controls: [control] }, true);
+    const exported = buildPortableGameConfiguration(stage.getPublishedConfiguration());
+    assert.equal('maps' in exported, false);
+    assert.equal(exported.screens[0].type, 'list');
+    assert.deepEqual(exported.screens[0].sections, [section]);
+    assert.equal(exported.controls[0].screenId, screen.id);
+    exported.screens[0].sections[0].details.push('changed');
+    assert.deepEqual(screen.sections[0].details, ['actorStat:health']);
+    stage.saveData = JSON.parse(JSON.stringify(stage.saveData));
+    stage.getConfiguration();
+    assert.ok(stage.getPublishedConfiguration().screens[0] instanceof GameMap);
+    assert.equal(stage.applyConfigurationScreenToSave(screen.id), true);
+    const saved = stage.getSave().screens.find(candidate => candidate.id === screen.id);
+    assert.ok(saved);
+    assert.equal(saved.type, 'list');
+    assert.deepEqual(saved.sections, [section]);
+    saved.sections[0].header = 'Save-only edit';
+    assert.equal(stage.getPublishedConfiguration().screens[0].sections[0].header, 'Crew');
+});
+
 const publishUpdate = (stage: Stage) => {
     const configuration: GameConfiguration = {
         ...stage.getPublishedConfiguration(),
@@ -88,7 +114,7 @@ const publishUpdate = (stage: Stage) => {
         ],
         locations: [new Location({ id: 'place', name: 'Updated place' }), new Location({ id: 'added' })],
         items: [new Item({ id: 'item', name: 'Updated item' }), new Item({ id: 'added' })],
-        maps: [new GameMap({ id: 'map', name: 'Updated map' }), new GameMap({ id: 'added' })],
+        screens: [new GameMap({ id: 'map', name: 'Updated map' }), new GameMap({ id: 'added' })],
         lorebook: [lore('lore', 'Updated lore'), lore('added')],
         calendarEvents: [event('event', 'Updated event'), event('added'), event('completed')],
         globalStats: [numberStat('score', 1), numberStat('new-stat', 3)],
@@ -120,9 +146,9 @@ test('clone and update replaces published content, preserves progress, and persi
     assert.ok(copy.atlas.extra && copy.atlas.added);
     assert.deepEqual(copy.inventory.map(item => item.id), ['item', 'extra', 'added']);
     assert.equal(copy.inventory[0].name, 'Updated item');
-    assert.deepEqual(copy.maps.map(map => map.id), ['map', 'extra', 'added']);
-    assert.ok(copy.maps.every(map => map instanceof GameMap));
-    assert.equal(copy.maps[0].name, 'Updated map');
+    assert.deepEqual(copy.screens.map(map => map.id), ['map', 'extra', 'added']);
+    assert.ok(copy.screens.every(map => map instanceof GameMap));
+    assert.equal(copy.screens[0].name, 'Updated map');
     assert.equal(copy.lorebook?.find(entry => entry.id === 'lore')?.content, 'Updated lore');
     assert.ok(copy.lorebook?.some(entry => entry.id === 'extra'));
     assert.equal(copy.upcomingEvents?.find(entry => entry.id === 'event')?.name, 'Updated event');
@@ -508,7 +534,7 @@ test('global apply replaces the current slot with all draft content even with no
     assert.equal(applied.actors.player.name, 'My player');
     assert.equal(applied.atlas.place.name, 'Updated place');
     assert.equal(applied.inventory[0].name, 'Updated item');
-    assert.equal(applied.maps[0].name, 'Updated map');
+    assert.equal(applied.screens[0].name, 'Updated map');
     assert.equal(applied.lorebook?.find(entry => entry.id === 'lore')?.content, 'Updated lore');
     assert.equal(applied.configuration?.functions[0].id, 'fn');
     assert.equal(applied.configuration?.controls[0].id, 'new-control');

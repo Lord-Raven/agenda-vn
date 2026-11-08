@@ -172,7 +172,7 @@ export const imageToPreviewCoordinates = (fitMode: MapFitMode, image: Size, x: n
 export class Map {
     id: string = generateUuid();
     active: boolean = true; // Soft-delete flag. Inactive maps are hidden from management UIs.
-    priority: number = 0; // A priority for ordering maps in the UI. Lower numbers are higher priority. This is also used to determine which Map shows by default; the lowest number displays when the game starts; a lower number will display if two maps have the same Location when leaving a skit. Maps cannot share a priority number.
+    priority: number = 0; // Lower numbers display first; Screens use configuration order to break ties.
     name: string = '';
     description: string = '';
     category: string = ''; // A category for filtering or organization in the UI. Could be a region, perhaps ("northlands", "ocean"); it is for organizational and not gameplay purposes.

@@ -20,8 +20,8 @@ import { functionReference, FUNCTION_RETURN_TYPES, GameFunction, isStatReturnTyp
 import { ControlRenderer } from '../src/components/ControlRenderer';
 import { ConditionEditor } from '../src/components/ConditionEditor';
 import { OutcomeEditor } from '../src/components/OutcomeEditor';
-import { Map as GameMap } from '../src/content/Map';
-import { MapDetailPanel } from '../src/screens/MapDetailPanel';
+import { Screen as GameMap } from '../src/content/Screen';
+import { ScreenDetailPanel } from '../src/screens/ScreenDetailPanel';
 import { DefinedMapView } from '../src/screens/DefinedMapView';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { Location } from '../src/content/Location';
@@ -30,7 +30,7 @@ import { Skit } from '../src/content/Skit';
 
 const fixture = () => {
     const configuration: GameConfiguration = {
-        actors: [], items: [], locations: [], maps: [], universalSchedule: {},
+        actors: [], items: [], locations: [], screens: [], universalSchedule: {},
         lorebook: [], calendarEvents: [], actorStats: [], itemStats: [], locationStats: [],
         globalStats: [], globalStatValues: {}, statUpdateRules: [], controls: [],
         functions: [{ id: 'reward', name: 'Reward player', description: 'Give gold', script: 'set("Gold", 10);', returnType: 'void' }],
@@ -40,7 +40,7 @@ const fixture = () => {
         dateMode: 'calendar', timeMode: 'timeOfDay', useEvents: true,
     };
     const save: SaveType = {
-        playerId: '', actors: {}, atlas: {}, inventory: [], maps: [],
+        playerId: '', actors: {}, atlas: {}, inventory: [], screens: [],
         universalSchedule: {}, timeline: [], timestamp: 0, globalStatValues: {},
     };
     const stage: Stage = Object.create(Stage.prototype);
@@ -93,7 +93,7 @@ test('maps can offer action buttons even without another map or location', () =>
     const map = new GameMap({ links: [{
         type: 'button', parentId: '', childId: '', name: 'Rest', iconName: 'hotel', coordinates: { x: .5, y: .5 }, actions: [],
     }] });
-    const html = renderToStaticMarkup(<MapDetailPanel map={map} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />);
+    const html = renderToStaticMarkup(<ScreenDetailPanel map={map} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />);
     assert.match(html, /Add Button/);
     assert.match(html, /Drag Rest marker/);
     assert.match(html, /data-testid="HotelIcon"/);
@@ -108,7 +108,7 @@ test('map link disclosures start collapsed, expand independently and reset when 
         { parentId: 'map', childId: destination.id, coordinates: { x: .3, y: .3 } },
         { type: 'button', parentId: 'map', childId: '', coordinates: { x: .7, y: .7 } },
     ] });
-    configuration.maps = [map, destination];
+    configuration.screens = [map, destination];
     const states: unknown[] = [];
     let hookIndex = 0;
     let inspectingPanel = false;
@@ -126,7 +126,7 @@ test('map link disclosures start collapsed, expand independently and reset when 
         hookIndex = 0;
         inspectingPanel = true;
         try {
-            panel = MapDetailPanel({ map, stage: () => stage, isCreatorMode: true, onChange: () => {}, onDeactivate: () => {} });
+            panel = ScreenDetailPanel({ map, stage: () => stage, isCreatorMode: true, onChange: () => {}, onDeactivate: () => {} });
             return panel;
         } finally {
             inspectingPanel = false;
@@ -243,7 +243,7 @@ test('map button labels and control labels resolve parameterized templates while
         type: 'button', parentId: '', childId: '', name: 'Internal button', label,
         coordinates: { x: .5, y: .5 }, contentList: { kind: 'location', values: ['missing'] },
     }] });
-    configuration.maps = [map];
+    configuration.screens = [map];
     const renderMap = () => renderToStaticMarkup(<TooltipProvider>
         <DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={false} />
     </TooltipProvider>);
@@ -254,7 +254,7 @@ test('map button labels and control labels resolve parameterized templates while
     const panel = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
     assert.ok(panel.includes('value="Visit {{Greeting(&quot;Alex&quot;)}}"'));
     assert.match(panel, /Arguments follow parameter order; omitted arguments use defaults/);
-    const mapPanel = renderToStaticMarkup(<MapDetailPanel map={map} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />);
+    const mapPanel = renderToStaticMarkup(<ScreenDetailPanel map={map} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />);
     assert.match(mapPanel, /Drag Visit Alex: 2 marker/);
     stage.getSave().globalStatValues!.score = 7;
     assert.match(renderMap(), /aria-label="Visit Alex: 7"/);
