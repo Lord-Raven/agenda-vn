@@ -481,7 +481,7 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
         : draft.alternativeImages[previewSelection]?.imageUrl || draft.imageUrl;
 
     return (
-        <div style={{ padding: '20px', display: 'grid', gap: '16px', flex: 'none', minHeight: '100%', boxSizing: 'border-box' }}>
+        <div style={{ padding: '20px', display: 'grid', gap: '10px', flex: 'none', minHeight: '100%', boxSizing: 'border-box' }}>
             <div style={{ display: 'grid', gap: '8px' }}>
                 <div>
                     <Title variant="glow" style={{ fontSize: '24px', margin: 0 }}>
