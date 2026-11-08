@@ -724,7 +724,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
             };
 
             // Resolves a narrative stat-change tag/field into an outcome. Amount is a numeric delta (for
-            // 'number' stats); Value is an absolute assignment (needed for option/text/checkbox stats). If both
+            // 'number' stats); Value is an absolute assignment (needed for option/text/boolean stats). If both
             // are provided, Amount takes precedence. When actorName is blank, this targets a global/world stat
             // (no associated actor) rather than a specific character's stat.
             const resolveStatChangeOutcome = (actorName: string, statName: string, amountText?: string, valueText?: string, actorPool: Actor[] = allActors): Outcome | undefined => {

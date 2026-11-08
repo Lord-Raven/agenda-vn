@@ -418,7 +418,10 @@ test('function editor offers isolated testing without scoped target selectors', 
 test('stats no longer offer a function type', () => {
     const html = renderToStaticMarkup(<select>{renderStatTypeOptions()}</select>);
     assert.match(html, /value="number"/);
+    assert.match(html, /value="boolean">Boolean<\/option>/);
+    assert.doesNotMatch(html, /value="checkbox"|Checkbox/);
     assert.doesNotMatch(html, /value="function"/);
+    assert.equal(FUNCTION_RETURN_TYPE_LABELS.boolean, 'Boolean');
 });
 
 test('button function actions select separate definitions without stat or entity targets', () => {
@@ -547,19 +550,19 @@ test('list stat values use their picker for function selection instead of a sepa
     assert.match(optionList, /aria-label="Selected options: Options\(\)"/);
 });
 
-test('checkbox and option inputs combine literals and sources in one picker', () => {
+test('boolean and option values combine literals and sources in one picker', () => {
     const { stage, configuration } = fixture();
-    configuration.globalStats = [valueStat('checkbox'), valueStat('option')];
+    configuration.globalStats = [valueStat('boolean'), valueStat('option')];
     configuration.functions = [
         { id: 'choice', name: 'Choice', description: '', returnType: 'option', script: 'throw new Error("No preview");' },
     ];
-    const yes = renderToStaticMarkup(<StatValueInput stat={valueStat('checkbox')} value={true} onChange={() => {}} stage={stage} />);
-    const no = renderToStaticMarkup(<StatValueInput stat={valueStat('checkbox')} value={false} onChange={() => {}} stage={stage} />);
+    const yes = renderToStaticMarkup(<StatValueInput stat={valueStat('boolean')} value={true} onChange={() => {}} stage={stage} />);
+    const no = renderToStaticMarkup(<StatValueInput stat={valueStat('boolean')} value={false} onChange={() => {}} stage={stage} />);
     assert.match(yes, />True</);
     assert.match(no, />False</);
     assert.doesNotMatch(yes, /<select|type="checkbox"|Value source/);
-    const sourced = renderToStaticMarkup(<StatValueInput stat={valueStat('checkbox')} value="globalStat:checkbox" onChange={() => {}} stage={stage} />);
-    assert.match(sourced, />checkbox</);
+    const sourced = renderToStaticMarkup(<StatValueInput stat={valueStat('boolean')} value="globalStat:boolean" onChange={() => {}} stage={stage} />);
+    assert.match(sourced, />boolean</);
     const choice = renderToStaticMarkup(<StatValueInput stat={valueStat('option')} value="function:choice" onChange={() => {}} stage={stage} />);
     assert.match(choice, /Choice\(\)/);
     assert.doesNotMatch(choice, /<select|Value source/);

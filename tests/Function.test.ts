@@ -600,7 +600,7 @@ const parameter = (id: string, type: StatType, defaultValue: StatValue, extra: P
 const scaledFunction = (): GameFunction => ({
     id: 'scaled', name: 'Scaled', description: '', returnType: 'number',
     script: "return arg('Amount') * (arg('Double') ? 2 : 1);",
-    parameters: [parameter('amount', 'number', 1), parameter('double', 'checkbox', false)],
+    parameters: [parameter('amount', 'number', 1), parameter('double', 'boolean', false)],
 });
 
 test('schedule function parameters bind Variable to each actor for own and universal rules', () => {
@@ -686,7 +686,7 @@ test('formulas and text calls pass positional literal arguments and leave non-ca
     configuration.functions = [scaledFunction(), {
         id: 'greet', name: 'Greet', description: '', returnType: 'text',
         script: "return 'Hello, ' + arg('Who') + (arg('Loud') ? '!' : '.');",
-        parameters: [parameter('who', 'text', 'friend'), parameter('loud', 'checkbox', false)],
+        parameters: [parameter('who', 'text', 'friend'), parameter('loud', 'boolean', false)],
     }];
     assert.equal(stage.resolveValue('Scaled(3) + 1', 'number'), 4);
     assert.equal(stage.resolveValue('call("Scaled", 4, 1) * 2', 'number'), 8);
@@ -1099,7 +1099,7 @@ test('label templates accept positional function arguments and defaults against 
         parameters: [
             stat('person', 'text', { name: 'Person', default: 'Player' }),
             stat('amount', 'number', { name: 'Amount', default: 3 }),
-            stat('double', 'checkbox', { name: 'Double', default: false }),
+            stat('double', 'boolean', { name: 'Double', default: false }),
         ],
     }];
     const source = 'Visit {{ gReEtInG("Alex, Smith", 2, true) }} / {{Greeting(\'Sam\')}} / {{Greeting()}} / {{Greeting}}';
@@ -1146,7 +1146,7 @@ test('bare global stat tags resolve current values, defaults, references and for
     const { stage, save, configuration } = fixture();
     configuration.globalStats.push(
         stat('summary', 'text', { name: 'Score summary', default: functionReference('summary-function') }),
-        stat('enabled', 'checkbox', { name: 'Enabled', default: false }),
+        stat('enabled', 'boolean', { name: 'Enabled', default: false }),
         stat('fallback', 'text', { name: 'Fallback', default: 'Default text' }),
     );
     configuration.functions = [typedFunction('summary-function', 'text', 'return `Score: ${get("Score")}`;')];
@@ -1198,7 +1198,7 @@ test('function placeholders format every non-void return type without normalizin
     const cases: [StatType, StatValue, string][] = [
         ['text', 'A label', 'A label'], ['text', '', ''],
         ['number', 0, '0'], ['number', -7.5, '-7.5'],
-        ['checkbox', true, 'yes'], ['checkbox', false, 'no'],
+        ['boolean', true, 'yes'], ['boolean', false, 'no'],
         ['actor', 'a', 'Same name'], ['item', 'item', 'Sword'], ['location', 'place', 'Town'],
         ['actorList', ['b', 'a'], 'Same name, Same name'],
         ['itemList', ['item', 'item'], 'Sword, Sword'],
@@ -1316,7 +1316,7 @@ test('every declared value type resolves and snapshots its primitive or ID resul
     const { stage, configuration, save } = fixture();
     stage.saveGame = () => {};
     const cases: [StatType, StatValue][] = [
-        ['number', 7], ['text', 'A label'], ['checkbox', false], ['option', 'first'],
+        ['number', 7], ['text', 'A label'], ['boolean', false], ['option', 'first'],
         ['actor', 'a'], ['item', 'item'], ['location', 'place'], ['optionList', ['first']],
         ['actorList', ['a', 'b']], ['itemList', ['item']], ['locationList', ['place']],
     ];
@@ -1467,8 +1467,8 @@ test('writes snapshot references and adjustments resolve operands without evalua
 
 test('function-backed defaults are evaluated at initialization and unused defaults are not evaluated', () => {
     const { stage, save, configuration } = fixture();
-    for (const type of ['number', 'checkbox', 'locationList', 'optionList'] as const) {
-        const value = type === 'number' ? 3 : type === 'checkbox' ? true : [];
+    for (const type of ['number', 'boolean', 'locationList', 'optionList'] as const) {
+        const value = type === 'number' ? 3 : type === 'boolean' ? true : [];
         configuration.functions = [typedFunction('default', type, `return ${JSON.stringify(value)};`)];
         const dynamic = stat(type, type, { default: functionReference('default') });
         assert.deepEqual(buildInitialGlobalStatValues([dynamic], {}, stage.getScheduleContext(save))[type], value);
@@ -1542,13 +1542,13 @@ test('conditions resolve actual values, comparison values, identity, and content
     assert.equal(evaluateCondition({ type: 'calendar', field: 'dayOfWeek', comparison: 'equals', value: functionReference('weekday') }, context), true);
 });
 
-test('function conditions compare scalar, checkbox, and list results against literal and resolved values', () => {
+test('function conditions compare scalar, boolean, and list results against literal and resolved values', () => {
     const { stage, configuration, save } = fixture();
     configuration.functions = [
         typedFunction('score', 'number', 'return 6;'),
         typedFunction('tag', 'text', 'return "hero";'),
         typedFunction('party', 'actorList', 'return ["a", "b"];'),
-        typedFunction('flag', 'checkbox', 'return true;'),
+        typedFunction('flag', 'boolean', 'return true;'),
         { ...typedFunction('offset', 'number', 'return arg("Amount") + 1;'), parameters: [stat('Amount', 'number', { default: 0 })] },
         { id: 'reset', name: 'Reset', description: '', returnType: 'void', script: '' },
     ];
@@ -1634,7 +1634,7 @@ test('global stat picker sources match exact types and remain distinct from func
 test('all global stat source types resolve save values or stat defaults, ignoring legacy configuration overrides', () => {
     const { stage, configuration, save } = fixture();
     const cases: [StatType, StatValue, StatValue][] = [
-        ['number', 3, 4], ['text', 'star', 'favorite'], ['checkbox', false, true],
+        ['number', 3, 4], ['text', 'star', 'favorite'], ['boolean', false, true],
         ['option', 'first', 'second'], ['optionList', ['first'], ['second']],
         ['actor', 'a', 'b'], ['actorList', ['a'], ['b']],
         ['item', 'item', 'other-item'], ['itemList', ['item'], ['other-item']],
@@ -1841,7 +1841,7 @@ test('direct and script assignments snapshot sources and reject invalid sources 
 
 test('configuration updates preserve typed entity values, seed defaults, and remove stale IDs', () => {
     const cases: [StatType, StatValue][] = [
-        ['number', 5], ['text', 'hello'], ['checkbox', false],
+        ['number', 5], ['text', 'hello'], ['boolean', false],
         ['option', 'first'], ['optionList', ['first']],
         ['actor', 'b'], ['actorList', ['a', 'b']],
         ['item', 'item'], ['itemList', ['item']],
@@ -1856,11 +1856,11 @@ test('configuration updates preserve typed entity values, seed defaults, and rem
         configuration.actorStats = configuration.locationStats = configuration.itemStats = definitions;
         const entity = sync === 'syncActorStats' ? save.actors.b
             : sync === 'syncLocationStats' ? save.atlas.place : save.inventory[0];
-        entity.statMap = { stale: 42, checkbox: true, number: 8, actorList: ['b'] };
+        entity.statMap = { stale: 42, boolean: true, number: 8, actorList: ['b'] };
         stage.updateConfiguration({ actorStats: definitions, locationStats: definitions, itemStats: definitions });
         const expected = {
             ...Object.fromEntries(cases),
-            checkbox: true, number: 8, actorList: ['b'],
+            boolean: true, number: 8, actorList: ['b'],
         };
         assert.deepEqual(entity.statMap, expected, sync);
         stage.updateConfiguration({});

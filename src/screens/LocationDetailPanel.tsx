@@ -282,7 +282,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
         setEditedStatMap((prev) => {
             const next = createInitialLocationStatMap(location, locationStats);
             locationStats.forEach((stat) => {
-                if (isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || stat.type === 'checkbox') {
+                if (isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || stat.type === 'boolean') {
                     return;
                 }
                 const previousValue = Number(prev[stat.id]);
@@ -342,7 +342,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
     };
 
     const handleLocationStatValueChange = (stat: Stat, value: number) => {
-        if (stat.type === 'checkbox') {
+        if (stat.type === 'boolean') {
             setEditedStatMap((prev) => ({
                 ...prev,
                 [stat.id]: Boolean(value),
@@ -842,7 +842,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
 
                                                         {hasValueSource ? <StatValueInput stat={stat} value={editedStatMap[stat.id]} onChange={value => handleLocationStatReferenceChange(stat, value)}
                                                             stage={stage} actors={actorOptions} items={itemOptions} locations={locationOptions} /> : <>
-                                                        {stat.type === 'checkbox' && (
+                                                        {stat.type === 'boolean' && (
                                                             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
                                                                 <input
                                                                     type="checkbox"

@@ -39,7 +39,7 @@ export const resolveConditionalFlag = (flag: ConditionalFlag | undefined, contex
 // 'optionList' holds a pool of options (Stat.options) whose value is the list of currently active option ids;
 // 'option' stats may pull their choices from one via Stat.optionSourceStatId.
 // 'contentList' is a mixed reference list whose ids may point at actors, items, and locations together.
-export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'checkbox' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'contentList';
+export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'boolean' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'contentList';
 export type StatValue = number | string | boolean | string[];
 
 export const isNumericDisplayType = (type: StatType): boolean => type === 'number';
@@ -392,7 +392,7 @@ export const cloneStat = (stat: Stat): Stat => ({
     guidance: stat.guidance,
     default: isValueReference(stat.default) ? stat.default : isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type)
         ? normalizeReferenceListValue(stat.default)
-        : (typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'checkbox' ? false : 0))),
+        : (typeof stat.default === 'boolean' ? stat.default : (typeof stat.default === 'number' || typeof stat.default === 'string' ? stat.default : (stat.type === 'boolean' ? false : 0))),
     type: stat.type,
     options: (stat.options || []).map((option) => ({
         id: option.id,
@@ -437,7 +437,7 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
         return typeof stat.default === 'string' ? stat.default : '';
     }
 
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         return typeof stat.default === 'boolean' ? stat.default : false;
     }
 
@@ -491,7 +491,7 @@ export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValu
         return typeof fallback === 'string' ? fallback : '';
     }
 
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         if (typeof value === 'boolean') {
             return value;
         }

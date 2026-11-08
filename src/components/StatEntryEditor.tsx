@@ -87,7 +87,7 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
         };
     }
 
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         return {
             ...stat,
             default: typeof stat.default === 'boolean' ? stat.default : false,
@@ -108,7 +108,7 @@ export const renderStatTypeOptions = () => (
     <>
         <option value="actor">Actor</option>
         <option value="actorList">Actor List</option>
-        <option value="checkbox">Checkbox</option>
+        <option value="boolean">Boolean</option>
         <option value="contentList">Content List</option>
         <option value="item">Item</option>
         <option value="itemList">Item List</option>
@@ -468,7 +468,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                             </div>
                         )}
 
-                        {normalizedStat.type === 'checkbox' && !hasDefaultValueRules && (
+                        {normalizedStat.type === 'boolean' && !hasDefaultValueRules && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Value</label>
                                 {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}

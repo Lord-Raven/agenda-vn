@@ -43,7 +43,7 @@ const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]
     if (stat.type === 'option' || stat.type === 'optionList') {
         return formatStatOptionValueText(stat, normalized) || '';
     }
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         return normalized === true ? 'True' : 'False';
     }
     return typeof normalized === 'string' ? normalized : `${Number(normalized)}`;

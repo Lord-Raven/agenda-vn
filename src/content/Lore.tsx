@@ -108,7 +108,7 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
     const lookup = { actors: save.actors, items: save.inventory, locations: save.atlas };
 
     const formatValue = (type: StatType, value: StatValue): string => {
-        if (type === 'checkbox') {
+        if (type === 'boolean') {
             return value === true ? 'yes' : 'no';
         }
         if (isReferenceStatType(type)) {

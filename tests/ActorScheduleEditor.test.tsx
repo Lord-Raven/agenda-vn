@@ -15,7 +15,7 @@ import { variableContentValue } from '../src/content/Condition';
 
 const testSchedulePicker = (source: 'destination' | 'condition') => test(`schedule ${source} Function actor parameters offer Variable and persist it on confirmation`, () => {
     const fn: GameFunction = {
-        id: 'destination', name: 'Destination', description: '', returnType: source === 'destination' ? 'location' : 'checkbox',
+        id: 'destination', name: 'Destination', description: '', returnType: source === 'destination' ? 'location' : 'boolean',
         script: "return arg('Who') ? 'place' : '';",
         parameters: [cloneStat({
             id: 'Who', name: 'Who', type: 'actor', default: '', guidance: '',

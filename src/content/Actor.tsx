@@ -320,9 +320,9 @@ function buildActorStatFields(actorStats: Stat[], stage?: Stage): StructuredFiel
         key: `stat_${index}`,
         label: `STAT ${index + 1}`,
         description:
-            `${stat.type === 'checkbox' ? 'Boolean value' : 'Numeric value'} for "${stat.name}".` +
+            `${stat.type === 'boolean' ? 'Boolean value' : 'Numeric value'} for "${stat.name}".` +
             ` Guidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}.` +
-            `${stat.type === 'checkbox' ? ` Default: ${stat.default === true}.` : ` Range: ${typeof stat.min === 'number' ? stat.min : '-inf'} to ${typeof stat.max === 'number' ? stat.max : '+inf'}. Default: ${Number.isFinite(stat.default) ? Number(stat.default) : 0}.`}`,
+            `${stat.type === 'boolean' ? ` Default: ${stat.default === true}.` : ` Range: ${typeof stat.min === 'number' ? stat.min : '-inf'} to ${typeof stat.max === 'number' ? stat.max : '+inf'}. Default: ${Number.isFinite(stat.default) ? Number(stat.default) : 0}.`}`,
     }));
 }
 
@@ -345,13 +345,13 @@ export function resolveInitialActorStatValue(stat: Stat, initial: ActorStatIniti
         stat, { evaluateDiceNotation: true },
     );
     const modifiers = (initial?.modifiers || []).filter(modifier => evaluateConditionCollections(modifier.conditions, context));
-    if (!isNumericDisplayType(stat.type) && stat.type !== 'checkbox') {
+    if (!isNumericDisplayType(stat.type) && stat.type !== 'boolean') {
         const value = modifiers.reduce((_, modifier) =>
             normalizeStatValue(modifier.amount, stat, { evaluateDiceNotation: true }), storedValue);
         return resolveStatValue(value, stat, context);
     }
 
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         return resolveStatValue(storedValue, stat, context);
     }
 
@@ -393,8 +393,8 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
 
     const actorStatContext = actorStats.length > 0
         ? actorStats.map((stat, index) => {
-            if (stat.type === 'checkbox') {
-                return `${index + 1}. ${stat.name}\nGuidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}\nType: checkbox\nDefault: ${stat.default === true}`;
+            if (stat.type === 'boolean') {
+                return `${index + 1}. ${stat.name}\nGuidance: ${resolveStatText(stat.guidance, stage) || 'N/A'}\nType: boolean\nDefault: ${stat.default === true}`;
             }
             const defaultValue = Number.isFinite(stat.default) ? Number(stat.default) : 0;
             const minValue = typeof stat.min === 'number' ? `${stat.min}` : '-inf';
@@ -405,7 +405,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
 
     const exampleStatValues = Object.fromEntries(actorStatFields.map((field, index) => {
         const sourceStat = actorStats[index];
-        const fallbackValue = sourceStat?.type === 'checkbox'
+        const fallbackValue = sourceStat?.type === 'boolean'
             ? `${sourceStat.default === true}`
             : `${Number.isFinite(sourceStat?.default) ? Number(sourceStat.default) : 0}`;
         return [field.key, fallbackValue];
@@ -908,7 +908,7 @@ export function updateActorLore(actorId: string, lore: string, stage: Stage, isC
 }
 
 const formatActorStatValue = (value: StatValue, stat: Stat, atlas?: { [key: string]: { name: string } }, actors?: { [key: string]: { name: string } }, inventory?: Array<{ id: string; name: string }>): string => {
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         return value === true ? 'yes' : 'no';
     }
     if (isReferenceStatType(stat.type)) {

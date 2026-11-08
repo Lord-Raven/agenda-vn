@@ -61,7 +61,7 @@ export type FunctionCondition = {
 // location. Each field compares like a stat of the mapped type; with no active skit, participants are empty and
 // location is unset.
 export type SkitStateField = 'active' | 'participants' | 'location';
-export const SKIT_STATE_FIELD_TYPES: Record<SkitStateField, StatType> = { active: 'checkbox', participants: 'actorList', location: 'location' };
+export const SKIT_STATE_FIELD_TYPES: Record<SkitStateField, StatType> = { active: 'boolean', participants: 'actorList', location: 'location' };
 
 export type SkitStateCondition = {
     type: 'skitState';

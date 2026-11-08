@@ -109,7 +109,7 @@ for (const { name, stats, expected } of cases) {
 
 test('default conditions use the first global stat and its type-specific value', () => {
     for (const [stat, value] of [
-        [cloneStat({ ...numberStat, type: 'checkbox', default: true }), true],
+        [cloneStat({ ...numberStat, type: 'boolean', default: true }), true],
         [cloneStat({ ...numberStat, type: 'text', default: 'Ready' }), 'Ready'],
         [cloneStat({
             ...numberStat, type: 'option', default: 'second',
@@ -179,7 +179,7 @@ const statSelectionCases: Array<{
     { name: 'variable reference', from: locationStat, to: locationStat, value: 'variable:location', expectedValue: 'variable:location' },
     { name: 'numeric zero', from: numberStat, to: numberStat, comparison: 'greaterThan', value: 0, expectedValue: 0 },
     { name: 'numeric formula', from: numberStat, to: numberStat, value: '1d6+2', expectedValue: '1d6+2' },
-    { name: 'checkbox false', from: cloneStat({ ...numberStat, type: 'checkbox', default: true }), to: cloneStat({ ...numberStat, type: 'checkbox', default: true }), value: false, expectedValue: false },
+    { name: 'boolean false', from: cloneStat({ ...numberStat, type: 'boolean', default: true }), to: cloneStat({ ...numberStat, type: 'boolean', default: true }), value: false, expectedValue: false },
     { name: 'text substring', from: cloneStat({ ...numberStat, type: 'text' }), to: cloneStat({ ...numberStat, type: 'text' }), comparison: 'contains', value: 'hello', expectedValue: 'hello' },
     { name: 'shared option', from: optionStat, to: optionStat, value: 'shared', expectedValue: 'shared' },
     { name: 'unavailable option', from: optionStat, to: cloneStat({ ...optionStat, options: [{ id: 'other', name: 'Other', description: '' }], default: 'other' }), value: 'shared', expectedValue: 'other' },
@@ -282,7 +282,7 @@ test('function conditions reset incompatible comparisons and values for list res
 });
 
 test('boolean function conditions default to true when choosing the condition kind or function', () => {
-    const booleanFunction = { id: 'fn-ready', name: 'Ready', description: '', script: '', returnType: 'checkbox' };
+    const booleanFunction = { id: 'fn-ready', name: 'Ready', description: '', script: '', returnType: 'boolean' };
     const condition: Condition = { type: 'globalStat', statId: numberStat.id, comparison: 'equals', value: 7 };
     const expected: Condition = { type: 'function', reference: 'function:fn-ready', comparison: 'equals', value: true };
     assert.deepEqual(changeConditionSelect(condition, 'globalStat', 'function', {
@@ -297,17 +297,17 @@ test('boolean function conditions default to true when choosing the condition ki
 
 test('boolean function conditions retain explicit false comparisons when editing', () => {
     const stage = stageWithFunctions([
-        { id: 'first', name: 'First', description: '', script: '', returnType: 'checkbox' },
-        { id: 'second', name: 'Second', description: '', script: '', returnType: 'checkbox' },
+        { id: 'first', name: 'First', description: '', script: '', returnType: 'boolean' },
+        { id: 'second', name: 'Second', description: '', script: '', returnType: 'boolean' },
     ]);
     const condition: Condition = { type: 'function', reference: 'function:first', comparison: 'equals', value: false };
     assert.deepEqual(changeConditionSelect(condition, condition.reference, 'function:second', { stage }),
         { ...condition, reference: 'function:second' });
     assert.deepEqual(changeConditionSelect(condition, 'equals', 'notEquals', { stage }),
         { ...condition, comparison: 'notEquals' });
-    const checkbox = cloneStat({ ...numberStat, type: 'checkbox', default: false });
-    assert.deepEqual(changeConditionSelect({ type: 'globalStat', statId: checkbox.id, comparison: 'equals', value: false },
-        'globalStat', 'function', { globalStats: [checkbox], stage }), condition);
+    const booleanStat = cloneStat({ ...numberStat, type: 'boolean', default: false });
+    assert.deepEqual(changeConditionSelect({ type: 'globalStat', statId: booleanStat.id, comparison: 'equals', value: false },
+        'globalStat', 'function', { globalStats: [booleanStat], stage }), condition);
 });
 
 for (const type of ['actorList', 'locationList', 'itemList', 'contentList', 'optionList'] as const) {

@@ -231,11 +231,11 @@ test('actor-card rules react to stat changes, global state, actor identity, and 
     assert.doesNotMatch(render(), /Health/);
 });
 
-test('actor stat displays support option labels, checkboxes, references, and numbers', () => {
+test('actor stat displays support option labels, booleans, references, and numbers', () => {
     const { actor, configuration, render } = fixture();
     configuration.actorStats = [
         makeStat('Mood', { type: 'option', default: 'happy', options: [{ id: 'happy', name: 'Happy', description: '' }] }),
-        makeStat('Ready', { type: 'checkbox', default: true }),
+        makeStat('Ready', { type: 'boolean', default: true }),
         makeStat('Friends', { type: 'actorList', default: [actor.id] }),
         makeStat('Relationship', { default: 7 }),
     ];

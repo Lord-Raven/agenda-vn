@@ -15,7 +15,7 @@ export const FUNCTION_RETURN_TYPE_LABELS: Record<FunctionReturnType, string> = {
     number: 'Number',
     text: 'String',
     textList: 'String List',
-    checkbox: 'Checkbox',
+    boolean: 'Boolean',
     option: 'Option',
     optionList: 'Option List',
     actor: 'Actor',

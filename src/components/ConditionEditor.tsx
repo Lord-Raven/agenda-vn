@@ -94,7 +94,7 @@ const comparisonsForFunctionReturnType = (type?: StatType): Array<{ value: Condi
 
 const getDefaultFunctionConditionValue = (fn?: GameFunction): string | number | boolean => {
     const type = functionConditionValueType(fn);
-    return type === 'number' ? 0 : type === 'checkbox' ? true : '';
+    return type === 'number' ? 0 : type === 'boolean' ? true : '';
 };
 
 export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
@@ -170,7 +170,7 @@ const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
     if (!stat) {
         return 0;
     }
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         return typeof stat.default === 'boolean' ? stat.default : false;
     }
     if (stat.type === 'option' || stat.type === 'optionList') {
@@ -417,7 +417,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             const stat = statsForCondition(next).find(candidate => candidate.id === statId);
             return !!findStatOptionByValue(stat, value);
         }
-        if (type === 'checkbox') {
+        if (type === 'boolean') {
             return typeof value === 'boolean';
         }
         if (type === 'text') {

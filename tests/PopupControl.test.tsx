@@ -27,7 +27,7 @@ const makeStage = () => {
     const configuration: GameConfiguration = {
         controls: [], screens: [],
         actors: [], locations: [], items: [], globalStats: [cloneStat({
-            id: 'visible', name: 'Visible', type: 'checkbox', default: true, guidance: '',
+            id: 'visible', name: 'Visible', type: 'boolean', default: true, guidance: '',
             llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
         })], actorStats: [],
         locationStats: [], itemStats: [], functions: [], backgroundImageUrl: '',

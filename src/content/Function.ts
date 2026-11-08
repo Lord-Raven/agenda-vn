@@ -7,7 +7,7 @@ import { cloneStat } from './Stat';
 export type FunctionReturnType = StatType | 'textList' | 'void';
 
 export const FUNCTION_RETURN_TYPES: FunctionReturnType[] = [
-    'void', 'number', 'text', 'textList', 'checkbox', 'option', 'optionList',
+    'void', 'number', 'text', 'textList', 'boolean', 'option', 'optionList',
     'actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList',
 ];
 
@@ -85,7 +85,7 @@ export const validateFunctionResult = (value: unknown, type: FunctionReturnType)
         return;
     }
     const valid = type === 'number' ? typeof value === 'number' && Number.isFinite(value)
-        : type === 'checkbox' ? typeof value === 'boolean'
+        : type === 'boolean' ? typeof value === 'boolean'
             : type === 'textList' ? Array.isArray(value) && value.every(entry => typeof entry === 'string')
             : isListValueType(type) ? Array.isArray(value) && value.every(entry => typeof entry === 'string' && !isValueReference(entry))
                 : typeof value === 'string' && !isValueReference(value);

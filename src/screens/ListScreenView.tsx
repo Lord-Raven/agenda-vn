@@ -50,7 +50,7 @@ const formatDetailText = (detail: ResolvedListCardDetail): string => {
     if (detail.stat && (detail.type === 'option' || detail.type === 'optionList')) {
         return formatStatOptionValueText(detail.stat, detail.value) ?? '';
     }
-    if (detail.type === 'checkbox') return detail.value ? 'Yes' : 'No';
+    if (detail.type === 'boolean') return detail.value ? 'Yes' : 'No';
     return Array.isArray(detail.value) ? detail.value.join(', ') : String(detail.value ?? '');
 };
 

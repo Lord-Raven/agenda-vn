@@ -258,7 +258,7 @@ test('text value editors accept global stat references directly and preserve ref
     const selected = renderToStaticMarkup(<StatValueInput stat={target} value={globalStatReference('icon')} onChange={() => {}} stage={stage} />);
     assert.match(selected, /<input[^>]*value="globalStat:icon"/);
     assert.doesNotMatch(selected, /<select|Value source/);
-    for (const type of ['number', 'checkbox', 'option', 'optionList', 'actorList', 'locationList', 'itemList'] as const) {
+    for (const type of ['number', 'boolean', 'option', 'optionList', 'actorList', 'locationList', 'itemList'] as const) {
         const stat = sourceStat('target', type, globalStatReference('source'));
         assert.equal(normalizeStatShape(stat).default, globalStatReference('source'));
     }

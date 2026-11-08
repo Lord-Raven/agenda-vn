@@ -140,7 +140,7 @@ const normalizeActorStatModifierAmount = (stat: Stat, amount: unknown): StatValu
     if (isListStatType(stat.type)) {
         return normalizeStatValue(amount, stat);
     }
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         return typeof amount === 'boolean' ? amount : Boolean(resolveStatDefault(stat));
     }
     return Number.isFinite(amount) ? Number(amount) : 0;
@@ -817,7 +817,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     };
 
     const handleActorStatValueChange = (stat: Stat, value: StatValue) => {
-        if (stat.type === 'checkbox') {
+        if (stat.type === 'boolean') {
             setEditedStatMap((prev) => ({
                 ...prev,
                 [stat.id]: Boolean(value),
@@ -850,7 +850,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             setEditedStatInitialMap(prev => ({ ...prev, [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value } }));
             return;
         }
-        if (stat.type === 'checkbox') {
+        if (stat.type === 'boolean') {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
                 [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: Boolean(value) },
@@ -2160,7 +2160,7 @@ ${indent}}`;
 
                                                             {hasValueSource ? <StatValueInput stat={stat} value={editorValue} onChange={value => handleActorStatEditorValueChange(stat, value)}
                                                                 stage={stage} actors={actorOptions} items={itemOptions} locations={locationOptions} optionContext={{ entityStatValues: entityOptionValues }} /> : <>
-                                                            {stat.type === 'checkbox' && (
+                                                            {stat.type === 'boolean' && (
                                                                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--agenda-text-primary)' }}>
                                                                     <input
                                                                         type="checkbox"

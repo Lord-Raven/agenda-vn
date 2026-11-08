@@ -34,7 +34,7 @@ const StatValueContainer: FC<{ stat: Stat; control: Control; value: StatValue; s
             </Box>
         );
     }
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         return (
             <Box sx={{ color: 'var(--agenda-highlight)', fontWeight: 700, whiteSpace: 'nowrap' }}>
                 {value === true ? 'True' : 'False'}

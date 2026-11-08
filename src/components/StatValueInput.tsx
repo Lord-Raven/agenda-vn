@@ -37,7 +37,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
             resolveValue: (source, type) => stageInstance.resolveValue(source, type),
         };
     }
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         if (valuePickerOptions(stageInstance?.getConfiguration(), stat.type).length || isValueReference(value)) {
             return <SearchableOptionPicker
                 value={String(value)}
@@ -45,7 +45,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
                     if (typeof next === 'string') onChange(next === 'true' ? true : next === 'false' ? false : next);
                 }}
                 options={[{ key: 'true', label: 'True' }, { key: 'false', label: 'False' }]}
-                functionType="checkbox" stage={stage} title="Choose value"
+                functionType="boolean" stage={stage} title="Choose value"
             />;
         }
         return (

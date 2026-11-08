@@ -15,7 +15,7 @@ interface OutcomeDisplayProps {
     stage: () => Stage;
 }
 
-// Unlike resolveStatValueText (numeric stats only), this also handles option/text/checkbox StatValues.
+// Unlike resolveStatValueText (numeric stats only), this also handles option/text/boolean StatValues.
 const formatStatValue = (stat: Stat, value: StatValue, control: Control): string => {
     if (stat.type === 'number') {
         return resolveStatValueText(stat, Number(value), control.displayType);
@@ -23,7 +23,7 @@ const formatStatValue = (stat: Stat, value: StatValue, control: Control): string
     if (stat.type === 'option' || stat.type === 'optionList') {
         return formatStatOptionValueText(stat, value) || `${value ?? ''}`;
     }
-    if (stat.type === 'checkbox') {
+    if (stat.type === 'boolean') {
         return value ? 'Yes' : 'No';
     }
     return `${value ?? ''}`;

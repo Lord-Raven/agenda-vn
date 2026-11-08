@@ -119,7 +119,7 @@ test('no Screens, inactive Screens, and unavailable Screens retain the default L
     assert.match(renderMapScreen(stage), /No Locations/);
     screen.active = true;
     stage.getConfiguration().globalStats.push(cloneStat({
-        id: 'qualifies', name: 'Qualifies', type: 'checkbox', default: false, guidance: '',
+        id: 'qualifies', name: 'Qualifies', type: 'boolean', default: false, guidance: '',
         llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
     }));
     stage.getSave().globalStatValues!.qualifies = false;
