@@ -101,6 +101,19 @@ test('function generation includes world, actors, date, typed signatures, stats,
     assert.equal(configuration.functions[0].script, fn.script);
 });
 
+test('function generation documents evaluated actor locations and accepts scripts using them', async () => {
+    const { stage, fn } = fixture();
+    const body = "return getActor('Player')?.getLocation()?.id ?? '';";
+    stage.generateText = async prompt => {
+        for (const reference of ['getLocation()', 'universal schedule', 'current game date, time, and stats',
+            'Location accessor', 'undefined', 'missing/inactive', "actors().filter(a => a.getLocation()?.id"]) {
+            assert.ok(prompt.includes(reference), `Missing schedule API: ${reference}`);
+        }
+        return `<Script>${body}</Script>`;
+    };
+    assert.equal(await generateFunctionScript({ ...fn, returnType: 'location' }, [fn], stage), body);
+});
+
 test('generation accepts fenced bodies, rejects empty/invalid code, and never executes the result', async () => {
     const { stage, fn } = fixture();
     stage.generateText = async () => '```javascript\nthrow new Error("Not executed");\n```';

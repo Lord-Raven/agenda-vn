@@ -172,6 +172,14 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                         description, category, imageUrl, themeColor).
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
+                        Actor accessors also expose <strong>getLocation()</strong>, which evaluates their own and
+                        universal schedule rules using the current game date, time, and stats.
+                        It returns a Location accessor, or <strong>undefined</strong> if the actor is available
+                        without an assigned location, unavailable, or the location is missing or inactive.
+                        For a Location return value, use <strong>return getActor('Alice')?.getLocation()?.id ?? '';</strong>
+                        {' '}or filter actors with <strong>actors().filter(a =&gt; a.getLocation()?.id === 'location-id')</strong>.
+                    </Typography>
+                    <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         This script may optionally <strong>return</strong> a value; other functions can call it with
                         <strong>call(name)</strong>. Any stats written through <strong>set</strong> go through the normal stat
                         normalization pipeline, while direct field writes skip that pipeline and mutate the underlying

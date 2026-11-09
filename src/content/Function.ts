@@ -217,6 +217,7 @@ export type FunctionScriptEntity = {
     kind: ContentType;
     get: (statName: string) => StatValue | undefined;
     getObjects: (statName: string) => FunctionScriptObject[];
+    getLocation?: () => FunctionScriptEntity | undefined;
     set: (statName: string, value: StatValue) => void;
     getField?: (fieldName: string) => string | undefined;
     setField?: (fieldName: string, value: string) => void;

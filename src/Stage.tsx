@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import { ConditionContext, ContentType, createSeededRandom, evaluateConditionCollections, hashString, parseVariableContentValue } from "./content/Condition";
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
-import { Actor, ACTOR_SCHEDULE_AVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
+import { Actor, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult, HEADER_VARIABLE_VALUE, isStatReturnType } from './content/Function';
@@ -2161,6 +2161,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 statMap[stat.id] = this.readStatValue(value, stat, save, context.stack, context.variables);
             },
         };
+        if (kind === 'actor') {
+            accessor.getLocation = () => {
+                const destination = resolveActorSchedule(save.actors[entity.id], {
+                    ...this.getScheduleContext(save),
+                    resolveValue: (value, type, variables) => this.resolveValue(value, type, save, context.stack, { ...context.variables, ...variables }),
+                });
+                if (destination === ACTOR_SCHEDULE_AVAILABLE || destination === ACTOR_SCHEDULE_UNAVAILABLE) {
+                    return undefined;
+                }
+                const location = save.atlas[destination];
+                return location && location.active !== false
+                    ? this.buildEntityScriptAccessor(save, location, 'location', this.getConfiguration(save).locationStats || [], LOCATION_SCRIPT_FIELDS, context)
+                    : undefined;
+            };
+        }
         if (fieldAllowlist) {
             const findField = (fieldName: string) => fieldAllowlist.find(candidate => candidate.toLowerCase() === `${fieldName || ''}`.trim().toLowerCase());
             accessor.getField = (fieldName: string) => {

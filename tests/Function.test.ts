@@ -73,6 +73,124 @@ const gameFunction = (script: string): GameFunction => ({
     id: 'test-function', name: 'Test function', description: '', script, returnType: 'void',
 });
 
+test('actor getLocation is available through lookups, enumeration, and resolved lists', () => {
+    const { stage, save, configuration } = fixture();
+    save.actors.a.schedule = { place: [] };
+    save.actors.b.schedule = { place: [] };
+    const fn = {
+        ...gameFunction(`return [
+            getActor('Same name').getLocation().id,
+            actors()[1].getLocation().name,
+            getObjects('Party')[0].getLocation().get('Score'),
+            getItem('Sword').getObjects('Party')[1].getLocation().getField('description'),
+            typeof getLocation('Town').getLocation,
+            typeof getItem('Sword').getLocation
+        ];`),
+    };
+    assert.deepEqual(stage.testFunction(fn), {
+        value: ['place', 'Town', 2, 'Busy', 'undefined', 'undefined'], errors: [],
+    });
+    const locationFunction: GameFunction = {
+        ...gameFunction("return getActor('Same name')?.getLocation()?.id ?? '';"),
+        returnType: 'location',
+    };
+    configuration.functions = [locationFunction];
+    assert.equal(stage.resolveValue(functionReference(locationFunction.id), 'location'), 'place');
+});
+
+test('actor getLocation evaluates current calendar and stat rules with universal fallback and unavailable precedence', () => {
+    const { stage, save } = fixture();
+    save.atlas.other = new Location({ id: 'other', name: 'Other' });
+    save.currentDate = '2026-11-09';
+    save.currentTimeOfDay = 'morning';
+    save.actors.a.schedule = { other: [[
+        { type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'evening' },
+        { type: 'globalStat', statId: 'Score', comparison: 'equals', value: 3 },
+    ]] };
+    save.universalSchedule = { place: [] };
+    const fn = gameFunction("return getActor('Same name').getLocation()?.id;");
+    assert.deepEqual(stage.testFunction(fn), { value: 'place', errors: [] });
+    save.currentTimeOfDay = 'evening';
+    assert.equal(stage.testFunction(fn).value, 'place');
+    save.globalStatValues!.Score = 3;
+    assert.deepEqual(stage.testFunction(fn), { value: 'other', errors: [] });
+    save.universalSchedule.unavailable = [];
+    assert.deepEqual(stage.testFunction(fn), { value: undefined, errors: [] });
+});
+
+test('actor getLocation returns undefined for unassigned, unavailable, missing, and inactive destinations', () => {
+    const { stage, save } = fixture();
+    const fn = gameFunction("return actors()[0].getLocation();");
+    for (const destination of ['', 'available', 'unavailable', 'missing', 'place']) {
+        save.actors.a.schedule = destination ? { [destination]: [] } : {};
+        save.atlas.place.active = false;
+        assert.deepEqual(stage.testFunction(fn), { value: undefined, errors: [] }, destination);
+    }
+});
+
+test('actor getLocation resolves stat and function destinations with the scheduled actor binding', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.globalStats.push(stat('Destination', 'location', { default: 'place' }));
+    configuration.actorStats.push(stat('Destinations', 'locationList', { default: ['place'] }));
+    const destination: GameFunction = {
+        ...gameFunction("return arg('Who') === 'a' ? 'place' : '';"),
+        id: 'destination', name: 'Destination', returnType: 'location',
+        parameters: [stat('Who', 'actor', { default: variableContentValue('actor') })],
+    };
+    configuration.functions = [destination];
+    const fn = gameFunction("return actors().map(a => a.getLocation()?.id ?? '');");
+    for (const target of [globalStatReference('Destination'), 'actorStat:Destinations', functionReference(destination.id)]) {
+        save.actors.a.schedule = { [target]: [] };
+        save.actors.b.schedule = { [target]: [] };
+        assert.deepEqual(stage.testFunction(fn), {
+            value: target === functionReference(destination.id) ? ['place', ''] : ['place', 'place'],
+            errors: [],
+        }, target);
+    }
+});
+
+test('actor getLocation reads live changes and preserves clone isolation and read-only access', () => {
+    const { stage, save, configuration } = fixture();
+    save.actors.a.schedule = { [globalStatReference('Destination')]: [] };
+    configuration.globalStats.push(stat('Destination', 'location', { default: '' }));
+    const fn = gameFunction(`
+        const actor = actors()[0];
+        const before = actor.getLocation();
+        set('Destination', 'place');
+        actor.getLocation().set('Score', 7);
+        actor.getLocation().setField('description', 'Changed');
+        return [before, actor.getLocation().get('Score'), actor.getLocation().getField('description')];
+    `);
+    const before = JSON.stringify(save);
+    assert.deepEqual(stage.testFunction(fn), { value: [undefined, 7, 'Changed'], errors: [] });
+    assert.equal(JSON.stringify(save), before);
+    save.globalStatValues!.Destination = 'place';
+    for (const write of ["set('Score', 7)", "setField('description', 'Changed')"]) {
+        const reader: GameFunction = {
+            ...gameFunction(`actors()[0].getLocation().${write}; return 1;`), returnType: 'number',
+        };
+        assert.match(stage.testFunction(reader).errors[0], /read-only/);
+    }
+});
+
+test('actor getLocation reports cycles in schedule destinations and conditions', () => {
+    const { stage, save, configuration } = fixture();
+    const fn: GameFunction = {
+        ...gameFunction("return actors()[0].getLocation()?.id ?? '';"), returnType: 'location',
+    };
+    configuration.functions = [fn];
+    for (const schedule of [
+        { [functionReference(fn.id)]: [] },
+        { place: [[{ type: 'function' as const, reference: functionReference(fn.id), comparison: 'equals' as const, value: 'place' }]] },
+    ]) {
+        save.actors.a.schedule = schedule;
+        const result = stage.testFunction(fn);
+        assert.equal(result.errors.length, 1);
+        assert.match(result.errors[0], /cyclic function reference/);
+        assert.throws(() => stage.resolveValue(functionReference(fn.id), 'location'), /cyclic function reference/);
+    }
+});
+
 test('list stat maximum truncates defaults and values while preserving unlimited and zero limits', () => {
     for (const type of ['actorList', 'itemList', 'locationList', 'contentList', 'optionList'] as const) {
         const options = ['a', 'b', 'c'].map(id => ({ id, name: id, description: '' }));

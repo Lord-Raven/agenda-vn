@@ -21,6 +21,11 @@ Only these game helpers are injected; there is no stage, save, player, or curren
   getField(fieldName), setField(fieldName, stringValue). There is no direct stat property access.
   getField/setField access metadata such as name, role, description, category, imageUrl, themeColor;
   field writes skip stat normalization. Resolved options are copies with id, name, description.
+  Actor accessors also expose getLocation(): evaluate their own and universal schedule rules
+  using the current game date, time, and stats, including dynamic destinations.
+  Returns a Location accessor, or undefined when available without an assigned location,
+  unavailable, or the location is missing/inactive. Use getActor('Alice')?.getLocation()?.id ?? ''
+  for a location ID; actors().filter(a => a.getLocation()?.id === 'location-id') finds actors there.
 - call(name, { 'Parameter name': value }): invoke another Function with named arguments.
   Omitted arguments use defaults. Do not call Functions as bare JavaScript identifiers.
   Duplicate names are ambiguous. Avoid recursive or cyclic calls.
