@@ -54,6 +54,7 @@ interface CategorizedEntrySidebarProps<TEntry> {
     shouldReduceMotion: boolean;
     emptyListMessage: string;
     renderSectionAction?: (section: CategorizedEntrySection<TEntry>) => void;
+    shouldShowSectionAction?: (section: CategorizedEntrySection<TEntry>) => boolean;
     sectionEmptyMessage?: string | ((section: CategorizedEntrySection<TEntry>) => string);
     shouldHideSection?: (section: CategorizedEntrySection<TEntry>) => boolean;
     defaultCollapsed?: boolean;
@@ -71,6 +72,7 @@ export const CategorizedEntrySidebar = <TEntry,>({
     shouldReduceMotion,
     emptyListMessage,
     renderSectionAction,
+    shouldShowSectionAction,
     sectionEmptyMessage,
     shouldHideSection,
     defaultCollapsed = true,
@@ -160,7 +162,7 @@ export const CategorizedEntrySidebar = <TEntry,>({
                                         ▸
                                     </motion.span>
                                 </button>
-                                {renderSectionAction && (
+                                {renderSectionAction && (shouldShowSectionAction?.(section) ?? true) && (
                                     <Button
                                         variant="secondary"
                                         onClick={() => renderSectionAction(section)}

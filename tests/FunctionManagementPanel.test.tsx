@@ -302,6 +302,20 @@ test('sidebar groups each function under its declared return type, including lis
     assert.equal((html.match(/aria-pressed="false"/g) || []).length, FUNCTION_RETURN_TYPES.length);
 });
 
+test('orphaned functions remain listed and their unsupported return type can be corrected', () => {
+    const { stage, configuration } = fixture();
+    const fn = { id: 'orphan', name: 'Orphaned function', description: '', script: '', returnType: 'removedType' as GameFunction['returnType'] };
+    configuration.functions = [fn];
+
+    const sidebarHtml = renderToStaticMarkup(<FunctionManagementPanel stage={() => stage} />);
+    assert.match(sidebarHtml, /Orphaned \(1\)/);
+    assert.ok(sidebarHtml.indexOf('Orphaned (1)') < sidebarHtml.indexOf('Orphaned function'));
+
+    const detailHtml = renderToStaticMarkup(<FunctionDetailPanel fn={fn} functions={[fn]} stage={stage}
+        onChange={() => {}} onMove={() => {}} onDelete={() => {}} />);
+    assert.match(detailHtml, /<option value="removedType"[^>]*>Invalid return type: removedType<\/option>/);
+});
+
 test('selected function details include all editable fields, script testing, reorder and delete controls', () => {
     const { stage, configuration } = fixture();
     const html = renderToStaticMarkup(<FunctionDetailPanel fn={configuration.functions[0]} functions={configuration.functions} stage={stage}

@@ -39,11 +39,15 @@ export const FunctionManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) =
         setFunctions(next);
     };
     const selectedFunction = functions.find(fn => fn.id === selectedFunctionId);
-    const sections = FUNCTION_RETURN_TYPES.map(type => ({
-        id: type,
-        title: FUNCTION_RETURN_TYPE_LABELS[type],
-        entries: functions.filter(fn => fn.returnType === type),
-    }));
+    const orphanedFunctions = functions.filter(fn => !FUNCTION_RETURN_TYPES.includes(fn.returnType));
+    const sections = [
+        ...FUNCTION_RETURN_TYPES.map(type => ({
+            id: type,
+            title: FUNCTION_RETURN_TYPE_LABELS[type],
+            entries: functions.filter(fn => fn.returnType === type),
+        })),
+        ...(orphanedFunctions.length > 0 ? [{ id: 'orphaned', title: 'Orphaned', entries: orphanedFunctions }] : []),
+    ];
     const create = (returnType: FunctionReturnType) => {
         const names = new Set(functions.map(fn => fn.name.trim().toLowerCase()));
         let name = 'New Function';
@@ -108,6 +112,7 @@ export const FunctionManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) =
                     shouldReduceMotion={Boolean(shouldReduceMotion)}
                     emptyListMessage="No functions defined."
                     sectionEmptyMessage="No functions."
+                    shouldShowSectionAction={section => section.id !== 'orphaned'}
                     renderSectionAction={section => {
                         const type = FUNCTION_RETURN_TYPES.find(type => type === section.id);
                         if (type) create(type);

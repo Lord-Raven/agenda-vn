@@ -38,6 +38,7 @@ interface FunctionDetailPanelProps {
 
 export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, functions, stage, onChange, onMove, onDelete }) => {
     const index = functions.findIndex(candidate => candidate.id === fn.id);
+    const hasSupportedReturnType = FUNCTION_RETURN_TYPES.includes(fn.returnType);
     const parameters = fn.parameters || [];
     const parameterTypes = FUNCTION_RETURN_TYPES.filter(isStatReturnType);
     const save = stage.getSave();
@@ -85,6 +86,7 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                 <label style={{ color: 'var(--agenda-text-muted)' }}>
                     Return Type
                     <select className="input-base" value={fn.returnType} onChange={event => onChange({ returnType: event.target.value as FunctionReturnType })}>
+                        {!hasSupportedReturnType && <option value={fn.returnType}>Invalid return type: {String(fn.returnType)}</option>}
                         {FUNCTION_RETURN_TYPES.map(type => <option key={type} value={type}>{FUNCTION_RETURN_TYPE_LABELS[type]}</option>)}
                     </select>
                 </label>
