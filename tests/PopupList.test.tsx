@@ -46,6 +46,8 @@ const fixture = () => {
             script: "return `${arg('Team')}:${arg('Who')}`;",
             parameters: [stat('Who', 'actor', ''), stat('Team', 'text', '')],
         },
+        { id: 'greeting', name: 'Greeting', description: '', returnType: 'text', script: "return 'Hello';" },
+        { id: 'macro-teams', name: 'Macro Teams', description: '', returnType: 'textList', script: "return ['{{Title}}', '{{Greeting}}'];" },
         { id: 'unrelated', name: 'Unrelated', description: '', returnType: 'number', script: 'return 1;' },
     ];
     const actorStats = [stat('Mood', 'number', 0), stat('Team', 'text', '')];
@@ -114,6 +116,20 @@ test('list sections expand String List headers, bind the header variable, and hi
     assert.equal(new Set(pages.map(page => page.key)).size, pages.length);
     assert.throws(() => stage.resolveValue(HEADER_VARIABLE_VALUE, 'text'), /header/i);
     assert.deepEqual(stage.resolveTextList(globalStatReference('Title')), ['Squad']);
+});
+
+test('List Screen headers expand Stat and Function macros for display', () => {
+    const { stage } = fixture();
+    const screen = new Screen({ type: 'list', sections: [
+        { ...createListSection(), header: '{{Title}} / {{Greeting}}', contentSource: globalStatReference('Crew') },
+        { ...createListSection(), headerSource: functionReference('macro-teams'), contentSource: globalStatReference('Crew') },
+    ] });
+
+    assert.deepEqual(buildListContentPages(stage, screen, () => {}).map(page => page.title), [
+        'Squad / Hello',
+        'Squad',
+        'Hello',
+    ]);
 });
 
 test('a failing header source is skipped without hiding other sections', () => {

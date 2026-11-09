@@ -6,6 +6,7 @@ import { formatStatOptionValueText, resolveReferenceKind } from '../content/Stat
 import { ContentCardList, ContentCardPage } from '../components/ContentCardList';
 import { ContentListPortraits } from '../components/ContentListControl';
 import { Skit } from '../content/Skit';
+import { processLoreText } from '../content/Lore';
 
 interface ListScreenViewProps {
     stage: () => Stage;
@@ -17,7 +18,7 @@ interface ListScreenViewProps {
 export const buildListContentPages = (stage: Stage, screen: Screen, onAction: (skit?: Skit | null) => void, isVerticalLayout = false): ContentCardPage[] =>
     stage.resolveListSections(screen).map(page => ({
         key: page.key,
-        title: page.header,
+        title: processLoreText(page.header, stage),
         cards: page.ids.map(id => {
             const details = page.section.details
                 .map(detail => stage.resolveListCardDetail(detail, page.kind, id, page.header))

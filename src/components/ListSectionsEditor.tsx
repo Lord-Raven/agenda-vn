@@ -82,6 +82,7 @@ export const ListSectionsEditor: FC<ListSectionsEditorProps> = ({ sections, onCh
                                 <TextInput fullWidth value={section.header} placeholder="e.g. Friends"
                                     onChange={event => update(section.id, { header: event.target.value })} />
                             )}
+                            <span style={helpStyle}>Header text supports Stat and Function macros with {'{{...}}'}.</span>
                         </div>
                         <div>
                             <label style={labelStyle}>Header Source (optional)</label>
