@@ -1,8 +1,9 @@
 import { FC, useEffect, useRef, useState } from 'react';
-import { Box, IconButton, Popover, Tooltip, Typography } from '@mui/material';
+import { Box, IconButton, Popover, Typography } from '@mui/material';
 import { AutoAwesome, PlayArrow } from '@mui/icons-material';
 import { Button, ConfirmDialog, TextArea } from './UiComponents';
 import { FunctionScriptTestResult } from '../content/Function';
+import { useTooltip } from './TooltipContext';
 
 interface FunctionEditorProps {
     script: string;
@@ -27,6 +28,7 @@ const formatTestValue = (value: unknown): string => {
 export const FunctionEditor: FC<FunctionEditorProps> = ({
     script, onScriptChange, onTest, onGenerate,
 }) => {
+    const { setTooltip, clearTooltip } = useTooltip();
     const [helpAnchor, setHelpAnchor] = useState<HTMLElement | null>(null);
     const [testRun, setTestRun] = useState<{ script: string; result: FunctionScriptTestResult } | null>(null);
     const testResult = testRun?.script === script ? testRun.result : undefined;
@@ -72,21 +74,25 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <label style={fieldLabelStyle}>Script</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%' }}>
-                    <Tooltip title="Test with a clone of the current game state">
-                        <span>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setTestRun({ script, result: onTest() })}
-                            >
-                                <PlayArrow fontSize="small" /> Test
-                            </Button>
-                        </span>
-                    </Tooltip>
                     {onGenerate && (
-                        <Button variant="secondary" disabled={isGenerating} onClick={() => setConfirmGeneration(true)}>
+                        <Button
+                            variant="secondary"
+                            disabled={isGenerating}
+                            onClick={() => setConfirmGeneration(true)}
+                            onMouseEnter={() => setTooltip('Generate a script after confirming replacement of the current script body', AutoAwesome)}
+                            onMouseLeave={clearTooltip}
+                        >
                             <AutoAwesome fontSize="small" /> {isGenerating ? 'Generating...' : 'Generate'}
                         </Button>
                     )}
+                    <Button
+                        variant="secondary"
+                        onClick={() => setTestRun({ script, result: onTest() })}
+                        onMouseEnter={() => setTooltip('Test with a clone of the current game state', PlayArrow)}
+                        onMouseLeave={clearTooltip}
+                    >
+                        <PlayArrow fontSize="small" /> Test
+                    </Button>
                     <IconButton
                         size="small"
                         aria-label="Function script reference"

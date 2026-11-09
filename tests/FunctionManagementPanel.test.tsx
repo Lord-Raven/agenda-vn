@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { renderToStaticMarkup as renderMarkup } from 'react-dom/server';
 import React, { isValidElement, ReactNode } from 'react';
 import { GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { Control } from '../src/content/Control';
@@ -27,6 +27,8 @@ import { TooltipProvider } from '../src/components/TooltipContext';
 import { Location } from '../src/content/Location';
 import { globalStatReference } from '../src/content/Function';
 import { Skit } from '../src/content/Skit';
+
+const renderToStaticMarkup = (node: ReactNode) => renderMarkup(<TooltipProvider>{node}</TooltipProvider>);
 
 const fixture = () => {
     const configuration: GameConfiguration = {
@@ -433,7 +435,7 @@ test('function details offer generation beside script testing', () => {
     const { stage, configuration } = fixture();
     const html = renderToStaticMarkup(<FunctionDetailPanel fn={configuration.functions[0]}
         functions={configuration.functions} stage={stage} onChange={() => {}} onMove={() => {}} onDelete={() => {}} />);
-    assert.match(html, /Test<\/button>.*Generate<\/button>/s);
+    assert.match(html, /Generate<\/button>.*Test<\/button>/s);
 });
 
 test('stats no longer offer a function type', () => {

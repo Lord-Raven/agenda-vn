@@ -12,6 +12,14 @@ import { generateFunctionScript } from '../src/content/FunctionGeneration';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { FunctionEditor } from '../src/components/FunctionEditor';
 import { Button, ConfirmDialog } from '../src/components/UiComponents';
+import { TooltipProvider, useTooltip } from '../src/components/TooltipContext';
+import { TooltipBar } from '../src/components/TooltipBar';
+import { AutoAwesome, PlayArrow } from '@mui/icons-material';
+
+const TestTooltipBar = () => {
+    const { message, icon } = useTooltip();
+    return <TooltipBar message={message} Icon={icon} autoDismissMs={0} />;
+};
 
 let originalWindow: PropertyDescriptor | undefined;
 beforeEach(() => {
@@ -112,8 +120,8 @@ test('Generate requires confirmation, prevents duplicate requests, and replaces 
     const onTest = mock.fn(() => ({ value: undefined, errors: [] }));
     let renderer!: ReactTestRenderer;
     act(() => {
-        renderer = create(<FunctionEditor script="return 1;" onGenerate={onGenerate}
-            onScriptChange={onScriptChange} onTest={onTest} />);
+        renderer = create(<TooltipProvider><FunctionEditor script="return 1;" onGenerate={onGenerate}
+            onScriptChange={onScriptChange} onTest={onTest} /></TooltipProvider>);
     });
     try {
         const clickGenerate = () => act(() => renderer.root.findAllByType(Button)
@@ -146,9 +154,9 @@ test('generation failures preserve the script and expose an error', async () => 
     const errorLog = mock.method(console, 'error', () => {});
     let renderer!: ReactTestRenderer;
     act(() => {
-        renderer = create(<FunctionEditor script="return 1;" onScriptChange={onScriptChange}
+        renderer = create(<TooltipProvider><FunctionEditor script="return 1;" onScriptChange={onScriptChange}
             onGenerate={async () => { throw new Error('Offline'); }}
-            onTest={() => ({ value: undefined, errors: [] })} />);
+            onTest={() => ({ value: undefined, errors: [] })} /></TooltipProvider>);
     });
     try {
         await act(async () => { await renderer.root.findByType(ConfirmDialog).props.onConfirm(); });
@@ -169,14 +177,15 @@ test('late generation results do not overwrite edited scripts or unmounted Funct
         const props = { onGenerate, onScriptChange, onTest: () => ({ value: undefined, errors: [] }) };
         const errorLog = mock.method(console, 'error', () => {});
         let renderer!: ReactTestRenderer;
-        act(() => { renderer = create(<FunctionEditor {...props} script="return 1;" />); });
+        act(() => { renderer = create(<TooltipProvider><FunctionEditor {...props} script="return 1;" /></TooltipProvider>); });
         let request!: Promise<void>;
         act(() => { request = renderer.root.findByType(ConfirmDialog).props.onConfirm(); });
         try {
             act(() => {
                 if (unmount) renderer.unmount();
-                else renderer.update(<FunctionEditor {...props} script="return 2;" />);
+                else renderer.update(<TooltipProvider><FunctionEditor {...props} script="return 2;" /></TooltipProvider>);
             });
+
             await act(async () => { resolve('return 42;'); await request; });
             assert.equal(onScriptChange.mock.callCount(), 0);
             if (!unmount) {
@@ -186,5 +195,37 @@ test('late generation results do not overwrite edited scripts or unmounted Funct
             if (!unmount) act(() => renderer.unmount());
             errorLog.mock.restore();
         }
+    }
+});
+
+test('Generate precedes Test and both buttons use the shared tooltip bar', () => {
+    const onTest = mock.fn(() => ({ value: 42, errors: [] }));
+    let renderer!: ReactTestRenderer;
+    act(() => {
+        renderer = create(<TooltipProvider>
+            <FunctionEditor script="return 42;" onScriptChange={() => {}}
+                onGenerate={async () => 'return 1;'} onTest={onTest} />
+            <TestTooltipBar />
+        </TooltipProvider>);
+    });
+    try {
+        const [generate, testButton] = renderer.root.findAllByType(Button);
+        assert.ok(React.Children.toArray(generate.props.children).includes('Generate'));
+        assert.ok(React.Children.toArray(testButton.props.children).includes(' Test'));
+        for (const [button, message, icon] of [
+            [generate, 'Generate a script after confirming replacement of the current script body', AutoAwesome],
+            [testButton, 'Test with a clone of the current game state', PlayArrow],
+        ] as const) {
+            act(() => button.props.onMouseEnter());
+            assert.equal(renderer.root.findByType(TooltipBar).props.message, message);
+            assert.equal(renderer.root.findByType(TooltipBar).props.Icon, icon);
+            act(() => button.props.onMouseLeave());
+            assert.equal(renderer.root.findByType(TooltipBar).props.message, null);
+        }
+        act(() => testButton.props.onClick());
+        assert.equal(onTest.mock.callCount(), 1);
+        assert.match(renderer.root.findByProps({ role: 'status' }).findByType('pre').children.join(''), /42/);
+    } finally {
+        act(() => renderer.unmount());
     }
 });
