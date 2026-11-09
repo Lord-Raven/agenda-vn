@@ -77,11 +77,11 @@ export async function generateFunctionScript(fn: GameFunction, functions: GameFu
         .addBlock('Other Functions', functions.filter(candidate => candidate.id !== fn.id).map(describeFunction))
         .addBlock('Function Script API', SCRIPT_REFERENCE)
         .addBlock('Response Format',
-            'Return ONLY the JavaScript body, without a function wrapper, Markdown fences, or explanation. ' +
-            'Finish with #END.')
+            '<Reasoning>Brief explanation of strategy.</Reasoning>\n<Script>JavaScript body with no function wrapper</Script>')
         .format();
     const response = (await stage.generateText(prompt, 50, 2500)).trim();
-    const script = (/^```(?:javascript|js)?\s*\n([\s\S]*?)\n```\s*$/i.exec(response)?.[1] ?? response).trim();
+
+    const script = /<Script>([\s\S]*?)<\/Script>/i.exec(response)?.[1]?.trim() || '';
     if (!script) {
         throw new Error('Function generation returned an empty script.');
     }
