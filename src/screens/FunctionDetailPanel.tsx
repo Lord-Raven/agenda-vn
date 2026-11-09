@@ -9,6 +9,7 @@ import { FunctionEditor } from '../components/FunctionEditor';
 import { StatValueInput } from '../components/StatValueInput';
 import { normalizeStatShape, resolveStatDefaultValue } from '../components/StatEntryEditor';
 import { Stage } from '../Stage';
+import { generateFunctionScript } from '../content/FunctionGeneration';
 
 export const FUNCTION_RETURN_TYPE_LABELS: Record<FunctionReturnType, string> = {
     void: 'Void (action only)',
@@ -165,7 +166,8 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                         Value pickers and formulas (e.g. {fn.name || 'Function'}(1, 'text')) supply arguments positionally; omitted arguments use the default.
                     </span>}
                 </div>
-                <FunctionEditor script={fn.script} onScriptChange={script => onChange({ script })} onTest={() => stage.testFunction(fn, functions)} />
+                <FunctionEditor script={fn.script} onScriptChange={script => onChange({ script })} onTest={() => stage.testFunction(fn, functions)}
+                    onGenerate={() => generateFunctionScript(fn, functions, stage)} />
             </div>
         </GlassPanel>
     );

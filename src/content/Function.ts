@@ -242,15 +242,17 @@ export type FunctionScriptBindings = {
 
 export type FunctionScriptTestResult = { value: unknown; errors: string[] };
 
+export const compileFunctionScript = (body: string) => new Function(
+    'get', 'set', 'getActor', 'getLocation', 'getItem', 'actors', 'locations', 'items', 'call', 'getObjects', 'arg', 'random', body,
+);
+
 export const runFunctionScript = (script: string | undefined, bindings: FunctionScriptBindings, onError?: (message: string) => void): unknown => {
     const body = (script || '').trim();
     if (!body) {
         return undefined;
     }
     try {
-        const scriptFunction = new Function(
-            'get', 'set', 'getActor', 'getLocation', 'getItem', 'actors', 'locations', 'items', 'call', 'getObjects', 'arg', 'random', body,
-        );
+        const scriptFunction = compileFunctionScript(body);
         return scriptFunction(
             bindings.get, bindings.set, bindings.getActor, bindings.getLocation, bindings.getItem,
             bindings.actors, bindings.locations, bindings.items, bindings.call, bindings.getObjects, bindings.arg, bindings.random,

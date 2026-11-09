@@ -429,6 +429,13 @@ test('function editor offers isolated testing without scoped target selectors', 
     assert.doesNotMatch(html, /Function test target|<select/);
 });
 
+test('function details offer generation beside script testing', () => {
+    const { stage, configuration } = fixture();
+    const html = renderToStaticMarkup(<FunctionDetailPanel fn={configuration.functions[0]}
+        functions={configuration.functions} stage={stage} onChange={() => {}} onMove={() => {}} onDelete={() => {}} />);
+    assert.match(html, /Test<\/button>.*Generate<\/button>/s);
+});
+
 test('stats no longer offer a function type', () => {
     const html = renderToStaticMarkup(<select>{renderStatTypeOptions()}</select>);
     assert.match(html, /value="number"/);

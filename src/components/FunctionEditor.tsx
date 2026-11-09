@@ -1,13 +1,14 @@
-import { FC, useState } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 import { Box, IconButton, Popover, Tooltip, Typography } from '@mui/material';
-import { PlayArrow } from '@mui/icons-material';
-import { Button, TextArea } from './UiComponents';
+import { AutoAwesome, PlayArrow } from '@mui/icons-material';
+import { Button, ConfirmDialog, TextArea } from './UiComponents';
 import { FunctionScriptTestResult } from '../content/Function';
 
 interface FunctionEditorProps {
     script: string;
     onScriptChange: (script: string) => void;
     onTest: () => FunctionScriptTestResult;
+    onGenerate?: () => Promise<string>;
 }
 
 const fieldLabelStyle = { color: 'var(--agenda-text-muted)', fontSize: 12 };
@@ -24,11 +25,47 @@ const formatTestValue = (value: unknown): string => {
 };
 
 export const FunctionEditor: FC<FunctionEditorProps> = ({
-    script, onScriptChange, onTest,
+    script, onScriptChange, onTest, onGenerate,
 }) => {
     const [helpAnchor, setHelpAnchor] = useState<HTMLElement | null>(null);
     const [testRun, setTestRun] = useState<{ script: string; result: FunctionScriptTestResult } | null>(null);
     const testResult = testRun?.script === script ? testRun.result : undefined;
+    const [confirmGeneration, setConfirmGeneration] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generationError, setGenerationError] = useState('');
+    const pending = useRef(false);
+    const mounted = useRef(false);
+    const latest = useRef({ script, onScriptChange });
+    latest.current = { script, onScriptChange };
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; };
+    }, []);
+
+    const generate = async () => {
+        if (!onGenerate || pending.current) return;
+        pending.current = true;
+        setConfirmGeneration(false);
+        setGenerationError('');
+        setIsGenerating(true);
+        try {
+            const generated = await onGenerate();
+            if (!mounted.current) return;
+            if (latest.current.script !== script) {
+                throw new Error('The script changed during generation. Your edits were kept; please generate again.');
+            }
+            latest.current.onScriptChange(generated);
+            setTestRun(null);
+        } catch (error) {
+            console.error('Failed to generate function script:', error);
+            if (mounted.current) {
+                setGenerationError(`Failed to generate function script: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        } finally {
+            pending.current = false;
+            if (mounted.current) setIsGenerating(false);
+        }
+    };
 
     return (
         <div style={{ display: 'grid', gap: 8 }}>
@@ -45,6 +82,11 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                             </Button>
                         </span>
                     </Tooltip>
+                    {onGenerate && (
+                        <Button variant="secondary" disabled={isGenerating} onClick={() => setConfirmGeneration(true)}>
+                            <AutoAwesome fontSize="small" /> {isGenerating ? 'Generating...' : 'Generate'}
+                        </Button>
+                    )}
                     <IconButton
                         size="small"
                         aria-label="Function script reference"
@@ -82,6 +124,9 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                         or use <strong>{'{{Greeting}}'}</strong> in lore or descriptions. Names are case-insensitive;
                         duplicate names are ambiguous. Function-backed values are read-only, and Test runs on a
                         copy without saving changes.
+                        Generate asks for confirmation before replacing only the script body using the description,
+                        parameters, other Functions, world context, stats, and this API. Review and Test the result;
+                        generation does not execute it.
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         Functions are global and may declare typed parameters. Option and Option List parameters
@@ -137,6 +182,15 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                     </Typography>
                 </Box>
             </Popover>
+            <ConfirmDialog
+                isOpen={confirmGeneration}
+                title="Generate Function Script"
+                message="Generate a JavaScript body from this Function's description? This will replace the existing script. Review and Test the generated code before using it."
+                confirmText="Generate"
+                onConfirm={generate}
+                onCancel={() => setConfirmGeneration(false)}
+            />
+            {generationError && <div role="alert" style={fieldLabelStyle}>{generationError}</div>}
             <TextArea
                 value={script}
                 onChange={(event) => onScriptChange(event.target.value)}
