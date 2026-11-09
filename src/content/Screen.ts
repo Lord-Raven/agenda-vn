@@ -69,7 +69,7 @@ export class Screen extends GameMap {
 }
 
 export const isScreenAvailable = (screen: Screen, context: ConditionContext): boolean =>
-    screen.active !== false && evaluateConditionCollections(screen.availabilityConditions, context);
+    screen.active !== false && evaluateConditionCollections(screen.availabilityConditions, context, false);
 
 // Stable sorting preserves configuration order for equal priorities.
 export const compareScreenPriority = (left: Screen, right: Screen): number => left.priority - right.priority;

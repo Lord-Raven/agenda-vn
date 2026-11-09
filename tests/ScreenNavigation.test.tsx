@@ -41,6 +41,19 @@ const createStage = (withMap = false) => {
     return stage;
 };
 
+const makeScreenAvailable = (stage: Stage, screen: GameMap) => {
+    const statId = 'screen-available';
+    if (!stage.getConfiguration().globalStats.some(stat => stat.id === statId)) {
+        stage.getConfiguration().globalStats.push(cloneStat({
+            id: statId, name: 'Screen Available', type: 'boolean', default: false, guidance: '',
+            llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+        }));
+    }
+    stage.getSave().globalStatValues![statId] = true;
+    screen.availabilityConditions = [[{ type: 'globalStat', statId, comparison: 'equals', value: true }]];
+    return screen;
+};
+
 const addListScreen = (stage: Stage, priority = 0) => {
     const actor = new Actor({ id: 'listed-actor', name: 'Listed Actor' });
     stage.getSave().actors[actor.id] = actor;
@@ -53,6 +66,7 @@ const addListScreen = (stage: Stage, priority = 0) => {
         type: 'list', name: 'Reusable List', priority,
         sections: [{ ...createListSection(), header: 'Custom Header', contentSource: globalStatReference('screen-content') }],
     });
+    makeScreenAvailable(stage, screen);
     stage.getSave().screens.push(screen);
     return screen;
 };
@@ -90,7 +104,7 @@ test('a List Screen replaces the default location list and shares its paged card
 for (const listWins of [true, false]) {
     test(`Screen priorities select ${listWins ? 'List' : 'Map'} across types`, () => {
         const stage = createStage(true);
-        const map = stage.getSave().screens[0];
+        const map = makeScreenAvailable(stage, stage.getSave().screens[0]);
         map.name = 'Priority Map';
         map.priority = listWins ? 10 : -10;
         addListScreen(stage);
@@ -103,7 +117,7 @@ for (const listWins of [true, false]) {
 test('equal Screen priorities use configuration order, not names', () => {
     const stage = createStage();
     const list = addListScreen(stage);
-    const map = new GameMap({ name: 'A Map' });
+    const map = makeScreenAvailable(stage, new GameMap({ name: 'A Map' }));
     stage.getSave().screens.push(map);
     assert.match(renderMapScreen(stage), /Custom Header/);
     stage.getSave().screens = [map, list];
@@ -111,10 +125,12 @@ test('equal Screen priorities use configuration order, not names', () => {
     assert.match(renderMapScreen(stage), /A Map/);
 });
 
-test('no Screens, inactive Screens, and unavailable Screens retain the default List fallback', () => {
+test('Screens without conditions, inactive Screens, and unavailable Screens retain the default List fallback', () => {
     const stage = createStage();
     assert.match(renderMapScreen(stage), /No Locations/);
     const screen = addListScreen(stage);
+    screen.availabilityConditions = [];
+    assert.match(renderMapScreen(stage), /No Locations/);
     screen.active = false;
     assert.match(renderMapScreen(stage), /No Locations/);
     screen.active = true;
@@ -131,7 +147,7 @@ test('no Screens, inactive Screens, and unavailable Screens retain the default L
 
 test('an available empty List Screen shows its own empty state, not the default fallback', () => {
     const stage = createStage();
-    stage.getSave().screens.push(new GameMap({ type: 'list', name: 'Empty Screen' }));
+    stage.getSave().screens.push(makeScreenAvailable(stage, new GameMap({ type: 'list', name: 'Empty Screen' })));
     const html = renderMapScreen(stage);
     assert.match(html, /Empty Screen/);
     assert.match(html, /No headers configured for this Screen/);
