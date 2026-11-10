@@ -228,16 +228,21 @@ export const buildContentTargetOptions = (
 
 const META_TARGET_KEYS = ['variable', 'any', 'none'];
 
-export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats = [], locationStats = [], itemStats = [], actors = [], items = [], locations = [], stage, variableContentType, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true, allowSkitState = false }) => {
+export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections, globalStats: globalStats, actorStats, locationStats, itemStats, actors = [], items = [], locations = [], stage, variableContentType, onChange, collectionCategories, collectionCategoryValues, onCollectionCategoryValuesChange, showAddConditionButton = true, allowSkitState = false }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
+    const configuration = stageInstance?.getConfiguration();
     const playerId = stageInstance?.getSave().playerId;
     actors = actors.filter(actor => actor.id !== playerId);
     const conditionCount = conditionCollections.reduce((total, collection) => total + collection.length, 0);
-    const statsByContentType: Record<ContentType, Stat[]> = { actor: actorStats, location: locationStats, item: itemStats };
+    const statsByContentType: Record<ContentType, Stat[]> = {
+        actor: actorStats ?? configuration?.actorStats ?? [],
+        location: locationStats ?? configuration?.locationStats ?? [],
+        item: itemStats ?? configuration?.itemStats ?? [],
+    };
     const entitiesByContentType: Record<ContentType, ContentTargetEntity[]> = { actor: actors, location: locations, item: items };
     const targetOptionsFor = (contentType: ContentType) => buildContentTargetOptions(contentType, entitiesByContentType[contentType], { allowVariable: variableContentType === contentType });
     const concreteTargetOptionsFor = (contentType: ContentType) => targetOptionsFor(contentType).filter((option) => !META_TARGET_KEYS.includes(option.key));
-    const conditionFunctions = (stageInstance?.getConfiguration().functions || []).filter(fn => isStatReturnType(fn.returnType));
+    const conditionFunctions = (configuration?.functions || []).filter(fn => isStatReturnType(fn.returnType));
     const functionOptions = conditionFunctions.map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description }));
     const conditionFunction = (condition: FunctionCondition): GameFunction | undefined => conditionFunctions.find(fn => fn.id === functionReferenceId(condition.reference));
     const functionReturnTypeFor = (condition: FunctionCondition): StatType | undefined => {

@@ -405,6 +405,28 @@ const hasOption = (tree: ReactNode, value: string): boolean => {
     return found;
 };
 
+test('condition stat kinds fall back to stage configuration unless explicitly overridden', () => {
+    const stage = {
+        getSave: () => ({ playerId: 'player' }),
+        getConfiguration: () => ({
+            functions: [], globalStats: [], actorStats: [],
+            locationStats: [locationStat], itemStats: [numberStat],
+        }),
+    } as unknown as React.ComponentProps<typeof ConditionEditor>['stage'];
+    const props = {
+        conditionCollections: [[{ type: 'calendar', field: 'day', comparison: 'equals', value: 1 } as Condition]],
+        globalStats: [], stage, onChange: () => undefined,
+    };
+
+    const configured = ConditionEditor(props);
+    assert.equal(hasOption(configured, 'contentStat:location'), true);
+    assert.equal(hasOption(configured, 'contentStat:item'), true);
+
+    const overridden = ConditionEditor({ ...props, locationStats: [], itemStats: [] });
+    assert.equal(hasOption(overridden, 'contentStat:location'), false);
+    assert.equal(hasOption(overridden, 'contentStat:item'), false);
+});
+
 test('Skit State is only offered when allowed or already selected', () => {
     const calendar: ConditionCollection[] = [[{ type: 'calendar', field: 'day', comparison: 'equals', value: 1 }]];
     const skit: ConditionCollection[] = [[{ type: 'skitState', field: 'active', comparison: 'equals', value: true }]];
