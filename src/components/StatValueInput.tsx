@@ -134,7 +134,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
         );
     }
 
-    return <FormulaValueInput numeric value={value} onChange={onChange} allowExpression={allowExpression} />;
+    return <FormulaValueInput numeric value={value} onChange={onChange} allowExpression={allowExpression} stage={stage} />;
 };
 
 // Text input that, inside a list pop-up, can instead bind to the current page's header.
@@ -160,7 +160,7 @@ const HeaderTextInput: FC<Pick<StatValueInputProps, 'value' | 'onChange'>> = ({ 
     );
 };
 
-const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'allowExpression'> & { numeric?: boolean }> = ({ value, onChange, numeric = false, allowExpression }) => {
+const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'allowExpression' | 'stage'> & { numeric?: boolean }> = ({ value, onChange, numeric = false, allowExpression, stage }) => {
     const [draft, setDraft] = useState(String(value ?? ''));
     const [error, setError] = useState('');
     useEffect(() => {
@@ -180,14 +180,30 @@ const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'al
             setError(message);
         }
     };
-    return <div style={{ display: 'grid', gap: 4, minWidth: 0 }}><TextInput fullWidth value={draft}
-        aria-invalid={error ? true : undefined}
-        placeholder={numeric ? (allowExpression ? 'e.g. 5, -2, 1d6+1, or Score() * 2' : 'e.g. 5 or Score() * 2') : 'Text, Greeting(), or {{Greeting}}'}
-        title={numeric ? 'Arithmetic: +, -, *, /, %, parentheses, dice, Function name(args…), call("Function name", args…), get("Global Stat").' : 'Use Function name(args…) or {{Function name}} for text functions. References: function:<id>, globalStat:<id>.'}
-        onChange={event => { setDraft(event.target.value); setError(''); }}
-        onBlur={commit}
-        onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
-    />
+    return <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+        <TextInput fullWidth value={draft}
+            aria-invalid={error ? true : undefined}
+            placeholder={numeric ? (allowExpression ? 'e.g. 5, -2, 1d6+1, or {{Money}} * 2' : 'e.g. 5 or {{Money}} * 2') : 'Text, Greeting(), or {{Greeting}}'}
+            title={numeric ? 'Arithmetic: +, -, *, /, %, parentheses, dice, Function name(args…), call("Function name", args…), get("Global Stat"), {{Name}} (function first, then global Stat). References: function:<id>, globalStat:<id>.' : 'Use Function name(args…) or {{Function name}} for text functions. References: function:<id>, globalStat:<id>.'}
+            onChange={event => { setDraft(event.target.value); setError(''); }}
+            onBlur={commit}
+            onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+        />
+        {numeric && stage && <SearchableOptionPicker
+            value={isValueReference(value) ? value : undefined}
+            options={[]}
+            functionType="number"
+            stage={stage}
+            title="Choose formula source"
+            buttonAriaLabel="Choose formula source"
+            emptyLabel="Choose source"
+            onChange={next => {
+                if (typeof next !== 'string') return;
+                setDraft(next);
+                setError('');
+                onChange(next);
+            }}
+        />}
         {error && <span role="alert" style={{ color: 'var(--agenda-text-primary)', fontSize: 12 }}>{error}</span>}
     </div>;
 };

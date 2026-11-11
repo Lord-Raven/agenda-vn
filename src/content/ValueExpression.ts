@@ -4,6 +4,7 @@ export const isNumericValueExpression = (value: unknown): value is string =>
 export type ValueExpressionSources = {
     call: (name: string, args?: (number | string)[]) => number;
     get: (name: string) => number;
+    macro?: (name: string) => number;
 };
 
 // Parse only arithmetic, dice, and explicit value lookups; never execute input as JavaScript.
@@ -55,7 +56,7 @@ export const evaluateValueExpression = (source: string, sources: ValueExpression
                 if (end < 0) return fail('expected "}}"');
                 const name = expression.slice(position, end).trim();
                 position = end + 2;
-                return finite(sources.call(name));
+                return finite((sources.macro || sources.call)(name));
             }
             consume('');
             const rest = expression.slice(position);

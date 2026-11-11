@@ -124,7 +124,10 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                     <Typography variant="subtitle2" style={{ fontWeight: 700, color: 'var(--agenda-text-primary)' }}>Function script reference</Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         Use <strong>Score()</strong>, <strong>call("Function name")</strong>, or
-                        <strong> get("Global Stat")</strong> in formulas; numeric formulas support +, -, *, /, %,
+                        <strong> get("Global Stat")</strong> in formulas. Numeric <strong>{'{{Name}}'}</strong> macros
+                        resolve functions first, then global Stats; use <strong>get("Global Stat")</strong> to
+                        select a Stat when names overlap. Numeric value fields also offer a source picker for
+                        number-returning functions and numeric global Stats. Numeric formulas support +, -, *, /, %,
                         parentheses, dice (for example, 1d6), and positional arguments such as
                         <strong> Score(2, 'hard')</strong>. In text values, call <strong>Greeting('Bob')</strong>
                         or use <strong>{'{{Greeting}}'}</strong> in lore or descriptions. Names are case-insensitive;

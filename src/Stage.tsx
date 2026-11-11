@@ -621,6 +621,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             return evaluateValueExpression(value, {
                 call: (name, args) => Number(namedSource(name, 'function', 'number', args)),
                 get: name => Number(namedSource(name, 'stat', 'number')),
+                macro: name => {
+                    const hasFunction = this.getConfiguration(save).functions.some(fn => fn.name.trim().toLowerCase() === name.trim().toLowerCase());
+                    return Number(namedSource(name, hasFunction ? 'function' : 'stat', 'number'));
+                },
             });
         }
         if (typeof value === 'string' && type === 'text') {

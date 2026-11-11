@@ -487,6 +487,38 @@ test('formula syntax validation does not roll dice or evaluate functions', conte
     assert.equal(random.mock.callCount(), 0);
 });
 
+test('numeric macros resolve live global Stats and preserve function precedence', () => {
+    const { stage, configuration, save } = fixture();
+    assert.equal(stage.resolveValue('{{ sCoRe }} * 3', 'number'), 6);
+    const context = {
+        globalStats: configuration.globalStats, globalStatValues: save.globalStatValues,
+        resolveValue: (value: unknown, type: StatType) => stage.resolveValue(value, type),
+    };
+    const condition = { type: 'globalStat' as const, statId: 'Score', comparison: 'equals' as const, value: '{{Score}}' };
+    assert.equal(evaluateCondition(condition, context), true);
+    save.globalStatValues.Score = 5;
+    assert.equal(stage.resolveValue('{{Score}} + 1', 'number'), 6);
+    assert.equal(evaluateCondition(condition, context), true);
+    configuration.functions = [
+        { id: 'score-function', name: 'Score', description: '', returnType: 'number', script: 'return 9;' },
+    ];
+    assert.equal(stage.resolveValue('{{Score}}', 'number'), 9);
+    assert.equal(stage.resolveValue('get("Score")', 'number'), 5);
+    assert.equal(evaluateCondition(condition, context), false);
+    assert.equal(condition.value, '{{Score}}');
+});
+
+test('numeric Stat macros report missing, ambiguous, wrong-type, and cyclic sources', () => {
+    const { stage, configuration, save } = fixture();
+    assert.throws(() => stage.resolveValue('{{Missing}}', 'number'), /Unknown stat name/);
+    assert.throws(() => stage.resolveValue('{{Party}}', 'number'), /has type actorList, not number/);
+    configuration.globalStats.push(stat('other-score', 'number', { name: ' score ' }));
+    assert.throws(() => stage.resolveValue('{{Score}}', 'number'), /Ambiguous stat name/);
+    configuration.globalStats.pop();
+    save.globalStatValues.Score = '{{Score}} + 1';
+    assert.throws(() => stage.resolveValue('{{Score}}', 'number'), /cyclic global stat reference/);
+});
+
 test('formula defaults and value rules survive normalization and evaluate at use time', () => {
     const { stage, configuration, save } = fixture();
     configuration.functions = [
