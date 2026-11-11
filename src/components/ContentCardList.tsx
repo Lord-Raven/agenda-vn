@@ -234,7 +234,7 @@ export const ContentCardView: FC<ContentCardViewProps> = ({ card, index, stage, 
     const delay = reduceMotion ? 0 : Math.min(index * 0.04, 0.18);
     const motionProps = {
         initial: { opacity: 0, y: reduceMotion ? 0 : 16 },
-        animate: { opacity: 1, y: 0 },
+        animate: { opacity: card.disabled ? 0.56 : 1, y: 0 },
         whileHover: interactive ? { x: 10 } : undefined,
         transition: {
             opacity: { duration: reduceMotion ? 0 : 0.22, delay },

@@ -11,7 +11,7 @@ import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
-import { Item } from "./content/Item";
+import { Item, isItemAvailable } from "./content/Item";
 import { compareControlPriority, Control, ControlPlacement, controlReferenceId, isControlAvailable, isControlReference } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, getCurrentActors, getCurrentLocation, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
@@ -113,7 +113,7 @@ const MAX_STAT_UPDATE_PERIODS = 128;
 const MAX_FUNCTION_INVOCATION_DEPTH = 8;
 type ScriptContext = { readOnly: boolean; stack: string[]; variables?: FunctionVariableBindings };
 
-export type ResolvedListSection = { key: string; section: ListSection; header: string; kind: ContentType; ids: string[] };
+export type ResolvedListSection = { key: string; section: ListSection; header: string; kind: ContentType; ids: string[]; unavailableIds: string[] };
 export type ResolvedListCardDetail = { key: string; label: string; type: StatType; value: StatValue; stat?: Stat; control?: Control };
 
 // Simple (string) metadata fields a function script may read/write directly on an actor/location/item via
@@ -691,8 +691,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     .map(header => header.trim());
                 return headers.flatMap((header, index) => {
                     const ids = this.resolveValue(section.contentSource, LIST_CONTENT_TYPES[kind], save, [], { header }) as string[];
-                    const activeIds = [...new Set(ids)].filter(id => this.getActiveContent(kind, id, save));
-                    return activeIds.length ? [{ key: `${section.id}:${index}:${header}`, section, header, kind, ids: activeIds }] : [];
+                    const entries = [...new Set(ids)].map(id => ({
+                        id, ...this.resolveListCardState(section, kind, id, header, save),
+                    })).filter(entry => entry.visible);
+                    return entries.length ? [{
+                        key: `${section.id}:${index}:${header}`, section, header, kind,
+                        ids: entries.map(entry => entry.id),
+                        unavailableIds: entries.filter(entry => !entry.available).map(entry => entry.id),
+                    }] : [];
                 });
             } catch (error) {
                 console.error(`Screen "${screen.name}" header could not be resolved: ${error instanceof Error ? error.message : String(error)}`);
@@ -704,6 +710,29 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private getActiveContent(kind: ContentType, id: string, save: SaveType): Actor | Location | Item | undefined {
         const entity = kind === 'actor' ? save.actors?.[id] : kind === 'location' ? save.atlas?.[id] : save.inventory?.find(item => item.id === id);
         return entity && entity.active !== false ? entity : undefined;
+    }
+
+    resolveListCardState(section: ListSection, kind: ContentType, id: string, header: string, save: SaveType = this.getSave()): { visible: boolean; available: boolean } {
+        const entity = this.getActiveContent(kind, id, save);
+        if (!entity) return { visible: false, available: false };
+        try {
+            const context: ConditionContext = {
+                ...this.getScheduleContext(save),
+                skitState: this.getSkitConditionState(),
+                ...(kind === 'actor' ? { currentActor: entity } : kind === 'location' ? { currentLocation: entity } : { currentItem: entity }),
+                resolveValue: (value, type) => this.resolveValue(value, type, save, [], { [kind]: id, header }),
+            };
+            const visible = (kind !== 'location' || this.isLocationVisible(id, save))
+                && evaluateConditionCollections(section.visibilityConditions, context);
+            if (!visible) return { visible: false, available: false };
+            const contentAvailable = kind === 'location' ? this.canVisitLocation(id, save)
+                : kind === 'actor' ? resolveActorSchedule(entity as Actor, this.getScheduleContext(save)) !== ACTOR_SCHEDULE_UNAVAILABLE
+                    : isItemAvailable(entity as Item, context);
+            return { visible, available: contentAvailable && evaluateConditionCollections(section.availabilityConditions, context) };
+        } catch (error) {
+            console.error(`List entry "${id}" conditions could not be resolved: ${error instanceof Error ? error.message : String(error)}`);
+            return { visible: false, available: false };
+        }
     }
 
     // Resolves one card detail: a content stat of the card's entity, a function evaluated with
@@ -764,6 +793,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Runs a list pop-up section's click actions for one card.
     runListCardActions(section: ListSection, kind: ContentType, id: string, header: string): Skit | null {
+        const state = this.resolveListCardState(section, kind, id, header);
+        if (!state.visible || !state.available) return null;
         return this.runButtonActions(section.actions || [], { [kind]: id, header });
     }
 
@@ -1600,11 +1631,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return;
     }
 
-    getCurrentLocationEvent(locationId: string): CalendarEvent | null {
-        if (!this.areEventsEnabled()) {
+    getCurrentLocationEvent(locationId: string, save: SaveType = this.getSave()): CalendarEvent | null {
+        if (this.getConfiguration(save).useEvents === false) {
             return null;
         }
-        const save = this.getSave();
         this.ensureCalendarState(save);
         const currentDate = save.currentDate || this.getStartingDate(save);
         const currentTimeOfDay = save.currentTimeOfDay || 'morning';
@@ -1631,19 +1661,17 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .sort((left, right) => this.compareCalendarEvents(left, right))[0] || null;
     }
 
-    canVisitLocation(locationId: string): boolean {
-        const save = this.getSave();
+    canVisitLocation(locationId: string, save: SaveType = this.getSave()): boolean {
         const location = save.atlas?.[locationId];
         if (!location || location.active === false || isLocationDisabled(location, this.getScheduleContext(save))) {
             return false;
         }
 
-        return Boolean(this.getCurrentLocationEvent(locationId)) || isLocationAvailable(location, this.getScheduleContext(save));
+        return Boolean(this.getCurrentLocationEvent(locationId, save)) || isLocationAvailable(location, this.getScheduleContext(save));
     }
 
     // Disabled locations don't exist yet/anymore and should never appear on screens.
-    isLocationVisible(locationId: string): boolean {
-        const save = this.getSave();
+    isLocationVisible(locationId: string, save: SaveType = this.getSave()): boolean {
         const location = save.atlas?.[locationId];
         if (!location || location.active === false) {
             return false;

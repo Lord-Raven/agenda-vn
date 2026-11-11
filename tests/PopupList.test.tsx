@@ -3,16 +3,16 @@ import { mock, test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { GameConfiguration, SaveType, Stage } from '../src/Stage';
-import { Actor } from '../src/content/Actor';
+import { Actor, ACTOR_SCHEDULE_UNAVAILABLE } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
 import { Location } from '../src/content/Location';
 import { cloneStat, Stat, StatType, StatValue } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { cloneListSection, contentStatReference, Screen, createListSection, parseContentStatReference, listContentKind } from '../src/content/Screen';
 import { functionReference, globalStatReference, HEADER_VARIABLE_VALUE, GameFunction } from '../src/content/Function';
-import { variableContentValue } from '../src/content/Condition';
+import { ConditionCollection, variableContentValue } from '../src/content/Condition';
 import { buildListContentPages, ListCardDetail } from '../src/screens/ListScreenView';
-import { ContentCardList } from '../src/components/ContentCardList';
+import { ContentCardList, ContentCardView } from '../src/components/ContentCardList';
 import { listContentSourceOptions, listDetailOptions, listHeaderSourceOptions } from '../src/components/ListSectionsEditor';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
@@ -20,6 +20,7 @@ import { Control, controlReference } from '../src/content/Control';
 import { ScreenDetailPanel } from '../src/screens/ScreenDetailPanel';
 import { StatValueInput } from '../src/components/StatValueInput';
 import { HeaderVariableContext } from '../src/components/VariableContentContext';
+import { ConditionEditor } from '../src/components/ConditionEditor';
 
 const stat = (id: string, type: StatType, defaultValue: StatValue, extra: Partial<Stat> = {}): Stat => cloneStat({
     id, name: id, type, guidance: '', default: defaultValue,
@@ -70,8 +71,8 @@ const fixture = () => {
     stage.getConfiguration = () => configuration;
     stage.getSave = () => save;
     stage.saveGame = () => {};
-    stage.getScheduleContext = () => ({ globalStats: configuration.globalStats, globalStatValues: save.globalStatValues });
     stage.getSkitConditionState = () => undefined;
+    stage.getCurrentLocationEvent = () => null;
     return { stage, configuration, save };
 };
 
@@ -99,6 +100,161 @@ test('content kinds come from list function and global stat return types', () =>
     assert.equal(listContentKind(configuration, globalStatReference('Crew')), 'actor');
     assert.equal(listContentKind(configuration, globalStatReference('Title')), undefined);
     assert.equal(listContentKind(configuration, ''), undefined);
+});
+
+test('List entry conditions default to unrestricted and deep-clone across serialization', () => {
+    const legacy = cloneListSection({ id: 'legacy', header: 'Crew' });
+    assert.deepEqual(legacy.visibilityConditions, []);
+    assert.deepEqual(legacy.availabilityConditions, []);
+    const section = createListSection();
+    section.visibilityConditions = [[{ type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' }]];
+    section.availabilityConditions = [[{ type: 'globalStat', statId: 'Title', comparison: 'equals', value: 'Squad' }]];
+    const screen = new Screen({ type: 'list', sections: [section] });
+    const restored = new Screen(JSON.parse(JSON.stringify(screen)));
+    assert.deepEqual(restored.sections, [section]);
+    screen.sections[0].visibilityConditions[0][0].value = 'bob';
+    screen.sections[0].availabilityConditions[0][0].value = 'Other';
+    assert.equal(section.visibilityConditions[0][0].value, 'alice');
+    assert.equal(section.availabilityConditions[0][0].value, 'Squad');
+    assert.deepEqual(restored.sections, [section]);
+});
+
+test('List entry conditions bind each card and retain OR groups and AND conditions per header', () => {
+    const { stage, save } = fixture();
+    save.globalStatValues!.Crew = ['alice', 'bob', 'gone', 'missing', 'alice'];
+    const section = { ...createListSection(), header: 'Restricted', contentSource: globalStatReference('Crew') };
+    section.visibilityConditions = [
+        [
+            { type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' },
+            { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Mood', comparison: 'greaterThan', value: 3 },
+        ],
+        [{ type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'bob' }],
+    ];
+    section.availabilityConditions = [[{ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Mood', comparison: 'greaterThan', value: 5 }]];
+    const unrestricted = { ...createListSection(), header: 'Unrestricted', contentSource: section.contentSource };
+    const screen = new Screen({ type: 'list', sections: [section, unrestricted] });
+    assert.deepEqual(stage.resolveListSections(screen).map(page => [page.header, page.ids, page.unavailableIds]), [
+        ['Restricted', ['bob'], ['bob']],
+        ['Unrestricted', ['alice', 'bob'], []],
+    ]);
+    save.actors.alice.statMap.Mood = 4;
+    save.actors.bob.statMap.Mood = 6;
+    assert.deepEqual(stage.resolveListSections(screen)[0].ids, ['alice', 'bob']);
+    assert.deepEqual(stage.resolveListSections(screen)[0].unavailableIds, ['alice']);
+    screen.sections[0].visibilityConditions = [[{ type: 'globalStat', statId: 'Title', comparison: 'equals', value: 'Other' }]];
+    assert.deepEqual(stage.resolveListSections(screen).map(page => page.header), ['Unrestricted']);
+});
+
+for (const [kind, id] of [['actor', 'bob'], ['item', 'sword'], ['location', 'park']] as const) {
+    test(`List entry Functions bind the ${kind} and header for visibility and availability`, () => {
+        const { stage, configuration, save } = fixture();
+        configuration.globalStats.push(stat('Entries', `${kind}List`, [id]));
+        configuration.functions.push({
+            id: 'matches-entry', name: 'Matches Entry', description: '', returnType: 'boolean',
+            parameters: [stat('Content', kind, ''), stat('Header', 'text', '')],
+            script: `return arg('Content') === '${id}' && arg('Header') === 'Allowed';`,
+        });
+        const conditions: ConditionCollection[] = [[{
+            type: 'function', comparison: 'equals', value: true,
+            reference: functionReference('matches-entry', { Content: variableContentValue(kind), Header: HEADER_VARIABLE_VALUE }),
+        }]];
+        const section = { ...createListSection(), header: 'Allowed', contentSource: globalStatReference('Entries') };
+        section.visibilityConditions = conditions;
+        const screen = new Screen({ type: 'list', sections: [section] });
+        assert.deepEqual(stage.resolveListSections(screen).map(page => page.ids), [[id]]);
+        screen.sections[0].header = 'Denied';
+        assert.deepEqual(stage.resolveListSections(screen), []);
+        screen.sections[0].visibilityConditions = [];
+        screen.sections[0].availabilityConditions = conditions;
+        assert.deepEqual(stage.resolveListSections(screen)[0].unavailableIds, [id]);
+        screen.sections[0].header = 'Allowed';
+        assert.deepEqual(stage.resolveListSections(screen)[0].unavailableIds, []);
+        const alternateSave = { ...save, globalStatValues: { ...save.globalStatValues, Title: 'Alternate' } };
+        screen.sections[0].availabilityConditions = [[{ type: 'globalStat', statId: 'Title', comparison: 'equals', value: 'Alternate' }]];
+        assert.deepEqual(stage.resolveListSections(screen)[0].unavailableIds, [id]);
+        assert.deepEqual(stage.resolveListSections(screen, alternateSave)[0].unavailableIds, []);
+    });
+}
+
+test('List entry rules never override location visibility or availability, including event access', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.globalStats.push(stat('Places', 'locationList', ['park']));
+    const section = { ...createListSection(), header: 'Places', contentSource: globalStatReference('Places') };
+    const screen = new Screen({ type: 'list', sections: [section] });
+    const location = save.atlas.park;
+    const passes: ConditionCollection[] = [[{ type: 'globalStat', statId: 'Title', comparison: 'equals', value: 'Squad' }]];
+    const fails: ConditionCollection[] = [[{ type: 'globalStat', statId: 'Title', comparison: 'equals', value: 'Other' }]];
+    location.availabilityConditions.disabled = passes;
+    assert.deepEqual(stage.resolveListSections(screen), []);
+    location.availabilityConditions.disabled = [];
+    location.availabilityConditions.unavailable = fails;
+    assert.deepEqual(stage.resolveListSections(screen)[0].unavailableIds, ['park']);
+    stage.getCurrentLocationEvent = () => ({
+        id: 'event', name: 'Event', date: '2026-10-08', duration: ['morning'],
+        locationId: 'park', actorIds: [], description: '', guidance: '',
+    });
+    assert.deepEqual(stage.resolveListSections(screen)[0].unavailableIds, []);
+    screen.sections[0].availabilityConditions = fails;
+    assert.deepEqual(stage.resolveListSections(screen)[0].unavailableIds, ['park']);
+    screen.sections[0].availabilityConditions = [];
+    location.availabilityConditions.disabled = passes;
+    assert.deepEqual(stage.resolveListSections(screen), []);
+});
+
+test('unavailable actors and items remain visible but disabled in List Screens', () => {
+    const { stage, save } = fixture();
+    save.actors.bob.schedule = { [ACTOR_SCHEDULE_UNAVAILABLE]: [[]] };
+    save.inventory[0].availabilityConditions = [[{ type: 'globalStat', statId: 'Title', comparison: 'equals', value: 'Other' }]];
+    for (const [kind, id] of [['actor', 'bob'], ['item', 'sword']] as const) {
+        assert.deepEqual(stage.resolveListCardState(createListSection(), kind, id, 'Crew'), { visible: true, available: false });
+    }
+});
+
+test('List entry condition errors are logged and isolate only the failing card', () => {
+    const { stage, configuration, save } = fixture();
+    save.globalStatValues!.Crew = ['alice', 'bob'];
+    configuration.functions.push({
+        id: 'fails-for-alice', name: 'Fails for Alice', description: '', returnType: 'boolean',
+        parameters: [stat('Who', 'actor', '')],
+        script: "if (arg('Who') === 'alice') throw new Error('Bad entry'); return true;",
+    });
+    const section = { ...createListSection(), contentSource: globalStatReference('Crew') };
+    section.visibilityConditions = [[{
+        type: 'function', reference: functionReference('fails-for-alice', { Who: variableContentValue('actor') }),
+        comparison: 'equals', value: true,
+    }]];
+    const log = mock.method(console, 'error', () => {});
+    try {
+        assert.deepEqual(stage.resolveListSections(new Screen({ type: 'list', sections: [section] }))[0].ids, ['bob']);
+        assert.ok(log.mock.calls.some(call => /List entry "alice".*Bad entry/.test(String(call.arguments[0]))));
+    } finally {
+        log.mock.restore();
+    }
+});
+
+test('unavailable List cards stay dim after animation and cannot run actions, even through stale handlers', () => {
+    const { stage, save } = fixture();
+    const section = {
+        ...createListSection(), contentSource: globalStatReference('Crew'),
+        actions: [{ id: 'bump', kind: 'stat' as const, targetType: 'actor' as const, targetId: 'variable', statId: 'Mood', operation: 'adjust' as const, value: 1 }],
+    };
+    section.availabilityConditions = [[{ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Mood', comparison: 'greaterThan', value: 4 }]];
+    const screen = new Screen({ type: 'list', sections: [section] });
+    const onAction = mock.fn();
+    const staleCard = buildListContentPages(stage, screen, onAction)[0].cards[0];
+    assert.equal(staleCard.disabled, false);
+    save.actors.bob.statMap.Mood = 4;
+    const card = buildListContentPages(stage, screen, onAction)[0].cards[0];
+    assert.equal(card.disabled, true);
+    const element = ContentCardView({ card, index: 0, stage: () => stage, isVerticalLayout: false, reduceMotion: true });
+    assert.equal(element.props.disabled, true);
+    assert.equal(element.props.animate.opacity, 0.56);
+    staleCard.onClick?.();
+    assert.equal(save.actors.bob.statMap.Mood, 4);
+    const html = renderToStaticMarkup(<TooltipProvider><ContentCardList stage={() => stage} pages={buildListContentPages(stage, screen, onAction)} isVerticalLayout={false} /></TooltipProvider>);
+    assert.match(html, /<button[^>]*disabled=""/);
+    card.onClick?.();
+    assert.equal(save.actors.bob.statMap.Mood, 4);
 });
 
 test('list sections expand String List headers, bind the header variable, and hide empty or inactive content', () => {
@@ -348,6 +504,8 @@ test('Screen editor switches between Map and List options; Controls only select 
     assert.match(list, /Add Header/);
     assert.match(list, /Card Details/);
     assert.match(list, /Card Click Actions/);
+    assert.match(list, /Entry Visibility/);
+    assert.match(list, /Entry Availability/);
     assert.doesNotMatch(list, /Map Image URL|Add Link/);
     const map = renderToStaticMarkup(<ScreenDetailPanel {...props} screen={configuration.screens[1]} />);
     assert.match(map, /Map Image URL|Add Link/);
@@ -381,6 +539,12 @@ for (const isCreatorMode of [true, false]) {
             act(() => addButton.props.onClick());
             act(() => renderer!.root.findByProps({ 'aria-label': 'Screen Type' }).props.onChange({ target: { value: 'list' } }));
             assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Expand Links' }).length, 0);
+            section.visibilityConditions = [[{ type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'bob' }]];
+            section.availabilityConditions = [[{ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Mood', comparison: 'greaterThan', value: 3 }]];
+            const entryEditors = () => renderer!.root.findAllByType(ConditionEditor).filter(editor => editor.props.variableContentType === 'actor');
+            assert.equal(entryEditors().length, 2);
+            act(() => entryEditors()[0].props.onChange(section.visibilityConditions));
+            act(() => entryEditors()[1].props.onChange(section.availabilityConditions));
             act(() => renderer!.unmount());
             renderer = undefined;
             const saved = (isCreatorMode ? configuration : save).screens[0];

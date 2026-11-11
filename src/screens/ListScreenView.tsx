@@ -29,6 +29,7 @@ export const buildListContentPages = (stage: Stage, screen: Screen, onAction: (s
                 key: id,
                 kind: page.kind,
                 id,
+                disabled: page.unavailableIds.includes(id),
                 onClick: page.section.actions.length ? () => onAction(stage.runListCardActions(page.section, page.kind, id, page.header)) : undefined,
                 trailing: details.length ? (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.75 }}>

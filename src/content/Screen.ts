@@ -1,5 +1,5 @@
 import { Map as GameMap } from './Map';
-import { CONTENT_TYPES, ConditionContext, ContentType, evaluateConditionCollections } from './Condition';
+import { CONTENT_TYPES, ConditionCollection, ConditionContext, ContentType, evaluateConditionCollections } from './Condition';
 import { cloneStatUpdateAction, Stat, StatType, StatUpdateAction } from './Stat';
 import { functionReferenceId, GameFunction, globalStatReferenceId, isFunctionReference, isGlobalStatReference } from './Function';
 import { v4 as generateUuid } from 'uuid';
@@ -15,6 +15,8 @@ export type ListSection = {
     headerSource: string;
     // An actorList/itemList/locationList source; text parameters may bind the header variable.
     contentSource: string;
+    visibilityConditions: ConditionCollection[];
+    availabilityConditions: ConditionCollection[];
     // Content stat references or functions with their content parameter bound to the card.
     details: string[];
     // Card-click actions bind the variable content target and header.
@@ -24,7 +26,8 @@ export type ListSection = {
 export const LIST_CONTENT_TYPES: Record<ContentType, StatType> = { actor: 'actorList', item: 'itemList', location: 'locationList' };
 
 export const createListSection = (): ListSection => ({
-    id: generateUuid(), header: '', headerSource: '', contentSource: '', details: [], actions: [],
+    id: generateUuid(), header: '', headerSource: '', contentSource: '',
+    visibilityConditions: [], availabilityConditions: [], details: [], actions: [],
 });
 
 export const cloneListSection = (source: unknown): ListSection => {
@@ -34,6 +37,8 @@ export const cloneListSection = (source: unknown): ListSection => {
         header: `${section.header || ''}`,
         headerSource: `${section.headerSource || ''}`,
         contentSource: `${section.contentSource || ''}`,
+        visibilityConditions: Array.isArray(section.visibilityConditions) ? section.visibilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [],
+        availabilityConditions: Array.isArray(section.availabilityConditions) ? section.availabilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [],
         details: Array.isArray(section.details) ? section.details.filter((entry): entry is string => typeof entry === 'string') : [],
         actions: Array.isArray(section.actions) ? section.actions.map(cloneStatUpdateAction) : [],
     };

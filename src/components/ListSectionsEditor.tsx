@@ -8,6 +8,7 @@ import { OutcomeEditor, OutcomeEditorContext } from './OutcomeEditor';
 import { PickerOption, SearchableOptionPicker } from './SearchableOptionPicker';
 import { Button, TextInput } from './UiComponents';
 import { HeaderVariableContext, VariableContentContext } from './VariableContentContext';
+import { ConditionEditor } from './ConditionEditor';
 
 interface ListSectionsEditorProps extends Omit<OutcomeEditorContext, 'stage'> {
     sections: ListSection[];
@@ -120,6 +121,20 @@ export const ListSectionsEditor: FC<ListSectionsEditorProps> = ({ sections, onCh
                             <VariableContentContext.Provider value={kind}>
                                 <HeaderVariableContext.Provider value={true}>
                                     <div>
+                                        <label style={labelStyle}>Entry Visibility</label>
+                                        <ConditionEditor {...outcomeContext} stage={stage} variableContentType={kind} allowSkitState
+                                            conditionCollections={section.visibilityConditions}
+                                            onChange={visibilityConditions => update(section.id, { visibilityConditions })} />
+                                        <span style={helpStyle}>Entries appear only when these conditions and the content's own visibility rules pass. No conditions adds no restriction. Variable is the card's content; Function text arguments can use Header.</span>
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>Entry Availability</label>
+                                        <ConditionEditor {...outcomeContext} stage={stage} variableContentType={kind} allowSkitState
+                                            conditionCollections={section.availabilityConditions}
+                                            onChange={availabilityConditions => update(section.id, { availabilityConditions })} />
+                                        <span style={helpStyle}>Visible entries are grayed out and cannot be clicked unless these conditions and the content's own availability rules pass. No conditions adds no restriction.</span>
+                                    </div>
+                                    <div>
                                         <label style={labelStyle}>Card Details</label>
                                         <SearchableOptionPicker stage={stage} multiple bindVariableParameters title="Choose card details"
                                             values={section.details} options={listDetailOptions(stageInstance, kind)}
@@ -134,7 +149,7 @@ export const ListSectionsEditor: FC<ListSectionsEditorProps> = ({ sections, onCh
                                 </HeaderVariableContext.Provider>
                             </VariableContentContext.Provider>
                         ) : (
-                            <span style={helpStyle}>Choose contents to configure card details and click actions.</span>
+                            <span style={helpStyle}>Choose contents to configure entry conditions, card details, and click actions.</span>
                         )}
                     </div>
                 );
