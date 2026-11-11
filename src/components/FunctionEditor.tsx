@@ -127,7 +127,10 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                         <strong> get("Global Stat")</strong> in formulas. Numeric <strong>{'{{Name}}'}</strong> macros
                         resolve functions first, then global Stats; use <strong>get("Global Stat")</strong> to
                         select a Stat when names overlap. Numeric value fields also offer a source picker for
-                        number-returning functions and numeric global Stats. Numeric formulas support +, -, *, /, %,
+                        number-returning functions and numeric global Stats. Numeric condition values are buttons:
+                        open one to edit the formula, search sources, and insert macros at the value field's cursor.
+                        Picker macros use quoted references (for example, <strong>{'{{"globalStat:score"}}'}</strong>)
+                        to preserve source ids and function arguments. Numeric formulas support +, -, *, /, %,
                         parentheses, dice (for example, 1d6), and positional arguments such as
                         <strong> Score(2, 'hard')</strong>. In text values, call <strong>Greeting('Bob')</strong>
                         or use <strong>{'{{Greeting}}'}</strong> in lore or descriptions. Names are case-insensitive;

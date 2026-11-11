@@ -519,6 +519,26 @@ test('numeric Stat macros report missing, ambiguous, wrong-type, and cyclic sour
     assert.throws(() => stage.resolveValue('{{Score}}', 'number'), /cyclic global stat reference/);
 });
 
+test('picker reference macros preserve source ids and typed function arguments', () => {
+    const { stage, configuration, save } = fixture();
+    const macro = (reference: string) => `{{${JSON.stringify(reference)}}}`;
+    configuration.functions = [{
+        id: 'bonus', name: 'Score', description: '', returnType: 'number',
+        script: 'return arg("Amount") + arg("Label").length;',
+        parameters: [stat('amount', 'number', { name: 'Amount', default: 0 }), stat('label', 'text', { name: 'Label', default: '' })],
+    }];
+    const source = functionReference('bonus', { amount: globalStatReference('Score'), label: '}} "quoted"' });
+    const formula = `${macro(globalStatReference('Score'))} + ${macro(source)} * 2`;
+    validateValueExpression(formula);
+    assert.equal(stage.resolveValue(formula, 'number'), 2 + (2 + '}} "quoted"'.length) * 2);
+    save.globalStatValues.Score = 4;
+    assert.equal(stage.resolveValue(macro(source), 'number'), 4 + '}} "quoted"'.length);
+    configuration.functions[0].name = 'Renamed';
+    assert.equal(stage.resolveValue(macro(source), 'number'), 4 + '}} "quoted"'.length);
+    assert.throws(() => stage.resolveValue(macro(globalStatReference('missing')), 'number'), /Unknown global stat/);
+    assert.throws(() => validateValueExpression('{{"globalStat:Score"}'), /expected "}}"/);
+});
+
 test('formula defaults and value rules survive normalization and evaluate at use time', () => {
     const { stage, configuration, save } = fixture();
     configuration.functions = [

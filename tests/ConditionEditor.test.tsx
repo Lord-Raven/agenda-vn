@@ -7,12 +7,42 @@ import { ConditionalFlagEditor } from '../src/components/ConditionalFlagEditor';
 import { StatUpdateRuleEditor } from '../src/components/StatUpdateRuleEditor';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
+import { StatValueInput } from '../src/components/StatValueInput';
 import { Condition, ConditionCollection, GlobalStatCondition } from '../src/content/Condition';
 import { cloneStat, Stat, StatUpdateRule } from '../src/content/Stat';
 
 const numberStat = cloneStat({
     id: 'score', name: 'Score', type: 'number', default: 7, guidance: '',
     llmSees: { value: true, conditions: [] }, llmMaintained: { value: true, conditions: [] },
+});
+
+test('numeric conditions edit their current values in a picker across condition kinds', () => {
+    const conditions: Condition[] = [
+        { type: 'globalStat', statId: 'score', comparison: 'greaterThan', value: '{{Score}} * 2' },
+        { type: 'contentStat', contentType: 'actor', targetId: 'any', statId: 'score', comparison: 'equals', value: 5 },
+        { type: 'calendar', field: 'day', comparison: 'equals', value: 3 },
+        { type: 'function', reference: 'function:bonus', comparison: 'equals', value: 7 },
+    ];
+    for (const condition of conditions) {
+        let updated: Condition = condition;
+        const tree = ConditionEditor({
+            globalStats: [numberStat], actorStats: [numberStat],
+            stage: stageWithFunctions([{ id: 'bonus', name: 'Bonus', returnType: 'number', description: '', script: '' }]),
+            conditionCollections: [[condition]], onChange: next => { updated = next[0][0]; },
+        });
+        let input: React.ReactElement<React.ComponentProps<typeof StatValueInput>> | undefined;
+        const visit = (children: ReactNode) => React.Children.forEach(children, child => {
+            if (!isValidElement<{ children?: ReactNode }>(child)) return;
+            if (child.type === StatValueInput) input = child as React.ReactElement<React.ComponentProps<typeof StatValueInput>>;
+            visit(child.props.children);
+        });
+        visit(tree);
+        assert.ok(input);
+        assert.equal(input.props.formulaPicker, true);
+        assert.equal(input.props.value, condition.value);
+        input.props.onChange('5 + {{"globalStat:score"}}');
+        assert.deepEqual(updated, { ...condition, value: '5 + {{"globalStat:score"}}' });
+    }
 });
 
 const clickButton = (tree: ReactNode, label: string) => {

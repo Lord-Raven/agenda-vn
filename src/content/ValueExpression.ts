@@ -52,6 +52,12 @@ export const evaluateValueExpression = (source: string, sources: ValueExpression
                 return value;
             }
             if (consume('{{')) {
+                consume('');
+                if (expression[position] === '"' || expression[position] === "'") {
+                    const name = quotedName();
+                    if (!consume('}}')) return fail('expected "}}"');
+                    return finite((sources.macro || sources.call)(name));
+                }
                 const end = expression.indexOf('}}', position);
                 if (end < 0) return fail('expected "}}"');
                 const name = expression.slice(position, end).trim();

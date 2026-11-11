@@ -1,4 +1,4 @@
-import { CSSProperties, FC, useContext, useEffect, useState } from 'react';
+import { CSSProperties, FC, useContext, useEffect, useRef, useState } from 'react';
 import { findStatOptionByValue, isNumericDisplayType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, statListMaxLength, Stat, StatUpdate, StatValue, getStatOptionValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
@@ -19,11 +19,13 @@ interface StatValueInputProps {
     stage?: Stage | (() => Stage);
     // Adds dice/relative-expression guidance for stat update inputs. All numeric inputs support formulas.
     allowExpression?: boolean;
+    // Numeric condition values are edited inside their source picker.
+    formulaPicker?: boolean;
     // The owning entity's statMap etc., so a sourced option stat only offers that entity's active options.
     optionContext?: OptionListSourceContext;
 }
 
-export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, optionContext }) => {
+export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, formulaPicker = false, optionContext }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const allowedOptions = useContext(PickerAllowedOptionsContext);
     if (!stat) {
@@ -134,7 +136,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
         );
     }
 
-    return <FormulaValueInput numeric value={value} onChange={onChange} allowExpression={allowExpression} stage={stage} />;
+    return <FormulaValueInput numeric value={value} onChange={onChange} allowExpression={allowExpression} formulaPicker={formulaPicker} stage={stage} />;
 };
 
 // Text input that, inside a list pop-up, can instead bind to the current page's header.
@@ -160,9 +162,10 @@ const HeaderTextInput: FC<Pick<StatValueInputProps, 'value' | 'onChange'>> = ({ 
     );
 };
 
-const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'allowExpression' | 'stage'> & { numeric?: boolean }> = ({ value, onChange, numeric = false, allowExpression, stage }) => {
+const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'allowExpression' | 'formulaPicker' | 'stage'> & { numeric?: boolean }> = ({ value, onChange, numeric = false, allowExpression, formulaPicker = false, stage }) => {
     const [draft, setDraft] = useState(String(value ?? ''));
     const [error, setError] = useState('');
+    const selection = useRef<{ start: number; end: number } | null>(null);
     useEffect(() => {
         setDraft(String(value ?? ''));
         setError('');
@@ -180,15 +183,49 @@ const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'al
             setError(message);
         }
     };
-    return <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+    const editor = <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
         <TextInput fullWidth value={draft}
+            aria-label="Formula value"
             aria-invalid={error ? true : undefined}
             placeholder={numeric ? (allowExpression ? 'e.g. 5, -2, 1d6+1, or {{Money}} * 2' : 'e.g. 5 or {{Money}} * 2') : 'Text, Greeting(), or {{Greeting}}'}
             title={numeric ? 'Arithmetic: +, -, *, /, %, parentheses, dice, Function name(args…), call("Function name", args…), get("Global Stat"), {{Name}} (function first, then global Stat). References: function:<id>, globalStat:<id>.' : 'Use Function name(args…) or {{Function name}} for text functions. References: function:<id>, globalStat:<id>.'}
             onChange={event => { setDraft(event.target.value); setError(''); }}
+            onSelect={event => {
+                selection.current = { start: event.currentTarget.selectionStart ?? draft.length, end: event.currentTarget.selectionEnd ?? draft.length };
+            }}
             onBlur={commit}
             onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
         />
+        {error && <span role="alert" style={{ color: 'var(--agenda-text-primary)', fontSize: 12 }}>{error}</span>}
+    </div>;
+    if (numeric && formulaPicker) {
+        return <SearchableOptionPicker
+            options={[]}
+            functionType="number"
+            stage={stage}
+            title="Edit formula value"
+            buttonAriaLabel="Edit formula value"
+            renderButton={() => <span style={{ overflowWrap: 'anywhere' }}>{String(value ?? '') || 'Enter value'}</span>}
+            valueEditor={editor}
+            closeOnSelect={false}
+            onChange={next => {
+                if (typeof next !== 'string') return;
+                // References inside macros retain ids and typed function arguments.
+                const macro = `{{${JSON.stringify(next)}}}`;
+                const range = selection.current ?? { start: draft.length, end: draft.length };
+                const wrapReference = isValueReference(draft) && !(range.start === 0 && range.end === draft.length);
+                const updated = wrapReference
+                    ? `{{${JSON.stringify(draft)}}}${macro}`
+                    : draft.slice(0, range.start) + macro + draft.slice(range.end);
+                setDraft(updated);
+                const caret = wrapReference ? updated.length : range.start + macro.length;
+                selection.current = { start: caret, end: caret };
+                setError('');
+            }}
+        />;
+    }
+    return <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+        {editor}
         {numeric && stage && <SearchableOptionPicker
             value={isValueReference(value) ? value : undefined}
             options={[]}
@@ -204,7 +241,6 @@ const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'al
                 onChange(next);
             }}
         />}
-        {error && <span role="alert" style={{ color: 'var(--agenda-text-primary)', fontSize: 12 }}>{error}</span>}
     </div>;
 };
 

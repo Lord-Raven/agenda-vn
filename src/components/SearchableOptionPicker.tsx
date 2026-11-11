@@ -46,6 +46,8 @@ export interface SearchableOptionPickerProps {
     stage?: Stage | (() => Stage);
     // Newly chosen functions default their first matching parameter to the bound Variable / header.
     bindVariableParameters?: boolean;
+    valueEditor?: ReactNode;
+    closeOnSelect?: boolean;
 }
 
 export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
@@ -67,6 +69,8 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     functionType,
     stage,
     bindVariableParameters = false,
+    valueEditor,
+    closeOnSelect = true,
 }) => {
     const variableContentType = useContext(VariableContentContext);
     const headerVariableAvailable = useContext(HeaderVariableContext);
@@ -223,7 +227,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         }
 
         onChange(nextValue);
-        setIsOpen(false);
+        if (closeOnSelect) setIsOpen(false);
     };
 
     // Choosing a parameterful function routes through the argument entry step instead of committing directly.
@@ -264,8 +268,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
             }
             return;
         }
-        onChange(key);
-        setIsOpen(false);
+        commitSelect(key);
     };
 
     const renderClearOption = () => (
@@ -400,6 +403,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 
     const pickerContent = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {valueEditor}
             {multiple && (
                 <div role="group" aria-label="Current elements" style={{ display: 'grid', gap: 6 }}>
                     <div style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>

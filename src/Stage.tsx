@@ -622,6 +622,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 call: (name, args) => Number(namedSource(name, 'function', 'number', args)),
                 get: name => Number(namedSource(name, 'stat', 'number')),
                 macro: name => {
+                    const reference: unknown = name;
+                    if (isValueReference(reference)) {
+                        return Number(this.resolveValue(reference, 'number', save, stack, variables));
+                    }
                     const hasFunction = this.getConfiguration(save).functions.some(fn => fn.name.trim().toLowerCase() === name.trim().toLowerCase());
                     return Number(namedSource(name, hasFunction ? 'function' : 'stat', 'number'));
                 },
