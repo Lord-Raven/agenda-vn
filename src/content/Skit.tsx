@@ -274,6 +274,7 @@ function buildScriptLogContext(builder: PromptBuilder, skit: Skit, additionalEnt
     const actors = stage?.getSave().actors;
     entries.forEach(entry => {
         builder.addBlock('Entry', entryBuilder => {
+            entryBuilder.addBlock('Message', entry.message);
             entryBuilder.addBlock('Speaker', actors?.[entry.speakerId]?.name.toUpperCase() || entry.speakerId || 'NARRATOR');
             Object.entries(entry.actorEmotions || {}).forEach(([actorId, emotion]) => {
                 const actor = actors?.[actorId];
@@ -292,7 +293,6 @@ function buildScriptLogContext(builder: PromptBuilder, skit: Skit, additionalEnt
                         .addBlock('Outfit', outfit.name));
                 }
             });
-            entryBuilder.addBlock('Message', entry.message);
         });
     });
     return builder;
@@ -572,9 +572,10 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 .addBlock(`Instructions`,
                     `${skit.script.length == 0 ? 'Use the Scene Prompt to produce the initial moments of a scene (perhaps joined in medias res)' : 'Extend or conclude the current scene script'} with three to five formatted and tagged entries. ` +
                     `The script should tacitly consider characters motives, relationships, stats, lore, and past events. ` +
-                    `\n\nFollow the structure of the strict Example Script formatting; ` +
-                    `actions are depicted in prose and character dialogue in quotation marks. ` +
-                    `Characters present their own actions and dialogue, while other events within the scene are attributed to Narrator. ` +
+                    `\n\nFollow the structure of the strict entry formatting. ` +
+                    `actions are depicted in prose and character dialogue in quotation marks; ` +
+                    `each entry may host a single speaker, who is then indicated with Speaker tags. ` +
+                    `Non-speaking entries may be attributed to either a Speaker that they most apply to or to a generic Narrator. ` +
                     (save.enableImpersonation ?
                         `Entries from the player, ${playerName}, are written in first-person, while other entries consistently refer to ${playerName} in second-person; all other characters are referred to in third-person, even in their own entries.` :
                         `New entries refer to the player, ${playerName}, in second-person; all other characters are referred to in third-person, even in their own entries.`) +
@@ -582,8 +583,8 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     (skit.script.length == 0 ? 'As this is the initial, establishing moment of a new scene, evaluate the current outfit and alternative outfits of each character and use <OutfitChange> tags to update the characters to the most appropriate outfit for the moment. Begin the scene with appropriate tags at the "System:" prompt.' : 'Continue the scene at the "System:" prompt.') +
                     ((save.language || 'English').toLowerCase() !== 'english' ? `\n\nNote: The game is now being played in ${save.language}. Regardless of historic language use, generate this skit content in ${save.language} accordingly. Special tags (emotion, outfit, movement, etc.) continue to use English (these are invisible to the user).` : '')
                 )
-                .addBlock('Script Format',
-                    `<Entry><Speaker>[Speaker Name]</Speaker>[Appropriate Tags]<Message>Prose with "embedded dialogue" and actions.</Message></Entry>`)
+                .addBlock('Entry Format',
+                    `<Entry><Message>Prose with "embedded dialogue" and actions.</Message><Speaker>[Speaker Name]</Speaker>[Appropriate Tags]</Entry>`)
                 .addBlock('Tags', (builder) => {
                     const tagsBuilder = builder.addBlock('Tag Instruction',
                         `Embedded within this script, you may employ special tags to trigger various game mechanics. These tags are not presented to users, so the narrative content of the script should also organically mention characters entering, exiting, or relocating.`)
@@ -613,7 +614,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                         );
                     if (save.enableFontEffects !== false) {
                         tagsBuilder.addBlock('Text Style Tags',
-                            `Use these square-bracket style tags sparingly inside <Message> text when they suit the moment. A style tag changes the presentation of the following text; use [] to reset to the default style. ` +
+                            `Use these square-bracket style tags inside <Message> text when they suit the moment. A style tag changes the presentation of the following text; use [] to reset to the default style. ` +
                             `These are presentation tags, not game-mechanic/XML tags: keep them exactly in the message text using the form [styleName]Text to be styled[], and do not move them into metadata or remove them. ` +
                             `Only use these supported styles: ` +
                             `arcane (mystical shimmer), burn (smoldering flicker), flutter (light movement), glitch (digital distortion), hologram (glowing scanlines), ` +
@@ -636,13 +637,13 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                 .addBlock('Context',
                     generateContext(skit, stage, 7 - retry * 2))
                 .addBlock('Example Script',
-                    `System:\n<Entry>\n  <Speaker>\n    Narrator\n  </Speaker>\n  <Message>\n    The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.\n  </Message>\n</Entry>\n` +
-                    `<Entry>\n  <Speaker>\n    CYANEA\n  </Speaker>\n  <Message>\n    "I can't believe we're finally here. It's been a long journey."\n  </Message>\n</Entry>\n` +
-                    `<Entry>\n  <Speaker>\n    PERSEPHONE\n  </Speaker>\n  <Message>\n    "Yes, but the real challenge is just beginning. We must stay vigilant." Persephone gently chides Cyanea.\n  </Message>\n</Entry>\n` +
-                    `<Entry>\n  <Speaker>\n    CYANEA\n  </Speaker>\n  <Expression><Actor>Cyanea</Actor><Mood>Determination</Mood></Expression>\n  <Message>\n    Cyanea frowns uncharacteristically with determination, "Of course." She nods with almost comical sobriety.\n  </Message>\n</Entry>\n` +
-                    `<Entry>\n  <Speaker>\n    PERSEPHONE\n  </Speaker>\n  <StatChange>\n    <Actor>\n      Cyanea\n    </Actor>\n    <Stat>\n      Resolve\n    </Stat>\n    <Amount>+1</Amount>\n  </StatChange>\n  <Message>\n    "Good. That's the spirit we'll need." Persephone offers a rare, approving smile.\n  </Message>\n</Entry>\n` +
-                    (save.enableImpersonation ? `<Entry>\n  <Speaker>\n    ${playerName.toUpperCase()}\n  </Speaker>\n  <Message>\n    I smile warmly at the two women, "I agree. We need to be careful and work together."\n  </Message>\n</Entry>\n` : '') +
-                    `<Entry>\n  <Speaker>\n    RED HOOD\n  </Speaker>\n  <Movement>\n    <Actor>\n      Red Hood\n    </Actor>\n    <Location>Here</Location>\n  </Movement>\n  <Message>\n    A crimson-clad figure approaches with supplies.\n  </Message>\n</Entry>\n`
+                    `System:\n<Entry>\n  <Message>\n    The sun sets over the horizon, casting a warm glow across the abandoned city. The air is thick with anticipation as the group gathers in the central plaza.\n  </Message>\n  <Speaker>\n    Narrator\n  </Speaker>\n  </Entry>\n` +
+                    `<Entry>\n  <Message>\n    "I can't believe we're finally here. It's been a long journey."\n  </Message>\n  <Speaker>\n    CYANEA\n  </Speaker>\n</Entry>\n` +
+                    `<Entry>\n  <Message>\n    "Yes, but the real challenge is just beginning. We must stay vigilant." Persephone gently chides Cyanea.\n  </Message>\n  <Speaker>\n    PERSEPHONE\n  </Speaker>\n</Entry>\n` +
+                    `<Entry>\n  <Message>\n    Cyanea frowns uncharacteristically with determination, "Of course." She nods with almost comical sobriety.\n  </Message>\n  <Speaker>\n    CYANEA\n  </Speaker>\n  <Expression><Actor>Cyanea</Actor><Mood>Determination</Mood></Expression>\n</Entry>\n` +
+                    `<Entry>\n  <Message>\n    "Good. That's the spirit we'll need." Persephone offers a rare, approving smile.\n  </Message>\n  <Speaker>\n    PERSEPHONE\n  </Speaker>\n  <StatChange>\n    <Actor>\n      Cyanea\n    </Actor>\n    <Stat>\n      Resolve\n    </Stat>\n    <Amount>+1</Amount>\n  </StatChange>\n</Entry>\n` +
+                    (save.enableImpersonation ? `<Entry>\n  <Message>\n    I smile warmly at the two women, "I agree. We need to be careful and work together."\n  </Message>\n  <Speaker>\n    ${playerName.toUpperCase()}\n  </Speaker>\n</Entry>\n` : '') +
+                    `<Entry>\n  <Message>\n    A crimson-clad figure approaches with supplies.\n  </Message>\n  <Speaker>\n    RED HOOD\n  </Speaker>\n  <Movement>\n    <Actor>\n      Red Hood\n    </Actor>\n    <Location>Here</Location>\n  </Movement>\n</Entry>\n`
                 )
                 .format();
         console.log(prompt);
