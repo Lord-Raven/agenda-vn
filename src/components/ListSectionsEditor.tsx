@@ -2,6 +2,7 @@ import { CSSProperties, FC } from 'react';
 import { Stage } from '../Stage';
 import { ContentType } from '../content/Condition';
 import { contentStatReference, createListSection, ListSection, listContentKind } from '../content/Screen';
+import { controlReference } from '../content/Control';
 import { functionReference, functionSignature, isStatReturnType, valuePickerOptions } from '../content/Function';
 import { OutcomeEditor, OutcomeEditorContext } from './OutcomeEditor';
 import { PickerOption, SearchableOptionPicker } from './SearchableOptionPicker';
@@ -35,8 +36,8 @@ export const listContentSourceOptions = (stage: Stage): PickerOption[] => {
     return [...valuePickerOptions(configuration, 'actorList'), ...valuePickerOptions(configuration, 'itemList'), ...valuePickerOptions(configuration, 'locationList')];
 };
 
-// Card details for a content kind: value functions taking a parameter of that kind, and that kind's stats.
-export const listDetailOptions = (stage: Stage, kind: ContentType): PickerOption[] => {
+// Stat badge sources for a content kind: value functions taking a parameter of that kind, and that kind's stats.
+export const contentDetailSourceOptions = (stage: Stage, kind: ContentType): PickerOption[] => {
     const configuration = stage.getConfiguration();
     const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
     return [
@@ -44,6 +45,17 @@ export const listDetailOptions = (stage: Stage, kind: ContentType): PickerOption
             .filter(fn => isStatReturnType(fn.returnType) && (fn.parameters || []).some(parameter => parameter.type === kind))
             .map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description })),
         ...(stats || []).map(stat => ({ key: contentStatReference(kind, stat.id), label: stat.name, category: `${CONTENT_LABELS[kind]} Stats`, description: stat.guidance })),
+    ];
+};
+
+// Card details for a content kind: stat badge controls for that kind, plus that kind's badge sources.
+export const listDetailOptions = (stage: Stage, kind: ContentType): PickerOption[] => {
+    const configuration = stage.getConfiguration();
+    return [
+        ...(configuration.controls || [])
+            .filter(control => control.active !== false && control.type === 'statBadge' && control.contentType === kind)
+            .map(control => ({ key: controlReference(control.id), label: control.name || '(Unnamed Control)', category: 'Stat Badges', description: control.description })),
+        ...contentDetailSourceOptions(stage, kind),
     ];
 };
 

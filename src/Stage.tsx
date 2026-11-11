@@ -12,7 +12,7 @@ import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item } from "./content/Item";
-import { compareControlPriority, Control, ControlPlacement, isControlAvailable } from "./content/Control";
+import { compareControlPriority, Control, ControlPlacement, controlReferenceId, isControlAvailable, isControlReference } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, getCurrentActors, getCurrentLocation, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Screen, ListSection, parseContentStatReference, listContentKind, LIST_CONTENT_TYPES } from "./content/Screen";
@@ -114,7 +114,7 @@ const MAX_FUNCTION_INVOCATION_DEPTH = 8;
 type ScriptContext = { readOnly: boolean; stack: string[]; variables?: FunctionVariableBindings };
 
 export type ResolvedListSection = { key: string; section: ListSection; header: string; kind: ContentType; ids: string[] };
-export type ResolvedListCardDetail = { key: string; label: string; type: StatType; value: StatValue; stat?: Stat };
+export type ResolvedListCardDetail = { key: string; label: string; type: StatType; value: StatValue; stat?: Stat; control?: Control };
 
 // Simple (string) metadata fields a function script may read/write directly on an actor/location/item via
 // getField/setField, bypassing the Stat system entirely. Deliberately excludes complex fields (schedule,
@@ -706,11 +706,38 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return entity && entity.active !== false ? entity : undefined;
     }
 
-    // Resolves one card detail: a content stat of the card's entity, or a function evaluated with
-    // "variable:<kind>" bound to the card and the header variable bound to its page's header.
+    // Resolves one card detail: a content stat of the card's entity, a function evaluated with
+    // "variable:<kind>" bound to the card and the header variable bound to its page's header, or a
+    // stat badge control wrapping either source with its display settings and per-card availability.
     resolveListCardDetail(detail: string, kind: ContentType, id: string, header: string, save: SaveType = this.getSave()): ResolvedListCardDetail | undefined {
         try {
             const configuration = this.getConfiguration(save);
+            if (isControlReference(detail)) {
+                const control = (configuration.controls || []).find(candidate => candidate.id === controlReferenceId(detail));
+                if (!control || control.type !== 'statBadge' || control.contentType !== kind || isControlReference(control.badgeSource)) {
+                    return undefined;
+                }
+                const entity = this.getActiveContent(kind, id, save);
+                if (!entity) {
+                    return undefined;
+                }
+                // Availability binds the card's entity as the badge's variable content target.
+                const context: ConditionContext = {
+                    ...this.getScheduleContext(save),
+                    skitState: this.getSkitConditionState(),
+                    ...(kind === 'actor' ? { currentActor: entity as Actor } : kind === 'location' ? { currentLocation: entity as Location } : { currentItem: entity as Item }),
+                };
+                if (!isControlAvailable(control, context)) {
+                    return undefined;
+                }
+                const resolved = this.resolveListCardDetail(control.badgeSource, kind, id, header, save);
+                if (!resolved) {
+                    return undefined;
+                }
+                // Function sources have no stat; synthesize one so numeric display settings have a range.
+                const stat = resolved.stat ?? (resolved.type === 'number' ? cloneStat({ name: resolved.label, type: 'number' } as Stat) : undefined);
+                return { ...resolved, key: detail, stat, control };
+            }
             const statReference = parseContentStatReference(detail);
             if (statReference) {
                 const stats = statReference.kind === 'actor' ? configuration.actorStats : statReference.kind === 'location' ? configuration.locationStats : configuration.itemStats;

@@ -21,6 +21,7 @@ const PLACEMENT_LABELS: Record<Control['placement'], string> = {
     outcome: 'Outcomes',
     settings: 'Settings',
     popup: 'Pop-ups',
+    standalone: 'Stat Badges',
 };
 
 const TYPE_LABELS: Record<Control['type'], string> = {
@@ -31,6 +32,7 @@ const TYPE_LABELS: Record<Control['type'], string> = {
     statOutcome: 'Stat Outcome',
     settings: 'Settings',
     popup: 'Pop-up',
+    statBadge: 'Stat Badge',
 };
 
 export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage }) => {
@@ -75,6 +77,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             { id: 'outcome', title: PLACEMENT_LABELS.outcome, entries: controls.filter((control) => control.placement === 'outcome') },
             { id: 'settings', title: PLACEMENT_LABELS.settings, entries: controls.filter((control) => control.type === 'settings') },
             { id: 'popup', title: PLACEMENT_LABELS.popup, entries: controls.filter((control) => control.type === 'popup') },
+            { id: 'standalone', title: PLACEMENT_LABELS.standalone, entries: controls.filter((control) => control.placement === 'standalone') },
         ];
         return sections;
     }, [controls]);
@@ -101,8 +104,8 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             active: true,
             name: candidateName,
             placement: sectionId === 'top' ? 'top' : sectionId === 'settings' ? 'settings' : 'bottom',
-            type: sectionId === 'popup' ? 'popup' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'actorCard' ? 'actorStatDisplay' : sectionId === 'settings' ? 'settings' : 'button',
-            label: sectionId === 'actorCard' || sectionId === 'outcome' || sectionId === 'settings' ? '' : candidateName,
+            type: sectionId === 'popup' ? 'popup' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'actorCard' ? 'actorStatDisplay' : sectionId === 'settings' ? 'settings' : sectionId === 'standalone' ? 'statBadge' : 'button',
+            label: sectionId === 'actorCard' || sectionId === 'outcome' || sectionId === 'settings' || sectionId === 'standalone' ? '' : candidateName,
         });
 
         stage().updateConfiguration({ controls: [...configuredControls, control] });

@@ -16,7 +16,7 @@ import { ContentCardList } from '../src/components/ContentCardList';
 import { listContentSourceOptions, listDetailOptions, listHeaderSourceOptions } from '../src/components/ListSectionsEditor';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
-import { Control } from '../src/content/Control';
+import { Control, controlReference } from '../src/content/Control';
 import { ScreenDetailPanel } from '../src/screens/ScreenDetailPanel';
 import { StatValueInput } from '../src/components/StatValueInput';
 import { HeaderVariableContext } from '../src/components/VariableContentContext';
@@ -158,6 +158,56 @@ test('card details resolve content stats and functions bound to the card and hea
     assert.equal(stage.resolveListCardDetail(contentStatReference('item', 'Mood'), 'actor', 'alice', 'red'), undefined);
 });
 
+test('stat badge details resolve their source with per-card availability and carry the control', () => {
+    const { stage, configuration, save } = fixture();
+    // Availability evaluation needs the content stat definitions, as the real schedule context provides.
+    stage.getScheduleContext = () => ({ globalStats: configuration.globalStats, globalStatValues: save.globalStatValues, actorStats: configuration.actorStats });
+    const moodBadge = new Control({
+        type: 'statBadge', name: 'Mood Badge', contentType: 'actor', badgeSource: contentStatReference('actor', 'Mood'),
+        displayType: 'rating', label: 'Mood!',
+        availabilityConditions: [[{ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Mood', comparison: 'greaterThan', value: 4 }]],
+    });
+    const labelBadge = new Control({
+        type: 'statBadge', name: 'Label Badge', contentType: 'actor',
+        badgeSource: functionReference('label', { Who: variableContentValue('actor'), Team: HEADER_VARIABLE_VALUE }),
+    });
+    const numberBadge = new Control({ type: 'statBadge', name: 'Number Badge', contentType: 'actor', badgeSource: functionReference('unrelated') });
+    configuration.controls = [moodBadge, labelBadge, numberBadge];
+
+    // Availability binds the card's entity: Bob (Mood 5) passes, Alice (Mood 3) does not.
+    const resolved = stage.resolveListCardDetail(controlReference(moodBadge.id), 'actor', 'bob', 'blue');
+    assert.equal(resolved?.control, moodBadge);
+    assert.equal(resolved?.value, 5);
+    assert.equal(resolved?.stat?.name, 'Mood');
+    assert.equal(stage.resolveListCardDetail(controlReference(moodBadge.id), 'actor', 'alice', 'red'), undefined);
+
+    // Function sources bind the variable content and header like plain function details.
+    assert.equal(stage.resolveListCardDetail(controlReference(labelBadge.id), 'actor', 'bob', 'blue')?.value, 'blue:bob');
+
+    // Numeric function sources synthesize a stat so display settings have a range.
+    const numeric = stage.resolveListCardDetail(controlReference(numberBadge.id), 'actor', 'bob', 'blue');
+    assert.equal(numeric?.value, 1);
+    assert.equal(numeric?.stat?.type, 'number');
+
+    // Content-kind mismatches and unknown controls resolve to nothing.
+    assert.equal(stage.resolveListCardDetail(controlReference(moodBadge.id), 'item', 'sword', 'blue'), undefined);
+    assert.equal(stage.resolveListCardDetail(controlReference('missing'), 'actor', 'bob', 'blue'), undefined);
+});
+
+test('stat badges render on list cards with their display settings', () => {
+    const { stage, configuration } = fixture();
+    const moodBadge = new Control({
+        type: 'statBadge', name: 'Mood Badge', contentType: 'actor',
+        badgeSource: contentStatReference('actor', 'Mood'), displayType: 'rating',
+    });
+    configuration.controls = [moodBadge];
+    const section = { ...createListSection(), header: 'Crew', contentSource: globalStatReference('Crew'), details: [controlReference(moodBadge.id)] };
+    const pages = buildListContentPages(stage, new Screen({ type: 'list', sections: [section] }), () => {});
+    const html = renderToStaticMarkup(<TooltipProvider><ContentCardList stage={() => stage} pages={pages} isVerticalLayout={false} /></TooltipProvider>);
+    assert.match(html, new RegExp(`data-popup-card-detail="${controlReference(moodBadge.id)}"`));
+    assert.match(html, /aria-label="Mood: 5 of 5"/);
+});
+
 test('card click actions bind Variable to the clicked content', () => {
     const { stage, save } = fixture();
     const section = {
@@ -219,6 +269,22 @@ test('editor pickers offer header, content, and kind-filtered detail sources', (
     assert.deepEqual(listContentSourceOptions(stage).map(option => option.key), [functionReference('members'), globalStatReference('Crew')]);
     assert.deepEqual(listDetailOptions(stage, 'actor').map(option => option.key), [functionReference('label'), 'actorStat:Mood', 'actorStat:Team']);
     assert.deepEqual(listDetailOptions(stage, 'item'), []);
+});
+
+test('list detail pickers offer active stat badges matching the content kind', () => {
+    const { stage, configuration } = fixture();
+    const moodBadge = new Control({ type: 'statBadge', name: 'Mood Badge', contentType: 'actor', badgeSource: contentStatReference('actor', 'Mood') });
+    const itemBadge = new Control({ type: 'statBadge', name: 'Quality Badge', contentType: 'item' });
+    configuration.controls = [
+        moodBadge,
+        itemBadge,
+        new Control({ type: 'statBadge', name: 'Hidden Badge', contentType: 'actor', active: false }),
+        new Control({ type: 'button', name: 'Button' }),
+    ];
+    const actorOptions = listDetailOptions(stage, 'actor');
+    assert.deepEqual(actorOptions.map(option => option.key), [controlReference(moodBadge.id), functionReference('label'), 'actorStat:Mood', 'actorStat:Team']);
+    assert.equal(actorOptions[0].category, 'Stat Badges');
+    assert.deepEqual(listDetailOptions(stage, 'item').map(option => option.key), [controlReference(itemBadge.id)]);
 });
 
 test('Screen editor switches between Map and List options; Controls only select Screens', () => {

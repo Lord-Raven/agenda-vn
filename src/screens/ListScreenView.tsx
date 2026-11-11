@@ -5,6 +5,8 @@ import { Screen } from '../content/Screen';
 import { formatStatOptionValueText, resolveReferenceKind } from '../content/Stat';
 import { ContentCardList, ContentCardPage } from '../components/ContentCardList';
 import { ContentListPortraits } from '../components/ContentListControl';
+import { resolveIcon } from '../components/StatRating';
+import { StatValueDisplay } from '../components/StatDisplay';
 import { Skit } from '../content/Skit';
 import { processLoreText } from '../content/Lore';
 
@@ -56,26 +58,39 @@ const formatDetailText = (detail: ResolvedListCardDetail): string => {
 };
 
 export const ListCardDetail: FC<{ detail: ResolvedListCardDetail; stage: Stage; isVerticalLayout: boolean }> = ({ detail, stage, isVerticalLayout }) => {
+    const control = detail.control;
+    const label = control ? processLoreText(control.label.trim() || detail.label, stage) : detail.label;
     const isReference = ['actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList'].includes(detail.type);
     if (isReference) {
         const values = (Array.isArray(detail.value) ? detail.value : [detail.value]).map(String).filter(Boolean);
         return values.length ? (
-            <Box data-popup-card-detail={detail.key} title={detail.label} sx={{ display: 'flex' }}>
-                <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={detail.label} variant="overlay" size={isVerticalLayout ? 30 : 36} />
+            <Box data-popup-card-detail={detail.key} title={label} sx={{ display: 'flex' }}>
+                <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={label} variant="overlay" size={isVerticalLayout ? 30 : 36} />
             </Box>
         ) : null;
     }
+    const BadgeIcon = control?.iconName ? resolveIcon(control.iconName, stage) : null;
+    const numericValue = Number(detail.value);
+    // Stat badges render numeric values with their display settings; everything else uses the text pill.
+    const badgeDisplay = control && detail.stat && detail.type === 'number' && Number.isFinite(numericValue) && (
+        <Box sx={{ width: control.displayType === 'percentage' || control.displayType === 'bar' ? '90px' : undefined, height: '16px', display: 'flex', alignItems: 'center' }}>
+            <StatValueDisplay stat={detail.stat} display={control} value={numericValue} />
+        </Box>
+    );
     return (
-        <Box data-popup-card-detail={detail.key} sx={{
-            display: 'flex', alignItems: 'baseline', gap: 0.5, px: 1, py: 0.4, borderRadius: '999px',
+        <Box data-popup-card-detail={detail.key} title={control ? processLoreText(control.description, stage).trim() || undefined : undefined} sx={{
+            display: 'flex', alignItems: badgeDisplay ? 'center' : 'baseline', gap: 0.5, px: 1, py: 0.4, borderRadius: '999px',
             border: '1px solid var(--agenda-line-subtle)',
             background: 'color-mix(in srgb, var(--agenda-surface-base) 70%, transparent)',
             maxWidth: 220, minWidth: 0,
         }}>
-            <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{detail.label}</Typography>
-            <Typography component="span" sx={{ color: 'var(--agenda-text-primary)', fontSize: '0.8rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {formatDetailText(detail)}
-            </Typography>
+            {BadgeIcon && <BadgeIcon sx={{ fontSize: '0.9rem', color: control?.displayColor || 'var(--agenda-text-muted)' }} />}
+            {label && <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{label}</Typography>}
+            {badgeDisplay || (
+                <Typography component="span" sx={{ color: control?.displayColor || 'var(--agenda-text-primary)', fontSize: '0.8rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {formatDetailText(detail)}
+                </Typography>
+            )}
         </Box>
     );
 };

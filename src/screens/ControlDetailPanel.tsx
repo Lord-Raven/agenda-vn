@@ -1,13 +1,17 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Stage } from '../Stage';
 import { ContentListDisplay, Control, ControlPlacement, ControlType, StatDisplayType } from '../content/Control';
-import { ConditionCollection } from '../content/Condition';
+import { ConditionCollection, ContentType } from '../content/Condition';
 import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
+import { parseContentStatReference } from '../content/Screen';
+import { functionReferenceId, isFunctionReference } from '../content/Function';
 import { Button, ColorPickerInput, GlassPanel, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker } from '../components/StatRating';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
+import { contentDetailSourceOptions } from '../components/ListSectionsEditor';
+import { HeaderVariableContext, VariableContentContext } from '../components/VariableContentContext';
 
 interface ControlDetailPanelProps {
     control: Control;
@@ -26,6 +30,8 @@ type ControlDraft = {
     iconName: string;
     description: string;
     statId: string;
+    contentType: ContentType;
+    badgeSource: string;
     pickerSource?: string[];
     screenId: string;
     contentListDisplay: ContentListDisplay;
@@ -47,6 +53,8 @@ const createDraft = (control: Control): ControlDraft => ({
     iconName: control.iconName,
     description: control.description,
     statId: control.statId,
+    contentType: control.contentType,
+    badgeSource: control.badgeSource,
     pickerSource: control.pickerSource ? [...control.pickerSource] : undefined,
     screenId: control.screenId,
     contentListDisplay: control.contentListDisplay ?? 'carousel',
@@ -116,6 +124,8 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             iconName: nextDraft.iconName,
             description: nextDraft.description,
             statId: nextDraft.statId,
+            contentType: nextDraft.contentType,
+            badgeSource: nextDraft.badgeSource,
             pickerSource: nextDraft.pickerSource ? [...nextDraft.pickerSource] : undefined,
             screenId: nextDraft.screenId,
             contentListDisplay: nextDraft.contentListDisplay,
@@ -180,6 +190,15 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const selectableStats = usesActorStat ? updatableActorStats : updatableGlobalStats;
     const selectedStat = selectableStats.find((stat) => stat.id === draft.statId);
     const supportsDisplaySettings = draft.type === 'statDisplay' || draft.type === 'actorStatDisplay' || draft.type === 'statOutcome';
+    const isStatBadge = draft.type === 'statBadge';
+    const contentTypeStats = draft.contentType === 'actor' ? actorStats : draft.contentType === 'location' ? updatableLocationStats : updatableItemStats;
+    // The badge source's value type, for gating the numeric display settings.
+    const badgeStatReference = parseContentStatReference(draft.badgeSource);
+    const badgeSourceType = badgeStatReference
+        ? contentTypeStats.find((stat) => stat.id === badgeStatReference.statId)?.type
+        : isFunctionReference(draft.badgeSource)
+            ? (stageInstance.getConfiguration().functions || []).find((fn) => fn.id === functionReferenceId(draft.badgeSource))?.returnType
+            : undefined;
 
     return (
         <GlassPanel variant="default" style={{ overflow: 'visible', position: 'relative', padding: '20px', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
@@ -226,7 +245,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 Lower numbers display first. Equal priorities keep configuration order.
                             </span>
                         </div>
-                        {draft.type !== 'actorStatDisplay' && draft.type !== 'statOutcome' && draft.type !== 'settings' && draft.type !== 'popup' && (
+                        {draft.type !== 'actorStatDisplay' && draft.type !== 'statOutcome' && draft.type !== 'settings' && draft.type !== 'popup' && draft.type !== 'statBadge' && (
                             <div>
                                 <label htmlFor={`control-width-weight-${control.id}`} style={labelStyle}>Width Weight</label>
                                 <TextInput
@@ -259,7 +278,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.placement}
-                                    disabled={draft.type === 'actorStatDisplay' || draft.type === 'statOutcome' || draft.type === 'settings' || draft.type === 'popup'}
+                                    disabled={draft.type === 'actorStatDisplay' || draft.type === 'statOutcome' || draft.type === 'settings' || draft.type === 'popup' || draft.type === 'statBadge'}
                                     onChange={(e) => setDraft((current) => ({ ...current, placement: e.target.value as ControlPlacement }))}
                                 >
                                     <option value="top">Top (with date/stats)</option>
@@ -268,6 +287,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     {draft.type === 'statOutcome' && <option value="outcome">Outcomes</option>}
                                     {draft.type === 'settings' && <option value="settings">Settings</option>}
                                     {draft.type === 'popup' && <option value="popup">Pop-up</option>}
+                                    {draft.type === 'statBadge' && <option value="standalone">Standalone (List Screens)</option>}
                                 </select>
                             </div>
                             <div>
@@ -281,8 +301,9 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         setDraft((current) => ({
                                             ...current,
                                             type,
-                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'actorStatDisplay' ? 'actorCard' : type === 'settings' ? 'settings' : current.placement === 'actorCard' || current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' ? 'bottom' : current.placement,
+                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'actorStatDisplay' ? 'actorCard' : type === 'settings' ? 'settings' : type === 'statBadge' ? 'standalone' : current.placement === 'actorCard' || current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' || current.placement === 'standalone' ? 'bottom' : current.placement,
                                             statId: '',
+                                            badgeSource: '',
                                             pickerSource: undefined,
                                         }));
                                     }}
@@ -291,6 +312,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <option value="statDisplay">Stat Display</option>
                                     <option value="statEditor">Stat Editor</option>
                                     <option value="actorStatDisplay">Actor Stat Display</option>
+                                    <option value="statBadge">Stat Badge</option>
                                     <option value="statOutcome">Outcome</option>
                                     <option value="settings">Settings</option>
                                     <option value="popup">Pop-up</option>
@@ -313,7 +335,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             stage={stage}
                             items={items}
                             locations={locations}
-                            variableContentType={usesActorStat ? 'actor' : undefined}
+                            variableContentType={isStatBadge ? draft.contentType : usesActorStat ? 'actor' : undefined}
                             allowSkitState
                             onChange={(availabilityConditions) => setDraft((current) => ({ ...current, availabilityConditions }))}
                         />
@@ -323,6 +345,11 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         {draft.type === 'actorStatDisplay' && (
                             <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                 Rendered on actor cards. Variable actor targets refer to the actor whose card is shown.
+                            </span>
+                        )}
+                        {isStatBadge && (
+                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                Evaluated per entry. Variable targets refer to the entry this badge is attached to.
                             </span>
                         )}
                     </section>
@@ -395,6 +422,89 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             />
                         </section>
                     </>
+                ) : isStatBadge ? (
+                    <section>
+                        <h2 style={sectionHeadingStyle}>Stat Badge</h2>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                            <div>
+                                <label style={labelStyle}>Content Type</label>
+                                <select
+                                    style={selectStyle}
+                                    value={draft.contentType}
+                                    onChange={(e) => setDraft((current) => ({ ...current, contentType: e.target.value as ContentType, badgeSource: '' }))}
+                                >
+                                    <option value="actor">Actor</option>
+                                    <option value="item">Item</option>
+                                    <option value="location">Location</option>
+                                </select>
+                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                    This badge can be attached to entries of this content type, e.g. as a Card Detail on a List Screen header with matching contents.
+                                </span>
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Value Source</label>
+                                <VariableContentContext.Provider value={draft.contentType}>
+                                    <HeaderVariableContext.Provider value={true}>
+                                        <SearchableOptionPicker stage={stage} allowClear emptyLabel="None" title="Choose badge source" bindVariableParameters
+                                            value={draft.badgeSource || undefined} options={contentDetailSourceOptions(stageInstance, draft.contentType)}
+                                            onChange={(value) => setDraft((current) => ({ ...current, badgeSource: typeof value === 'string' ? value : '' }))} />
+                                    </HeaderVariableContext.Provider>
+                                </VariableContentContext.Provider>
+                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                    A stat of the chosen content type, or a function whose Variable parameter binds to the entry this badge is attached to.
+                                </span>
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Label (optional)</label>
+                                <TextInput fullWidth value={draft.label} placeholder="Use source name"
+                                    onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))} />
+                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                    {'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only.'}
+                                </span>
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Description</label>
+                                <TextArea
+                                    value={draft.description}
+                                    onChange={(e) => setDraft((current) => ({ ...current, description: e.target.value }))}
+                                    rows={2}
+                                    placeholder="Tooltip shown with this badge"
+                                    style={{ width: '100%', resize: 'vertical' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Label Icon (optional)</label>
+                                <IconPicker stage={stage} value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
+                            </div>
+                            {badgeSourceType === 'number' && (
+                                <div>
+                                    <label style={labelStyle}>Display</label>
+                                    <select style={selectStyle} value={draft.displayType}
+                                        onChange={(e) => setDraft((current) => ({ ...current, displayType: e.target.value as StatDisplayType }))}>
+                                        <option value="straight">Straight Number</option>
+                                        <option value="percentage">Percentage</option>
+                                        <option value="bar">Bar</option>
+                                        <option value="rating">Rating</option>
+                                        <option value="letter grade">Letter Grade</option>
+                                    </select>
+                                    {draft.displayType === 'rating' && (
+                                        <div style={{ marginTop: 15 }}>
+                                            <label style={labelStyle}>Rating Icon</label>
+                                            <IconPicker stage={stage} value={draft.ratingIconName} onChange={(ratingIconName) => setDraft((current) => ({ ...current, ratingIconName: ratingIconName || 'star' }))} />
+                                        </div>
+                                    )}
+                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                        Function sources use a 0–100 range for Percentage, Bar, and Letter Grade displays, and 5 pips for Rating.
+                                    </span>
+                                </div>
+                            )}
+                            <div>
+                                <label style={labelStyle}>Display Color</label>
+                                <ColorPickerInput value={draft.displayColor} popoverTitle="Choose Display Color"
+                                    onChange={(displayColor) => setDraft((current) => ({ ...current, displayColor }))} />
+                            </div>
+                        </div>
+                    </section>
                 ) : (
                     <section>
                         <h2 style={sectionHeadingStyle}>{draft.type === 'statOutcome' ? 'Stat Outcome' : draft.type === 'actorStatDisplay' ? 'Actor Stat Display' : draft.type === 'statEditor' ? 'Stat Editor' : draft.type === 'settings' ? 'Settings' : 'Stat Display'}</h2>
