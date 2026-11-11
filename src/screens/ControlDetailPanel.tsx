@@ -5,7 +5,7 @@ import { ConditionCollection, ContentType } from '../content/Condition';
 import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
 import { parseContentStatReference } from '../content/Screen';
 import { functionReferenceId, isFunctionReference } from '../content/Function';
-import { Button, ColorPickerInput, GlassPanel, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
+import { Button, ColorPickerInput, GlassPanel, HelpTip, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker } from '../components/StatRating';
@@ -84,6 +84,15 @@ const labelStyle: React.CSSProperties = {
     fontWeight: 'bold',
     marginBottom: '8px',
 };
+
+const fieldHeadingStyle: React.CSSProperties = {
+    ...labelStyle,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+};
+
+const labelHelpText = 'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only.';
 
 const sectionHeadingStyle: React.CSSProperties = {
     color: 'var(--agenda-highlight)',
@@ -223,7 +232,12 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             />
                         </div>
                         <div>
-                            <label htmlFor={`control-priority-${control.id}`} style={labelStyle}>Priority</label>
+                            <div style={fieldHeadingStyle}>
+                                <label htmlFor={`control-priority-${control.id}`}>Priority</label>
+                                <HelpTip title="Control priority">
+                                    Lower numbers display first. Equal priorities keep configuration order.
+                                </HelpTip>
+                            </div>
                             <TextInput
                                 id={`control-priority-${control.id}`}
                                 fullWidth
@@ -241,13 +255,16 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     setDraft((current) => ({ ...current, priority }));
                                 }}
                             />
-                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                Lower numbers display first. Equal priorities keep configuration order.
-                            </span>
                         </div>
                         {draft.type !== 'actorStatDisplay' && draft.type !== 'statOutcome' && draft.type !== 'settings' && draft.type !== 'popup' && draft.type !== 'statBadge' && (
                             <div>
-                                <label htmlFor={`control-width-weight-${control.id}`} style={labelStyle}>Width Weight</label>
+                                <div style={fieldHeadingStyle}>
+                                    <label htmlFor={`control-width-weight-${control.id}`}>Width Weight</label>
+                                    <HelpTip title="Width weight">
+                                        Relative width among controls on the same row, including buttons. Default: 1.
+                                        Use 2 for twice the space or 0.5 for half. Controls wrap onto new rows when needed.
+                                    </HelpTip>
+                                </div>
                                 <TextInput
                                     id={`control-width-weight-${control.id}`}
                                     fullWidth
@@ -266,10 +283,6 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         setDraft((current) => ({ ...current, widthWeight }));
                                     }}
                                 />
-                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                    Relative width among controls on the same row, including buttons. Default: 1.
-                                    Use 2 for twice the space or 0.5 for half. Controls wrap onto new rows when needed.
-                                </span>
                             </div>
                         )}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
@@ -287,7 +300,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     {draft.type === 'statOutcome' && <option value="outcome">Outcomes</option>}
                                     {draft.type === 'settings' && <option value="settings">Settings</option>}
                                     {draft.type === 'popup' && <option value="popup">Pop-up</option>}
-                                    {draft.type === 'statBadge' && <option value="standalone">Standalone (List Screens)</option>}
+                                    {draft.type === 'statBadge' && <option value="standalone">Standalone</option>}
                                 </select>
                             </div>
                             <div>
@@ -324,7 +337,14 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
 
                 {draft.type !== 'statOutcome' && draft.type !== 'settings' && (
                     <section>
-                        <h2 style={sectionHeadingStyle}>Availability</h2>
+                        <div style={{ ...sectionHeadingStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <h2 style={{ fontSize: 'inherit', margin: 0 }}>Availability</h2>
+                            <HelpTip title="Control availability">
+                                Leave conditions empty to always render this control.
+                                {draft.type === 'actorStatDisplay' && ' Rendered on actor cards. Variable actor targets refer to the actor whose card is shown.'}
+                                {isStatBadge && ' Evaluated per entry. Variable targets refer to the entry this badge is attached to.'}
+                            </HelpTip>
+                        </div>
                         <ConditionEditor
                             conditionCollections={draft.availabilityConditions}
                             globalStats={globalStats}
@@ -342,23 +362,23 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         {draft.availabilityConditions.length === 0 && (
                             <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Always rendered.</span>
                         )}
-                        {draft.type === 'actorStatDisplay' && (
-                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                Rendered on actor cards. Variable actor targets refer to the actor whose card is shown.
-                            </span>
-                        )}
-                        {isStatBadge && (
-                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                Evaluated per entry. Variable targets refer to the entry this badge is attached to.
-                            </span>
-                        )}
                     </section>
                 )}
 
                 {draft.type === 'popup' ? (
                     <section>
                         <h2 style={sectionHeadingStyle}>Pop-up</h2>
-                        <label htmlFor={`control-screen-${control.id}`} style={labelStyle}>Screen</label>
+                        <div style={fieldHeadingStyle}>
+                            <label htmlFor={`control-screen-${control.id}`}>Screen</label>
+                            <HelpTip title="Pop-up Screen">
+                                Appears over the map, calendar, or skit while its availability conditions pass.
+                                The top and bottom status bars remain visible and usable.
+                                Pop-ups animate in and out; switching pop-ups fades only their contents.
+                                Only one pop-up is shown: lower priority numbers win, with configuration order breaking ties.
+                                It cannot be dismissed; use map button or card click actions to change the visibility conditions.
+                                {' The selected Screen ignores its normal availability rules, but map links and buttons retain theirs. Define reusable Map and List content in Screens.'}
+                            </HelpTip>
+                        </div>
                         <select
                             id={`control-screen-${control.id}`}
                             style={selectStyle}
@@ -373,14 +393,6 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <option key={screen.id} value={screen.id}>{screen.name || 'Unnamed Screen'} ({screen.type === 'list' ? 'List' : 'Map'})</option>
                             ))}
                         </select>
-                        <p style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                            Appears over the map, calendar, or skit while its availability conditions pass.
-                            The top and bottom status bars remain visible and usable.
-                            Pop-ups animate in and out; switching pop-ups fades only their contents.
-                            Only one pop-up is shown: lower priority numbers win, with configuration order breaking ties.
-                            It cannot be dismissed; use map button or card click actions to change the visibility conditions.
-                            {' The selected Screen ignores its normal availability rules, but map links and buttons retain theirs. Define reusable Map and List content in Screens.'}
-                        </p>
                     </section>
                 ) : draft.type === 'button' ? (
                     <>
@@ -388,16 +400,16 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <h2 style={sectionHeadingStyle}>Button</h2>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                 <div>
-                                    <label style={labelStyle}>Label</label>
+                                    <div style={fieldHeadingStyle}>
+                                        <label>Label</label>
+                                        <HelpTip title="Control label">{labelHelpText}</HelpTip>
+                                    </div>
                                     <TextInput
                                         fullWidth
                                         value={draft.label}
                                         onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))}
                                         placeholder="Text shown on the button"
                                     />
-                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                        {'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only.'}
-                                    </span>
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Label Icon (optional)</label>
@@ -427,7 +439,12 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         <h2 style={sectionHeadingStyle}>Stat Badge</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             <div>
-                                <label style={labelStyle}>Content Type</label>
+                                <div style={fieldHeadingStyle}>
+                                    <label>Content Type</label>
+                                    <HelpTip title="Badge content type">
+                                        This badge can be attached to entries of this content type, e.g. as a Card Detail on a List Screen header with matching contents.
+                                    </HelpTip>
+                                </div>
                                 <select
                                     style={selectStyle}
                                     value={draft.contentType}
@@ -437,12 +454,14 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <option value="item">Item</option>
                                     <option value="location">Location</option>
                                 </select>
-                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                    This badge can be attached to entries of this content type, e.g. as a Card Detail on a List Screen header with matching contents.
-                                </span>
                             </div>
                             <div>
-                                <label style={labelStyle}>Value Source</label>
+                                <div style={fieldHeadingStyle}>
+                                    <label>Value Source</label>
+                                    <HelpTip title="Badge value source">
+                                        A stat of the chosen content type, or a function whose Variable parameter binds to the entry this badge is attached to.
+                                    </HelpTip>
+                                </div>
                                 <VariableContentContext.Provider value={draft.contentType}>
                                     <HeaderVariableContext.Provider value={true}>
                                         <SearchableOptionPicker stage={stage} allowClear emptyLabel="None" title="Choose badge source" bindVariableParameters
@@ -450,17 +469,16 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             onChange={(value) => setDraft((current) => ({ ...current, badgeSource: typeof value === 'string' ? value : '' }))} />
                                     </HeaderVariableContext.Provider>
                                 </VariableContentContext.Provider>
-                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                    A stat of the chosen content type, or a function whose Variable parameter binds to the entry this badge is attached to.
-                                </span>
                             </div>
                             <div>
-                                <label style={labelStyle}>Label (optional)</label>
-                                <TextInput fullWidth value={draft.label} placeholder="Use source name"
+                                <div style={fieldHeadingStyle}>
+                                    <label>Label (optional)</label>
+                                    <HelpTip title="Badge label">
+                                        Leave empty to show no label. {labelHelpText}
+                                    </HelpTip>
+                                </div>
+                                <TextInput fullWidth value={draft.label} placeholder="No label"
                                     onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))} />
-                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                    {'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only.'}
-                                </span>
                             </div>
                             <div>
                                 <label style={labelStyle}>Description</label>
@@ -478,7 +496,12 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             </div>
                             {badgeSourceType === 'number' && (
                                 <div>
-                                    <label style={labelStyle}>Display</label>
+                                    <div style={fieldHeadingStyle}>
+                                        <label>Display</label>
+                                        <HelpTip title="Badge display">
+                                            Function sources use a 0–100 range for Percentage, Bar, and Letter Grade displays, and 5 pips for Rating.
+                                        </HelpTip>
+                                    </div>
                                     <select style={selectStyle} value={draft.displayType}
                                         onChange={(e) => setDraft((current) => ({ ...current, displayType: e.target.value as StatDisplayType }))}>
                                         <option value="straight">Straight Number</option>
@@ -493,9 +516,6 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             <IconPicker stage={stage} value={draft.ratingIconName} onChange={(ratingIconName) => setDraft((current) => ({ ...current, ratingIconName: ratingIconName || 'star' }))} />
                                         </div>
                                     )}
-                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                        Function sources use a 0–100 range for Percentage, Bar, and Letter Grade displays, and 5 pips for Rating.
-                                    </span>
                                 </div>
                             )}
                             <div>
@@ -531,11 +551,16 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         </div>
                         {draft.type === 'statEditor' && selectedStat && (isReferenceStatType(selectedStat.type) || selectedStat.type === 'option' || selectedStat.type === 'optionList') && (
                             <div style={{ marginTop: 15 }}>
-                                <label style={labelStyle}>
-                                    <input id={`control-picker-source-${control.id}`} type="checkbox" checked={draft.pickerSource !== undefined}
-                                        onChange={(e) => setDraft(current => ({ ...current, pickerSource: e.target.checked ? [] : undefined }))} />
-                                    {' '}Limit picker options
-                                </label>
+                                <div style={fieldHeadingStyle}>
+                                    <label>
+                                        <input id={`control-picker-source-${control.id}`} type="checkbox" checked={draft.pickerSource !== undefined}
+                                            onChange={(e) => setDraft(current => ({ ...current, pickerSource: e.target.checked ? [] : undefined }))} />
+                                        {' '}Limit picker options
+                                    </label>
+                                    <HelpTip title="Limit picker options">
+                                        Choose individual options or global stats and functions. Their current values determine the available choices in-game. Existing selections remain until removed.
+                                    </HelpTip>
+                                </div>
                                 {draft.pickerSource !== undefined && (
                                     <>
                                         {isReferenceStatType(selectedStat.type) ? (
@@ -548,21 +573,18 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                                 options={resolveStatOptionPool(selectedStat, { sourceStats: globalStats }).map(option => ({ key: option.id!, label: option.name, description: option.description }))}
                                                 functionType="option" stage={stage} title="Choose source options" />
                                         )}
-                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                            Choose individual options or global stats and functions. Their current values determine the available choices in-game. Existing selections remain until removed.
-                                        </span>
                                     </>
                                 )}
                             </div>
                         )}
                         {draft.type !== 'settings' && (
                             <div style={{ marginTop: 15 }}>
-                                <label style={labelStyle}>Label (optional)</label>
+                                <div style={fieldHeadingStyle}>
+                                    <label>Label (optional)</label>
+                                    <HelpTip title="Control label">{labelHelpText}</HelpTip>
+                                </div>
                                 <TextInput fullWidth value={draft.label} placeholder={selectedStat?.name || 'Use stat name'}
                                     onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))} />
-                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                    {'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only.'}
-                                </span>
                             </div>
                         )}
                         {(draft.type === 'statDisplay' || draft.type === 'statEditor' || draft.type === 'actorStatDisplay' || draft.type === 'settings') && (

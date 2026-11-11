@@ -11,7 +11,7 @@ import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { cloneListSection, contentStatReference, Screen, createListSection, parseContentStatReference, listContentKind } from '../src/content/Screen';
 import { functionReference, globalStatReference, HEADER_VARIABLE_VALUE, GameFunction } from '../src/content/Function';
 import { variableContentValue } from '../src/content/Condition';
-import { buildListContentPages } from '../src/screens/ListScreenView';
+import { buildListContentPages, ListCardDetail } from '../src/screens/ListScreenView';
 import { ContentCardList } from '../src/components/ContentCardList';
 import { listContentSourceOptions, listDetailOptions, listHeaderSourceOptions } from '../src/components/ListSectionsEditor';
 import { TooltipProvider } from '../src/components/TooltipContext';
@@ -206,6 +206,56 @@ test('stat badges render on list cards with their display settings', () => {
     const html = renderToStaticMarkup(<TooltipProvider><ContentCardList stage={() => stage} pages={pages} isVerticalLayout={false} /></TooltipProvider>);
     assert.match(html, new RegExp(`data-popup-card-detail="${controlReference(moodBadge.id)}"`));
     assert.match(html, /aria-label="Mood: 5 of 5"/);
+    assert.doesNotMatch(html, />Mood<\/span>/);
+    assert.doesNotMatch(html, /Mood Badge/);
+});
+
+test('stat badges omit blank labels while preserving icons, values, and descriptions', () => {
+    const { stage, configuration } = fixture();
+    for (const badgeSource of [contentStatReference('actor', 'Mood'), contentStatReference('actor', 'Team'), functionReference('greeting'), globalStatReference('Crew')]) {
+        const badge = new Control({
+            type: 'statBadge', name: 'Internal badge name', contentType: 'actor',
+            badgeSource, label: '   ', iconName: 'star', description: 'Badge tooltip',
+        });
+        configuration.controls = [badge];
+        const detail = stage.resolveListCardDetail(controlReference(badge.id), 'actor', 'bob', 'Crew');
+        assert.ok(detail);
+        const render = () => renderToStaticMarkup(<ListCardDetail detail={detail} stage={stage} isVerticalLayout={false} />);
+        const html = render();
+        assert.doesNotMatch(html, /Internal badge name|>Mood<\/span>|>Team<\/span>|>Greeting<\/span>|title="Crew"/);
+        if (detail.type === 'number' || detail.type === 'text') {
+            assert.match(html, /data-testid="StarIcon"/);
+            assert.match(html, /title="Badge tooltip"/);
+            assert.match(html, new RegExp(`>${detail.value}</span>`));
+        }
+        badge.label = 'Custom {{Greeting}}';
+        assert.match(render(), /Custom Hello/);
+    }
+});
+
+test('plain list stat details retain their source labels', () => {
+    const { stage } = fixture();
+    const detail = stage.resolveListCardDetail(contentStatReference('actor', 'Mood'), 'actor', 'bob', 'Crew');
+    assert.ok(detail);
+    const html = renderToStaticMarkup(<ListCardDetail detail={detail} stage={stage} isVerticalLayout={false} />);
+    assert.match(html, />Mood<\/span>/);
+    assert.match(html, />5<\/span>/);
+});
+
+test('stat badge editor uses standalone placement and help icons instead of inline guidance', () => {
+    const { stage, configuration } = fixture();
+    const badge = new Control({
+        type: 'statBadge', contentType: 'actor', badgeSource: contentStatReference('actor', 'Mood'),
+    });
+    configuration.controls = [badge];
+    const html = renderToStaticMarkup(<ControlDetailPanel control={badge} stage={() => stage} />);
+    assert.match(html, /<option value="standalone" selected="">Standalone<\/option>/);
+    assert.match(html, /<option value="statBadge" selected="">Stat Badge<\/option>/);
+    assert.match(html, /placeholder="No label"/);
+    for (const title of ['Control priority', 'Control availability', 'Badge content type', 'Badge value source', 'Badge label', 'Badge display']) {
+        assert.match(html, new RegExp(`aria-label="${title}"`));
+    }
+    assert.doesNotMatch(html, /\(List Screens\)|Use source name|This badge can be attached|A stat of the chosen|Evaluated per entry|Function sources use|Arguments follow parameter order/);
 });
 
 test('card click actions bind Variable to the clicked content', () => {

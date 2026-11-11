@@ -59,7 +59,7 @@ const formatDetailText = (detail: ResolvedListCardDetail): string => {
 
 export const ListCardDetail: FC<{ detail: ResolvedListCardDetail; stage: Stage; isVerticalLayout: boolean }> = ({ detail, stage, isVerticalLayout }) => {
     const control = detail.control;
-    const label = control ? processLoreText(control.label.trim() || detail.label, stage) : detail.label;
+    const label = control ? processLoreText(control.label.trim(), stage) : detail.label;
     const isReference = ['actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList'].includes(detail.type);
     if (isReference) {
         const values = (Array.isArray(detail.value) ? detail.value : [detail.value]).map(String).filter(Boolean);
