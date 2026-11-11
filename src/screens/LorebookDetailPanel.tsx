@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from 'react';
+import { FC, useEffect, useMemo, useState } from 'react';
 import { Add, KeyboardArrowDownRounded, KeyboardArrowUpRounded } from '@mui/icons-material';
 import { Chip } from '@mui/material';
 import { Stage } from '../Stage';
@@ -85,6 +85,11 @@ export const LorebookDetailPanel: FC<LorebookDetailPanelProps> = ({
 }) => {
     const [editingTriggerIndex, setEditingTriggerIndex] = useState<number | 'new' | null>(null);
     const [editingTriggerValue, setEditingTriggerValue] = useState('');
+
+    const locationOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().locations || [] : Object.values(stage().getSave().atlas || {}))
+        .filter((candidate) => candidate.active !== false), [stage, isCreatorMode]);
+    const itemOptions = useMemo(() => (isCreatorMode ? stage().getConfiguration().items || [] : stage().getSave().inventory || [])
+        .filter((candidate) => candidate.active !== false), [stage, isCreatorMode]);
 
     const cancelTriggerEdit = () => {
         setEditingTriggerIndex(null);
@@ -186,6 +191,8 @@ export const LorebookDetailPanel: FC<LorebookDetailPanelProps> = ({
                     conditionCollections={lore.conditionCollections || []}
                     globalStats={stage().getConfiguration().globalStats || []}
                     actors={Object.values(stage().getSave().actors || {})}
+                    items={itemOptions}
+                    locations={locationOptions}
                     stage={stage}
                     onChange={(conditionCollections) => onChange({ conditionCollections })}
                 />
@@ -197,6 +204,8 @@ export const LorebookDetailPanel: FC<LorebookDetailPanelProps> = ({
                         conditionCollections={lore.triggerConditionCollections || []}
                         globalStats={stage().getConfiguration().globalStats || []}
                         actors={Object.values(stage().getSave().actors || {})}
+                        items={itemOptions}
+                        locations={locationOptions}
                         stage={stage}
                         onChange={(triggerConditionCollections) => onChange({ triggerConditionCollections })}
                     />
