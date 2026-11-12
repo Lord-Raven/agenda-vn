@@ -308,7 +308,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     const save = stage.getSave();
     const location = skit ? save.atlas[skit.initialLocationId] : undefined;
     console.log(`Testing skit ID: ${skit?.id}`);
-    const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e =>  {console.log(`Filtering event for skit ID: ${skit?.id}`); return skit?.id || 'undefined' !== e?.skit?.id || ''});
+    const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e =>  {console.log(`Filtering event for skit ID: ${e?.skit?.id}`); return skit?.id || 'undefined' !== e?.skit?.id || ''});
     const currentActors = skit ? getCurrentActors(skit, skit.script.length - 1).map(actorId => save.actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[] : [];
     currentActors.forEach(() => {});
     const lorebook = save.lorebook || [];
