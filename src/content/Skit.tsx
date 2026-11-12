@@ -307,11 +307,8 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     const playerName = stage.getPlayerActor()?.name || 'The Player';
     const save = stage.getSave();
     const location = skit ? save.atlas[skit.initialLocationId] : undefined;
-    console.log(`Testing skit ID: ${skit?.id}`);
-    const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e =>  {const retVal = (skit?.id || 'undefined') !== (e?.skit?.id || ''); console.log(`Filtering event for skit ID ${e?.skit?.id} is ${retVal}`); return retVal; });
-    console.log(`Past events for skit ID ${skit?.id}:`, pastEvents);
+    const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e =>  (skit?.id || 'undefined') !== (e?.skit?.id || ''));
     const currentActors = skit ? getCurrentActors(skit, skit.script.length - 1).map(actorId => save.actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[] : [];
-    currentActors.forEach(() => {});
     const lorebook = save.lorebook || [];
     const agendaConfig = stage.getConfiguration(save);
     const conditionContext: ConditionContext = stage.getScheduleContext(save);
