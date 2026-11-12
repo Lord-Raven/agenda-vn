@@ -1482,6 +1482,22 @@ test('function substitution reaches world lore, actor lore, locations, and gener
     assert.equal(save.atlas.place.description, 'Location {{Value}}');
 });
 
+test('generated scene context formats the current date according to date mode', () => {
+    const { stage, save, configuration } = fixture();
+    save.currentDate = '2026-10-10';
+    save.currentTimeOfDay = 'morning';
+    const skit = new Skit({ initialLocationId: 'place', initialActors: ['b'] });
+
+    configuration.dateMode = 'calendar';
+    const calendarPrompt = buildPrompt().addBlock('Context', generateContext(skit, stage, 5)).format();
+    assert.match(calendarPrompt, /Saturday, October 10th, 2026 - Morning/);
+
+    configuration.dateMode = 'turnBased';
+    const turnBasedPrompt = buildPrompt().addBlock('Context', generateContext(skit, stage, 5)).format();
+    assert.match(turnBasedPrompt, /Day 3, Morning/);
+    assert.doesNotMatch(turnBasedPrompt, /October 10th, 2026/);
+});
+
 test('every declared value type resolves and snapshots its primitive or ID result and survives portable JSON', () => {
     const { stage, configuration, save } = fixture();
     stage.saveGame = () => {};

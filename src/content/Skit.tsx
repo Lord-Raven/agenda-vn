@@ -307,7 +307,7 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     const playerName = stage.getPlayerActor()?.name || 'The Player';
     const save = stage.getSave();
     const location = skit ? save.atlas[skit.initialLocationId] : undefined;
-    const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e => e.skit !== skit);
+    const pastEvents = (save.timeline ? save.timeline.slice(-historyLength) : []).filter(e =>  skit?.id || 'undefined' !== e?.skit?.id || '');
     const currentActors = skit ? getCurrentActors(skit, skit.script.length - 1).map(actorId => save.actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor()) as Actor[] : [];
     currentActors.forEach(() => {});
     const lorebook = save.lorebook || [];
@@ -463,7 +463,9 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         }).addBlock(`Current Location`, 
             `${location?.id ? getLocationName(location.id, stage) : 'Unknown Location'}:\n  ${getLocationDescription(location?.id || '', stage) || 'No description available.'}`
         ).addBlock(`Current Date`,
-            formatCurrentDate(save.currentDate, save.currentTimeOfDay)
+            stage.getDateMode() === 'calendar'
+                ? formatCurrentDate(save.currentDate, save.currentTimeOfDay)
+                : `Day ${stage.getDayNumberForDate(save.currentDate || '')}, ${formatTimeOfDayLabel(save.currentTimeOfDay)}`
         ).addBlock(`Player`, (builder) => {
             builder.addBlock(`Name`, playerName);
             builder.addBlock(`Profile`, stage.getPlayerActor().profile);
@@ -641,7 +643,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     `<Entry>\n  <Message>\n    "Good. That's the spirit we'll need." Persephone offers a rare, approving smile.\n  </Message>\n  <Speaker>\n    PERSEPHONE\n  </Speaker>\n  <StatChange>\n    <Actor>\n      Cyanea\n    </Actor>\n    <Stat>\n      Resolve\n    </Stat>\n    <Amount>+1</Amount>\n  </StatChange>\n</Entry>\n` +
                     (save.enableImpersonation ? `<Entry>\n  <Message>\n    I smile warmly at the two women, "I agree. We need to be careful and work together."\n  </Message>\n  <Speaker>\n    ${playerName.toUpperCase()}\n  </Speaker>\n</Entry>\n` : '') +
                     `<Entry>\n  <Message>\n    A crimson-clad figure approaches with supplies.\n  </Message>\n  <Speaker>\n    RED HOOD\n  </Speaker>\n  <Movement>\n    <Actor>\n      Red Hood\n    </Actor>\n    <Location>Here</Location>\n  </Movement>\n</Entry>\n`
-                )
+                ).addBlock('Current Scene', buildScriptLog(skit, [], stage))
                 .format();
         console.log(prompt);
         let response;
