@@ -6,7 +6,7 @@ import { SettingsScreen } from "./SettingsScreen";
 import { BlurredBackground } from "@lord-raven/novel-visualizer";
 import { Button } from "../components/UiComponents";
 import { motion, AnimatePresence } from "framer-motion";
-import { Box } from "@mui/material";
+import { Box, CircularProgress } from "@mui/material";
 import { useTooltip } from "../components/TooltipContext";
 import React from "react";
 import { SaveLoadScreen } from "./SaveLoadScreen";
@@ -22,6 +22,8 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     const [showSettings, setShowSettings] = useState(false);
     const [showContentManagement, setShowContentManagement] = useState(false);
     const [isNewGameSettings, setIsNewGameSettings] = useState(false);
+    // Key of the menu button whose async work is in flight; disables the menu and shows a spinner on that button
+    const [pendingAction, setPendingAction] = useState<string | null>(null);
     const [expandedSection, setExpandedSection] = useState<'menu' | 'version' | 'attribution'>('menu');
     const { setTooltip, clearTooltip } = useTooltip();
     const disableAllButtons = false; // When true, disable all options on this menu, including escape to continue; this is being used to effectively shut down the game at the moment.
@@ -41,7 +43,7 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
     // Handle escape key to continue game if available
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && !disableAllButtons && !showContentManagement && !isUpdatingSave) {
+            if (event.key === 'Escape' && !disableAllButtons && !showContentManagement && !isUpdatingSave && !pendingAction) {
                 if (showSettings) {
                     handleSettingsCancel();
                 } else if (showSaveLoad) {
@@ -54,18 +56,24 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [showSettings, showSaveLoad, showContentManagement, isUpdatingSave]);
+    }, [showSettings, showSaveLoad, showContentManagement, isUpdatingSave, pendingAction]);
 
     const handleContinue = () => {
         setScreenType(stage().getCurrentSkit() ? ScreenType.SKIT : ScreenType.MAP);
     };
 
     const handleNewGame = async () => {
-        // Refresh configuration before showing new game settings so players start from the latest
-        // published configuration (a no-op for creators, who work from their chat-state configuration)
-        await stage().readStageConfiguration();
-        setIsNewGameSettings(true);
-        setShowSettings(true);
+        if (pendingAction) return;
+        setPendingAction('new');
+        try {
+            // Refresh configuration before showing new game settings so players start from the latest
+            // published configuration (a no-op for creators, who work from their chat-state configuration)
+            await stage().readStageConfiguration();
+            setIsNewGameSettings(true);
+            setShowSettings(true);
+        } finally {
+            setPendingAction(null);
+        }
     };
 
     const handleLoad = () => {
@@ -377,20 +385,23 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                         }}
                                     >
                                         <div style={{ marginTop: 'clamp(8px, 1.5vh, 12px)', display: 'flex', flexDirection: 'column', gap: 'clamp(10px, 2vh, 15px)' }}>
-                                            {menuButtons.map((button, index) => (
+                                            {menuButtons.map((button, index) => {
+                                                const isPending = pendingAction === button.key;
+                                                const isEnabled = button.enabled && !pendingAction;
+                                                return (
                                                 <motion.div
                                                     key={button.key}
                                                     initial={{ opacity: 0, x: -30 }}
                                                     animate={{
                                                         opacity: 1,
-                                                        x: hoveredButton === button.key && button.enabled ? 10 : 0
+                                                        x: hoveredButton === button.key && isEnabled ? 10 : 0
                                                     }}
                                                     transition={{
                                                         opacity: { delay: 0.15 + (index * 0.08), duration: 0.4, ease: 'easeOut' },
                                                         x: { duration: 0.2, ease: 'easeOut' }
                                                     }}
                                                     onMouseEnter={() => {
-                                                        setHoveredButton(button.enabled ? button.key : null);
+                                                        setHoveredButton(isEnabled ? button.key : null);
                                                         setTooltip(button.tooltip, button.icon);
                                                     }}
                                                     onMouseLeave={() => {
@@ -400,18 +411,25 @@ export const MenuScreen: FC<MenuScreenProps> = ({ stage, setScreenType }) => {
                                                 >
                                                     <Button
                                                         variant="menu"
-                                                        onClick={button.enabled ? button.onClick : undefined}
-                                                        disabled={!button.enabled}
+                                                        onClick={isEnabled ? button.onClick : undefined}
+                                                        disabled={!isEnabled && !isPending}
                                                         style={{
                                                             width: '100%',
                                                             fontSize: 'clamp(12px, 2.5vw, 16px)',
                                                             padding: 'clamp(8px, 1.5vh, 12px) clamp(16px, 3vw, 24px)',
+                                                            ...(isPending ? { cursor: 'progress' } : {}),
                                                         }}
                                                     >
-                                                        {button.label}
+                                                        {isPending ? (
+                                                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                                <CircularProgress size={14} style={{ color: 'var(--agenda-accent-primary)' }} />
+                                                                {button.label}
+                                                            </span>
+                                                        ) : button.label}
                                                     </Button>
                                                 </motion.div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </motion.div>
                                 )}
