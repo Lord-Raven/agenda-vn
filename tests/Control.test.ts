@@ -81,20 +81,19 @@ test('priority ordering preserves placement and availability filtering', () => {
     assert.deepEqual(visible.map((control) => control.name), ['First', 'Zulu', 'Alpha']);
 });
 
-test('actor stat displays always use actor-card placement and survive export/import', () => {
-    for (const placement of [undefined, 'top', 'bottom', 'actorCard']) {
-        const control = new Control({ type: 'actorStatDisplay', placement, statId: 'health' });
+test('cards always use standalone placement and survive export/import', () => {
+    for (const placement of [undefined, 'top', 'bottom', 'standalone'] as const) {
+        const control = new Control({ type: 'card', placement, contentType: 'actor', cardDetails: [controlReference('health')] });
         const imported = new Control(JSON.parse(JSON.stringify(control)));
-        assert.equal(imported.type, 'actorStatDisplay');
-        assert.equal(imported.placement, 'actorCard');
-        assert.equal(imported.statId, 'health');
+        assert.equal(imported.type, 'card');
+        assert.equal(imported.placement, 'standalone');
+        assert.deepEqual(imported.cardDetails, [controlReference('health')]);
     }
-    assert.equal(new Control({ type: 'button', placement: 'actorCard' }).placement, 'bottom');
 });
 
-test('actor-card availability binds identity and stat rules to the displayed actor', () => {
+test('card availability binds identity and stat rules to the displayed actor', () => {
     const control = new Control({
-        type: 'actorStatDisplay',
+        type: 'card',
         availabilityConditions: [[
             { type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' },
             { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'health', comparison: 'greaterThan', value: 5 },

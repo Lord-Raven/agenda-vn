@@ -9,6 +9,8 @@ import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { buildCreatorNotesHtml } from './CreatorNotesHtml';
 import { getEmotionImage } from '../content/Actor';
 import { getLocationImageUrl } from '../content/Location';
+import { DEFAULT_CARD_IDS } from '../content/Control';
+import { cardControlOptions } from '../components/ListSectionsEditor';
 
 interface GameManagementPanelProps {
     stage: () => Stage;
@@ -35,6 +37,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
     const [dateMode, setDateMode] = useState<DateMode>(() => configuration.dateMode === 'turnBased' ? 'turnBased' : 'calendar');
     const [timeMode, setTimeMode] = useState<TimeMode>(() => configuration.timeMode === 'phase' ? 'phase' : 'timeOfDay');
     const [useEvents, setUseEvents] = useState<boolean>(() => configuration.useEvents !== false);
+    const [defaultActorCardId, setDefaultActorCardId] = useState(() => configuration.defaultActorCardId || DEFAULT_CARD_IDS.actor);
     const [artStyle, setArtStyle] = useState<string>(() => configuration.artStyle || '');
     const [globalStats, setGlobalStats] = useState<Stat[]>(() =>
         (configuration.globalStats || []).map(cloneStat),
@@ -131,6 +134,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             timeMode,
             useEvents,
             controls: configuration.controls || [],
+            defaultActorCardId,
         });
     }, [
         activeActors,
@@ -146,6 +150,7 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
         dateMode,
         timeMode,
         useEvents,
+        defaultActorCardId,
         managedCalendarEvents,
         globalStats,
         itemStats,
@@ -245,9 +250,10 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
             dateMode,
             timeMode,
             useEvents,
+            defaultActorCardId,
         });
 
-    }, [activeActors, activeItems, activeLocations, activeScreens, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, timeMode, useEvents, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, versionNotes]);
+    }, [activeActors, activeItems, activeLocations, activeScreens, actorStats, artStyle, backgroundImagePrompt, backgroundImageUrl, castActorIds, configuration.lorebook, creatorNotes, dateMode, timeMode, useEvents, defaultActorCardId, managedCalendarEvents, globalStats, itemStats, locationStats, slideshowLocationIds, stageInstance, startingDate, title, titleImagePrompt, titleImageUrl, versionNotes]);
 
     useEffect(() => {
         saveGameConfigurationRef.current = saveGameConfiguration;
@@ -371,6 +377,13 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Game Settings</Title>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
 
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Default Actor Card</label>
+                        <SearchableOptionPicker stage={stage} title="Choose default Actor Card"
+                            value={defaultActorCardId} options={cardControlOptions(stageInstance, 'actor')}
+                            onChange={value => { if (typeof value === 'string') setDefaultActorCardId(value); }} />
+                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Used when hovering over Actors. Customize this Card Control in Controls.</span>
+                    </div>
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Game Title</label>
                         <TextInput

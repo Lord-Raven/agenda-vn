@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { EditNote, EventAvailable, MenuRounded, Settings } from "@mui/icons-material";
 import { Box } from "@mui/material";
 import { Stage } from "../Stage";
@@ -37,10 +37,10 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
     const [revision, setRevision] = useState(0);
-    const handleAction = (skit?: Skit | null) => {
+    const handleAction = useCallback((skit?: Skit | null) => {
         setRevision(current => current + 1);
         if (skit) setScreenType(ScreenType.SKIT);
-    };
+    }, [setScreenType]);
 
     const stageInstance = stage();
     const configuredBackgroundImageUrl = (stageInstance.getConfiguration(stageInstance.getSave()).backgroundImageUrl || "").trim();
@@ -87,6 +87,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                     subtitle: currentEvent ? currentEvent.name : !canVisit ? "Unavailable" : undefined,
                     highlightSubtitle: !!currentEvent,
                     disabled: !canVisit,
+                    onAction: handleAction,
                     onClick: () => {
                         if (stageInstance.startLocationVisit(location.id)) {
                             setScreenType(ScreenType.SKIT);
@@ -96,7 +97,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
                 };
             }),
         }));
-    }, [activeLocations, stageInstance, isVerticalLayout, setScreenType]);
+    }, [activeLocations, stageInstance, isVerticalLayout, setScreenType, handleAction]);
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {

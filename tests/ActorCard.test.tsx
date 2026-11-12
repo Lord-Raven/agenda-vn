@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ActorCard } from '../src/components/ActorCard';
 import { Stage, GameConfiguration, SaveType } from '../src/Stage';
 import { Actor } from '../src/content/Actor';
-import { Control } from '../src/content/Control';
+import { Control, controlReference, createDefaultCardControls } from '../src/content/Control';
 import { cloneStat, Stat } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { SettingsScreen } from '../src/screens/SettingsScreen';
@@ -41,6 +41,14 @@ const fixture = () => {
     stage.getSave = () => save;
     const render = () => renderToStaticMarkup(<TooltipProvider><ActorCard actor={actor} stage={() => stage} /></TooltipProvider>);
     return { actor, configuration, save, stage, render };
+};
+
+const setCardBadges = (configuration: GameConfiguration, badges: Control[]) => {
+    const card = createDefaultCardControls()[0];
+    card.cardDetails = badges.map(badge => controlReference(badge.id));
+    configuration.controls = [card, ...badges];
+    configuration.defaultActorCardId = card.id;
+    return card;
 };
 
 test('button and stat controls substitute labels and descriptions on each render without changing templates', () => {
@@ -81,11 +89,11 @@ test('button name and stat name fallbacks support tags while empty evaluated lab
 test('actor-card controls substitute tags with the displayed actor as char', () => {
     const { configuration, render } = fixture();
     configuration.globalStats = [makeStat('Gold', { default: 3 })];
-    configuration.controls = [new Control({
-        type: 'actorStatDisplay', statId: 'Health',
+    setCardBadges(configuration, [new Control({
+        type: 'statBadge', badgeSource: 'actorStat:Health',
         label: '{{char}}: {{char:Health}} / {{Gold}}',
         description: '{{user}} sees {{char}}',
-    })];
+    })]);
     const html = render();
     assert.match(html, /Alice: 7 \/ 3/);
     assert.match(html, /title="Alice sees Alice"/);
@@ -137,7 +145,7 @@ test('actor cards show source attribution with a link icon after all other card 
     const { actor, configuration, render } = fixture();
     actor.sourcePath = 'SomeAuthor/a-character-with-id-aca19a976af2';
     actor.summary = 'Character summary';
-    configuration.controls = [new Control({ type: 'actorStatDisplay', statId: 'Health', label: 'Health' })];
+    setCardBadges(configuration, [new Control({ type: 'statBadge', badgeSource: 'actorStat:Health', label: 'Health' })]);
 
     const html = render();
     assert.match(html, /href="https:\/\/chub.ai\/characters\/SomeAuthor\/a-character-with-id-aca19a976af2"/);
@@ -189,15 +197,15 @@ for (const isNewGame of [false, true]) {
     }
 }
 
-test('actor cards show only configured controls in priority order with actor values and defaults', () => {
+test('actor cards show only attached standalone badges in selection order with actor values and defaults', () => {
     const { configuration, render } = fixture();
     assert.doesNotMatch(render(), /Health|Energy/);
-    configuration.controls = [
-        new Control({ type: 'actorStatDisplay', statId: 'Energy', priority: 2 }),
-        new Control({ type: 'actorStatDisplay', statId: 'Health', priority: 1 }),
-        new Control({ type: 'statDisplay', statId: 'Health', placement: 'top' }),
-        new Control({ type: 'actorStatDisplay', statId: 'Missing' }),
-    ];
+    setCardBadges(configuration, [
+        new Control({ type: 'statBadge', badgeSource: 'actorStat:Health', label: 'Health' }),
+        new Control({ type: 'statBadge', badgeSource: 'actorStat:Energy', label: 'Energy' }),
+        new Control({ type: 'statBadge', badgeSource: 'actorStat:Missing', label: 'Missing' }),
+    ]);
+    configuration.controls.push(new Control({ type: 'statDisplay', statId: 'Health', placement: 'top' }));
     const html = render();
     assert.ok(html.indexOf('Health') < html.indexOf('Energy'));
     assert.match(html, />7</);
@@ -207,14 +215,14 @@ test('actor cards show only configured controls in priority order with actor val
 test('actor-card rules react to stat changes, global state, actor identity, and deactivation', () => {
     const { actor, configuration, save, stage, render } = fixture();
     const control = new Control({
-        type: 'actorStatDisplay', statId: 'Health',
+        type: 'statBadge', badgeSource: 'actorStat:Health', label: 'Health',
         availabilityConditions: [[
             { type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' },
             { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Health', comparison: 'greaterThan', value: 5 },
             { type: 'globalStat', statId: 'Visible', comparison: 'equals', value: true },
         ]],
     });
-    configuration.controls = [control];
+    setCardBadges(configuration, [control]);
     save.globalStatValues = { Visible: true };
     assert.match(render(), /Health/);
     actor.statMap.Health = 3;
@@ -224,14 +232,15 @@ test('actor-card rules react to stat changes, global state, actor identity, and 
     assert.doesNotMatch(render(), /Health/);
     save.globalStatValues.Visible = true;
     const other = new Actor({ id: 'bob', statMap: { Health: 7 } });
-    assert.deepEqual(stage.getVisibleControls('actorCard', other), []);
+    save.actors.bob = other;
+    assert.equal(stage.resolveListCardDetail(controlReference(control.id), 'actor', other.id, ''), undefined);
     assert.deepEqual(stage.getVisibleControls('top'), []);
     assert.deepEqual(stage.getVisibleControls('bottom'), []);
     control.active = false;
     assert.doesNotMatch(render(), /Health/);
 });
 
-test('actor stat displays support option labels, booleans, references, and numbers', () => {
+test('actor card badges support option labels, booleans, references, and numbers', () => {
     const { actor, configuration, render } = fixture();
     configuration.actorStats = [
         makeStat('Mood', { type: 'option', default: 'happy', options: [{ id: 'happy', name: 'Happy', description: '' }] }),
@@ -239,10 +248,10 @@ test('actor stat displays support option labels, booleans, references, and numbe
         makeStat('Friends', { type: 'actorList', default: [actor.id] }),
         makeStat('Relationship', { default: 7 }),
     ];
-    configuration.controls = configuration.actorStats.map(stat => new Control({ type: 'actorStatDisplay', statId: stat.id }));
+    setCardBadges(configuration, configuration.actorStats.map(stat => new Control({ type: 'statBadge', badgeSource: `actorStat:${stat.id}`, label: stat.name })));
     const html = render();
     assert.match(html, /Happy/);
-    assert.match(html, /True/);
+    assert.match(html, /Yes/);
     assert.match(html, /Friends/);
     assert.match(html, /Alice/);
     assert.match(html, /Relationship/);

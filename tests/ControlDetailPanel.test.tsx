@@ -419,10 +419,10 @@ for (const type of ['statEditor', 'settings'] as const) {
     });
 }
 
-for (const type of ['button', 'statDisplay', 'statEditor', 'actorStatDisplay', 'statOutcome'] satisfies ControlType[]) {
+for (const type of ['button', 'statDisplay', 'statEditor', 'card', 'statOutcome'] satisfies ControlType[]) {
     test(`${type} exposes width weight only for top/bottom controls`, () => {
         const html = renderPanel(type, '', 2.5);
-        if (type === 'actorStatDisplay' || type === 'statOutcome') {
+        if (type === 'card' || type === 'statOutcome') {
             assert.doesNotMatch(html, /Width Weight/);
         } else {
             assert.match(html, /Width Weight/);

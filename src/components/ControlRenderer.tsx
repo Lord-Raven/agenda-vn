@@ -56,7 +56,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     const stageInstance = stage();
     const fontSize = isVerticalLayout ? 'clamp(0.8rem, 10cqi, 1rem)' : valueFontSize;
 
-    if (control.type === 'actorStatDisplay' || control.type === 'statOutcome' || control.type === 'popup' || control.type === 'statBadge') {
+    if (control.type === 'card' || control.type === 'statOutcome' || control.type === 'popup' || control.type === 'statBadge') {
         return null;
     }
 

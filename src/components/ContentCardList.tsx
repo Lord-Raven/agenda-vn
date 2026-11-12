@@ -4,12 +4,11 @@ import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Stage } from '../Stage';
 import { ContentType } from '../content/Condition';
-import { getLocationImageUrl } from '../content/Location';
+import { Control } from '../content/Control';
+import { Skit } from '../content/Skit';
 import { useTooltip } from './TooltipContext';
 import { Button } from './UiComponents';
-import { CachedBackgroundUrl } from './CachedImage';
-import { ActorPortrait } from './ActorPortrait';
-import { ItemPortrait } from './ItemPortrait';
+import { ContentCardControl } from './ContentCardControl';
 
 export const CONTENT_CARD_LIST_EDGE_MASK = 'linear-gradient(to bottom, transparent, black 24px, black calc(100% - 24px), transparent)';
 
@@ -17,6 +16,9 @@ export type ContentCard = {
     key: string;
     kind: ContentType;
     id: string;
+    control?: Control;
+    header?: string;
+    onAction?: (skit?: Skit | null) => void;
     subtitle?: ReactNode;
     highlightSubtitle?: boolean;
     disabled?: boolean;
@@ -51,21 +53,18 @@ const headerSideTextSx = {
     whiteSpace: 'nowrap',
 };
 
-const cardTitleSx = {
-    color: 'var(--agenda-text-primary)',
-    fontFamily: 'var(--agenda-font-flavor)',
-    fontWeight: 700,
-    lineHeight: 1.15,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-};
-
 // A paged vertical column of horizontal content cards: one header page at a time with previous/next
 // navigation. Pages without cards are hidden. Shared by the default location list and List Screens.
 export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVerticalLayout, emptyTitle = 'Nothing Here', emptyMessage = 'Nothing is available yet.' }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const reduceMotion = useReducedMotion();
-    const visiblePages = pages.filter(page => page.cards.length > 0);
+    const visiblePages = pages.map(page => ({
+        ...page,
+        cards: page.cards.filter(card => {
+            const control = card.control || stage().getCardControl(card.kind);
+            return control && stage().resolveCardState(control, card.kind, card.id, card.header).visible;
+        }),
+    })).filter(page => page.cards.length > 0);
     const pageKeys = visiblePages.map(page => page.key);
     const [selectedKey, setSelectedKey] = useState<string>(pageKeys[0] || '');
     const pageKeySignature = JSON.stringify(pageKeys);
@@ -228,13 +227,15 @@ interface ContentCardViewProps {
 }
 
 export const ContentCardView: FC<ContentCardViewProps> = ({ card, index, stage, isVerticalLayout, reduceMotion }) => {
-    const stageInstance = stage();
-    const save = stageInstance.getSave();
-    const interactive = !!card.onClick && !card.disabled;
+    const control = card.control || stage().getCardControl(card.kind);
+    if (!control) return null;
+    const state = stage().resolveCardState(control, card.kind, card.id, card.header);
+    if (!state.visible) return null;
+    const interactive = (!!card.onClick || control.actions.length > 0) && !card.disabled && state.available;
     const delay = reduceMotion ? 0 : Math.min(index * 0.04, 0.18);
     const motionProps = {
         initial: { opacity: 0, y: reduceMotion ? 0 : 16 },
-        animate: { opacity: card.disabled ? 0.56 : 1, y: 0 },
+        animate: { opacity: 1, y: 0 },
         whileHover: interactive ? { x: 10 } : undefined,
         transition: {
             opacity: { duration: reduceMotion ? 0 : 0.22, delay },
@@ -242,105 +243,17 @@ export const ContentCardView: FC<ContentCardViewProps> = ({ card, index, stage, 
             x: { duration: 0.2, ease: 'easeOut' },
         },
     };
-    const shellStyle: React.CSSProperties = {
-        width: '100%', flexShrink: 0, padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'inherit',
-        cursor: interactive ? 'pointer' : card.onClick ? 'not-allowed' : 'default', opacity: card.disabled ? 0.56 : 1,
-    };
-    const shell = (body: ReactNode) => card.onClick
-        ? <motion.button type="button" disabled={card.disabled} onClick={card.onClick} {...motionProps} style={shellStyle}>{body}</motion.button>
-        : <motion.div {...motionProps} style={shellStyle}>{body}</motion.div>;
     const subtitle = card.subtitle ? (
         <Typography sx={{ color: card.highlightSubtitle ? 'var(--agenda-highlight)' : 'var(--agenda-text-muted)', fontSize: '0.76rem', fontWeight: card.highlightSubtitle ? 700 : 500, mt: 0.5 }}>
             {card.subtitle}
         </Typography>
     ) : null;
 
-    if (card.kind === 'location') {
-        const location = save.atlas?.[card.id];
-        const imageUrl = getLocationImageUrl(location, stageInstance);
-        const focalPoint = location?.focalPoint || { x: 0.5, y: 0.5 };
-        const borderColor = location?.themeColor || 'var(--agenda-accent-primary)';
-        const shade = 'linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 84%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 55%, transparent) 42%, color-mix(in srgb, var(--agenda-surface-base) 80%, transparent) 100%)';
-        return (
-            <CachedBackgroundUrl url={imageUrl}>
-                {(cachedImageUrl) => shell(
-                    <Box
-                        data-content-card="location"
-                        sx={{
-                            position: 'relative',
-                            minHeight: isVerticalLayout ? 180 : 210,
-                            borderRadius: '18px',
-                            overflow: 'hidden',
-                            border: `1px solid ${borderColor}`,
-                            backgroundImage: cachedImageUrl ? `${shade}, url(${cachedImageUrl})` : shade,
-                            backgroundSize: 'cover',
-                            backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
-                            boxShadow: '0 10px 28px color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)',
-                        }}
-                    >
-                        {card.trailing && (
-                            <Box sx={{ position: 'absolute', top: 12, right: 12, zIndex: 2 }}>{card.trailing}</Box>
-                        )}
-                        <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, color-mix(in srgb, var(--agenda-surface-base) 20%, transparent) 0%, color-mix(in srgb, var(--agenda-surface-base) 14%, transparent) 36%, color-mix(in srgb, var(--agenda-surface-base) 76%, transparent) 100%)' }} />
-                        <Box sx={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', p: { xs: 1.5, md: 2 } }}>
-                            <Box
-                                sx={{
-                                    maxWidth: 'min(100%, 540px)',
-                                    background: 'color-mix(in srgb, var(--agenda-surface-base) 72%, transparent)',
-                                    border: '1px solid color-mix(in srgb, var(--agenda-text-primary) 18%, transparent)',
-                                    backdropFilter: 'blur(8px)',
-                                    borderRadius: '12px',
-                                    px: 1.4,
-                                    py: 1.1,
-                                }}
-                            >
-                                <Typography sx={{ ...cardTitleSx, fontSize: { xs: '1.15rem', md: '1.45rem' }, textShadow: '0 2px 10px color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)' }}>
-                                    {location?.name || 'Unnamed Location'}
-                                </Typography>
-                                {subtitle}
-                            </Box>
-                        </Box>
-                    </Box>,
-                )}
-            </CachedBackgroundUrl>
-        );
-    }
-
-    const actor = card.kind === 'actor' ? save.actors?.[card.id] : undefined;
-    const item = card.kind === 'item' ? save.inventory?.find(candidate => candidate.id === card.id) : undefined;
-    const name = actor ? actor.displayName || actor.name : item?.name || `Unknown ${card.kind}`;
-    const themeColor = actor?.themeColor || item?.themeColor || 'var(--agenda-accent-primary)';
-    const portraitSize = isVerticalLayout ? 48 : 60;
-    return shell(
-        <Box
-            data-content-card={card.kind}
-            sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: { xs: 1.25, md: 1.75 },
-                minHeight: portraitSize + 20,
-                px: { xs: 1.25, md: 1.75 },
-                py: 1.25,
-                borderRadius: '14px',
-                border: `1px solid color-mix(in srgb, ${themeColor} 55%, var(--agenda-line-subtle))`,
-                background: `linear-gradient(110deg, color-mix(in srgb, ${themeColor} 16%, var(--agenda-surface-raised)) 0%, var(--agenda-surface-raised) 70%)`,
-                boxShadow: '0 6px 18px color-mix(in srgb, var(--agenda-surface-base) 45%, transparent)',
-            }}
-        >
-            <Box sx={{ flexShrink: 0, display: 'flex' }}>
-                {actor ? (
-                    <ActorPortrait actor={actor} stage={stageInstance} size={portraitSize} borderRadius="12px" objectPosition="center 20%" title={name}
-                        style={{ border: `2px solid ${themeColor}` }} />
-                ) : (
-                    <ItemPortrait item={item} stage={stageInstance} width={portraitSize} height={portraitSize} borderRadius="12px" title={name}
-                        style={{ border: `2px solid ${themeColor}` }} />
-                )}
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ ...cardTitleSx, fontSize: { xs: '1.05rem', md: '1.25rem' }, whiteSpace: 'nowrap' }}>{name}</Typography>
-                {subtitle}
-            </Box>
-            {card.trailing && <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', maxWidth: '50%' }}>{card.trailing}</Box>}
-        </Box>,
+    return (
+        <motion.div {...motionProps} style={{ width: '100%', flexShrink: 0 }}>
+            <ContentCardControl stage={stage} control={control} kind={card.kind} id={card.id} header={card.header}
+                compact={isVerticalLayout} disabled={card.disabled} subtitle={subtitle} trailing={card.trailing}
+                onClick={card.onClick} onAction={card.onAction} />
+        </motion.div>
     );
 };

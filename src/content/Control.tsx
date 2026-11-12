@@ -2,26 +2,26 @@ import { v4 as generateUuid } from 'uuid';
 import { ConditionCollection, ConditionContext, CONTENT_TYPES, ContentType, evaluateConditionCollections } from './Condition';
 import { cloneStatUpdateAction, StatUpdateAction } from './Stat';
 
-// Settings controls render in SettingsScreen; actor stat displays render on actor cards.
+// Settings controls render in SettingsScreen.
 // Pop-ups overlay gameplay; only the first available control in priority order is displayed.
 // 'standalone' controls render nowhere on their own; they are attached to content elsewhere
-// (currently as List Screen card details).
-export type ControlPlacement = 'top' | 'bottom' | 'actorCard' | 'outcome' | 'settings' | 'popup' | 'standalone';
+// as badges or reusable content cards.
+export type ControlPlacement = 'top' | 'bottom' | 'outcome' | 'settings' | 'popup' | 'standalone';
 
 // 'button' runs outcomes; 'statDisplay'/'statEditor' show/edit a global stat.
-// 'actorStatDisplay' shows a read-only stat belonging to the actor whose card is displayed;
 // 'settings' exposes a global stat as a player-editable setting.
 // 'statBadge' is a standalone display for one content type (actor/item/location): it shows a content
-// stat or a function value for the entity it is attached to, e.g. on List Screen card entries.
-export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'actorStatDisplay' | 'statOutcome' | 'settings' | 'popup' | 'statBadge';
+// stat or a function value for the entity it is attached to.
+// 'card' composes labels, standalone badges, conditions, and actions for a content type.
+export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'statOutcome' | 'settings' | 'popup' | 'statBadge' | 'card';
 export type ContentListDisplay = 'carousel' | 'abbreviated';
 export const STAT_DISPLAY_TYPES = ['straight', 'percentage', 'bar', 'rating', 'letter grade'] as const;
 export type StatDisplayType = typeof STAT_DISPLAY_TYPES[number];
 export type StatDisplaySettings = Pick<Control, 'displayType' | 'displayColor' | 'ratingIconName'>;
 
-export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'actorStatDisplay', 'statOutcome', 'settings', 'popup', 'statBadge'];
+export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'statOutcome', 'settings', 'popup', 'statBadge', 'card'];
 
-// References embed a stat badge control wherever content details are listed (e.g. ListSection.details).
+// References embed standalone stat badges in Card Controls.
 const CONTROL_REFERENCE_PREFIX = 'control:';
 export const controlReference = (id: string): string => `${CONTROL_REFERENCE_PREFIX}${id}`;
 export const isControlReference = (value: unknown): value is string =>
@@ -44,6 +44,7 @@ export class Control {
     placement: ControlPlacement = 'bottom';
     type: ControlType = 'button';
     availabilityConditions: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
+    visibilityConditions: ConditionCollection[] = []; // Cards only; unavailable visible cards remain disabled.
 
     // Labels/descriptions resolve context tags at render time, including {{Function Name("text", 2, true)}}.
     // Calls are read-only; arguments follow parameter order and omitted arguments use defaults.
@@ -53,11 +54,16 @@ export class Control {
     label: string = '';
     iconName: string = '';
     description: string = '';
+    subLabel: string = '';
+    cardDetails: string[] = [];
+    useNamePlate: boolean = false;
+    showPortrait: boolean = true;
+    showSourceLink: boolean = false;
     actions: StatUpdateAction[] = [];
 
-    // The global stat shown/edited, or the actor stat shown by 'actorStatDisplay'.
+    // The global stat shown/edited.
     statId: string = '';
-    // 'statBadge' only: the content type whose entities this badge attaches to.
+    // The content type this badge or card attaches to.
     contentType: ContentType = 'actor';
     // 'statBadge' only: a content stat reference ("<kind>Stat:<id>") or a function reference whose
     // variable content parameter binds to the attached entity.
@@ -72,7 +78,7 @@ export class Control {
     ratingIconName: string = 'star';
     outcomeStatTarget: 'actor' | 'global' = 'global';
 
-    constructor(props: any) {
+    constructor(props: Partial<Control> = {}) {
         Object.assign(this, props);
         if (!this.id) {
             this.id = generateUuid();
@@ -81,11 +87,17 @@ export class Control {
         this.priority = Number.isFinite(this.priority) ? this.priority : 0;
         this.widthWeight = Number.isFinite(this.widthWeight) && this.widthWeight > 0 ? this.widthWeight : 1;
         this.type = CONTROL_TYPES.includes(this.type) ? this.type : 'button';
-        this.placement = this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'actorStatDisplay' ? 'actorCard' : this.type === 'settings' ? 'settings' : this.type === 'statBadge' ? 'standalone' : this.placement === 'top' ? 'top' : 'bottom';
-        this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map((collection) => [...collection]) : [];
+        this.placement = this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'settings' ? 'settings' : this.type === 'statBadge' || this.type === 'card' ? 'standalone' : this.placement === 'top' ? 'top' : 'bottom';
+        this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
+        this.visibilityConditions = Array.isArray(this.visibilityConditions) ? this.visibilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.label = `${this.label || ''}`;
         this.iconName = `${this.iconName || ''}`;
         this.description = `${this.description || ''}`;
+        this.subLabel = `${this.subLabel || ''}`;
+        this.cardDetails = Array.isArray(this.cardDetails) ? this.cardDetails.filter(isControlReference) : [];
+        this.useNamePlate = this.useNamePlate === true;
+        this.showPortrait = this.showPortrait !== false;
+        this.showSourceLink = this.showSourceLink === true;
         this.actions = Array.isArray(this.actions) ? this.actions.map(cloneStatUpdateAction) : [];
         this.statId = `${this.statId || ''}`;
         this.contentType = CONTENT_TYPES.includes(this.contentType) ? this.contentType : 'actor';
@@ -99,3 +111,19 @@ export class Control {
         this.outcomeStatTarget = this.outcomeStatTarget === 'actor' ? 'actor' : 'global';
     }
 }
+
+export const DEFAULT_CARD_IDS: Record<ContentType, string> = {
+    actor: 'default-actor-card', item: 'default-item-card', location: 'default-location-card',
+};
+
+export const createDefaultCardControls = (): Control[] => CONTENT_TYPES.map(contentType => new Control({
+    id: DEFAULT_CARD_IDS[contentType],
+    name: `Default ${contentType[0].toUpperCase()}${contentType.slice(1)} Card`,
+    type: 'card', contentType,
+    label: '{{content:name}}',
+    subLabel: contentType === 'actor' ? '{{content:meta}}' : '',
+    description: contentType === 'actor' ? '{{content:summary}}' : '',
+    useNamePlate: contentType === 'actor',
+    showPortrait: contentType !== 'actor',
+    showSourceLink: contentType === 'actor',
+}));

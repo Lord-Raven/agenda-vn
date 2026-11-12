@@ -17,18 +17,17 @@ interface ControlManagementPanelProps {
 const PLACEMENT_LABELS: Record<Control['placement'], string> = {
     top: 'Top',
     bottom: 'Bottom',
-    actorCard: 'Actor Card',
     outcome: 'Outcomes',
     settings: 'Settings',
     popup: 'Pop-ups',
-    standalone: 'Stat Badges',
+    standalone: 'Standalone Controls',
 };
 
 const TYPE_LABELS: Record<Control['type'], string> = {
     button: 'Button',
     statDisplay: 'Stat Display',
     statEditor: 'Stat Editor',
-    actorStatDisplay: 'Actor Stat Display',
+    card: 'Card',
     statOutcome: 'Stat Outcome',
     settings: 'Settings',
     popup: 'Pop-up',
@@ -73,11 +72,11 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
         const sections: CategorizedEntrySection<Control>[] = [
             { id: 'top', title: PLACEMENT_LABELS.top, entries: controls.filter((control) => control.placement === 'top') },
             { id: 'bottom', title: PLACEMENT_LABELS.bottom, entries: controls.filter((control) => control.placement === 'bottom') },
-            { id: 'actorCard', title: PLACEMENT_LABELS.actorCard, entries: controls.filter((control) => control.placement === 'actorCard') },
+            { id: 'cards', title: 'Cards', entries: controls.filter(control => control.type === 'card') },
             { id: 'outcome', title: PLACEMENT_LABELS.outcome, entries: controls.filter((control) => control.placement === 'outcome') },
             { id: 'settings', title: PLACEMENT_LABELS.settings, entries: controls.filter((control) => control.type === 'settings') },
             { id: 'popup', title: PLACEMENT_LABELS.popup, entries: controls.filter((control) => control.type === 'popup') },
-            { id: 'standalone', title: PLACEMENT_LABELS.standalone, entries: controls.filter((control) => control.placement === 'standalone') },
+            { id: 'standalone', title: PLACEMENT_LABELS.standalone, entries: controls.filter((control) => control.placement === 'standalone' && control.type !== 'card') },
         ];
         return sections;
     }, [controls]);
@@ -104,8 +103,8 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             active: true,
             name: candidateName,
             placement: sectionId === 'top' ? 'top' : sectionId === 'settings' ? 'settings' : 'bottom',
-            type: sectionId === 'popup' ? 'popup' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'actorCard' ? 'actorStatDisplay' : sectionId === 'settings' ? 'settings' : sectionId === 'standalone' ? 'statBadge' : 'button',
-            label: sectionId === 'actorCard' || sectionId === 'outcome' || sectionId === 'settings' || sectionId === 'standalone' ? '' : candidateName,
+            type: sectionId === 'popup' ? 'popup' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'cards' ? 'card' : sectionId === 'settings' ? 'settings' : sectionId === 'standalone' ? 'statBadge' : 'button',
+            label: sectionId === 'cards' ? '{{content:name}}' : sectionId === 'outcome' || sectionId === 'settings' || sectionId === 'standalone' ? '' : candidateName,
         });
 
         stage().updateConfiguration({ controls: [...configuredControls, control] });

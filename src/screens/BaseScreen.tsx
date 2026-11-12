@@ -13,6 +13,7 @@ import { LoadingScreen } from './LoadingScreen';
 import { applyUiSettingsToRoot } from '../content/Style';
 import { collectFontFamilies, FontHandler } from "@lord-raven/novel-visualizer";
 import { ScreenErrorBoundary } from '../components/ScreenErrorBoundary';
+import { CardActionContext } from '../components/ContentCardControl';
 
 /*
  * Base screen management; the Stage class will display this, and this will track the current screen being displayed.
@@ -32,6 +33,7 @@ interface BaseScreenProps {
 
 const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
     const [screenType, setScreenType] = React.useState<ScreenType>(ScreenType.MENU);
+    const [, refreshCards] = React.useState(0);
     const [isVerticalLayout, setIsVerticalLayout] = React.useState<boolean>(stage().isVerticalLayout());
     const { message, icon, clearTooltip, setPriorityMessage } = useTooltip();
 
@@ -74,6 +76,10 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
     };
 
     return (
+        <CardActionContext.Provider value={skit => {
+            refreshCards(value => value + 1);
+            if (skit) setScreenType(ScreenType.SKIT);
+        }}>
         <div className="agenda-screen-root">
             <FontHandler fontFamilies={collectStageFontFamilies(stage())} />
             <AnimatePresence mode="wait" initial={false}>
@@ -115,6 +121,7 @@ const BaseScreenContent: FC<{ stage: () => Stage }> = ({ stage }) => {
                 isVerticalLayout={isVerticalLayout}
             />
         </div>
+        </CardActionContext.Provider>
     );
 };
 

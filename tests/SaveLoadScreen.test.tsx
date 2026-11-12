@@ -77,7 +77,7 @@ const fixture = () => {
 test('Screen types, List rules, and Control selections survive portable export and save normalization', () => {
     const { stage } = fixture();
     stage.isOwner = true;
-    const section = { ...createListSection(), header: 'Crew', details: ['actorStat:health'] };
+    const section = { ...createListSection(), header: 'Crew', cardControlId: 'actor-card' };
     const screen = new GameMap({ id: 'list-screen', type: 'list', sections: [section], priority: -2 });
     const control = new Control({ type: 'popup', screenId: screen.id });
     stage.updateConfiguration({ screens: [screen], controls: [control] }, true);
@@ -86,8 +86,8 @@ test('Screen types, List rules, and Control selections survive portable export a
     assert.equal(exported.screens[0].type, 'list');
     assert.deepEqual(exported.screens[0].sections, [section]);
     assert.equal(exported.controls[0].screenId, screen.id);
-    exported.screens[0].sections[0].details.push('changed');
-    assert.deepEqual(screen.sections[0].details, ['actorStat:health']);
+    exported.screens[0].sections[0].cardControlId = 'changed';
+    assert.equal(screen.sections[0].cardControlId, 'actor-card');
     stage.saveData = JSON.parse(JSON.stringify(stage.saveData));
     stage.getConfiguration();
     assert.ok(stage.getPublishedConfiguration().screens[0] instanceof GameMap);
@@ -514,7 +514,7 @@ test('creators clone and update from unpublished drafts without changing the sou
     assert.equal(stage.getConfiguration(stage.getSave()).functions.length, 0);
     assert.equal(stage.getConfiguration().functions[0].id, 'fn');
     assert.throws(() => stage.resolveValue('function:fn', 'number'), /Unknown function/);
-    assert.equal(stage.getVisibleControls('actorCard').length, 0);
+    assert.equal(stage.getConfiguration(stage.getSave()).controls.some(control => control.id === 'new-control'), false);
     assert.equal(JSON.stringify(source), original);
 });
 

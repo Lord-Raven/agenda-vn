@@ -243,7 +243,8 @@ export const Title: FC<TitleProps> = ({
    =============================================== */
 
 interface NamePlateProps {
-	actor?: Actor;
+	actor?: Pick<Actor, 'name'> & Partial<Pick<Actor, 'displayName' | 'role' | 'themeColor' | 'themeFontFamily'>>;
+	label?: string;
 	includeRole?: boolean;
 	style?: React.CSSProperties;
 	className?: string;
@@ -251,6 +252,7 @@ interface NamePlateProps {
 
 export const NamePlate: FC<NamePlateProps> = ({
 	actor,
+	label,
 	includeRole,
 	style,
 	className = ''
@@ -326,7 +328,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 						color: nameColor,
 					}}
 				>
-					{actor.displayName || actor.name}
+					{label ?? (actor.displayName || actor.name)}
 				</span>
 				{includeRole && actor.role && (
 					<span

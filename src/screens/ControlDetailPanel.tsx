@@ -10,7 +10,7 @@ import { ConditionEditor } from '../components/ConditionEditor';
 import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker } from '../components/StatRating';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
-import { contentDetailSourceOptions } from '../components/ListSectionsEditor';
+import { contentDetailSourceOptions, listDetailOptions } from '../components/ListSectionsEditor';
 import { HeaderVariableContext, VariableContentContext } from '../components/VariableContentContext';
 
 interface ControlDetailPanelProps {
@@ -29,6 +29,12 @@ type ControlDraft = {
     label: string;
     iconName: string;
     description: string;
+    subLabel: string;
+    cardDetails: string[];
+    useNamePlate: boolean;
+    showPortrait: boolean;
+    showSourceLink: boolean;
+    visibilityConditions: ConditionCollection[];
     statId: string;
     contentType: ContentType;
     badgeSource: string;
@@ -52,6 +58,12 @@ const createDraft = (control: Control): ControlDraft => ({
     label: control.label,
     iconName: control.iconName,
     description: control.description,
+    subLabel: control.subLabel,
+    cardDetails: [...control.cardDetails],
+    useNamePlate: control.useNamePlate,
+    showPortrait: control.showPortrait,
+    showSourceLink: control.showSourceLink,
+    visibilityConditions: control.visibilityConditions.map(collection => collection.map(condition => ({ ...condition }))),
     statId: control.statId,
     contentType: control.contentType,
     badgeSource: control.badgeSource,
@@ -132,6 +144,12 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             label: nextDraft.label,
             iconName: nextDraft.iconName,
             description: nextDraft.description,
+            subLabel: nextDraft.subLabel,
+            cardDetails: [...nextDraft.cardDetails],
+            useNamePlate: nextDraft.useNamePlate,
+            showPortrait: nextDraft.showPortrait,
+            showSourceLink: nextDraft.showSourceLink,
+            visibilityConditions: nextDraft.visibilityConditions,
             statId: nextDraft.statId,
             contentType: nextDraft.contentType,
             badgeSource: nextDraft.badgeSource,
@@ -195,11 +213,19 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         onDelete?.(control.id);
     };
 
-    const usesActorStat = draft.type === 'actorStatDisplay' || (draft.type === 'statOutcome' && draft.outcomeStatTarget === 'actor');
+    const usesActorStat = draft.type === 'statOutcome' && draft.outcomeStatTarget === 'actor';
     const selectableStats = usesActorStat ? updatableActorStats : updatableGlobalStats;
     const selectedStat = selectableStats.find((stat) => stat.id === draft.statId);
-    const supportsDisplaySettings = draft.type === 'statDisplay' || draft.type === 'actorStatDisplay' || draft.type === 'statOutcome';
+    const supportsDisplaySettings = draft.type === 'statDisplay' || draft.type === 'statOutcome';
     const isStatBadge = draft.type === 'statBadge';
+    const isCard = draft.type === 'card';
+    const conditionProps = {
+        globalStats, actorStats, locationStats: updatableLocationStats, itemStats: updatableItemStats,
+        actors: actors.filter(actor => actor.active !== false),
+        items: items.filter(item => item.active !== false),
+        locations: locations.filter(location => location.active !== false),
+        stage, variableContentType: isCard || isStatBadge ? draft.contentType : usesActorStat ? 'actor' as const : undefined,
+    };
     const contentTypeStats = draft.contentType === 'actor' ? actorStats : draft.contentType === 'location' ? updatableLocationStats : updatableItemStats;
     // The badge source's value type, for gating the numeric display settings.
     const badgeStatReference = parseContentStatReference(draft.badgeSource);
@@ -218,6 +244,8 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                 <Button variant="danger" onClick={handleDelete}>Delete</Button>
             </div>
 
+            <VariableContentContext.Provider value={conditionProps.variableContentType}>
+            <HeaderVariableContext.Provider value={isCard || isStatBadge}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 <section>
                     <h2 style={sectionHeadingStyle}>Basic Information</h2>
@@ -256,7 +284,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 }}
                             />
                         </div>
-                        {draft.type !== 'actorStatDisplay' && draft.type !== 'statOutcome' && draft.type !== 'settings' && draft.type !== 'popup' && draft.type !== 'statBadge' && (
+                        {!isCard && draft.type !== 'statOutcome' && draft.type !== 'settings' && draft.type !== 'popup' && !isStatBadge && (
                             <div>
                                 <div style={fieldHeadingStyle}>
                                     <label htmlFor={`control-width-weight-${control.id}`}>Width Weight</label>
@@ -291,16 +319,15 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.placement}
-                                    disabled={draft.type === 'actorStatDisplay' || draft.type === 'statOutcome' || draft.type === 'settings' || draft.type === 'popup' || draft.type === 'statBadge'}
+                                    disabled={isCard || draft.type === 'statOutcome' || draft.type === 'settings' || draft.type === 'popup' || isStatBadge}
                                     onChange={(e) => setDraft((current) => ({ ...current, placement: e.target.value as ControlPlacement }))}
                                 >
                                     <option value="top">Top (with date/stats)</option>
                                     <option value="bottom">Bottom (control dock)</option>
-                                    {draft.type === 'actorStatDisplay' && <option value="actorCard">Actor Card</option>}
                                     {draft.type === 'statOutcome' && <option value="outcome">Outcomes</option>}
                                     {draft.type === 'settings' && <option value="settings">Settings</option>}
                                     {draft.type === 'popup' && <option value="popup">Pop-up</option>}
-                                    {draft.type === 'statBadge' && <option value="standalone">Standalone</option>}
+                                    {(isStatBadge || isCard) && <option value="standalone">Standalone</option>}
                                 </select>
                             </div>
                             <div>
@@ -314,7 +341,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         setDraft((current) => ({
                                             ...current,
                                             type,
-                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'actorStatDisplay' ? 'actorCard' : type === 'settings' ? 'settings' : type === 'statBadge' ? 'standalone' : current.placement === 'actorCard' || current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' || current.placement === 'standalone' ? 'bottom' : current.placement,
+                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'settings' ? 'settings' : type === 'statBadge' || type === 'card' ? 'standalone' : current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' || current.placement === 'standalone' ? 'bottom' : current.placement,
                                             statId: '',
                                             badgeSource: '',
                                             pickerSource: undefined,
@@ -324,7 +351,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <option value="button">Button</option>
                                     <option value="statDisplay">Stat Display</option>
                                     <option value="statEditor">Stat Editor</option>
-                                    <option value="actorStatDisplay">Actor Stat Display</option>
+                                    <option value="card">Card</option>
                                     <option value="statBadge">Stat Badge</option>
                                     <option value="statOutcome">Outcome</option>
                                     <option value="settings">Settings</option>
@@ -335,32 +362,42 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                     </div>
                 </section>
 
+                {isCard && (
+                    <section>
+                        <h2 style={sectionHeadingStyle}>Card Content</h2>
+                        <label style={labelStyle}>Content Type</label>
+                        <select style={selectStyle} value={draft.contentType}
+                            onChange={event => setDraft(current => ({ ...current, contentType: event.target.value as ContentType, cardDetails: [] }))}>
+                            <option value="actor">Actor</option>
+                            <option value="item">Item</option>
+                            <option value="location">Location</option>
+                        </select>
+                        <h2 style={{ ...sectionHeadingStyle, marginTop: 20 }}>Visibility</h2>
+                        <ConditionEditor {...conditionProps} allowSkitState conditionCollections={draft.visibilityConditions}
+                            onChange={visibilityConditions => setDraft(current => ({ ...current, visibilityConditions }))} />
+                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                            Hidden unless these conditions and the content's visibility rules pass. Variable is the card's content; Header is the List page header (empty for hovers).
+                        </span>
+                    </section>
+                )}
+
                 {draft.type !== 'statOutcome' && draft.type !== 'settings' && (
                     <section>
                         <div style={{ ...sectionHeadingStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <h2 style={{ fontSize: 'inherit', margin: 0 }}>Availability</h2>
                             <HelpTip title="Control availability">
-                                Leave conditions empty to always render this control.
-                                {draft.type === 'actorStatDisplay' && ' Rendered on actor cards. Variable actor targets refer to the actor whose card is shown.'}
+                                {isCard ? 'Visible cards are disabled unless these conditions and the content availability rules pass.' : 'Leave conditions empty to always render this control.'}
                                 {isStatBadge && ' Evaluated per entry. Variable targets refer to the entry this badge is attached to.'}
                             </HelpTip>
                         </div>
                         <ConditionEditor
+                            {...conditionProps}
                             conditionCollections={draft.availabilityConditions}
-                            globalStats={globalStats}
-                            actorStats={actorStats}
-                            locationStats={stageInstance.getConfiguration().locationStats || []}
-                            itemStats={stageInstance.getConfiguration().itemStats || []}
-                            actors={actors}
-                            stage={stage}
-                            items={items}
-                            locations={locations}
-                            variableContentType={isStatBadge ? draft.contentType : usesActorStat ? 'actor' : undefined}
                             allowSkitState
                             onChange={(availabilityConditions) => setDraft((current) => ({ ...current, availabilityConditions }))}
                         />
                         {draft.availabilityConditions.length === 0 && (
-                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Always rendered.</span>
+                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>{isCard ? 'No additional availability restriction.' : 'Always rendered.'}</span>
                         )}
                     </section>
                 )}
@@ -394,10 +431,10 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             ))}
                         </select>
                     </section>
-                ) : draft.type === 'button' ? (
+                ) : draft.type === 'button' || isCard ? (
                     <>
                         <section>
-                            <h2 style={sectionHeadingStyle}>Button</h2>
+                            <h2 style={sectionHeadingStyle}>{isCard ? 'Card Appearance' : 'Button'}</h2>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                 <div>
                                     <div style={fieldHeadingStyle}>
@@ -408,13 +445,49 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         fullWidth
                                         value={draft.label}
                                         onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))}
-                                        placeholder="Text shown on the button"
+                                        placeholder={isCard ? '{{content:name}}' : 'Text shown on the button'}
                                     />
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Label Icon (optional)</label>
                                     <IconPicker stage={stage} value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
                                 </div>
+                                {isCard && (
+                                    <>
+                                        <div>
+                                            <label style={labelStyle}>Sub-label</label>
+                                            <TextInput fullWidth value={draft.subLabel}
+                                                onChange={event => setDraft(current => ({ ...current, subLabel: event.target.value }))} />
+                                        </div>
+                                        <div>
+                                            <label style={labelStyle}>Description</label>
+                                            <TextArea rows={3} value={draft.description} style={{ width: '100%' }}
+                                                onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} />
+                                        </div>
+                                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                            Labels, sub-labels, descriptions, and badge text support Stat/Function macros.
+                                            {' Use {{content:name}}, {{content:description}}, {{content:header}}, and for Actors {{content:role}}, {{content:age}}, {{content:meta}}, {{content:summary}} or {{char:Stat Name}}.'}
+                                            {' Function arguments can bind "variable:actor", "variable:item", "variable:location", or "variable:header". Cards are horizontal in Lists and vertical in hovers.'}
+                                        </span>
+                                        {([
+                                            ['useNamePlate', 'Use NamePlate for label'],
+                                            ['showPortrait', 'Show portrait / Location background'],
+                                            ['showSourceLink', 'Show Actor source link'],
+                                        ] as const).map(([field, label]) => (
+                                            <label key={field} style={labelStyle}>
+                                                <input type="checkbox" checked={draft[field]}
+                                                    onChange={event => setDraft(current => ({ ...current, [field]: event.target.checked }))} /> {label}
+                                            </label>
+                                        ))}
+                                        <div>
+                                            <label style={labelStyle}>Standalone Controls</label>
+                                            <SearchableOptionPicker stage={stage} multiple title="Choose card controls"
+                                                values={draft.cardDetails} options={listDetailOptions(stageInstance, draft.contentType)}
+                                                onChange={value => setDraft(current => ({ ...current, cardDetails: Array.isArray(value) ? value : [] }))} />
+                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Standalone Stat Badges of the same content type, in selection order.</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </section>
 
@@ -442,7 +515,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <div style={fieldHeadingStyle}>
                                     <label>Content Type</label>
                                     <HelpTip title="Badge content type">
-                                        This badge can be attached to entries of this content type, e.g. as a Card Detail on a List Screen header with matching contents.
+                                        This badge can be attached to Card Controls of this content type.
                                     </HelpTip>
                                 </div>
                                 <select
@@ -527,7 +600,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                     </section>
                 ) : (
                     <section>
-                        <h2 style={sectionHeadingStyle}>{draft.type === 'statOutcome' ? 'Stat Outcome' : draft.type === 'actorStatDisplay' ? 'Actor Stat Display' : draft.type === 'statEditor' ? 'Stat Editor' : draft.type === 'settings' ? 'Settings' : 'Stat Display'}</h2>
+                        <h2 style={sectionHeadingStyle}>{draft.type === 'statOutcome' ? 'Stat Outcome' : draft.type === 'statEditor' ? 'Stat Editor' : draft.type === 'settings' ? 'Settings' : 'Stat Display'}</h2>
                         {draft.type === 'statOutcome' && (
                             <div style={{ marginBottom: 15 }}>
                                 <label style={labelStyle}>Stat Target</label>
@@ -587,7 +660,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))} />
                             </div>
                         )}
-                        {(draft.type === 'statDisplay' || draft.type === 'statEditor' || draft.type === 'actorStatDisplay' || draft.type === 'settings') && (
+                        {(draft.type === 'statDisplay' || draft.type === 'statEditor' || draft.type === 'settings') && (
                             <div style={{ marginTop: 15 }}>
                                 <label style={labelStyle}>Description</label>
                                 <TextArea
@@ -648,6 +721,8 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                     </section>
                 )}
             </div>
+            </HeaderVariableContext.Provider>
+            </VariableContentContext.Provider>
         </GlassPanel>
     );
 };

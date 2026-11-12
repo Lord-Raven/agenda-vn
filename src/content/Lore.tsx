@@ -6,7 +6,7 @@ import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
 import { Stat, StatType, StatValue, formatReferenceStatText, formatStatOptionValueText, isReferenceStatType } from './Stat';
-import { functionReference, isStatReturnType, parseFunctionCallText, positionalFunctionArguments } from './Function';
+import { FunctionVariableBindings, functionReference, isStatReturnType, parseFunctionCallText, positionalFunctionArguments } from './Function';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -100,7 +100,7 @@ const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined
 // Bare names prefer functions, then global stats; calls use positional arguments and parameter defaults.
 // Unresolvable tags (unknown stat/function, no target actor, void functions) are left untouched.
 // Don't use on text written back to the source.
-export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor): string {
+export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor, variables?: FunctionVariableBindings): string {
     const save = stage.getSave();
     const configuration = stage.getConfiguration(save);
     const player = stage.getPlayerActor();
@@ -129,12 +129,12 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
             if (fn) {
                 const reference = functionReference(fn.id, positionalFunctionArguments(fn, call?.args));
                 if (fn.returnType === 'textList') {
-                    return stage.resolveTextList(reference, save).join(', ');
+                    return stage.resolveTextList(reference, save, variables).join(', ');
                 }
                 if (!isStatReturnType(fn.returnType)) {
                     return match;
                 }
-                return formatValue(fn.returnType, stage.resolveValue(reference, fn.returnType, save));
+                return formatValue(fn.returnType, stage.resolveValue(reference, fn.returnType, save, [], variables));
             }
             if (call) {
                 return match;

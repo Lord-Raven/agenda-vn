@@ -12,13 +12,13 @@ import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item, isItemAvailable } from "./content/Item";
-import { compareControlPriority, Control, ControlPlacement, controlReferenceId, isControlAvailable, isControlReference } from "./content/Control";
+import { compareControlPriority, Control, ControlPlacement, controlReferenceId, createDefaultCardControls, DEFAULT_CARD_IDS, isControlAvailable, isControlReference } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, getCurrentActors, getCurrentLocation, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Screen, ListSection, parseContentStatReference, listContentKind, LIST_CONTENT_TYPES } from "./content/Screen";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
-import { Lore, updateLoreEntry } from "./content/Lore";
+import { Lore, processLoreText, updateLoreEntry } from "./content/Lore";
 import { DEFAULT_PLAYER_THEME_COLOR } from "./screens/SettingsScreen";
 import {buildPrompt} from "./utils/PromptBuilder.js";
 import {
@@ -141,6 +141,7 @@ export type GameConfiguration = {
     globalStatValues: {[key: string]: StatValue}, // Legacy configuration field; values now belong only to saves.
     statUpdateRules: StatUpdateRule[], // Conditional actions at new-game startup or as in-game time advances
     controls: Control[], // UI controls displayed in map docks, Settings, outcomes, or actor cards.
+    defaultActorCardId?: string;
     uiSettings: UiSettings, // Default UI styling for new games
     title: string, // Title of this game
     titleImageUrl: string, // URL of a title image for the game
@@ -273,6 +274,7 @@ export type PortableGameConfiguration = {
     timeMode: TimeMode;
     useEvents: boolean;
     controls: Control[];
+    defaultActorCardId?: string;
 };
 
 // Shared by the GameManagementPanel's JSON export/preview and Stage's storage sync so both always agree on shape.
@@ -307,6 +309,7 @@ export const buildPortableGameConfiguration = (input: PortableGameConfiguration)
     timeMode: input.timeMode === 'phase' ? 'phase' : 'timeOfDay',
     useEvents: input.useEvents !== false,
     controls: (input.controls || []).map((control) => new Control(control)),
+    defaultActorCardId: input.defaultActorCardId,
 });
 
 const cloneConfiguration = (configuration: GameConfiguration): GameConfiguration => {
@@ -414,7 +417,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             functions: [],
             globalStatValues: {},
             statUpdateRules: [],
-            controls: [],
+            controls: createDefaultCardControls(),
+            defaultActorCardId: DEFAULT_CARD_IDS.actor,
             uiSettings: cloneUiSettings(DEFAULT_UI_SETTINGS),
             title: 'Agenda VN',
             titleImageUrl: '',
@@ -467,7 +471,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 globalStats: [],
                 globalStatValues: {},
                 statUpdateRules: [],
-                controls: [],
+                controls: createDefaultCardControls(),
                 uiSettings: cloneUiSettings(activeSave?.uiSettings || {}),
             };
         }
@@ -694,12 +698,14 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 if (!kind) {
                     return [];
                 }
+                const card = this.getCardControl(kind, section.cardControlId, save);
+                if (!card) return [];
                 const headers = this.resolveTextList(section.headerSource.trim() ? section.headerSource : section.header, save)
                     .map(header => header.trim());
                 return headers.flatMap((header, index) => {
                     const ids = this.resolveValue(section.contentSource, LIST_CONTENT_TYPES[kind], save, [], { header }) as string[];
                     const entries = [...new Set(ids)].map(id => ({
-                        id, ...this.resolveListCardState(section, kind, id, header, save),
+                        id, ...this.resolveCardState(card, kind, id, header, save),
                     })).filter(entry => entry.visible);
                     return entries.length ? [{
                         key: `${section.id}:${index}:${header}`, section, header, kind,
@@ -719,9 +725,21 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return entity && entity.active !== false ? entity : undefined;
     }
 
-    resolveListCardState(section: ListSection, kind: ContentType, id: string, header: string, save: SaveType = this.getSave()): { visible: boolean; available: boolean } {
+    getCardControl(kind: ContentType, cardId?: string, save: SaveType = this.getSave()): Control | undefined {
+        const configuration = this.getConfiguration(save);
+        const id = cardId || (kind === 'actor' ? configuration.defaultActorCardId : undefined) || DEFAULT_CARD_IDS[kind];
+        const control = configuration.controls.find(candidate => candidate.id === id)
+            || createDefaultCardControls().find(candidate => candidate.id === id);
+        if (!control || control.type !== 'card' || control.contentType !== kind) {
+            console.error(`Missing or incompatible ${kind} Card Control "${id}".`);
+            return undefined;
+        }
+        return control;
+    }
+
+    resolveCardState(card: Control, kind: ContentType, id: string, header = '', save: SaveType = this.getSave()): { visible: boolean; available: boolean } {
         const entity = this.getActiveContent(kind, id, save);
-        if (!entity) return { visible: false, available: false };
+        if (!entity || card.active === false || card.type !== 'card' || card.contentType !== kind) return { visible: false, available: false };
         try {
             const context: ConditionContext = {
                 ...this.getScheduleContext(save),
@@ -730,16 +748,43 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 resolveValue: (value, type) => this.resolveValue(value, type, save, [], { [kind]: id, header }),
             };
             const visible = (kind !== 'location' || this.isLocationVisible(id, save))
-                && evaluateConditionCollections(section.visibilityConditions, context);
+                && evaluateConditionCollections(card.visibilityConditions, context);
             if (!visible) return { visible: false, available: false };
             const contentAvailable = kind === 'location' ? this.canVisitLocation(id, save)
                 : kind === 'actor' ? resolveActorSchedule(entity as Actor, this.getScheduleContext(save)) !== ACTOR_SCHEDULE_UNAVAILABLE
                     : isItemAvailable(entity as Item, context);
-            return { visible, available: contentAvailable && evaluateConditionCollections(section.availabilityConditions, context) };
+            return { visible, available: contentAvailable && evaluateConditionCollections(card.availabilityConditions, context) };
         } catch (error) {
             console.error(`List entry "${id}" conditions could not be resolved: ${error instanceof Error ? error.message : String(error)}`);
             return { visible: false, available: false };
         }
+    }
+
+    resolveCardText(text: string, kind: ContentType, id: string, header = ''): string {
+        const entity = this.getActiveContent(kind, id, this.getSave());
+        if (!entity) return '';
+        const actor = kind === 'actor' ? entity as Actor : undefined;
+        let age = '';
+        if (actor?.birthDate && this.getDateMode() === 'calendar') {
+            const birth = new Date(`${actor.birthDate.trim()}T00:00:00Z`);
+            const currentDate = (this.getSave().currentDate || this.getConfiguration().startingDate || new Date().toISOString().slice(0, 10)).trim();
+            const current = new Date(`${currentDate}T00:00:00Z`);
+            const birthdayPending = current.getUTCMonth() < birth.getUTCMonth()
+                || (current.getUTCMonth() === birth.getUTCMonth() && current.getUTCDate() < birth.getUTCDate());
+            const years = current.getUTCFullYear() - birth.getUTCFullYear() - Number(birthdayPending);
+            if (Number.isFinite(years) && years >= 0) age = String(years);
+        }
+        const fields: Record<string, string> = {
+            name: actor?.displayName || entity.name,
+            description: entity.description || '',
+            summary: actor?.summary || '',
+            role: actor?.role || '',
+            age,
+            meta: [actor?.role, age ? `Age ${age}` : ''].filter(Boolean).join(' • '),
+            header,
+        };
+        const expanded = text.replace(/\{\{\s*content:(name|description|summary|role|age|meta|header)\s*\}\}/gi, (_match, field: string) => fields[field.toLowerCase()]);
+        return processLoreText(expanded, this, actor, { [kind]: id, header });
     }
 
     // Resolves one card detail: a content stat of the card's entity, a function evaluated with
@@ -762,6 +807,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     ...this.getScheduleContext(save),
                     skitState: this.getSkitConditionState(),
                     ...(kind === 'actor' ? { currentActor: entity as Actor } : kind === 'location' ? { currentLocation: entity as Location } : { currentItem: entity as Item }),
+                    resolveValue: (value, type) => this.resolveValue(value, type, save, [], { [kind]: id, header }),
                 };
                 if (!isControlAvailable(control, context)) {
                     return undefined;
@@ -798,11 +844,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return undefined;
     }
 
-    // Runs a list pop-up section's click actions for one card.
-    runListCardActions(section: ListSection, kind: ContentType, id: string, header: string): Skit | null {
-        const state = this.resolveListCardState(section, kind, id, header);
+    // Re-check conditions at activation time, not just when the card was rendered.
+    runCardActions(card: Control, kind: ContentType, id: string, header = ''): Skit | null {
+        const state = this.resolveCardState(card, kind, id, header);
         if (!state.visible || !state.available) return null;
-        return this.runButtonActions(section.actions || [], { [kind]: id, header });
+        return this.runButtonActions(card.actions, { [kind]: id, header });
     }
 
     readStatValue(value: unknown, stat: Stat, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {
@@ -835,12 +881,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         };
     }
 
-    // Actor-card rules bind "Variable" actor targets to the actor whose card is displayed.
+    // Outcome rules may bind "Variable" to their target actor.
     getVisibleControls(placement: ControlPlacement, actor?: Actor): Control[] {
         const context: ConditionContext = {
             ...this.getScheduleContext(this.getSave()),
             skitState: this.getSkitConditionState(),
-            ...(placement === 'actorCard' || placement === 'outcome' ? { currentActor: actor } : {}),
+            ...(placement === 'outcome' ? { currentActor: actor } : {}),
         };
         return (this.getConfiguration(this.getSave()).controls || [])
             .filter((control) => control.placement === placement && isControlAvailable(control, context))
@@ -3508,6 +3554,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             uiSettings: configuration.uiSettings,
             castActorIds: configuration.castActorIds || [],
             controls: (configuration.controls || []).filter((control) => control.active !== false),
+            defaultActorCardId: configuration.defaultActorCardId,
             slideshowLocationIds: configuration.slideshowLocationIds || [],
             dateMode: configuration.dateMode,
             timeMode: configuration.timeMode,
