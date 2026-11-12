@@ -1455,8 +1455,8 @@ test('function substitution reaches world lore, actor lore, locations, and gener
     const conditionTriggeredLore = createLoreEntry({
         title: 'Condition Triggered',
         content: 'Conditional {{Value}}',
-        triggers: ['never-in-script'],
-        triggerConditionCollections: [[{
+        constant: true,
+        conditionCollections: [[{
             type: 'globalStat',
             statId: 'Score',
             comparison: 'greaterThanOrEqual',

@@ -62,7 +62,6 @@ export type Lore = {
     priority: number;
     probability: number; // 1 to 100
     conditionCollections: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
-    triggerConditionCollections: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
 }
 
 const resolveLoreProbability = (entry: Lore): number => {
@@ -198,7 +197,6 @@ export function createLoreEntry(params: Partial<Omit<Lore, 'id'>>): Lore {
         probability: 100,
         ...params,
         conditionCollections: (params.conditionCollections || []).map((collection) => [...collection]),
-        triggerConditionCollections: (params.triggerConditionCollections || []).map((collection) => [...collection]),
         id: generateUuid()
     };
 }

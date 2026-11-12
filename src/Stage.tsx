@@ -215,7 +215,6 @@ const cloneLore = (entry: Lore): Lore => ({
     ...entry,
     triggers: [...(entry.triggers || [])],
     conditionCollections: (entry.conditionCollections || []).map((collection) => [...collection]),
-    triggerConditionCollections: (entry.triggerConditionCollections || []).map((collection) => [...collection]),
 });
 
 const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({

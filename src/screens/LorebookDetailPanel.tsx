@@ -197,20 +197,6 @@ export const LorebookDetailPanel: FC<LorebookDetailPanelProps> = ({
                     onChange={(conditionCollections) => onChange({ conditionCollections })}
                 />
             </div>
-            <div style={{ display: 'grid', gap: '6px', opacity: lore.constant ? 0.5 : 1 }}>
-                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Triggering Conditions</label>
-                <div style={{ pointerEvents: lore.constant ? 'none' : 'auto' }}>
-                    <ConditionEditor
-                        conditionCollections={lore.triggerConditionCollections || []}
-                        globalStats={stage().getConfiguration().globalStats || []}
-                        actors={Object.values(stage().getSave().actors || {})}
-                        items={itemOptions}
-                        locations={locationOptions}
-                        stage={stage}
-                        onChange={(triggerConditionCollections) => onChange({ triggerConditionCollections })}
-                    />
-                </div>
-            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))', gap: '10px' }}>
                 <div style={{ display: 'grid', gap: '6px' }}>
                     <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Order</label>

@@ -68,7 +68,7 @@ test('lore detail retains the editor fields and allows controls to reflow withou
         onClone={() => {}}
         onDelete={() => {}}
     />);
-    for (const label of ['Title', 'Category', 'Availability', 'Triggering Conditions', 'Order', 'Priority', 'Probability', 'Scan Depth', 'Generatively Maintained', 'Triggers', 'Constant', 'Content']) {
+    for (const label of ['Title', 'Category', 'Availability', 'Order', 'Priority', 'Probability', 'Scan Depth', 'Generatively Maintained', 'Triggers', 'Constant', 'Content']) {
         assert.ok(html.includes(label), `Missing ${label}`);
     }
     assert.match(html, /providing the lore for a matching character/);
