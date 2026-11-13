@@ -784,7 +784,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             header,
         };
         const expanded = text.replace(/\{\{\s*content:(name|description|summary|role|age|meta|header)\s*\}\}/gi, (_match, field: string) => fields[field.toLowerCase()]);
-        return processLoreText(expanded, this, actor, { [kind]: id, header });
+        const configuration = this.getConfiguration();
+        const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
+        return processLoreText(expanded, this, actor, { [kind]: id, header }, { fields, stats: stats || [], statMap: entity.statMap });
     }
 
     // Resolves one card detail: a content stat of the card's entity, a function evaluated with

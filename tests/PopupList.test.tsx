@@ -166,6 +166,36 @@ test('one selected Card Control supplies context-bound text and badges in horizo
 });
 
 for (const [kind, id] of [['actor', 'bob'], ['item', 'sword'], ['location', 'park']] as const) {
+    test(`${kind} Card text resolves content stat ternaries and updates live`, () => {
+        const { stage, configuration, save } = fixture();
+        const stats = kind === 'actor' ? configuration.actorStats : kind === 'item' ? configuration.itemStats : configuration.locationStats;
+        stats.push(stat('Enabled', 'boolean', false), stat('Label', 'text', 'Default label'));
+        const entity = kind === 'actor' ? save.actors[id] : kind === 'item' ? save.inventory[0] : save.atlas[id];
+        entity.statMap.Enabled = true;
+        entity.statMap.Label = 'Custom label';
+        const template = '{{content:Enabled ? content:Label : "fallback label"}}';
+        assert.equal(stage.resolveCardText(template, kind, id), 'Custom label');
+        assert.equal(stage.resolveCardText('{{content:Enabled ? content:name : content:header}}', kind, id, 'Group'), entity.name);
+        assert.equal(stage.resolveCardText('{{content:Label}}', kind, id), 'Custom label');
+        entity.statMap.Enabled = false;
+        assert.equal(stage.resolveCardText(template, kind, id), 'fallback label');
+        assert.equal(stage.resolveCardText('{{content:Enabled ? content:name : content:header}}', kind, id, 'Group'), 'Group');
+        assert.equal(stage.resolveCardText('{{content:Missing ? "yes" : "no"}}', kind, id), '{{content:Missing ? "yes" : "no"}}');
+    });
+}
+
+test('Card Control labels render conditional content text', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.actorStats.push(stat('Enabled', 'boolean', false));
+    save.actors.bob.statMap.Enabled = true;
+    const card = new Control({ type: 'card', label: '{{content:Enabled ? content:name : "Hidden"}}', showPortrait: false });
+    const render = () => renderToStaticMarkup(<TooltipProvider><ContentCardControl control={card} kind="actor" id="bob" stage={() => stage} /></TooltipProvider>);
+    assert.match(render(), /Bob/);
+    save.actors.bob.statMap.Enabled = false;
+    assert.match(render(), /Hidden/);
+});
+
+for (const [kind, id] of [['actor', 'bob'], ['item', 'sword'], ['location', 'park']] as const) {
     test(`${kind} Card Controls bind label functions, badge availability, and click action functions to content and header`, () => {
         const { stage, configuration, save } = fixture();
         configuration.functions.push(

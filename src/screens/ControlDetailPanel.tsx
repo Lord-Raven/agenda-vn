@@ -104,7 +104,7 @@ const fieldHeadingStyle: React.CSSProperties = {
     gap: 8,
 };
 
-const labelHelpText = 'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only.';
+const labelHelpText = 'Use {{Function Name}} or {{Greeting("Alex", 2, true)}} anywhere in the label. Arguments follow parameter order; omitted arguments use defaults. Evaluated read-only. Use {{Enabled ? Label : "fallback"}} for conditional text; false, zero, and empty text are false.';
 
 const sectionHeadingStyle: React.CSSProperties = {
     color: 'var(--agenda-highlight)',
@@ -467,6 +467,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                             Labels, sub-labels, descriptions, and badge text support Stat/Function macros.
                                             {' Use {{content:name}}, {{content:description}}, {{content:header}}, and for Actors {{content:role}}, {{content:age}}, {{content:meta}}, {{content:summary}} or {{char:Stat Name}}.'}
+                                            {' Use {{content:Stat Name}} for Card content stats and {{content:Enabled ? content:Label : "fallback"}} for conditional text. Conditions use truthiness (false, zero, and empty text are false).'}
                                             {' Function arguments can bind "variable:actor", "variable:item", "variable:location", or "variable:header". Cards are horizontal in Lists and vertical in hovers.'}
                                         </span>
                                         {([

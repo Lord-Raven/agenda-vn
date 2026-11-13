@@ -96,11 +96,64 @@ const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined
     return (stats || []).find((stat) => stat.id === key || (stat.name || '').trim().toLowerCase() === lowerKey);
 };
 
+type LoreTextContent = { fields: Record<string, string>; stats: Stat[]; statMap?: Record<string, StatValue> };
+type LoreTextValue = { value: StatValue; text: string };
+
+// Find operators outside quoted strings and function arguments, without mistaking a tag prefix for the separator.
+const parseLoreTernary = (source: string): [string, string, string] | undefined => {
+    let quote = '';
+    let depth = 0;
+    let question = -1;
+    let colon = -1;
+    for (let i = 0; i < source.length; i++) {
+        const char = source[i];
+        if (quote) {
+            if (char === '\\') i++;
+            else if (char === quote) quote = '';
+        } else if (char === '"' || char === "'") {
+            quote = char;
+        } else if (char === '(') {
+            depth++;
+        } else if (char === ')') {
+            if (--depth < 0) return undefined;
+        } else if (depth === 0 && char === '?') {
+            if (question !== -1) return undefined;
+            question = i;
+        } else if (depth === 0 && char === ':' && question !== -1 && colon === -1) {
+            const branchPrefix = source.slice(question + 1, i).trim();
+            const isPrefix = /^(content|global)$/i.test(branchPrefix)
+                || (/^(user|char)$/i.test(branchPrefix) && !(/\s/.test(source[i - 1]) && /\s/.test(source[i + 1] || '')));
+            if (!isPrefix) colon = i;
+        }
+    }
+    if (quote || depth || question < 0 || colon < 0) return undefined;
+    const parts = [source.slice(0, question).trim(), source.slice(question + 1, colon).trim(), source.slice(colon + 1).trim()];
+    return parts.every(Boolean) ? [parts[0], parts[1], parts[2]] : undefined;
+};
+
+const parseLoreLiteral = (source: string): StatValue | undefined => {
+    const quote = source[0];
+    if (quote === '"' || quote === "'") {
+        let value = '';
+        for (let i = 1; i < source.length; i++) {
+            if (source[i] === quote) return i === source.length - 1 ? value : undefined;
+            if (source[i] === '\\') {
+                if (++i >= source.length) return undefined;
+            }
+            value += source[i];
+        }
+        return undefined;
+    }
+    if (/^(true|false)$/i.test(source)) return source.toLowerCase() === 'true';
+    if (/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(source)) return Number(source);
+    return undefined;
+};
+
 // Resolves template tags in lore and control text for LLM/display use, including {{Name("text", 2, true)}}.
 // Bare names prefer functions, then global stats; calls use positional arguments and parameter defaults.
 // Unresolvable tags (unknown stat/function, no target actor, void functions) are left untouched.
 // Don't use on text written back to the source.
-export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor, variables?: FunctionVariableBindings): string {
+export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor, variables?: FunctionVariableBindings, content?: LoreTextContent): string {
     const save = stage.getSave();
     const configuration = stage.getConfiguration(save);
     const player = stage.getPlayerActor();
@@ -116,57 +169,78 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
         return Array.isArray(value) ? value.join(', ') : String(value ?? '');
     };
 
-    const formatStatValue = (stat: Stat, rawValue: unknown): string => {
+    const resolveStat = (stat: Stat, rawValue: unknown): LoreTextValue => {
         const value = stage.readStatValue(rawValue, stat, save);
-        return formatStatOptionValueText(stat, value) ?? formatValue(stat.type, value);
+        return { value, text: formatStatOptionValueText(stat, value) ?? formatValue(stat.type, value) };
     };
 
-    return String(text || '').replace(LORE_TAG_PATTERN, (match, tag: string | undefined, statKey: string | undefined, functionKey: string | undefined) => {
-        if (functionKey !== undefined) {
-            const call = parseFunctionCallText(functionKey);
-            const name = (call?.name || functionKey).trim().toLowerCase();
+    const resolveTag = (source: string): LoreTextValue | undefined => {
+        const reserved = /^(user|char|global)\s*(?::\s*(.*?)\s*)?$/i.exec(source);
+        const contentTag = /^content\s*:\s*(.*?)\s*$/i.exec(source);
+        if (contentTag && content) {
+            const key = contentTag[1];
+            const field = content.fields[key.toLowerCase()];
+            if (field !== undefined) return { value: field, text: field };
+            const stat = findStatByKey(content.stats, key);
+            if (stat) return resolveStat(stat, content.statMap?.[stat.id]);
+        }
+        if (!reserved) {
+            const call = parseFunctionCallText(source);
+            const name = (call?.name || source).trim().toLowerCase();
             const fn = (configuration.functions || []).find(candidate => candidate.name.trim().toLowerCase() === name);
             if (fn) {
                 const reference = functionReference(fn.id, positionalFunctionArguments(fn, call?.args));
                 if (fn.returnType === 'textList') {
-                    return stage.resolveTextList(reference, save, variables).join(', ');
+                    const value = stage.resolveTextList(reference, save, variables);
+                    return { value, text: value.join(', ') };
                 }
                 if (!isStatReturnType(fn.returnType)) {
-                    return match;
+                    return undefined;
                 }
-                return formatValue(fn.returnType, stage.resolveValue(reference, fn.returnType, save, [], variables));
+                const value = stage.resolveValue(reference, fn.returnType, save, [], variables);
+                return { value, text: formatValue(fn.returnType, value) };
             }
             if (call) {
-                return match;
+                return undefined;
             }
-            const stat = findStatByKey(configuration.globalStats, functionKey.trim());
-            if (!stat) {
-                return match;
-            }
-            return formatStatValue(stat, save.globalStatValues?.[stat.id]);
+            const stat = findStatByKey(configuration.globalStats, source);
+            return stat ? resolveStat(stat, save.globalStatValues?.[stat.id]) : undefined;
         }
-        const tagName = tag?.toLowerCase();
+        const tagName = reserved[1].toLowerCase();
+        const statKey = reserved[2];
         if (tagName === 'global') {
             const stat = statKey ? findStatByKey(configuration.globalStats, statKey) : undefined;
-            if (!stat) {
-                return match;
-            }
-            return formatStatValue(stat, save.globalStatValues?.[stat.id]);
+            return stat ? resolveStat(stat, save.globalStatValues?.[stat.id]) : undefined;
         }
 
         const actor: LoreTextActor | undefined = tagName === 'user' ? player : targetActor;
         if (!statKey) {
             if (tagName === 'user') {
-                return player?.name || 'the player';
+                const value = player?.name || 'the player';
+                return { value, text: value };
             }
-            return actor ? (actor.displayName || actor.name) : match;
+            const value = actor && (actor.displayName || actor.name);
+            return value === undefined ? undefined : { value, text: value };
         }
 
         const stat = findStatByKey(configuration.actorStats, statKey);
-        if (!actor || !stat) {
-            return match;
+        return actor && stat ? resolveStat(stat, actor.statMap?.[stat.id]) : undefined;
+    };
+
+    const resolveExpression = (source: string): LoreTextValue | undefined => {
+        const literal = parseLoreLiteral(source);
+        return literal === undefined ? resolveTag(source) : { value: literal, text: String(literal) };
+    };
+
+    return String(text || '').replace(LORE_TAG_PATTERN, (match) => {
+        const source = match.slice(2, -2).trim();
+        const ternary = parseLoreTernary(source);
+        if (ternary) {
+            const condition = resolveExpression(ternary[0]);
+            if (!condition) return match;
+            return resolveExpression(condition.value ? ternary[1] : ternary[2])?.text ?? match;
         }
-        return formatStatValue(stat, actor.statMap?.[stat.id]);
+        return resolveTag(source)?.text ?? match;
     });
 }
 

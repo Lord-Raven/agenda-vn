@@ -1300,6 +1300,36 @@ test('label templates accept positional function arguments and defaults against 
     assert.throws(() => processLoreText('{{Greeting("Alex", 2, true, 4)}}', stage), /takes 3 arguments/);
 });
 
+test('text macro ternaries use raw values, resolve selected branches, and preserve unresolved expressions', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.globalStats.push(
+        stat('Enabled', 'boolean', { default: false }),
+        stat('Label', 'text', { default: 'Live label' }),
+    );
+    configuration.functions = [
+        typedFunction('True', 'boolean', 'return true;'),
+        typedFunction('False', 'boolean', 'return false;'),
+        typedFunction('Broken', 'text', 'throw new Error("selected branch");'),
+        { ...typedFunction('Echo', 'text', 'return arg("Text");'), parameters: [stat('Text', 'text', { default: '' })] },
+    ];
+    assert.equal(processLoreText('{{global:Enabled ? global:Label : "fallback: label?"}}', stage), 'fallback: label?');
+    save.globalStatValues!.Enabled = true;
+    assert.equal(processLoreText('{{global:Enabled ? global:Label : Broken}}', stage), 'Live label');
+    assert.equal(processLoreText('{{False ? Broken : Echo("yes:?",  )}}', stage), '{{False ? Broken : Echo("yes:?",  )}}');
+    assert.equal(processLoreText('{{True ? Echo("yes:?") : Broken}}', stage), 'yes:?');
+    assert.equal(processLoreText('{{False ? Broken : \'it\\\'s fine\'}}', stage), "it's fine");
+    assert.equal(processLoreText('{{True ? user : global:Label}}', stage), 'Same name');
+    assert.equal(processLoreText('{{True ? user:Score : "no"}}', stage), '2');
+    assert.equal(processLoreText('{{Score ? "nonzero" : "zero"}}', stage), 'nonzero');
+    save.globalStatValues!.Score = 0;
+    assert.equal(processLoreText('{{Score ? "nonzero" : "zero"}}', stage), 'zero');
+    assert.equal(processLoreText('{{Missing ? "yes" : "no"}}', stage), '{{Missing ? "yes" : "no"}}');
+    assert.equal(processLoreText('{{True ? Missing : "no"}}', stage), '{{True ? Missing : "no"}}');
+    assert.equal(processLoreText('{{True ? "yes"}}', stage), '{{True ? "yes"}}');
+    assert.equal(processLoreText('{{True ? "yes" : "no"', stage), '{{True ? "yes" : "no"');
+    assert.throws(() => processLoreText('{{True ? Broken : "no"}}', stage), /selected branch/);
+});
+
 test('parameterized label functions propagate errors and cannot write game state', () => {
     const { stage, save, configuration } = fixture();
     const fn = {
