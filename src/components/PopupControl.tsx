@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { Box, DialogContent, DialogTitle, Paper } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Stage } from '../Stage';
-import { isScreenAvailable } from '../content/Screen';
+import { isScreenAvailable, isSectionScreenType } from '../content/Screen';
 import { Skit } from '../content/Skit';
 import { ScreenType } from '../screens/BaseScreen';
 import { DefinedMapView } from '../screens/DefinedMapView';
@@ -68,7 +68,7 @@ export const PopupControl: FC<PopupControlProps> = ({ stage, isVerticalLayout, s
                             >
                                 <DialogTitle id={`popup-control-${control.id}`}>{control.name || 'Pop-up'}</DialogTitle>
                                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, p: { xs: 1, md: 2 } }}>
-                                    {selectedScreen?.type === 'list' ? (
+                                    {selectedScreen && isSectionScreenType(selectedScreen.type) ? (
                                         <ListScreenView stage={stage} screen={selectedScreen} isVerticalLayout={isVerticalLayout} onAction={onAction} />
                                     ) : selectedScreen ? (
                                         <DefinedMapView

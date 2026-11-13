@@ -38,6 +38,8 @@ interface ContentCardListProps {
     stage: () => Stage;
     pages: ContentCardPage[];
     isVerticalLayout: boolean;
+    // 'list' stacks horizontal cards; 'grid' flows vertical cards across multiple columns.
+    layout?: 'list' | 'grid';
     emptyTitle?: string;
     emptyMessage?: string;
 }
@@ -54,8 +56,9 @@ const headerSideTextSx = {
 };
 
 // A paged vertical column of horizontal content cards: one header page at a time with previous/next
-// navigation. Pages without cards are hidden. Shared by the default location list and List Screens.
-export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVerticalLayout, emptyTitle = 'Nothing Here', emptyMessage = 'Nothing is available yet.' }) => {
+// navigation. Pages without cards are hidden. Shared by the default location list and List Screens;
+// the grid layout renders vertical cards in a scrollable multi-column grid for Grid Screens.
+export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVerticalLayout, layout = 'list', emptyTitle = 'Nothing Here', emptyMessage = 'Nothing is available yet.' }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const reduceMotion = useReducedMotion();
     const visiblePages = pages.map(page => ({
@@ -179,21 +182,30 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
                         transition={{ duration: reduceMotion ? 0 : 0.22, ease: 'easeOut' }}
                         sx={{
                             gridArea: '1 / 1',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 1.25,
                             minHeight: 0,
                             overflowX: 'hidden',
                             overflowY: 'auto',
                             // Keep resting cards outside the fades and leave room for the hover shift.
                             py: '24px',
                             pr: '14px',
+                            ...(layout === 'grid' ? {
+                                display: 'grid',
+                                gridTemplateColumns: `repeat(auto-fill, minmax(${isVerticalLayout ? 150 : 220}px, 1fr))`,
+                                alignContent: 'start',
+                                alignItems: 'stretch',
+                                gap: 1.25,
+                            } : {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 1.25,
+                            }),
                         }}
                     >
                         {!currentPage && (
                             <Box
                                 sx={{
                                     minHeight: 220,
+                                    gridColumn: layout === 'grid' ? '1 / -1' : undefined,
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -209,7 +221,8 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
                             </Box>
                         )}
                         {currentPage?.cards.map((card, index) => (
-                            <ContentCardView key={card.key} card={card} index={index} stage={stage} isVerticalLayout={isVerticalLayout} reduceMotion={!!reduceMotion} />
+                            <ContentCardView key={card.key} card={card} index={index} stage={stage} isVerticalLayout={isVerticalLayout}
+                                orientation={layout === 'grid' ? 'vertical' : 'horizontal'} reduceMotion={!!reduceMotion} />
                         ))}
                     </Box>
                 </AnimatePresence>
@@ -223,20 +236,24 @@ interface ContentCardViewProps {
     index: number;
     stage: () => Stage;
     isVerticalLayout: boolean;
+    orientation?: 'horizontal' | 'vertical';
     reduceMotion: boolean;
 }
 
-export const ContentCardView: FC<ContentCardViewProps> = ({ card, index, stage, isVerticalLayout, reduceMotion }) => {
+export const ContentCardView: FC<ContentCardViewProps> = ({ card, index, stage, isVerticalLayout, orientation = 'horizontal', reduceMotion }) => {
     const control = card.control || stage().getCardControl(card.kind);
     if (!control) return null;
     const state = stage().resolveCardState(control, card.kind, card.id, card.header);
     if (!state.visible) return null;
+    const vertical = orientation === 'vertical';
     const interactive = (!!card.onClick || control.actions.length > 0) && !card.disabled && state.available;
     const delay = reduceMotion ? 0 : Math.min(index * 0.04, 0.18);
+    // Vertical grid cards lift on hover; horizontal list cards shift right.
+    const hoverShift = vertical ? { y: -8 } : { x: 10 };
     const motionProps = {
         initial: { opacity: 0, y: reduceMotion ? 0 : 16 },
         animate: { opacity: 1, y: 0 },
-        whileHover: interactive ? { x: 10 } : undefined,
+        whileHover: interactive ? hoverShift : undefined,
         transition: {
             opacity: { duration: reduceMotion ? 0 : 0.22, delay },
             y: { duration: reduceMotion ? 0 : 0.22, delay },
@@ -250,10 +267,11 @@ export const ContentCardView: FC<ContentCardViewProps> = ({ card, index, stage, 
     ) : null;
 
     return (
-        <motion.div {...motionProps} style={{ width: '100%', flexShrink: 0 }}>
+        <motion.div {...motionProps} style={{ width: '100%', flexShrink: 0, ...(vertical ? { height: '100%', minWidth: 0 } : {}) }}>
             <ContentCardControl stage={stage} control={control} kind={card.kind} id={card.id} header={card.header}
-                compact={isVerticalLayout} disabled={card.disabled} subtitle={subtitle} trailing={card.trailing}
-                onClick={card.onClick} onAction={card.onAction} />
+                orientation={orientation} compact={isVerticalLayout} disabled={card.disabled} subtitle={subtitle} trailing={card.trailing}
+                onClick={card.onClick} onAction={card.onAction}
+                style={vertical ? { maxWidth: '100%', height: '100%', boxSizing: 'border-box' } : undefined} />
         </motion.div>
     );
 };

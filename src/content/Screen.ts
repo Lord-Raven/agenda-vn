@@ -4,7 +4,12 @@ import { Stat, StatType } from './Stat';
 import { functionReferenceId, GameFunction, globalStatReferenceId, isFunctionReference, isGlobalStatReference } from './Function';
 import { v4 as generateUuid } from 'uuid';
 
-export type ScreenType = 'map' | 'list';
+export type ScreenType = 'map' | 'list' | 'grid';
+
+export const SCREEN_TYPE_LABELS: Record<ScreenType, string> = { map: 'Map', list: 'List', grid: 'Grid' };
+
+// List and Grid Screens share the section-driven card content model; Maps use links.
+export const isSectionScreenType = (type: ScreenType): boolean => type === 'list' || type === 'grid';
 
 // Each resolved header yields a page; pages without content are hidden.
 export type ListSection = {
@@ -59,7 +64,7 @@ export class Screen extends GameMap {
 
     constructor(data?: Partial<Screen>) {
         super(data);
-        this.type = data?.type === 'list' ? 'list' : 'map';
+        this.type = data?.type === 'list' || data?.type === 'grid' ? data.type : 'map';
         this.sections = (data?.sections || []).map(cloneListSection);
         this.priority = Number.isFinite(this.priority) ? this.priority : 0;
     }

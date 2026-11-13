@@ -13,7 +13,7 @@ import { GlobalStatBar } from "../components/GlobalStatBar";
 import { ControlDock } from "../components/ControlDock";
 import { useCachedImageUrl } from "../utils/ImageCache";
 import { ContentCardList, ContentCardPage } from "../components/ContentCardList";
-import { compareScreenPriority, isScreenAvailable } from "../content/Screen";
+import { compareScreenPriority, isScreenAvailable, isSectionScreenType } from "../content/Screen";
 import { Skit } from "../content/Skit";
 import { PopupControl } from "../components/PopupControl";
 import { ListScreenView } from "./ListScreenView";
@@ -192,7 +192,7 @@ export const MapScreen: FC<MapScreenProps> = ({ stage, setScreenType, isVertical
 
                 <Box sx={{ position: 'relative', isolation: 'isolate', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <GlassPanel variant="bright" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                    {selectedScreen?.type === 'list' ? (
+                    {selectedScreen && isSectionScreenType(selectedScreen.type) ? (
                         <ListScreenView key={selectedScreen.id} stage={stage} screen={selectedScreen} isVerticalLayout={isVerticalLayout} onAction={handleAction} />
                     ) : (
                     <ContentCardList

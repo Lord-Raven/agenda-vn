@@ -1,7 +1,7 @@
 import React, { FC, useMemo, useState } from 'react';
-import { List as ListIcon, Map as MapIcon } from '@mui/icons-material';
+import { GridView as GridViewIcon, List as ListIcon, Map as MapIcon } from '@mui/icons-material';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Screen } from '../content/Screen';
+import { Screen, SCREEN_TYPE_LABELS } from '../content/Screen';
 import { Stage } from '../Stage';
 import {
     CategorizedEntrySection,
@@ -95,8 +95,8 @@ export const ScreenManagementPanel: FC<ScreenManagementPanelProps> = ({ stage, i
                         onClick={() => setSelectedMapId(map.id)}
                         style={{ width: '100%', minHeight: 58, display: 'grid', gridTemplateColumns: '44px 1fr', gap: 10, alignItems: 'center', textAlign: 'left', padding: 9, cursor: 'pointer', color: 'var(--agenda-text-primary)', background: map.id === selectedMapId ? 'color-mix(in srgb, var(--agenda-highlight) 20%, transparent)' : 'color-mix(in srgb, var(--agenda-surface-base) 76%, transparent)', border: `1px solid ${map.id === selectedMapId ? 'var(--agenda-line-strong)' : 'var(--agenda-line-subtle)'}`, borderRadius: 8 }}
                     >
-                        <span style={{ width: 44, height: 40, display: 'grid', placeItems: 'center', borderRadius: 6, backgroundImage: map.type === 'map' && map.imageUrl ? `url(${map.imageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'var(--agenda-surface-base)' }}>{map.type === 'list' ? <ListIcon fontSize="small" /> : !map.imageUrl && <MapIcon fontSize="small" />}</span>
-                        <span><strong style={{ display: 'block' }}>{map.name || '(Unnamed Screen)'}</strong><small style={{ color: 'var(--agenda-text-muted)' }}>{map.type === 'list' ? 'List' : 'Map'} / Priority {map.priority}</small></span>
+                        <span style={{ width: 44, height: 40, display: 'grid', placeItems: 'center', borderRadius: 6, backgroundImage: map.type === 'map' && map.imageUrl ? `url(${map.imageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'var(--agenda-surface-base)' }}>{map.type === 'list' ? <ListIcon fontSize="small" /> : map.type === 'grid' ? <GridViewIcon fontSize="small" /> : !map.imageUrl && <MapIcon fontSize="small" />}</span>
+                        <span><strong style={{ display: 'block' }}>{map.name || '(Unnamed Screen)'}</strong><small style={{ color: 'var(--agenda-text-muted)' }}>{SCREEN_TYPE_LABELS[map.type]} / Priority {map.priority}</small></span>
                     </motion.button>
                 )}
                 getEntryKey={map => map.id}

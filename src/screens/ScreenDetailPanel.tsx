@@ -13,7 +13,7 @@ import { getLocationName } from '../content/Location';
 import { createDefaultStatUpdate, OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker, resolveIcon } from '../components/StatRating';
 import { processLoreText } from '../content/Lore';
-import { Screen, cloneListSection, ScreenType } from '../content/Screen';
+import { Screen, cloneListSection, isSectionScreenType, ScreenType } from '../content/Screen';
 import { ListSectionsEditor } from '../components/ListSectionsEditor';
 
 interface ScreenDetailPanelProps {
@@ -513,6 +513,7 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                     onChange={event => updateDraft('type', event.target.value as ScreenType)}>
                     <option value="map">Map</option>
                     <option value="list">List</option>
+                    <option value="grid">Grid</option>
                 </select>
             </label>
             <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>
@@ -547,7 +548,7 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                 />
             </section>
 
-            {draft.type === 'list' ? (
+            {isSectionScreenType(draft.type) ? (
                 <ListSectionsEditor
                     sections={draft.sections}
                     onChange={sections => updateDraft('sections', sections)}

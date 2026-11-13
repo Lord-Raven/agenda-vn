@@ -3,7 +3,7 @@ import { Stage } from '../Stage';
 import { ContentListDisplay, Control, ControlPlacement, ControlType, StatDisplayType } from '../content/Control';
 import { ConditionCollection, ContentType } from '../content/Condition';
 import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
-import { parseContentStatReference } from '../content/Screen';
+import { parseContentStatReference, SCREEN_TYPE_LABELS } from '../content/Screen';
 import { functionReferenceId, isFunctionReference } from '../content/Function';
 import { Button, ColorPickerInput, GlassPanel, HelpTip, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ConditionEditor } from '../components/ConditionEditor';
@@ -413,7 +413,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 Pop-ups animate in and out; switching pop-ups fades only their contents.
                                 Only one pop-up is shown: lower priority numbers win, with configuration order breaking ties.
                                 It cannot be dismissed; use map button or card click actions to change the visibility conditions.
-                                {' The selected Screen ignores its normal availability rules, but map links and buttons retain theirs. Define reusable Map and List content in Screens.'}
+                                {' The selected Screen ignores its normal availability rules, but map links and buttons retain theirs. Define reusable Map, List, and Grid content in Screens.'}
                             </HelpTip>
                         </div>
                         <select
@@ -427,7 +427,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <option value={draft.screenId}>Missing or inactive Screen ({draft.screenId})</option>
                             )}
                             {(stageInstance.getConfiguration().screens || []).filter(screen => screen.active !== false).map(screen => (
-                                <option key={screen.id} value={screen.id}>{screen.name || 'Unnamed Screen'} ({screen.type === 'list' ? 'List' : 'Map'})</option>
+                                <option key={screen.id} value={screen.id}>{screen.name || 'Unnamed Screen'} ({SCREEN_TYPE_LABELS[screen.type]})</option>
                             ))}
                         </select>
                     </section>

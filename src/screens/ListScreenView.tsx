@@ -31,7 +31,8 @@ export const ListScreenView: FC<ListScreenViewProps> = ({ stage, screen, isVerti
         stage={stage}
         pages={buildListContentPages(stage(), screen, onAction)}
         isVerticalLayout={isVerticalLayout}
-        emptyTitle={screen.name || 'List'}
+        layout={screen.type === 'grid' ? 'grid' : 'list'}
+        emptyTitle={screen.name || (screen.type === 'grid' ? 'Grid' : 'List')}
         emptyMessage={screen.sections.length ? 'Nothing to show right now.' : 'No headers configured for this Screen. Add headers in Screens.'}
     />
 );

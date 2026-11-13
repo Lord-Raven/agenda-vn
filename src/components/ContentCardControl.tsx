@@ -135,7 +135,7 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
     );
     if (!location || !control.showPortrait) return body;
     return <CachedBackgroundUrl url={getLocationImageUrl(location, instance)}>{url => (
-        <Box sx={{ '--card-background': url
+        <Box sx={{ height: style?.height, '--card-background': url
             ? `linear-gradient(110deg, color-mix(in srgb, var(--agenda-surface-base) 82%, transparent), color-mix(in srgb, var(--agenda-surface-base) 55%, transparent)), url(${JSON.stringify(url)})`
             : 'none' }}>{body}</Box>
     )}</CachedBackgroundUrl>;

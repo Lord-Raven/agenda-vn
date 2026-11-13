@@ -687,7 +687,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return [String(this.resolveValue(value, 'text', save, [], variables))];
     }
 
-    // Expands a List Screen's header entries into pages: one per resolved header string, each listing the
+    // Expands a List or Grid Screen's header entries into pages: one per resolved header string, each listing the
     // active content its contentSource returns for that header. Pages without content are omitted, and a
     // failing entry is logged and skipped so the rest of the Screen still renders.
     resolveListSections(screen: Screen, save: SaveType = this.getSave()): ResolvedListSection[] {
