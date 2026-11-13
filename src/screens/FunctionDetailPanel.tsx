@@ -15,6 +15,8 @@ export const FUNCTION_RETURN_TYPE_LABELS: Record<FunctionReturnType, string> = {
     void: 'Void (action only)',
     number: 'Number',
     text: 'String',
+    // Functions return text rather than icon; text sources satisfy icon stats. Present for type completeness.
+    icon: 'Icon',
     textList: 'String List',
     boolean: 'Boolean',
     option: 'Option',

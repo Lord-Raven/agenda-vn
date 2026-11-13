@@ -5,7 +5,7 @@ import { Stage } from '../Stage';
 import {
     Stat, StatValue, StatValueRule,
     findStatOptionByValue, getStatOptionValue, isListStatType, isNumericDisplayType, isOptionListStatType,
-    isReferenceDisplayType, isReferenceListDisplayType, isSourcedOptionStat, normalizeReferenceListValue, normalizeStatValue,
+    isReferenceDisplayType, isReferenceListDisplayType, isSourcedOptionStat, isTextDisplayType, normalizeReferenceListValue, normalizeStatValue,
     resolveStatDefault,
 } from '../content/Stat';
 import { Button, TextArea, TextInput } from './UiComponents';
@@ -77,7 +77,7 @@ const normalizeStatShapeForType = (stat: Stat): Stat => {
         };
     }
 
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
+    if (isTextDisplayType(stat.type) || isReferenceDisplayType(stat.type)) {
         return {
             ...stat,
             default: typeof stat.default === 'string' ? stat.default : '',
@@ -110,6 +110,7 @@ export const renderStatTypeOptions = () => (
         <option value="actorList">Actor List</option>
         <option value="boolean">Boolean</option>
         <option value="contentList">Content List</option>
+        <option value="icon">Icon</option>
         <option value="item">Item</option>
         <option value="itemList">Item List</option>
         <option value="location">Location</option>
@@ -450,6 +451,13 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                         {normalizedStat.type === 'text' && !hasDefaultValueRules && (
                             <div style={{ ...inlineFieldTopStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Default Value</label>
+                                {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
+                            </div>
+                        )}
+
+                        {normalizedStat.type === 'icon' && !hasDefaultValueRules && (
+                            <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
+                                <label style={fieldLabelStyle}>Default Icon</label>
                                 {renderValueInput(normalizedStat.default, defaultValue => onPatch({ default: defaultValue }))}
                             </div>
                         )}

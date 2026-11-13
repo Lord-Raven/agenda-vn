@@ -655,9 +655,11 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <div style={{ marginTop: 15 }}>
                                 <div style={fieldHeadingStyle}>
                                     <label>Label (optional)</label>
-                                    <HelpTip title="Control label">{labelHelpText}</HelpTip>
+                                    <HelpTip title="Control label">
+                                        {selectedStat?.type === 'icon' ? 'Leave empty to show no label. ' : ''}{labelHelpText}
+                                    </HelpTip>
                                 </div>
-                                <TextInput fullWidth value={draft.label} placeholder={selectedStat?.name || 'Use stat name'}
+                                <TextInput fullWidth value={draft.label} placeholder={selectedStat?.type === 'icon' ? 'No label' : (selectedStat?.name || 'Use stat name')}
                                     onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))} />
                             </div>
                         )}

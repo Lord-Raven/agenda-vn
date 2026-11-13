@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
-import { findStatOptionByValue, isContentListDisplayType, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat, StatType } from '../content/Stat';
+import { findStatOptionByValue, isContentListDisplayType, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, isTextDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat, StatType } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
 import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, FunctionCondition, GlobalStatCondition, SKIT_STATE_FIELD_TYPES, SkitStateCondition, SkitStateField, functionConditionValueType, isListLengthComparison, variableContentValue } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
@@ -73,7 +73,7 @@ const comparisonsForStat = (stat?: Stat): Array<{ value: ConditionComparison; la
     if (isListStat(stat)) {
         return LIST_COMPARISONS;
     }
-    return stat?.type === 'text' ? TEXT_COMPARISONS : COMPARISONS;
+    return stat && isTextDisplayType(stat.type) ? TEXT_COMPARISONS : COMPARISONS;
 };
 
 const getDefaultComparison = (stat: Stat | undefined, current?: ConditionComparison): ConditionComparison => {
@@ -177,7 +177,7 @@ const getDefaultConditionValue = (stat?: Stat): string | number | boolean => {
         const defaultOption = stat.type === 'option' ? findStatOptionByValue(stat, stat.default) : undefined;
         return defaultOption?.value || resolveStatOptionPool(stat)[0]?.id || '';
     }
-    if (isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || stat.type === 'text') {
+    if (isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || isTextDisplayType(stat.type)) {
         return typeof stat.default === 'string' ? stat.default : '';
     }
     return typeof stat.default === 'number' ? stat.default : 0;
@@ -425,7 +425,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (type === 'boolean') {
             return typeof value === 'boolean';
         }
-        if (type === 'text') {
+        if (type === 'text' || type === 'icon') {
             return typeof value === 'string';
         }
         return type === 'number' && (

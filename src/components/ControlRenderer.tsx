@@ -106,7 +106,12 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         ?? stat.default;
     const normalizedValue = control.type === 'statEditor' ? normalizeStatValue(rawValue, stat) : stageInstance.readStatValue(rawValue, stat);
     const StatIcon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;
-    const label = processLoreText(control.label.trim() || statName, stageInstance);
+    // Icon stats keep blank labels blank (no stat-name fallback) so a control can show the icon alone.
+    const label = processLoreText(control.label.trim() || (stat.type === 'icon' ? '' : statName), stageInstance);
+    // The stat's value names the displayed icon; empty means no icon.
+    const ValueIcon = stat.type === 'icon' && typeof normalizedValue === 'string' && normalizedValue.trim()
+        ? resolveIcon(normalizedValue, stageInstance)
+        : null;
     const selectedOptionDescription = stat.type === 'option'
         ? resolveStatText(findStatOptionByValue(stat, normalizedValue)?.option.description, stageInstance).trim()
         : '';
@@ -131,7 +136,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     return (
         <Box
             role="group"
-            aria-label={label}
+            aria-label={label || statName}
             title={tooltipText || undefined}
             sx={{
                 ...boxStyle,
@@ -147,12 +152,14 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         >
             {isVerticalLayout ? (
                 StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)', flexShrink: 0 }} />
-            ) : (
+            ) : (StatIcon || label) && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', lineHeight: 1.2 }}>
                     {StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)' }} />}
-                    <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.66rem', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
-                        {label}
-                    </Typography>
+                    {label && (
+                        <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.66rem', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                            {label}
+                        </Typography>
+                    )}
                 </Box>
             )}
 
@@ -199,6 +206,8 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                         } : { fontSize }),
                     }}
                 />
+            ) : stat.type === 'icon' ? (
+                ValueIcon && <ValueIcon sx={{ fontSize, color: control.displayColor || 'var(--agenda-text-primary)' }} titleAccess={label || statName} />
             ) : (
                 <Typography sx={{ color: control.displayColor || 'var(--agenda-text-primary)', fontSize, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
                     {resolveDisplayValue(stat, normalizedValue, stageInstance.getSave()?.atlas)}

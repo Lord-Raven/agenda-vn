@@ -167,6 +167,10 @@ export const ListCardDetail: FC<{
         ) : null;
     }
     const BadgeIcon = control?.iconName ? resolveIcon(control.iconName, stage) : null;
+    // Icon stats render their value as the named icon itself (empty value shows nothing).
+    const ValueIcon = detail.type === 'icon' && typeof detail.value === 'string' && detail.value.trim()
+        ? resolveIcon(detail.value, stage)
+        : null;
     const numericValue = Number(detail.value);
     const display = control && detail.stat && detail.type === 'number' && Number.isFinite(numericValue) && (
         <Box sx={{ width: control.displayType === 'percentage' || control.displayType === 'bar' ? 90 : undefined, height: 16, display: 'flex', alignItems: 'center' }}>
@@ -183,10 +187,12 @@ export const ListCardDetail: FC<{
         }}>
             {BadgeIcon && <BadgeIcon sx={{ fontSize: '0.9rem', color: control?.displayColor || 'var(--agenda-text-muted)' }} />}
             {label && <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.7rem' }}>{label}</Typography>}
-            {display || <Typography component="span" sx={{
-                color: control?.displayColor || 'var(--agenda-text-primary)', fontSize: '0.8rem', fontWeight: 700,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>{formatDetailText(detail)}</Typography>}
+            {display || (detail.type === 'icon'
+                ? ValueIcon && <ValueIcon sx={{ fontSize: '0.95rem', color: control?.displayColor || 'var(--agenda-text-primary)' }} titleAccess={label || undefined} />
+                : <Typography component="span" sx={{
+                    color: control?.displayColor || 'var(--agenda-text-primary)', fontSize: '0.8rem', fontWeight: 700,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{formatDetailText(detail)}</Typography>)}
         </Box>
     );
 };

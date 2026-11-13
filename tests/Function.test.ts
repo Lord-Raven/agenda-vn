@@ -2181,3 +2181,24 @@ test('conditions, schedules, skits, and calendar events read global references a
     assert.deepEqual(stage.resolveCalendarEvent(stored).actorIds, ['b', 'b']);
     assert.equal(stage.resolveCalendarEvent(stored).locationId, 'place');
 });
+
+test('icon stats normalize as text and interchange with text-typed sources', () => {
+    const mood = stat('Mood', 'icon', { default: 'star' });
+    assert.equal(resolveStatDefault(mood), 'star');
+    assert.equal(resolveStatDefault({ ...mood, default: 0 }), '');
+    assert.equal(normalizeStatValue('favorite', mood), 'favorite');
+    assert.equal(normalizeStatValue(undefined, mood), 'star');
+    assert.equal(normalizeStatValue(7, mood), 'star');
+    const { stage, save, configuration } = fixture();
+    configuration.globalStats = [...configuration.globalStats, mood];
+    save.globalStatValues!.Mood = 'favorite';
+    const iconSource: GameFunction = { ...gameFunction("return 'heart';"), id: 'icon-source', name: 'Icon source', returnType: 'text' };
+    configuration.functions = [iconSource];
+    assert.equal(stage.resolveValue(functionReference(iconSource.id), 'icon'), 'heart');
+    assert.equal(stage.resolveValue(globalStatReference('Mood'), 'icon'), 'favorite');
+    assert.equal(stage.resolveValue(globalStatReference('Mood'), 'text'), 'favorite');
+    assert.throws(() => stage.resolveValue(globalStatReference('Score'), 'icon'), /has type number, not icon/);
+    assert.deepEqual(valuePickerOptions(configuration, 'icon').map(option => option.key),
+        [functionReference('icon-source'), globalStatReference('Mood')]);
+    assert.ok(valuePickerOptions(configuration, 'text').map(option => option.key).includes(globalStatReference('Mood')));
+});

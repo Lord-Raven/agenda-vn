@@ -6,7 +6,7 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, OPPOSITE_BOOLEAN_VALUE, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult, HEADER_VARIABLE_VALUE, isStatReturnType } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, matchesValueType, validateFunctionResult, HEADER_VARIABLE_VALUE, isStatReturnType } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
@@ -595,7 +595,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (!stat) {
                 throw new Error(`Unknown global stat reference: ${id}`);
             }
-            if (stat.type !== type && !(type === 'contentList' && isReferenceStatType(stat.type))) {
+            if (!matchesValueType(stat.type, type) && !(type === 'contentList' && isReferenceStatType(stat.type))) {
                 throw new Error(`Global stat "${stat.name}" has type ${stat.type}, not ${type}.`);
             }
             if (stack.includes(value) || stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
@@ -609,7 +609,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (!fn) {
                 throw new Error(`Unknown function reference: ${id}`);
             }
-            if (fn.returnType !== type && !(type === 'contentList' && isReferenceStatType(fn.returnType as StatType))) {
+            if (!matchesValueType(fn.returnType, type) && !(type === 'contentList' && isReferenceStatType(fn.returnType as StatType))) {
                 throw new Error(`Function "${fn.name}" returns ${fn.returnType || 'void'}, not ${type}.`);
             }
             const errors: string[] = [];
@@ -634,7 +634,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 },
             });
         }
-        if (typeof value === 'string' && type === 'text') {
+        if (typeof value === 'string' && (type === 'text' || type === 'icon')) {
             const call = parseFunctionCallText(value);
             if (call) return namedSource(call.name, 'function', 'text', call.args);
             return value.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, name: string) => {

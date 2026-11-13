@@ -18,7 +18,7 @@ import { buildHexColorSwatches, Button, ColorPickerInput, GlassPanel, LocationSe
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
 import { ConditionCollection } from '../content/Condition';
 import { ConditionEditor } from '../components/ConditionEditor';
-import { isReferenceDisplayType, isReferenceListDisplayType, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
+import { isReferenceDisplayType, isReferenceListDisplayType, isTextDisplayType, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
 import { StatValueInput } from '../components/StatValueInput';
 import { isValueReference, valuePickerOptions } from '../content/Function';
 
@@ -793,7 +793,7 @@ export const LocationDetailPanel: FC<LocationDetailPanelProps> = ({ location, st
                                         padding: '12px',
                                     }}>
                                         {locationStats.map((stat) => {
-                                            const hasValueSource = stat.type === 'number' || stat.type === 'text' || isValueReference(editedStatMap[stat.id]) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
+                                            const hasValueSource = stat.type === 'number' || isTextDisplayType(stat.type) || isValueReference(editedStatMap[stat.id]) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
                                             const value = Number(editedStatMap[stat.id]);
                                             const displayValue = Number.isFinite(value)
                                                 ? value

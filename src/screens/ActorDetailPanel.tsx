@@ -2,7 +2,7 @@ import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import { Stage } from '../Stage';
-import { isListStatType, isNumericDisplayType, isReferenceDisplayType, Stat, StatValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
+import { isListStatType, isNumericDisplayType, isReferenceDisplayType, isTextDisplayType, Stat, StatValue, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault } from '../content/Stat';
 import { v4 as generateUuid } from 'uuid';
 import { Actor, ActorSchedule, ActorStatInitial, ActorStatModifier, distillActor, generateBaseActorImage, generateEmotionImage, generateOutfitEmotionPrompt, Outfit, getLinkedActorLore, supplementActorLoreTriggers, updateActorLore, upsertActorLoreEntry } from '../content/Actor';
 import { ACTOR_VOICES, ACTOR_VOICE_GENDER_LABELS, ActorVoice, formatActorVoiceLabel, getActorVoice, getActorVoiceVolume, normalizeVoiceModulation, VoiceModulation } from '@lord-raven/novel-visualizer';
@@ -134,7 +134,7 @@ const createInitialActorStatMap = (actor: Actor, actorStats: Stat[]): { [key: st
 
 const normalizeActorStatModifierAmount = (stat: Stat, amount: unknown): StatValue => {
     if (isValueReference(amount) || (stat.type === 'number' && isNumericValueExpression(amount))) return amount;
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
+    if (isTextDisplayType(stat.type) || isReferenceDisplayType(stat.type) || stat.type === 'option') {
         return typeof amount === 'string' ? amount : String(resolveStatDefault(stat));
     }
     if (isListStatType(stat.type)) {
@@ -824,7 +824,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }));
             return;
         }
-        if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
+        if (isTextDisplayType(stat.type) || isReferenceDisplayType(stat.type) || stat.type === 'option') {
             setEditedStatMap((prev) => ({
                 ...prev,
                 [stat.id]: typeof value === 'string' ? value : String(value),
@@ -857,7 +857,7 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
             }));
             return;
         }
-        if (stat.type === 'text' || isReferenceDisplayType(stat.type) || stat.type === 'option') {
+        if (isTextDisplayType(stat.type) || isReferenceDisplayType(stat.type) || stat.type === 'option') {
             setEditedStatInitialMap((prev) => ({
                 ...prev,
                 [stat.id]: { ...cloneActorStatInitial(prev[stat.id], stat), value: typeof value === 'string' ? value : String(value) },
@@ -2111,7 +2111,7 @@ ${indent}}`;
                                             {actorStats.map((stat) => {
                                                 const statInitial = cloneActorStatInitial(editedStatInitialMap[stat.id], stat);
                                                 const editorValue = isCreatorMode ? statInitial.value : editedStatMap[stat.id];
-                                                const hasValueSource = stat.type === 'number' || stat.type === 'text' || isValueReference(editorValue) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
+                                                const hasValueSource = stat.type === 'number' || isTextDisplayType(stat.type) || isValueReference(editorValue) || valuePickerOptions(stage().getConfiguration(), stat.type).length > 0;
                                                 const value = Number(editorValue);
                                                 const displayValue = Number.isFinite(value)
                                                     ? value
@@ -2233,7 +2233,7 @@ ${indent}}`;
 
                                                         {isExpanded && (
                                                             <>
-                                                                {isCreatorMode && (isNumericDisplayType(stat.type) || stat.type === 'text' || isReferenceDisplayType(stat.type) || isListStatType(stat.type)) && (
+                                                                {isCreatorMode && (isNumericDisplayType(stat.type) || isTextDisplayType(stat.type) || isReferenceDisplayType(stat.type) || isListStatType(stat.type)) && (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                                     <label style={{ color: 'var(--agenda-text-primary)', fontSize: '13px', fontWeight: 700 }}>
                                                                         Default Modifiers

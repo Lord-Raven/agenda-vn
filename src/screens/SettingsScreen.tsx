@@ -561,7 +561,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                     </div>
                                                 )}
 
-                                                {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type)) && (
+                                                {(isReferenceDisplayType(stat.type) || isReferenceListDisplayType(stat.type) || isOptionListStatType(stat.type) || stat.type === 'icon') && (
                                                     <StatValueInput
                                                         stat={stat}
                                                         value={selectedValue}

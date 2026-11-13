@@ -10,6 +10,7 @@ import { GameConfiguration, Stage } from '../src/Stage';
 import { GlobalStatBar } from '../src/components/GlobalStatBar';
 import { ControlDock } from '../src/components/ControlDock';
 import { Control } from '../src/content/Control';
+import { cloneStat } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { CALENDAR_TIME_OF_DAY_ORDER } from '../src/content/CalendarEvent';
 import { Actor } from '../src/content/Actor';
@@ -493,4 +494,29 @@ test('wrapped stats reclaim the area below the upper-right actions', { skip: !pr
     } finally {
         rmSync(directory, { recursive: true, force: true });
     }
+});
+
+test('icon stat displays render the named icon and keep blank labels blank', () => {
+    const stage = createStage();
+    const configuration = stage.getConfiguration();
+    const iconStat = cloneStat({
+        id: 'mood', name: 'Mood', type: 'icon', default: '', guidance: '',
+        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+    });
+    configuration.globalStats = [iconStat, cloneStat({ ...iconStat, id: 'title', name: 'Title', type: 'text' })];
+    configuration.controls = [
+        new Control({ name: 'Mood display', placement: 'top', type: 'statDisplay', statId: 'mood' }),
+        new Control({ name: 'Title display', placement: 'top', type: 'statDisplay', statId: 'title' }),
+    ];
+    const save = { ...stage.getSave()!, globalStatValues: { mood: 'heart', title: 'Hero' } };
+    stage.getSave = () => save;
+    const html = renderToStaticMarkup(<GlobalStatBar stage={() => stage} isVerticalLayout={false} />);
+    assert.match(html, /FavoriteIcon/, 'the icon stat value renders as its named icon');
+    assert.doesNotMatch(html, /<p[^>]*>Mood<\/p>/, 'blank labels stay blank for icon stats');
+    assert.match(html, /aria-label="Mood"/, 'the group still exposes the stat name');
+    assert.match(html, /<p[^>]*>Title<\/p>/, 'other stats keep the stat-name label fallback');
+
+    save.globalStatValues.mood = '';
+    const emptyHtml = renderToStaticMarkup(<GlobalStatBar stage={() => stage} isVerticalLayout={false} />);
+    assert.doesNotMatch(emptyHtml, /FavoriteIcon|StarIcon/, 'an empty icon value shows no icon');
 });

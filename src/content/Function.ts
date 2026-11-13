@@ -63,7 +63,11 @@ export const listElementType = (type: StatType): StatType | undefined => ({
 // Any type whose value is a string[] of ids, including the mixed 'contentList'.
 export const isListValueType = (type: StatType): boolean => type === 'contentList' || !!listElementType(type);
 
-export const matchesFunctionType = (fn: GameFunction, type: StatType): boolean => fn.returnType === type;
+// Icon stats hold an icon name as plain text, so text-returning sources satisfy icon values and vice versa.
+export const matchesValueType = (sourceType: StatType | FunctionReturnType | undefined, type: StatType): boolean =>
+    sourceType === type || (sourceType === 'text' && type === 'icon') || (sourceType === 'icon' && type === 'text');
+
+export const matchesFunctionType = (fn: GameFunction, type: StatType): boolean => matchesValueType(fn.returnType, type);
 
 export const functionSignature = (fn: GameFunction): string =>
     `${fn.name}(${(fn.parameters || []).map(parameter => parameter.name).join(', ')})`;
@@ -75,7 +79,7 @@ export const functionPickerOptions = (functions: GameFunction[] | undefined, typ
 
 export const valuePickerOptions = (configuration: { functions?: GameFunction[]; globalStats?: Stat[] } | undefined, type: StatType) => [
     ...functionPickerOptions(configuration?.functions, type),
-    ...(configuration?.globalStats || []).filter(stat => stat.type === type).map(stat => ({
+    ...(configuration?.globalStats || []).filter(stat => matchesValueType(stat.type, type)).map(stat => ({
         key: globalStatReference(stat.id), label: stat.name, category: 'Global Stats', description: stat.guidance,
     })),
 ];

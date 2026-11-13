@@ -7,6 +7,7 @@ import { ItemLike } from './ItemPortrait';
 import { HEADER_VARIABLE_VALUE, valuePickerOptions, isValueReference } from '../content/Function';
 import { HeaderVariableContext } from './VariableContentContext';
 import { PickerAllowedOptionsContext, SearchableOptionPicker } from './SearchableOptionPicker';
+import { IconPicker } from './StatRating';
 import { validateValueExpression } from '../content/ValueExpression';
 
 interface StatValueInputProps {
@@ -105,6 +106,18 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
                     </label>
                 ))}
             </div>
+        );
+    }
+
+    if (stat.type === 'icon') {
+        // Icon stats pick from the shared icon pool; the picker also offers text functions and global text stats.
+        return (
+            <IconPicker
+                stage={stage}
+                allowClear
+                value={typeof value === 'string' && value ? value : undefined}
+                onChange={(iconName) => onChange(iconName || '')}
+            />
         );
     }
 

@@ -39,10 +39,14 @@ export const resolveConditionalFlag = (flag: ConditionalFlag | undefined, contex
 // 'optionList' holds a pool of options (Stat.options) whose value is the list of currently active option ids;
 // 'option' stats may pull their choices from one via Stat.optionSourceStatId.
 // 'contentList' is a mixed reference list whose ids may point at actors, items, and locations together.
-export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'boolean' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'contentList';
+// 'icon' is a text value naming a recognized icon (see StatRating's icon pool), or empty for none.
+export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'icon' | 'boolean' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'contentList';
 export type StatValue = number | string | boolean | string[];
 
 export const isNumericDisplayType = (type: StatType): boolean => type === 'number';
+
+// Stat types whose value is plain text; 'icon' holds an icon name and normalizes exactly like 'text'.
+export const isTextDisplayType = (type: StatType): boolean => type === 'text' || type === 'icon';
 
 export const isOptionListStatType = (type: StatType): boolean => type === 'optionList';
 
@@ -433,7 +437,7 @@ export const resolveStatDefault = (stat: Stat, options: StatValueOptions = {}): 
         return limitStatList(normalizeReferenceListValue(stat.default), stat);
     }
 
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
+    if (isTextDisplayType(stat.type) || isReferenceDisplayType(stat.type)) {
         return typeof stat.default === 'string' ? stat.default : '';
     }
 
@@ -483,7 +487,7 @@ export const normalizeStatValue = (value: unknown, stat: Stat, options: StatValu
         return limitStatList(Array.isArray(value) ? normalizeReferenceListValue(value) : normalizeReferenceListValue(resolveStatDefault(stat, options)), stat);
     }
 
-    if (stat.type === 'text' || isReferenceDisplayType(stat.type)) {
+    if (isTextDisplayType(stat.type) || isReferenceDisplayType(stat.type)) {
         if (typeof value === 'string') {
             return value;
         }
