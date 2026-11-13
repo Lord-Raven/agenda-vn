@@ -10,7 +10,8 @@ import { Button } from './UiComponents';
 import { ContentListControl } from './ContentListControl';
 import { isValueReference } from '../content/Function';
 import { Skit } from '../content/Skit';
-import { processLoreText } from '../content/Lore';
+import { processLoreText, stripLoreIcons } from '../content/Lore';
+import { renderLoreIcons, renderLoreTextWithIcons } from './LoreIconText';
 import { PickerAllowedOptionsContext } from './SearchableOptionPicker';
 
 interface ControlRendererProps {
@@ -91,7 +92,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                 style={{ ...sizingStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isVerticalLayout ? 4 : 6, padding: isVerticalLayout ? '4px 6px' : '8px 14px', ...(isVerticalLayout ? { fontSize: '0.8rem', minHeight: 32 } : {}), whiteSpace: 'normal', overflowWrap: 'anywhere' }}
             >
                 {Icon && <Icon fontSize="small" />}
-                {processLoreText(control.label?.trim() || control.name?.trim() || 'Button', stageInstance)}
+                {renderLoreTextWithIcons(control.label?.trim() || control.name?.trim() || 'Button', stageInstance)}
             </Button>
         );
     }
@@ -107,7 +108,9 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     const normalizedValue = control.type === 'statEditor' ? normalizeStatValue(rawValue, stat) : stageInstance.readStatValue(rawValue, stat);
     const StatIcon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;
     // Icon stats keep blank labels blank (no stat-name fallback) so a control can show the icon alone.
-    const label = processLoreText(control.label.trim() || (stat.type === 'icon' ? '' : statName), stageInstance);
+    const labelText = processLoreText(control.label.trim() || (stat.type === 'icon' ? '' : statName), stageInstance, undefined, undefined, undefined, { icons: 'token' });
+    // Plain-text fallback for tooltip/aria strings, which cannot carry inline icons.
+    const label = stripLoreIcons(labelText).trim();
     // The stat's value names the displayed icon; empty means no icon.
     const ValueIcon = stat.type === 'icon' && typeof normalizedValue === 'string' && normalizedValue.trim()
         ? resolveIcon(normalizedValue, stageInstance)
@@ -152,12 +155,12 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         >
             {isVerticalLayout ? (
                 StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)', flexShrink: 0 }} />
-            ) : (StatIcon || label) && (
+            ) : (StatIcon || labelText) && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'var(--agenda-text-muted)', lineHeight: 1.2 }}>
                     {StatIcon && <StatIcon sx={{ fontSize: '0.8rem', color: 'var(--agenda-highlight)' }} />}
-                    {label && (
+                    {labelText && (
                         <Typography sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.66rem', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>
-                            {label}
+                            {renderLoreIcons(labelText, stageInstance)}
                         </Typography>
                     )}
                 </Box>

@@ -91,6 +91,44 @@ export type LoreTextActor = { name: string; displayName?: string; statMap?: { [s
 // Reserved user/char/global tags take precedence over {{Function name}}.
 const LORE_TAG_PATTERN = /\{\{\s*(user|char|global)\s*(?::\s*([^}]*?)\s*)?\}\}|\{\{\s*([^{}]*?)\s*\}\}/gi;
 
+// Sentinel characters wrapping a resolved {{icon: ...}} name; Unicode Private Use Area codepoints that
+// cannot collide with authored text. UI render sites request { icons: 'token' } and split the output on
+// LORE_ICON_TOKEN_PATTERN to draw inline icons; every other consumer (prompts, tooltips, aria labels)
+// uses the default 'strip' mode, which omits icons from the text entirely. An optional resolved color
+// follows the name inside the token behind LORE_ICON_TOKEN_COLOR_SEPARATOR.
+export const LORE_ICON_TOKEN_START = '\uE000';
+export const LORE_ICON_TOKEN_END = '\uE001';
+export const LORE_ICON_TOKEN_COLOR_SEPARATOR = '\uE002';
+export const LORE_ICON_TOKEN_PATTERN = /\uE000([^\uE000\uE001]*)\uE001/g;
+
+export type LoreIconMode = 'token' | 'strip';
+export type LoreTextOptions = { icons?: LoreIconMode };
+
+export const stripLoreIcons = (text: string): string => text.replace(LORE_ICON_TOKEN_PATTERN, '');
+
+// Splits an icon tag's source at the first top-level comma (outside quotes and parentheses) into the
+// icon name source and its optional color source.
+const splitIconSource = (source: string): [string, string?] => {
+    let quote = '';
+    let depth = 0;
+    for (let i = 0; i < source.length; i++) {
+        const char = source[i];
+        if (quote) {
+            if (char === '\\') i++;
+            else if (char === quote) quote = '';
+        } else if (char === '"' || char === "'") {
+            quote = char;
+        } else if (char === '(') {
+            depth++;
+        } else if (char === ')') {
+            depth--;
+        } else if (char === ',' && depth === 0) {
+            return [source.slice(0, i).trim(), source.slice(i + 1).trim()];
+        }
+    }
+    return [source.trim()];
+};
+
 const findStatByKey = (stats: Stat[] | undefined, key: string): Stat | undefined => {
     const lowerKey = key.toLowerCase();
     return (stats || []).find((stat) => stat.id === key || (stat.name || '').trim().toLowerCase() === lowerKey);
@@ -121,7 +159,7 @@ const parseLoreTernary = (source: string): [string, string, string] | undefined 
             question = i;
         } else if (depth === 0 && char === ':' && question !== -1 && colon === -1) {
             const branchPrefix = source.slice(question + 1, i).trim();
-            const isPrefix = /^(content|global)$/i.test(branchPrefix)
+            const isPrefix = /^(content|global|icon)$/i.test(branchPrefix)
                 || (/^(user|char)$/i.test(branchPrefix) && !(/\s/.test(source[i - 1]) && /\s/.test(source[i + 1] || '')));
             if (!isPrefix) colon = i;
         }
@@ -152,8 +190,12 @@ const parseLoreLiteral = (source: string): StatValue | undefined => {
 // Resolves template tags in lore and control text for LLM/display use, including {{Name("text", 2, true)}}.
 // Bare names prefer functions, then global stats; calls use positional arguments and parameter defaults.
 // Unresolvable tags (unknown stat/function, no target actor, void functions) are left untouched.
+// {{icon: source}} or {{icon: source, color}} resolves each part like any tag value (falling back to the
+// raw text as a literal icon name or CSS/hex color) and, per options.icons, emits a sentinel icon token
+// for UI renderers or nothing (the default).
 // Don't use on text written back to the source.
-export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor, variables?: FunctionVariableBindings, content?: LoreTextContent): string {
+export function processLoreText(text: string | undefined, stage: Stage, targetActor?: LoreTextActor, variables?: FunctionVariableBindings, content?: LoreTextContent, options?: LoreTextOptions): string {
+    const icons: LoreIconMode = options?.icons ?? 'strip';
     const save = stage.getSave();
     const configuration = stage.getConfiguration(save);
     const player = stage.getPlayerActor();
@@ -177,6 +219,18 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
     const resolveTag = (source: string): LoreTextValue | undefined => {
         const reserved = /^(user|char|global)\s*(?::\s*(.*?)\s*)?$/i.exec(source);
         const contentTag = /^content\s*:\s*(.*?)\s*$/i.exec(source);
+        const iconTag = /^icon\s*:\s*(\S[\s\S]*)$/i.exec(source);
+        if (iconTag) {
+            const [nameSource, colorSource] = splitIconSource(iconTag[1].trim());
+            const resolved = resolveExpression(nameSource);
+            const name = String(resolved ? resolved.text : nameSource).trim();
+            if (!name || icons !== 'token') {
+                return { value: name, text: '' };
+            }
+            const resolvedColor = colorSource ? resolveExpression(colorSource) : undefined;
+            const color = colorSource ? String(resolvedColor ? resolvedColor.text : colorSource).trim() : '';
+            return { value: name, text: `${LORE_ICON_TOKEN_START}${name}${color ? LORE_ICON_TOKEN_COLOR_SEPARATOR + color : ''}${LORE_ICON_TOKEN_END}` };
+        }
         if (contentTag && content) {
             const key = contentTag[1];
             const field = content.fields[key.toLowerCase()];

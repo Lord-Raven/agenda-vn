@@ -18,7 +18,7 @@ import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location }
 import { Screen, ListSection, parseContentStatReference, listContentKind, LIST_CONTENT_TYPES } from "./content/Screen";
 import { cloneUiSettings, DEFAULT_UI_SETTINGS, UiSettings } from './content/Style';
 import { BaseScreen } from "./screens/BaseScreen";
-import { Lore, processLoreText, updateLoreEntry } from "./content/Lore";
+import { Lore, LoreTextOptions, processLoreText, updateLoreEntry } from "./content/Lore";
 import { DEFAULT_PLAYER_THEME_COLOR } from "./screens/SettingsScreen";
 import {buildPrompt} from "./utils/PromptBuilder.js";
 import {
@@ -760,7 +760,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
     }
 
-    resolveCardText(text: string, kind: ContentType, id: string, header = ''): string {
+    resolveCardText(text: string, kind: ContentType, id: string, header = '', options?: LoreTextOptions): string {
         const entity = this.getActiveContent(kind, id, this.getSave());
         if (!entity) return '';
         const actor = kind === 'actor' ? entity as Actor : undefined;
@@ -786,7 +786,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const expanded = text.replace(/\{\{\s*content:(name|description|summary|role|age|meta|header)\s*\}\}/gi, (_match, field: string) => fields[field.toLowerCase()]);
         const configuration = this.getConfiguration();
         const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
-        return processLoreText(expanded, this, actor, { [kind]: id, header }, { fields, stats: stats || [], statMap: entity.statMap });
+        return processLoreText(expanded, this, actor, { [kind]: id, header }, { fields, stats: stats || [], statMap: entity.statMap }, options);
     }
 
     // Resolves one card detail: a content stat of the card's entity, a function evaluated with

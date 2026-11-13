@@ -9,6 +9,7 @@ import { ActorPortrait } from './ActorPortrait';
 import { resolveStatValueText, StatValueDisplay } from './StatDisplay';
 import { resolveIcon, StatRating } from './StatRating';
 import { processLoreText } from '../content/Lore';
+import { renderLoreIcons } from './LoreIconText';
 
 interface OutcomeDisplayProps {
     outcomes: Outcome[];
@@ -86,7 +87,7 @@ const getNumericStatChangeSign = (stat: Stat | undefined, outcome: Outcome, stag
 };
 
 const formatStatNameWithSign = (stat: Stat, control: Control, outcome: Outcome, stage: Stage, actor?: Actor): string => {
-    const statName = processLoreText(control.label.trim() || stat.name, stage, actor);
+    const statName = processLoreText(control.label.trim() || stat.name, stage, actor, undefined, undefined, { icons: 'token' });
     const sign = getNumericStatChangeSign(stat, outcome, stage, actor);
     return sign ? `${statName} ${sign}` : statName;
 };
@@ -96,7 +97,7 @@ const renderStatNameLabel = (control: Control, label: string, stage: Stage): Rea
     return (
         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, maxWidth: '100%' }}>
             {LabelIcon && <LabelIcon sx={{ fontSize: '0.9rem', color: 'var(--agenda-highlight)' }} />}
-            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</Box>
+            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{renderLoreIcons(label, stage)}</Box>
         </Box>
     );
 };
@@ -220,7 +221,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                     bottomLine = renderStatOutcome(outcome, actor);
                 } else if (outcome.type === OutcomeType.PLAYER_STAT) {
                     const { stat, control } = statMatches.get(outcome)!;
-                    topLine = renderStatNameLabel(control, `World · ${processLoreText(control.label.trim() || stat.name, stage())}`, stage());
+                    topLine = renderStatNameLabel(control, `World · ${processLoreText(control.label.trim() || stat.name, stage(), undefined, undefined, undefined, { icons: 'token' })}`, stage());
                     bottomLine = renderStatOutcome(outcome);
                 } else if (outcome.type === OutcomeType.LORE_UPDATE) {
                     topLine = 'Lore Update';

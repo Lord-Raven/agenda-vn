@@ -7,7 +7,8 @@ import { Control } from '../content/Control';
 import { Skit } from '../content/Skit';
 import { formatStatOptionValueText, resolveReferenceKind } from '../content/Stat';
 import { getLocationImageUrl } from '../content/Location';
-import { processLoreText } from '../content/Lore';
+import { processLoreText, stripLoreIcons } from '../content/Lore';
+import { renderLoreIcons } from './LoreIconText';
 import { NamePlate } from './UiComponents';
 import { ActorPortrait } from './ActorPortrait';
 import { ItemPortrait } from './ItemPortrait';
@@ -53,8 +54,10 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
     const vertical = orientation === 'vertical';
     const unavailable = disabled || !state.available;
     const clickable = !!onClick || control.actions.length > 0;
-    const text = (value: string) => instance.resolveCardText(value, kind, id, header);
-    const label = text(control.label);
+    const text = (value: string) => instance.resolveCardText(value, kind, id, header, { icons: 'token' });
+    const labelText = text(control.label);
+    // Plain-text label for string-only sinks (NamePlate, aria) that cannot carry inline icons.
+    const label = stripLoreIcons(labelText);
     const subLabel = text(control.subLabel);
     const description = text(control.description);
     const LabelIcon = control.iconName ? resolveIcon(control.iconName, instance) : null;
@@ -110,10 +113,10 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
             )}
             <Box sx={{ flex: 1, minWidth: 0, textAlign: vertical ? 'center' : 'left' }}>
                 {LabelIcon && <LabelIcon sx={{ color: 'var(--agenda-highlight)', mr: 0.75 }} />}
-                {label && (control.useNamePlate ? <NamePlate actor={entity} label={label} />
-                    : <Typography sx={{ fontWeight: 700, fontSize: '1.2rem', overflowWrap: 'anywhere' }}>{label}</Typography>)}
-                {subLabel && <Typography sx={{ fontSize: '0.8rem', color: 'var(--agenda-text-muted)', mt: 0.5 }}>{subLabel}</Typography>}
-                {description && <Typography sx={{ fontSize: '0.85rem', textAlign: 'left', whiteSpace: 'pre-wrap', mt: 0.75 }}>{description}</Typography>}
+                {labelText && (control.useNamePlate ? <NamePlate actor={entity} label={label} />
+                    : <Typography sx={{ fontWeight: 700, fontSize: '1.2rem', overflowWrap: 'anywhere' }}>{renderLoreIcons(labelText, instance)}</Typography>)}
+                {subLabel && <Typography sx={{ fontSize: '0.8rem', color: 'var(--agenda-text-muted)', mt: 0.5 }}>{renderLoreIcons(subLabel, instance)}</Typography>}
+                {description && <Typography sx={{ fontSize: '0.85rem', textAlign: 'left', whiteSpace: 'pre-wrap', mt: 0.75 }}>{renderLoreIcons(description, instance)}</Typography>}
                 {subtitle}
             </Box>
             {(details.length > 0 || trailing) && (
@@ -154,8 +157,12 @@ export const ListCardDetail: FC<{
     kind?: ContentType; id?: string; header?: string;
 }> = ({ detail, stage, isVerticalLayout, kind, id, header }) => {
     const control = detail.control;
-    const text = (value: string) => kind && id ? stage.resolveCardText(value, kind, id, header) : processLoreText(value, stage);
-    const label = control ? text(control.label.trim()) : detail.label;
+    const text = (value: string, options?: { icons: 'token' }) => kind && id
+        ? stage.resolveCardText(value, kind, id, header, options)
+        : processLoreText(value, stage, undefined, undefined, undefined, options);
+    const labelText = control ? text(control.label.trim(), { icons: 'token' }) : detail.label;
+    // Plain-text label for tooltip/aria strings, which cannot carry inline icons.
+    const label = stripLoreIcons(labelText);
     const isReference = ['actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList'].includes(detail.type);
     if (isReference) {
         const values = (Array.isArray(detail.value) ? detail.value : [detail.value]).map(String).filter(Boolean);
@@ -186,7 +193,7 @@ export const ListCardDetail: FC<{
             maxWidth: 220, minWidth: 0,
         }}>
             {BadgeIcon && <BadgeIcon sx={{ fontSize: '0.9rem', color: control?.displayColor || 'var(--agenda-text-muted)' }} />}
-            {label && <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.7rem' }}>{label}</Typography>}
+            {labelText && <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.7rem' }}>{renderLoreIcons(labelText, stage)}</Typography>}
             {display || (detail.type === 'icon'
                 ? ValueIcon && <ValueIcon sx={{ fontSize: '0.95rem', color: control?.displayColor || 'var(--agenda-text-primary)' }} titleAccess={label || undefined} />
                 : <Typography component="span" sx={{

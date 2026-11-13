@@ -17,7 +17,7 @@ interface ListScreenViewProps {
 export const buildListContentPages = (stage: Stage, screen: Screen, onAction: (skit?: Skit | null) => void): ContentCardPage[] =>
     stage.resolveListSections(screen).map(page => ({
         key: page.key,
-        title: processLoreText(page.header, stage),
+        title: processLoreText(page.header, stage, undefined, undefined, undefined, { icons: 'token' }),
         cards: page.ids.map(id => ({
             key: id, kind: page.kind, id, header: page.header,
             control: stage.getCardControl(page.kind, page.section.cardControlId),

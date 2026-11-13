@@ -12,7 +12,7 @@ import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
 import { Screen as GameMap } from '../src/content/Screen';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
-import { createLoreEntry, formatLoreEntriesAsContext, processLoreText } from '../src/content/Lore';
+import { createLoreEntry, formatLoreEntriesAsContext, LORE_ICON_TOKEN_COLOR_SEPARATOR, LORE_ICON_TOKEN_END, LORE_ICON_TOKEN_START, processLoreText, stripLoreIcons } from '../src/content/Lore';
 import { buildPrompt } from '../src/utils/PromptBuilder';
 import { evaluateValueExpression, validateValueExpression } from '../src/content/ValueExpression';
 import { normalizeStatShape } from '../src/components/StatEntryEditor';
@@ -1328,6 +1328,35 @@ test('text macro ternaries use raw values, resolve selected branches, and preser
     assert.equal(processLoreText('{{True ? "yes"}}', stage), '{{True ? "yes"}}');
     assert.equal(processLoreText('{{True ? "yes" : "no"', stage), '{{True ? "yes" : "no"');
     assert.throws(() => processLoreText('{{True ? Broken : "no"}}', stage), /selected branch/);
+});
+
+test('icon tags resolve literals, functions, and stats, emitting tokens only on request', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.functions = [
+        typedFunction('Mood', 'text', 'return "favorite";'),
+        typedFunction('True', 'boolean', 'return true;'),
+    ];
+    configuration.globalStats.push(stat('Badge', 'text', { default: 'shield' }), stat('Blank', 'text', { default: '' }), stat('Tint', 'text', { default: '#00ff00' }));
+    save.globalStatValues!.Badge = 'bolt';
+    const token = (name: string, color?: string) => `${LORE_ICON_TOKEN_START}${name}${color ? LORE_ICON_TOKEN_COLOR_SEPARATOR + color : ''}${LORE_ICON_TOKEN_END}`;
+    const asTokens = (source: string) => processLoreText(source, stage, undefined, undefined, undefined, { icons: 'token' });
+    // Plain-text output (the default) omits icons entirely.
+    assert.equal(processLoreText('Gold {{icon: paid}} here', stage), 'Gold  here');
+    assert.equal(asTokens('Gold {{icon: paid}} here'), `Gold ${token('paid')} here`);
+    assert.equal(asTokens('{{icon: "star"}}'), token('star'));
+    assert.equal(asTokens('{{ICON: Mood}}'), token('favorite'));
+    assert.equal(asTokens('{{icon: global:Badge}}'), token('bolt'));
+    assert.equal(asTokens('{{icon: Badge}}'), token('bolt'));
+    assert.equal(asTokens('{{True ? icon: heart : icon: skull}}'), token('heart'));
+    // Optional color: a literal hex, an evaluated source, or quoted names containing commas.
+    assert.equal(asTokens('{{icon: paid, #ff0000}}'), token('paid', '#ff0000'));
+    assert.equal(asTokens('{{icon: Mood, global:Tint}}'), token('favorite', '#00ff00'));
+    assert.equal(asTokens('{{icon: "a,b", "#fff"}}'), token('a,b', '#fff'));
+    assert.equal(processLoreText('{{icon: paid, #ff0000}}', stage), '');
+    // Empty names render nothing; an empty source is not an icon tag and stays untouched.
+    assert.equal(asTokens('{{icon: global:Blank}}'), '');
+    assert.equal(asTokens('{{icon:}}'), '{{icon:}}');
+    assert.equal(stripLoreIcons(`Gold ${token('paid')} here`), 'Gold  here');
 });
 
 test('parameterized label functions propagate errors and cannot write game state', () => {

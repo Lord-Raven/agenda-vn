@@ -18,7 +18,8 @@ import { CachedBackgroundUrl } from '../components/CachedImage';
 import { resolveIcon } from '../components/StatRating';
 import { ContentListPortraits } from '../components/ContentListControl';
 import { normalizeReferenceListValue } from '../content/Stat';
-import { processLoreText } from '../content/Lore';
+import { processLoreText, stripLoreIcons } from '../content/Lore';
+import { renderLoreIcons } from '../components/LoreIconText';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -96,7 +97,7 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
         >
             {children}
             <span ref={measureRef} aria-hidden="true" style={{ position: 'absolute', width: 'max-content', visibility: 'hidden', pointerEvents: 'none', whiteSpace: 'nowrap', padding: '0 12px 0 6px', fontSize: '0.82rem', fontWeight: 700 }}>
-                {label}
+                {renderLoreIcons(label)}
                 {secondaryLabel && <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 400 }}>{secondaryLabel}</span>}
             </span>
         </motion.button>
@@ -320,7 +321,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     const linkedMapImageUrl = getMapImageUrl(linkedMap, stage());
                                     const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
-                                    const markerName = isButton ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stage()) : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
+                                    const markerName = isButton ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stage(), undefined, undefined, undefined, { icons: 'token' }) : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
+                                    // Plain-text name for aria/portrait labels, which cannot carry inline icons.
+                                    const plainMarkerName = stripLoreIcons(markerName);
                                     const ButtonIcon = isButton && link.iconName ? resolveIcon(link.iconName, stage()) : TouchApp;
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
@@ -371,7 +374,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                 return (
                                                     <MapMarkerButton
                                                         isHovered={isHovered}
-                                                        aria-label={linkedMap ? `Open map ${markerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : markerName}
+                                                        aria-label={linkedMap ? `Open map ${plainMarkerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : plainMarkerName}
                                                         disabled={!isInteractive}
                                                         onClick={handleMarkerClick}
                                                         onMouseEnter={() => setHoveredLink(markerKey)}
@@ -388,7 +391,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                             {!markerImageUrl && (isButton ? <ButtonIcon sx={{ fontSize: markerSize / 2 }} /> : <MapRounded fontSize="small" />)}
                                                         </span>
                                                             <span style={{ padding: markerPosition.expansionDirection === 'left' ? '0 6px 0 12px' : '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700, flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textAlign: markerPosition.expansionDirection === 'left' ? 'right' : 'left' }}>
-                                                                {markerName}
+                                                                {renderLoreIcons(markerName, stage())}
                                                                 {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 400 }}>{linkedLocation?.name}</span>}
                                                             </span>
                                                         </span>
@@ -417,7 +420,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                 onMouseLeave={() => setHoveredLink(null)}
                                                 style={{ position: 'absolute', ...markerPosition.style, left: `clamp(${contentWidth / 2 + 8}px, ${markerPosition.style.left}, calc(100% - ${contentWidth / 2 + 8}px))`, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, width: contentWidth, zIndex: isHovered ? 5 : 3 }}
                                             >
-                                                <ContentListPortraits kind={link.contentList.kind === 'mixed' ? undefined : link.contentList.kind} values={contentValues} stage={stage()} label={`${markerName} contents`} variant="overlay" size={actorPortraitSize} />
+                                                <ContentListPortraits kind={link.contentList.kind === 'mixed' ? undefined : link.contentList.kind} values={contentValues} stage={stage()} label={`${plainMarkerName} contents`} variant="overlay" size={actorPortraitSize} />
                                             </div>
                                         )}
                                         </Fragment>

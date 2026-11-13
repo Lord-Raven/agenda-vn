@@ -9,6 +9,8 @@ import { Skit } from '../content/Skit';
 import { useTooltip } from './TooltipContext';
 import { Button } from './UiComponents';
 import { ContentCardControl } from './ContentCardControl';
+import { stripLoreIcons } from '../content/Lore';
+import { renderLoreIcons } from './LoreIconText';
 
 export const CONTENT_CARD_LIST_EDGE_MASK = 'linear-gradient(to bottom, transparent, black 24px, black calc(100% - 24px), transparent)';
 
@@ -106,13 +108,13 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, minWidth: 0 }}>
                     {previousPage && (
                         <>
-                            <Typography sx={headerSideTextSx}>{previousPage.title}</Typography>
+                            <Typography sx={headerSideTextSx}>{renderLoreIcons(previousPage.title, stage())}</Typography>
                             <Button
                                 variant="secondary"
                                 onClick={() => setSelectedKey(previousPage.key)}
-                                onMouseEnter={() => setTooltip(`Previous: ${previousPage.title}`, ArrowBackRounded)}
+                                onMouseEnter={() => setTooltip(`Previous: ${stripLoreIcons(previousPage.title)}`, ArrowBackRounded)}
                                 onMouseLeave={clearTooltip}
-                                aria-label={`Previous: ${previousPage.title}`}
+                                aria-label={`Previous: ${stripLoreIcons(previousPage.title)}`}
                                 style={{ padding: '8px 10px', flexShrink: 0 }}
                             >
                                 <ArrowBackRounded fontSize="small" />
@@ -138,7 +140,7 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
                             whiteSpace: 'nowrap',
                         }}
                     >
-                        {currentPage ? currentPage.title : emptyTitle}
+                        {currentPage ? renderLoreIcons(currentPage.title, stage()) : emptyTitle}
                     </Typography>
                 </Box>
 
@@ -148,14 +150,14 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
                             <Button
                                 variant="secondary"
                                 onClick={() => setSelectedKey(nextPage.key)}
-                                onMouseEnter={() => setTooltip(`Next: ${nextPage.title}`, ArrowForwardRounded)}
+                                onMouseEnter={() => setTooltip(`Next: ${stripLoreIcons(nextPage.title)}`, ArrowForwardRounded)}
                                 onMouseLeave={clearTooltip}
-                                aria-label={`Next: ${nextPage.title}`}
+                                aria-label={`Next: ${stripLoreIcons(nextPage.title)}`}
                                 style={{ padding: '8px 10px', flexShrink: 0 }}
                             >
                                 <ArrowForwardRounded fontSize="small" />
                             </Button>
-                            <Typography sx={headerSideTextSx}>{nextPage.title}</Typography>
+                            <Typography sx={headerSideTextSx}>{renderLoreIcons(nextPage.title, stage())}</Typography>
                         </>
                     )}
                 </Box>

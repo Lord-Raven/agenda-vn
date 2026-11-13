@@ -11,6 +11,7 @@ import { ScreenType } from './BaseScreen';
 import { StatValueInput } from '../components/StatValueInput';
 import { isValueReference, valuePickerOptions } from '../content/Function';
 import { processLoreText } from '../content/Lore';
+import { renderLoreIcons } from '../components/LoreIconText';
 
 export const DEFAULT_PLAYER_THEME_COLOR = '#66bbee';
 
@@ -500,8 +501,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                             return null;
                                         }
                                         const statName = (stat.name || '').trim();
-                                        const controlLabel = processLoreText(resolveText(control.label.trim() || statName), settingsStage);
-                                        const controlDescription = processLoreText(resolveText(control.description), settingsStage).trim();
+                                        const controlLabel = processLoreText(resolveText(control.label.trim() || statName), settingsStage, undefined, undefined, undefined, { icons: 'token' });
+                                        const controlDescription = processLoreText(resolveText(control.description), settingsStage, undefined, undefined, undefined, { icons: 'token' }).trim();
                                         const selectedValue = normalizeGlobalStatValue(globalStatValues[stat.id], stat);
                                         const hasValueSource = isValueReference(selectedValue) || valuePickerOptions(configuration, stat.type).length > 0;
                                         const optionEntries = resolveAvailableStatOptions(stat, selectedValue, { sourceStats: globalStats, globalStatValues });
@@ -523,11 +524,11 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 }}
                                             >
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--agenda-text-primary)', fontSize: '14px', fontWeight: 700 }}>
-                                                    <span>{controlLabel}</span>
+                                                    <span>{renderLoreIcons(controlLabel, settingsStage)}</span>
                                                 </div>
                                                 {!!controlDescription && (
                                                     <div style={{ color: 'color-mix(in srgb, var(--agenda-text-muted) 80%, transparent)', fontSize: '13px' }}>
-                                                        {controlDescription}
+                                                        {renderLoreIcons(controlDescription, settingsStage)}
                                                     </div>
                                                 )}
 
