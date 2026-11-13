@@ -77,9 +77,11 @@ export const functionPickerOptions = (functions: GameFunction[] | undefined, typ
         key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description,
     }));
 
-export const valuePickerOptions = (configuration: { functions?: GameFunction[]; globalStats?: Stat[] } | undefined, type: StatType) => [
+// statFilter narrows the offered global stats (e.g. to option stats sharing a source list); functions are
+// never filtered because their results are not type checked against a source.
+export const valuePickerOptions = (configuration: { functions?: GameFunction[]; globalStats?: Stat[] } | undefined, type: StatType, statFilter?: (stat: Stat) => boolean) => [
     ...functionPickerOptions(configuration?.functions, type),
-    ...(configuration?.globalStats || []).filter(stat => matchesValueType(stat.type, type)).map(stat => ({
+    ...(configuration?.globalStats || []).filter(stat => matchesValueType(stat.type, type) && (!statFilter || statFilter(stat))).map(stat => ({
         key: globalStatReference(stat.id), label: stat.name, category: 'Global Stats', description: stat.guidance,
     })),
 ];

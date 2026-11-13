@@ -247,6 +247,32 @@ export const resolveStatOptionPool = (stat: Stat | undefined, context?: OptionLi
     return materializeOptions(stat?.options);
 };
 
+// The stat whose own options define this stat's pool: the stat itself when unsourced, or the end of its
+// optionSourceStatId chain. A dangling source id is returned as-is so stats pointing at the same missing
+// list still match each other.
+const resolveOptionPoolRootId = (stat: Stat | undefined, context?: OptionListSourceContext): string | undefined => {
+    const visited = new Set<string>();
+    while (stat && isSourcedOptionStat(stat)) {
+        if (visited.has(stat.id)) {
+            return undefined;
+        }
+        visited.add(stat.id);
+        const source = resolveOptionListSource(stat.optionSourceStatId!, context);
+        if (!source) {
+            return stat.optionSourceStatId;
+        }
+        stat = source.stat;
+    }
+    return stat?.id;
+};
+
+// Whether two option stats draw their choices from the same option pool, so one's value is meaningful
+// as a source for the other.
+export const sharesOptionPool = (stat: Stat | undefined, candidate: Stat | undefined, context?: OptionListSourceContext): boolean => {
+    const root = resolveOptionPoolRootId(stat, context);
+    return !!root && root === resolveOptionPoolRootId(candidate, context);
+};
+
 // The options currently offered for selection. For a sourced option stat, only those active in the source
 // optionList's value; `currentValue`'s option is always kept so an existing selection still renders.
 export const resolveAvailableStatOptions = (stat: Stat | undefined, currentValue?: unknown, context?: OptionListSourceContext): StatOption[] => {

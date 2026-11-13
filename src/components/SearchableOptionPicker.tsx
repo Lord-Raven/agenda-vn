@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { DoNotDisturb, SwapHoriz } from '@mui/icons-material';
 import { Box } from '@mui/material';
 import type { Stage } from '../Stage';
-import { resolveStatDefault, type StatType, type StatValue } from '../content/Stat';
+import { resolveStatDefault, type Stat, type StatType, type StatValue } from '../content/Stat';
 import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction, HEADER_VARIABLE_VALUE } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
 import { variableContentValue } from '../content/Condition';
@@ -43,6 +43,9 @@ export interface SearchableOptionPickerProps {
     buttonAriaLabel?: string;
     disabled?: boolean;
     functionType?: StatType;
+    // Narrows the global stats merged in by functionType (e.g. to option stats sharing the same source
+    // list); functions are never filtered.
+    sourceStatFilter?: (stat: Stat) => boolean;
     stage?: Stage | (() => Stage);
     // Newly chosen functions default their first matching parameter to the bound Variable / header.
     bindVariableParameters?: boolean;
@@ -67,6 +70,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     buttonAriaLabel,
     disabled = false,
     functionType,
+    sourceStatFilter,
     stage,
     bindVariableParameters = false,
     valueEditor,
@@ -85,7 +89,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         const listTypes: StatType[] = !multiple ? []
             : functionType === 'contentList' ? ['actorList', 'itemList', 'locationList', 'contentList']
                 : listType ? [listType] : [];
-        const sourceOptions = [...scalarTypes, ...listTypes].flatMap(type => valuePickerOptions(stageInstance?.getConfiguration(), type));
+        const sourceOptions = [...scalarTypes, ...listTypes].flatMap(type => valuePickerOptions(stageInstance?.getConfiguration(), type, sourceStatFilter));
         options = [...options.filter(option => !isFunctionReference(option.key) && !sourceOptions.some(source => source.key === option.key)), ...sourceOptions];
     }
     if (variableContentType && (functionType === variableContentType || functionType === 'contentList')

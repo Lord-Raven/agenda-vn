@@ -1,5 +1,5 @@
 import { CSSProperties, FC, useContext, useEffect, useRef, useState } from 'react';
-import { findStatOptionByValue, isNumericDisplayType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, statListMaxLength, OPPOSITE_BOOLEAN_VALUE, Stat, StatUpdate, StatValue, getStatOptionValue } from '../content/Stat';
+import { findStatOptionByValue, isNumericDisplayType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, sharesOptionPool, statListMaxLength, OPPOSITE_BOOLEAN_VALUE, Stat, StatUpdate, StatValue, getStatOptionValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
@@ -71,6 +71,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
             <SearchableOptionPicker value={isValueReference(value) ? value : selectedOption?.value || ''}
                 onChange={next => { if (typeof next === 'string') onChange(next); }}
                 options={options.map((option, index) => ({ key: getStatOptionValue(option, index), label: option.name, description: option.description }))}
+                sourceStatFilter={candidate => sharesOptionPool(stat, candidate, optionContext)}
                 functionType="option" stage={stage} title="Choose option" emptyLabel="Select an option..."
             />
         );
@@ -82,9 +83,12 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
             : isValueReference(value) ? [value] : [];
         const pool = resolveAvailableStatOptions(stat, value, optionContext)
             .filter(option => !allowedOptions || allowedOptions.has(option.id!) || selectedIds.includes(option.id!));
-        if (valuePickerOptions(stageInstance?.getConfiguration(), 'option').length || valuePickerOptions(stageInstance?.getConfiguration(), 'optionList').length || selectedIds.some(isValueReference)) {
+        // Only global stats sharing this stat's option pool are meaningful sources; functions are not source checked.
+        const sharedPoolFilter = (candidate: Stat) => sharesOptionPool(stat, candidate, optionContext);
+        if (valuePickerOptions(stageInstance?.getConfiguration(), 'option', sharedPoolFilter).length || valuePickerOptions(stageInstance?.getConfiguration(), 'optionList', sharedPoolFilter).length || selectedIds.some(isValueReference)) {
             return <SearchableOptionPicker multiple values={selectedIds} maxSelections={statListMaxLength(stat)} onChange={next => onChange(Array.isArray(next) ? next : [])}
                 options={pool.map(option => ({ key: option.id!, label: option.name, description: option.description }))}
+                sourceStatFilter={sharedPoolFilter}
                 functionType="option" stage={stage} title="Choose active options" />;
         }
         if (pool.length === 0) {

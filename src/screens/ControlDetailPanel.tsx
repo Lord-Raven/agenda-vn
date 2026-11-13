@@ -2,7 +2,7 @@ import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Stage } from '../Stage';
 import { ContentListDisplay, Control, ControlPlacement, ControlType, StatDisplayType } from '../content/Control';
 import { ConditionCollection, ContentType } from '../content/Condition';
-import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
+import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, sharesOptionPool, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
 import { parseContentStatReference, SCREEN_TYPE_LABELS } from '../content/Screen';
 import { functionReferenceId, isFunctionReference } from '../content/Function';
 import { Button, ColorPickerInput, GlassPanel, HelpTip, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
@@ -645,6 +645,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             <SearchableOptionPicker multiple values={draft.pickerSource}
                                                 onChange={value => setDraft(current => ({ ...current, pickerSource: Array.isArray(value) ? value : [] }))}
                                                 options={resolveStatOptionPool(selectedStat, { sourceStats: globalStats }).map(option => ({ key: option.id!, label: option.name, description: option.description }))}
+                                                sourceStatFilter={candidate => sharesOptionPool(selectedStat, candidate, { sourceStats: globalStats })}
                                                 functionType="option" stage={stage} title="Choose source options" />
                                         )}
                                     </>
