@@ -244,7 +244,8 @@ export const Title: FC<TitleProps> = ({
 
 interface NamePlateProps {
 	actor?: Pick<Actor, 'name'> & Partial<Pick<Actor, 'displayName' | 'role' | 'themeColor' | 'themeFontFamily'>>;
-	label?: string;
+	label?: React.ReactNode;
+	subtitle?: React.ReactNode;
 	includeRole?: boolean;
 	style?: React.CSSProperties;
 	className?: string;
@@ -253,6 +254,7 @@ interface NamePlateProps {
 export const NamePlate: FC<NamePlateProps> = ({
 	actor,
 	label,
+	subtitle,
 	includeRole,
 	style,
 	className = ''
@@ -263,6 +265,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 
 	const themeColor = actor.themeColor || '#8ab0cc';
 	const nameColor = lighten(themeColor, 0.5)
+	const subtitleContent = subtitle ?? (includeRole ? actor.role : undefined);
 	const { clearTooltip } = useTooltip();
 
 	return (
@@ -330,7 +333,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 				>
 					{label ?? (actor.displayName || actor.name)}
 				</span>
-				{includeRole && actor.role && (
+				{subtitleContent && (
 					<span
 						style={{
 							fontSize: '0.72em',
@@ -340,7 +343,7 @@ export const NamePlate: FC<NamePlateProps> = ({
 							letterSpacing: '0.04em',
 						}}
 					>
-						{actor.role}
+						{subtitleContent}
 					</span>
 				)}
 			</div>

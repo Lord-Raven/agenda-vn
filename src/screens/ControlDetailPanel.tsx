@@ -466,6 +466,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         </div>
                                         <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                             Labels, sub-labels, descriptions, and badge text support Stat/Function macros.
+                                            {' With Use NamePlate enabled, the label and sub-label appear inside the NamePlate and support {{icon:star}} macros. The primary label keeps the content\'s theme color and font; an empty label uses its display name or name.'}
                                             {' Use {{content:name}}, {{content:description}}, {{content:header}}, and for Actors {{content:role}}, {{content:age}}, {{content:meta}}, {{content:summary}} or {{char:Stat Name}}.'}
                                             {' Use {{content:Stat Name}} for Card content stats and {{content:Enabled ? content:Label : "fallback"}} for conditional text. Conditions use truthiness (false, zero, and empty text are false).'}
                                             {' Function arguments can bind "variable:actor", "variable:item", "variable:location", or "variable:header". Cards are horizontal in Lists and vertical in hovers.'}

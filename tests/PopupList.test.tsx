@@ -26,6 +26,7 @@ import { CardActionContext, ContentCardControl } from '../src/components/Content
 import { OutcomeEditor } from '../src/components/OutcomeEditor';
 import { GameManagementPanel } from '../src/screens/GameManagementPanel';
 import { ActorCard } from '../src/components/ActorCard';
+import { NamePlate } from '../src/components/UiComponents';
 
 const stat = (id: string, type: StatType, defaultValue: StatValue, extra: Partial<Stat> = {}): Stat => cloneStat({
     id, name: id, type, guidance: '', default: defaultValue,
@@ -163,6 +164,64 @@ test('one selected Card Control supplies context-bound text and badges in horizo
     const portable = buildPortableGameConfiguration(configuration);
     assert.equal(portable.defaultActorCardId, card.id);
     assert.deepEqual(portable.controls[0].cardDetails, card.cardDetails);
+});
+
+test('Card NamePlates render label and subtitle macros inside the plate with actor styling', () => {
+    const { stage, save } = fixture();
+    save.actors.alice.themeFontFamily = 'Courier New';
+    save.actors.alice.role = 'Original role';
+    const card = new Control({
+        type: 'card', useNamePlate: true, showPortrait: false,
+        label: 'Captain {{content:name}} {{icon:star}}',
+        subLabel: 'Deputy {{content:header}} {{icon:favorite}}',
+    });
+    const html = renderToStaticMarkup(<TooltipProvider><ContentCardControl stage={() => stage}
+        control={card} kind="actor" id="alice" header="Crew" /></TooltipProvider>);
+    const primary = html.match(/<span style="font-family:[^]*?<\/span>/)?.[0] ?? '';
+    const subtitle = html.match(/<span style="font-size:0\.72em[^]*?<\/span>/)?.[0] ?? '';
+    assert.match(primary, /font-family:Courier New/);
+    assert.match(primary, /color:rgb\(255, 127, 127\)/);
+    assert.match(primary, /Captain Alice/);
+    assert.match(primary, /data-testid="StarIcon"/);
+    assert.match(subtitle, /Deputy Crew/);
+    assert.match(subtitle, /data-testid="FavoriteBorderIcon"/);
+    assert.equal(html.split('Deputy Crew').length - 1, 1);
+    assert.doesNotMatch(html, /Original role|\{\{icon:/);
+});
+
+test('Card NamePlates support sublabel-only overrides and keep evaluated empty labels empty', () => {
+    const { stage, save } = fixture();
+    save.actors.alice.displayName = 'Display Alice';
+    const card = new Control({
+        type: 'card', useNamePlate: true, showPortrait: false, subLabel: 'Custom subtitle',
+    });
+    const render = () => renderToStaticMarkup(<TooltipProvider><ContentCardControl stage={() => stage}
+        control={card} kind="actor" id="alice" /></TooltipProvider>);
+    assert.match(render(), />Display Alice<\/span><span[^>]*>Custom subtitle<\/span>/);
+
+    card.label = '{{false ? "Unused" : ""}}';
+    assert.doesNotMatch(render(), /Display Alice|Unused/);
+    assert.match(render(), /Custom subtitle/);
+
+    card.useNamePlate = false;
+    card.label = 'Plain {{icon:star}}';
+    const plain = render();
+    assert.match(plain, /Plain [^]*data-testid="StarIcon"/);
+    assert.match(plain, /<p[^>]*>Custom subtitle<\/p>/);
+    assert.doesNotMatch(plain, /font-size:0\.72em/);
+});
+
+test('NamePlate subtitle overrides preserve the default name and optional role behavior', () => {
+    const { save } = fixture();
+    save.actors.alice.role = 'Original role';
+    const render = (subtitle?: string, includeRole = true) => renderToStaticMarkup(
+        <TooltipProvider><NamePlate actor={save.actors.alice} subtitle={subtitle} includeRole={includeRole} /></TooltipProvider>,
+    );
+    assert.match(render(), />Alice<\/span><span[^>]*>Original role<\/span>/);
+    assert.doesNotMatch(render(undefined, false), /Original role/);
+    assert.match(render('Custom subtitle'), />Alice<\/span><span[^>]*>Custom subtitle<\/span>/);
+    assert.doesNotMatch(render('Custom subtitle'), /Original role/);
+    assert.doesNotMatch(render(''), /Original role/);
 });
 
 for (const [kind, id] of [['actor', 'bob'], ['item', 'sword'], ['location', 'park']] as const) {

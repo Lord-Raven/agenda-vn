@@ -56,8 +56,6 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
     const clickable = !!onClick || control.actions.length > 0;
     const text = (value: string) => instance.resolveCardText(value, kind, id, header, { icons: 'token' });
     const labelText = text(control.label);
-    // Plain-text label for string-only sinks (NamePlate, aria) that cannot carry inline icons.
-    const label = stripLoreIcons(labelText);
     const subLabel = text(control.subLabel);
     const description = text(control.description);
     const LabelIcon = control.iconName ? resolveIcon(control.iconName, instance) : null;
@@ -113,9 +111,11 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
             )}
             <Box sx={{ flex: 1, minWidth: 0, textAlign: vertical ? 'center' : 'left' }}>
                 {LabelIcon && <LabelIcon sx={{ color: 'var(--agenda-highlight)', mr: 0.75 }} />}
-                {labelText && (control.useNamePlate ? <NamePlate actor={entity} label={label} />
-                    : <Typography sx={{ fontWeight: 700, fontSize: '1.2rem', overflowWrap: 'anywhere' }}>{renderLoreIcons(labelText, instance)}</Typography>)}
-                {subLabel && <Typography sx={{ fontSize: '0.8rem', color: 'var(--agenda-text-muted)', mt: 0.5 }}>{renderLoreIcons(subLabel, instance)}</Typography>}
+                {control.useNamePlate ? <NamePlate actor={entity}
+                    label={control.label ? renderLoreIcons(labelText, instance) : undefined}
+                    subtitle={control.subLabel ? renderLoreIcons(subLabel, instance) : undefined} />
+                    : labelText && <Typography sx={{ fontWeight: 700, fontSize: '1.2rem', overflowWrap: 'anywhere' }}>{renderLoreIcons(labelText, instance)}</Typography>}
+                {!control.useNamePlate && subLabel && <Typography sx={{ fontSize: '0.8rem', color: 'var(--agenda-text-muted)', mt: 0.5 }}>{renderLoreIcons(subLabel, instance)}</Typography>}
                 {description && <Typography sx={{ fontSize: '0.85rem', textAlign: 'left', whiteSpace: 'pre-wrap', mt: 0.75 }}>{renderLoreIcons(description, instance)}</Typography>}
                 {subtitle}
             </Box>
