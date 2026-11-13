@@ -5,7 +5,7 @@ import { ConditionContext, ContentType, createSeededRandom, evaluateConditionCol
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
-import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
+import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, OPPOSITE_BOOLEAN_VALUE, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
 import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, validateFunctionResult, HEADER_VARIABLE_VALUE, isStatReturnType } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
@@ -2444,6 +2444,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     private applyResolvedStatUpdate(current: StatValue | undefined, update: StatUpdate, stat: Stat, save: SaveType, variables?: FunctionVariableBindings): StatValue {
+        if (stat.type === 'boolean' && update.value === OPPOSITE_BOOLEAN_VALUE) {
+            // Flip the resolved current value; stored values and defaults can themselves be references.
+            return this.readStatValue(current, stat, save, [], variables) !== true;
+        }
         if (update.operation === 'set' || (stat.type !== 'number' && stat.type !== 'optionList')) {
             return this.readStatValue(applyStatUpdateValue(current, {
                 ...update, value: this.resolveValue(update.value, stat.type, save, [], variables),

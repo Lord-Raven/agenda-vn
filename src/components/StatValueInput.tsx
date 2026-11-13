@@ -1,5 +1,5 @@
 import { CSSProperties, FC, useContext, useEffect, useRef, useState } from 'react';
-import { findStatOptionByValue, isNumericDisplayType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, statListMaxLength, Stat, StatUpdate, StatValue, getStatOptionValue } from '../content/Stat';
+import { findStatOptionByValue, isNumericDisplayType, isOptionListStatType, isReferenceListDisplayType, normalizeStatValue, OptionListSourceContext, resolveAvailableStatOptions, resolveReferenceKind, resolveStatOptionPool, statListMaxLength, OPPOSITE_BOOLEAN_VALUE, Stat, StatUpdate, StatValue, getStatOptionValue } from '../content/Stat';
 import { Stage } from '../Stage';
 import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './UiComponents';
 import { LocationLike } from './LocationPortrait';
@@ -21,11 +21,13 @@ interface StatValueInputProps {
     allowExpression?: boolean;
     // Numeric condition values are edited inside their source picker.
     formulaPicker?: boolean;
+    // Stat update values may set a boolean stat to the opposite of its current value.
+    allowOpposite?: boolean;
     // The owning entity's statMap etc., so a sourced option stat only offers that entity's active options.
     optionContext?: OptionListSourceContext;
 }
 
-export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, formulaPicker = false, optionContext }) => {
+export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, formulaPicker = false, allowOpposite = false, optionContext }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const allowedOptions = useContext(PickerAllowedOptionsContext);
     if (!stat) {
@@ -40,13 +42,18 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
         };
     }
     if (stat.type === 'boolean') {
-        if (valuePickerOptions(stageInstance?.getConfiguration(), stat.type).length || isValueReference(value)) {
+        const showOpposite = allowOpposite || value === OPPOSITE_BOOLEAN_VALUE;
+        if (showOpposite || valuePickerOptions(stageInstance?.getConfiguration(), stat.type).length || isValueReference(value)) {
             return <SearchableOptionPicker
                 value={String(value)}
                 onChange={next => {
                     if (typeof next === 'string') onChange(next === 'true' ? true : next === 'false' ? false : next);
                 }}
-                options={[{ key: 'true', label: 'True' }, { key: 'false', label: 'False' }]}
+                options={[
+                    { key: 'true', label: 'True' },
+                    { key: 'false', label: 'False' },
+                    ...(showOpposite ? [{ key: OPPOSITE_BOOLEAN_VALUE, label: 'Opposite', description: "The opposite of the stat's current value when the update runs." }] : []),
+                ]}
                 functionType="boolean" stage={stage} title="Choose value"
             />;
         }

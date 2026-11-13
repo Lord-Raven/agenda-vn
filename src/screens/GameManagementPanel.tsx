@@ -377,13 +377,6 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                 <Title variant="glow" style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Game Settings</Title>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
 
-                    <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Default Actor Card</label>
-                        <SearchableOptionPicker stage={stage} title="Choose default Actor Card"
-                            value={defaultActorCardId} options={cardControlOptions(stageInstance, 'actor')}
-                            onChange={value => { if (typeof value === 'string') setDefaultActorCardId(value); }} />
-                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Used when hovering over Actors. Customize this Card Control in Controls.</span>
-                    </div>
                     <div>
                         <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Game Title</label>
                         <TextInput
@@ -584,6 +577,14 @@ export const GameManagementPanel: FC<GameManagementPanelProps> = ({ stage }) => 
                                 Uses a soft gradient from the current theme until you set an image.
                             </div>
                         )}
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', color: 'var(--agenda-text-muted)', marginBottom: 6 }}>Default Actor Card</label>
+                        <SearchableOptionPicker stage={stage} title="Choose default Actor Card"
+                            value={defaultActorCardId} options={cardControlOptions(stageInstance, 'actor')}
+                            onChange={value => { if (typeof value === 'string') setDefaultActorCardId(value); }} />
+                        <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Used when hovering over Actors. Customize this Card Control in Controls.</span>
                     </div>
                 </div>
             </GlassPanel>

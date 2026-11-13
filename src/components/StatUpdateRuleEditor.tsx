@@ -1,7 +1,7 @@
 import { FC, useState } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
-import { Stat, StatUpdateRule, StatUpdateAction, formatStatOptionValueText, isNumericDisplayType, isOptionListStatType } from '../content/Stat';
+import { OPPOSITE_BOOLEAN_VALUE, Stat, StatUpdateRule, StatUpdateAction, formatStatOptionValueText, isNumericDisplayType, isOptionListStatType } from '../content/Stat';
 import { GameFunction } from '../content/Function';
 import { Condition } from '../content/Condition';
 import { formatTimeSlot } from '../content/CalendarEvent';
@@ -72,7 +72,8 @@ const describeUpdate = (update: StatUpdateAction, stat: Stat | GameFunction | un
         return `${stat.name} ${verb} ${formatStatOptionValueText(stat, update.value)}`;
     }
     const verb = update.operation === 'set' || !isNumericDisplayType(stat.type) ? 'set to' : 'adjust by';
-    return `${stat.name} ${verb} ${update.value}`;
+    const value = stat.type === 'boolean' && update.value === OPPOSITE_BOOLEAN_VALUE ? 'Opposite' : update.value;
+    return `${stat.name} ${verb} ${value}`;
 };
 
 export const StatUpdateRuleEditor: FC<StatUpdateRuleEditorProps> = ({ rules, onChange, ...context }) => {

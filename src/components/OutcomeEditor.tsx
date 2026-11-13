@@ -182,7 +182,7 @@ export const OutcomeEditor: FC<OutcomeEditorProps> = ({ actions, onChange, skitT
                                 </select>
                                 <StatUpdateOperationSelect stat={stat} style={selectStyle} operation={action.operation} onChange={operation => updateAction(action.id, { operation })} />
                                 <StatValueInput stat={stat} value={action.value} onChange={value => updateAction(action.id, { value })}
-                                    actors={targetActors} items={items} locations={locations} stage={stage} allowExpression />
+                                    actors={targetActors} items={items} locations={locations} stage={stage} allowExpression allowOpposite />
                             </div>
                         )}
                     </div>

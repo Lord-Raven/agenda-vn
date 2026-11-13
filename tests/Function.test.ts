@@ -4,7 +4,7 @@ import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } fr
 import { Actor, buildActorContext, getActorLore, resolveActorSchedule, resolveInitialActorStatValue } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
 import { getLocationDescription, Location } from '../src/content/Location';
-import { applyStatUpdateValue, buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, resolveAvailableStatOptions, resolveStatDefault, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
+import { applyStatUpdateValue, buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, OPPOSITE_BOOLEAN_VALUE, resolveAvailableStatOptions, resolveStatDefault, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateContext, generateSkitScript, Skit } from '../src/content/Skit';
 import { cloneGameFunction, functionPickerOptions, functionReference, functionReferenceArguments, functionReferenceId, functionSignature, globalStatReference, parseFunctionCallText, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { evaluateCondition, variableContentValue } from '../src/content/Condition';
@@ -219,6 +219,24 @@ test('option list updates limit final values without truncating remove operands'
     assert.deepEqual(applyStatUpdateValue([], update, list), ['a']);
     assert.deepEqual(applyStatUpdateValue(['a'], { ...update, operation: 'adjust', value: ['b', 'c'] }, list), ['a']);
     assert.deepEqual(applyStatUpdateValue(['b'], { ...update, operation: 'remove' }, list), []);
+});
+
+test('boolean updates set to Opposite flip the resolved current value', () => {
+    const flag = stat('Flag', 'boolean', { default: false });
+    const update = { id: 'update', targetType: 'global' as const, targetId: 'any', statId: flag.id, operation: 'set' as const, value: OPPOSITE_BOOLEAN_VALUE };
+    assert.equal(applyStatUpdateValue(true, update, flag), false);
+    assert.equal(applyStatUpdateValue(false, update, flag), true);
+    assert.equal(applyStatUpdateValue(undefined, update, { ...flag, default: true }), false);
+
+    const { stage, save, configuration } = fixture();
+    configuration.globalStats.push(flag, stat('Source', 'boolean', { default: true }));
+    // Stored values may themselves be references; Opposite flips the resolved value.
+    save.globalStatValues!.Flag = globalStatReference('Source');
+    stage.saveGame = () => {};
+    stage.runButtonActions([update]);
+    assert.equal(save.globalStatValues!.Flag, false);
+    stage.runButtonActions([update]);
+    assert.equal(save.globalStatValues!.Flag, true);
 });
 
 test('stage enforces list limits after expanding references and on global and entity writes', () => {

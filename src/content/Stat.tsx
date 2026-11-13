@@ -612,6 +612,10 @@ export type StatUpdate = {
     value: StatValue;
 };
 
+// Sentinel update value for boolean stats: sets the target to the opposite of its current value at
+// evaluation time. Callers must resolve the current value before applying the update.
+export const OPPOSITE_BOOLEAN_VALUE = 'opposite';
+
 export type GameAction = StatUpdate | FunctionInvocation;
 
 export type SkitStatReference = {
@@ -713,6 +717,9 @@ export const cloneStatUpdateRules = (rules: unknown): StatUpdateRule[] => (Array
 // update's value as a dice/relative expression, so 'adjust' adds the rolled amount while 'set' replaces with
 // it; value references must be resolved by the caller before applying the update.
 export const applyStatUpdateValue = (currentValue: StatValue | undefined, update: StatUpdate, stat: Stat): StatValue => {
+    if (stat.type === 'boolean' && update.value === OPPOSITE_BOOLEAN_VALUE) {
+        return normalizeStatValue(currentValue, stat) !== true;
+    }
     if (update.operation === 'set' && isValueReference(update.value)) {
         return update.value;
     }
