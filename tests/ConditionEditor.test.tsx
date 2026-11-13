@@ -38,7 +38,6 @@ test('numeric conditions edit their current values in a picker across condition 
         });
         visit(tree);
         assert.ok(input);
-        assert.equal(input.props.formulaPicker, true);
         assert.equal(input.props.value, condition.value);
         input.props.onChange('5 + {{"globalStat:score"}}');
         assert.deepEqual(updated, { ...condition, value: '5 + {{"globalStat:score"}}' });

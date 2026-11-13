@@ -515,7 +515,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             return <StatValueInput stat={{
                 id: condition.field, name: condition.field, type: 'number', default: 1, guidance: '',
                 llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
-            }} value={condition.value} onChange={value => { if (!Array.isArray(value)) updateValue(value); }} stage={stage} formulaPicker />;
+            }} value={condition.value} onChange={value => { if (!Array.isArray(value)) updateValue(value); }} stage={stage} />;
         }
         if (condition.type === 'contentIdentity') {
             const concreteOptions = concreteTargetOptionsFor(condition.contentType);
@@ -561,7 +561,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             return <StatValueInput stat={{ ...stat, type: listElementType(stat.type) || stat.type }} value={condition.value}
                 onChange={value => {
                     if (!Array.isArray(value)) updateValue(value);
-                }} stage={stage} allowExpression formulaPicker />;
+                }} stage={stage} allowExpression />;
         }
         const referenceKind = stat ? resolveReferenceKind(stat.type) : undefined;
         if (referenceKind && referenceKind === variableContentType) {

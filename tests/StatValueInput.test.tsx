@@ -14,7 +14,7 @@ const score = cloneStat({
     llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
 });
 
-test('condition formula picker combines value editing and source insertion without closing', () => {
+test('numeric formula picker combines value editing and source insertion without closing', () => {
     const stage: Stage = Object.create(Stage.prototype);
     stage.getConfiguration = () => ({
         globalStats: [score],
@@ -32,7 +32,7 @@ test('condition formula picker combines value editing and source insertion witho
     const changes: StatValue[] = [];
     const onChange = (next: StatValue) => { value = next; changes.push(next); };
     try {
-        act(() => { renderer = create(<StatValueInput stat={score} value={value} onChange={onChange} stage={stage} formulaPicker />); });
+        act(() => { renderer = create(<StatValueInput stat={score} value={value} onChange={onChange} stage={stage} />); });
         const root = renderer!.root;
         const button = (label: string) => root.findAllByType('button').find(node =>
             node.props['aria-label'] === label || node.children.includes(label)
@@ -74,7 +74,7 @@ test('condition formula picker combines value editing and source insertion witho
     }
 });
 
-test('numeric formula fields offer typed sources and remain editable after selection', () => {
+test('numeric formula fields render as a picker button only, offering typed sources', () => {
     const stage: Stage = Object.create(Stage.prototype);
     const configuration = {
         globalStats: [score, cloneStat({ ...score, id: 'text', type: 'text' })],
@@ -88,28 +88,15 @@ test('numeric formula fields offer typed sources and remain editable after selec
     assert.deepEqual(valuePickerOptions(configuration, 'number').map(option => option.key),
         [functionReference('bonus'), globalStatReference('score')]);
 
-    let value: StatValue = 0;
-    const onChange = (next: StatValue) => { value = next; };
     let renderer: ReturnType<typeof create>;
-    act(() => { renderer = create(<StatValueInput stat={score} value={value} onChange={onChange} stage={stage} />); });
+    act(() => { renderer = create(<StatValueInput stat={score} value={'{{Score}} * 2'} onChange={() => {}} stage={stage} />); });
     try {
-        const picker = () => renderer.root.findByType(SearchableOptionPicker);
-        assert.equal(picker().props.functionType, 'number');
-        for (const reference of [globalStatReference('score'), functionReference('bonus', { amount: 2 })]) {
-            act(() => picker().props.onChange(reference));
-            assert.equal(value, reference);
-            assert.equal(renderer.root.findByType('input').props.value, reference);
-            act(() => renderer.update(<StatValueInput stat={score} value={value} onChange={onChange} stage={stage} />));
-            assert.equal(picker().props.value, reference);
-        }
-        act(() => renderer.root.findByType('input').props.onChange({ target: { value: '{{Score}} * 2' } }));
-        act(() => renderer.root.findByType('input').props.onBlur());
-        assert.equal(value, '{{Score}} * 2');
-        act(() => renderer.update(<StatValueInput stat={score} value={value} onChange={onChange} stage={stage} />));
-        assert.equal(picker().props.value, undefined);
-        act(() => renderer.root.findByType('input').props.onChange({ target: { value: '12' } }));
-        act(() => renderer.root.findByType('input').props.onBlur());
-        assert.equal(value, 12);
+        const picker = renderer.root.findByType(SearchableOptionPicker);
+        assert.equal(picker.props.functionType, 'number');
+        // Closed state is a single button showing the current formula; no inline blank.
+        assert.equal(renderer.root.findAllByType('input').length, 0);
+        const button = renderer.root.findAllByType('button').find(node => node.props['aria-label'] === 'Edit formula value')!;
+        assert.ok(button.findAllByType('span').some(span => span.children.includes('{{Score}} * 2')));
     } finally {
         act(() => renderer.unmount());
     }
