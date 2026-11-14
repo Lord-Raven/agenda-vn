@@ -91,6 +91,10 @@ export type LoreTextActor = { name: string; displayName?: string; statMap?: { [s
 // Reserved user/char/global tags take precedence over {{Function name}}.
 const LORE_TAG_PATTERN = /\{\{\s*(user|char|global)\s*(?::\s*([^}]*?)\s*)?\}\}|\{\{\s*([^{}]*?)\s*\}\}/gi;
 
+// How many times tags emitted by resolved function text (e.g. a function returning {{icon: star}})
+// are re-resolved before being left as-is; bounds mutually recursive functions.
+const MAX_LORE_TAG_DEPTH = 4;
+
 // Sentinel characters wrapping a resolved {{icon: ...}} name; Unicode Private Use Area codepoints that
 // cannot collide with authored text. UI render sites request { icons: 'token' } and split the output on
 // LORE_ICON_TOKEN_PATTERN to draw inline icons; every other consumer (prompts, tooltips, aria labels)
@@ -189,6 +193,8 @@ const parseLoreLiteral = (source: string): StatValue | undefined => {
 
 // Resolves template tags in lore and control text for LLM/display use, including {{Name("text", 2, true)}}.
 // Bare names prefer functions, then global stats; calls use positional arguments and parameter defaults.
+// Tags in text returned by function calls (e.g. a function returning "{{icon: star, #gold}}") are
+// resolved recursively, up to MAX_LORE_TAG_DEPTH.
 // Unresolvable tags (unknown stat/function, no target actor, void functions) are left untouched.
 // {{icon: source}} or {{icon: source, color}} resolves each part like any tag value (falling back to the
 // raw text as a literal icon name or CSS/hex color) and, per options.icons, emits a sentinel icon token
@@ -216,18 +222,22 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
         return { value, text: formatStatOptionValueText(stat, value) ?? formatValue(stat.type, value) };
     };
 
-    const resolveTag = (source: string): LoreTextValue | undefined => {
+    // Re-resolves tags that a function's returned text may contain, until the depth limit is reached.
+    const resolveNestedTags = (resolvedText: string, depth: number): string =>
+        depth >= MAX_LORE_TAG_DEPTH ? resolvedText : resolveTagsInText(resolvedText, depth + 1);
+
+    const resolveTag = (source: string, depth: number): LoreTextValue | undefined => {
         const reserved = /^(user|char|global)\s*(?::\s*(.*?)\s*)?$/i.exec(source);
         const contentTag = /^content\s*:\s*(.*?)\s*$/i.exec(source);
         const iconTag = /^icon\s*:\s*(\S[\s\S]*)$/i.exec(source);
         if (iconTag) {
             const [nameSource, colorSource] = splitIconSource(iconTag[1].trim());
-            const resolved = resolveExpression(nameSource);
+            const resolved = resolveExpression(nameSource, depth);
             const name = String(resolved ? resolved.text : nameSource).trim();
             if (!name || icons !== 'token') {
                 return { value: name, text: '' };
             }
-            const resolvedColor = colorSource ? resolveExpression(colorSource) : undefined;
+            const resolvedColor = colorSource ? resolveExpression(colorSource, depth) : undefined;
             const color = colorSource ? String(resolvedColor ? resolvedColor.text : colorSource).trim() : '';
             return { value: name, text: `${LORE_ICON_TOKEN_START}${name}${color ? LORE_ICON_TOKEN_COLOR_SEPARATOR + color : ''}${LORE_ICON_TOKEN_END}` };
         }
@@ -246,13 +256,14 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
                 const reference = functionReference(fn.id, positionalFunctionArguments(fn, call?.args));
                 if (fn.returnType === 'textList') {
                     const value = stage.resolveTextList(reference, save, variables);
-                    return { value, text: value.join(', ') };
+                    return { value, text: resolveNestedTags(value.join(', '), depth) };
                 }
                 if (!isStatReturnType(fn.returnType)) {
                     return undefined;
                 }
                 const value = stage.resolveValue(reference, fn.returnType, save, [], variables);
-                return { value, text: formatValue(fn.returnType, value) };
+                const valueText = formatValue(fn.returnType, value);
+                return { value, text: fn.returnType === 'text' ? resolveNestedTags(valueText, depth) : valueText };
             }
             if (call) {
                 return undefined;
@@ -281,21 +292,23 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
         return actor && stat ? resolveStat(stat, actor.statMap?.[stat.id]) : undefined;
     };
 
-    const resolveExpression = (source: string): LoreTextValue | undefined => {
+    const resolveExpression = (source: string, depth: number): LoreTextValue | undefined => {
         const literal = parseLoreLiteral(source);
-        return literal === undefined ? resolveTag(source) : { value: literal, text: String(literal) };
+        return literal === undefined ? resolveTag(source, depth) : { value: literal, text: String(literal) };
     };
 
-    return String(text || '').replace(LORE_TAG_PATTERN, (match) => {
+    const resolveTagsInText = (input: string, depth: number): string => input.replace(LORE_TAG_PATTERN, (match) => {
         const source = match.slice(2, -2).trim();
         const ternary = parseLoreTernary(source);
         if (ternary) {
-            const condition = resolveExpression(ternary[0]);
+            const condition = resolveExpression(ternary[0], depth);
             if (!condition) return match;
-            return resolveExpression(condition.value ? ternary[1] : ternary[2])?.text ?? match;
+            return resolveExpression(condition.value ? ternary[1] : ternary[2], depth)?.text ?? match;
         }
-        return resolveTag(source)?.text ?? match;
+        return resolveTag(source, depth)?.text ?? match;
     });
+
+    return resolveTagsInText(String(text || ''), 0);
 }
 
 export const formatLoreEntriesAsContext = (entries: Lore[], stage: Stage): string => {

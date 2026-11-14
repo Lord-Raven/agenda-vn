@@ -1407,6 +1407,9 @@ test('icon tags resolve literals, functions, and stats, emitting tokens only on 
     configuration.functions = [
         typedFunction('Mood', 'text', 'return "favorite";'),
         typedFunction('True', 'boolean', 'return true;'),
+        typedFunction('Nameplate', 'text', 'return "{{icon: star, #gold}} Star";'),
+        typedFunction('Icons', 'textList', 'return ["{{icon: a}}", "plain"];'),
+        typedFunction('Loop', 'text', 'return "x{{Loop}}";'),
     ];
     configuration.globalStats.push(stat('Badge', 'text', { default: 'shield' }), stat('Blank', 'text', { default: '' }), stat('Tint', 'text', { default: '#00ff00' }));
     save.globalStatValues!.Badge = 'bolt';
@@ -1429,6 +1432,12 @@ test('icon tags resolve literals, functions, and stats, emitting tokens only on 
     assert.equal(asTokens('{{icon: global:Blank}}'), '');
     assert.equal(asTokens('{{icon:}}'), '{{icon:}}');
     assert.equal(stripLoreIcons(`Gold ${token('paid')} here`), 'Gold  here');
+    // Tags inside text returned by a function call are themselves resolved.
+    assert.equal(asTokens('{{Nameplate}}'), `${token('star', '#gold')} Star`);
+    assert.equal(processLoreText('{{Nameplate}}', stage), ' Star');
+    assert.equal(asTokens('{{Icons}}'), `${token('a')}, plain`);
+    // Recursive function text is bounded; the unresolved tag survives past the depth limit.
+    assert.equal(asTokens('{{Loop}}'), 'xxxxx{{Loop}}');
 });
 
 test('parameterized label functions propagate errors and cannot write game state', () => {
