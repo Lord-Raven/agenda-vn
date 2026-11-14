@@ -2379,14 +2379,32 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             }
             return seededRandom();
         };
+        const entityLookup = (name: string, all: () => FunctionScriptEntity[]) => {
+            function lookup(): FunctionScriptEntity[];
+            function lookup(id: string): FunctionScriptEntity | undefined;
+            function lookup(ids: string[]): FunctionScriptEntity[];
+            function lookup(ids?: unknown): FunctionScriptEntity | FunctionScriptEntity[] | undefined {
+                if (arguments.length === 0) return all();
+                if (typeof ids === 'string') return all().find(entity => entity.id === ids);
+                if (!Array.isArray(ids) || !ids.every(id => typeof id === 'string')) {
+                    throw new Error(`${name}() requires a string ID or an array of string IDs.`);
+                }
+                const byId = new Map(all().map(entity => [entity.id, entity]));
+                return ids.flatMap(id => {
+                    const entity = byId.get(id);
+                    return entity ? [entity] : [];
+                });
+            }
+            return lookup;
+        };
         return {
             ...this.buildGlobalScriptAccessors(save, context),
             getActor: (name: string) => this.findActorScriptEntity(save, name, context),
             getLocation: (name: string) => this.findLocationScriptEntity(save, name, context),
             getItem: (name: string) => this.findItemScriptEntity(save, name, context),
-            actors: () => this.buildActorScriptEntities(save, context),
-            locations: () => this.buildLocationScriptEntities(save, context),
-            items: () => this.buildItemScriptEntities(save, context),
+            actors: entityLookup('actors', () => this.buildActorScriptEntities(save, context)),
+            locations: entityLookup('locations', () => this.buildLocationScriptEntities(save, context)),
+            items: entityLookup('items', () => this.buildItemScriptEntities(save, context)),
             call,
             arg,
             random,

@@ -246,6 +246,12 @@ export type FunctionScriptEntity = {
 
 export type FunctionScriptObject = FunctionScriptEntity | StatOption;
 
+export type FunctionScriptEntityLookup = {
+    (): FunctionScriptEntity[];
+    (id: string): FunctionScriptEntity | undefined;
+    (ids: string[]): FunctionScriptEntity[];
+};
+
 export type FunctionScriptBindings = {
     get: (statName: string) => StatValue | undefined;
     getObjects: (statName: string) => FunctionScriptObject[];
@@ -253,9 +259,9 @@ export type FunctionScriptBindings = {
     getActor: (name: string) => FunctionScriptEntity | undefined;
     getLocation: (name: string) => FunctionScriptEntity | undefined;
     getItem: (name: string) => FunctionScriptEntity | undefined;
-    actors: () => FunctionScriptEntity[];
-    locations: () => FunctionScriptEntity[];
-    items: () => FunctionScriptEntity[];
+    actors: FunctionScriptEntityLookup;
+    locations: FunctionScriptEntityLookup;
+    items: FunctionScriptEntityLookup;
     call: (name: string, args?: Record<string, unknown>) => unknown;
     // Reads one of the current invocation's arguments by parameter name, falling back to the parameter default.
     arg: (name: string) => StatValue | undefined;

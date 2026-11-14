@@ -174,7 +174,12 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         You can also loop every active entity with <strong>actors()</strong>, <strong>locations()</strong>,
-                        and <strong>items()</strong>. For simple metadata, use <strong>getField(name)</strong> and
+                        and <strong>items()</strong>. Pass a content ID to one of these to get its accessor, or an
+                        array of IDs to get an array of accessors in the same order, including duplicates. A missing
+                        or inactive single ID returns <strong>undefined</strong>; missing or inactive IDs in arrays
+                        are omitted. Other argument types raise a script error.
+                        For example, <strong>actors(arg('Passenger'))</strong> resolves an Actor parameter.
+                        For simple metadata, use <strong>getField(name)</strong> and
                         <strong>setField(name, value)</strong> on actors/locations/items (for example: name, role,
                         description, category, imageUrl, themeColor).
                     </Typography>

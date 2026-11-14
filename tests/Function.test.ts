@@ -685,6 +685,62 @@ test('global functions resolve each entity kind through named and nested accesso
     ]);
 });
 
+test('entity enumeration helpers resolve scalar and array IDs while preserving their return shapes', () => {
+    const { stage, save } = fixture();
+    save.inventory.push(new Item({ id: 'inactive-item', name: 'Inactive', active: false }));
+    save.atlas['inactive-place'] = new Location({ id: 'inactive-place', name: 'Inactive', active: false });
+    const result = stage.testFunction(gameFunction(`
+        return [
+            actors().map(a => a.id), items().map(i => i.id), locations().map(l => l.id),
+            actors('b').getField('role'), items('item').getField('description'),
+            locations('place').name,
+            actors(['b']).map(a => a.id), items(['item']).map(i => i.id),
+            locations(['place']).map(l => l.id),
+            actors(['b', 'deleted', 'missing', 'a', 'b']).map(a => a.id),
+            items(['inactive-item', 'place', 'item']).map(i => i.id),
+            locations(['inactive-place', 'item', 'place']).map(l => l.id),
+            actors([]), actors('deleted'), items('missing'), locations('inactive-place')
+        ];
+    `));
+    assert.deepEqual(result, { value: [
+        ['a', 'b'], ['item'], ['place'],
+        'Friend', 'Sharp', 'Town',
+        ['b'], ['item'], ['place'],
+        ['b', 'a', 'b'], ['item'], ['place'],
+        [], undefined, undefined, undefined,
+    ], errors: [] });
+});
+
+test('ID lookups resolve nested function parameters and retain runtime write protections', () => {
+    const { stage, save, configuration } = fixture();
+    const nested: GameFunction = {
+        id: 'passenger', name: 'Add Passenger', description: '', returnType: 'void',
+        parameters: [parameter('New Passenger', 'actor', '')],
+        script: "actors(arg('New Passenger')).set('Score', 7);",
+    };
+    const outer = gameFunction("call('Add Passenger', { 'New Passenger': actors('b') });");
+    configuration.functions = [nested, outer];
+    assert.deepEqual(stage.testFunction(outer), { value: undefined, errors: [] });
+    assert.equal(save.actors.b.statMap.Score, 2);
+    stage.saveGame = () => {};
+    stage.runControlActions(new Control({ actions: [{ id: 'invoke', kind: 'function', functionId: outer.id }] }));
+    assert.equal(save.actors.b.statMap.Score, 7);
+    for (const expression of ['actors("b")', 'items(["item"])[0]', 'locations("place")']) {
+        const result = stage.testFunction(typedFunction('reader', 'number', `${expression}.set('Score', 9); return 1;`));
+        assert.match(result.errors[0], /read-only/);
+    }
+});
+
+test('ID lookups report invalid arguments rather than treating them as enumeration', () => {
+    const { stage } = fixture();
+    for (const helper of ['actors', 'items', 'locations']) {
+        for (const input of ['undefined', 'null', '42', "['a', 1]"]) {
+            const result = stage.testFunction(gameFunction(`return ${helper}(${input});`));
+            assert.match(result.errors[0], /requires a string ID or an array of string IDs/);
+        }
+    }
+});
+
 test('resolved content writes use normalization and tests do not mutate the real save', () => {
     const { stage, save } = fixture();
     const result = stage.testFunction(gameFunction(`

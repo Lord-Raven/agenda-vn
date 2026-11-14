@@ -17,6 +17,10 @@ Only these game helpers are injected; there is no stage, save, player, or curren
   Missing/inactive content is omitted; unknown or non-list stats raise an error.
 - getActor(name), getLocation(name), getItem(name): find an entity by name, or undefined.
 - actors(), locations(), items(): arrays of all active entity accessors.
+  Pass a string ID to get one accessor, or an array of IDs to get accessors in input order,
+  including duplicates. Invalid argument types raise a script error.
+  Missing/inactive single IDs return undefined; missing/inactive array entries are omitted.
+  For example, actors(arg('Passenger')) resolves an Actor parameter.
   Accessors expose id, name, kind, get(statName), set(statName, value), getObjects(statName),
   getField(fieldName), setField(fieldName, stringValue). There is no direct stat property access.
   getField/setField access metadata such as name, role, description, category, imageUrl, themeColor;
