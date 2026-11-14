@@ -27,7 +27,8 @@ Only these game helpers are injected; there is no stage, save, player, or curren
   unavailable, or the location is missing/inactive. Use getActor('Alice')?.getLocation()?.id ?? ''
   for a location ID; actors().filter(a => a.getLocation()?.id === 'location-id') finds actors there.
 - call(name, { 'Parameter name': value }): invoke another Function with named arguments.
-  Omitted arguments use defaults. Do not call Functions as bare JavaScript identifiers.
+  Omitted arguments use defaults. Entity accessors (or arrays of them) passed as argument
+  values stand in for their IDs. Do not call Functions as bare JavaScript identifiers.
   Duplicate names are ambiguous. Avoid recursive or cyclic calls.
 - random(): seeded number in [0, 1). The sequence depends on function ID, resolved arguments,
   current game date and time period. Same inputs replay the sequence; nested Functions have

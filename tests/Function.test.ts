@@ -899,6 +899,22 @@ test('scripts pass named arguments through call and report unknown parameters', 
     assert.match(stage.testFunction(gameFunction("arg('Nope');")).errors[0], /Unknown function parameter/);
 });
 
+test('entity accessors passed as call arguments stand in for their ids', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions = [{
+        id: 'passenger', name: 'Add Passenger', description: '', returnType: 'text',
+        script: "return JSON.stringify([arg('New Passenger'), arg('Group')]);",
+        parameters: [parameter('New Passenger', 'actor', ''), parameter('Group', 'actorList', [])],
+    }];
+    const outer = gameFunction(
+        "const chosen = actors().find(a => a.id === 'b');" +
+        "return call('Add Passenger', { 'New Passenger': chosen, Group: [chosen, 'a'] });",
+    );
+    const result = stage.testFunction({ ...outer, returnType: 'text' });
+    assert.deepEqual(result.errors, []);
+    assert.deepEqual(JSON.parse(result.value as string), ['b', ['b', 'a']]);
+});
+
 test('function actions preserve stored arguments through cloning and apply them when run', () => {
     const { stage, save, configuration } = fixture();
     configuration.functions = [{

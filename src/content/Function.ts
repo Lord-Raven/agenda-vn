@@ -125,6 +125,21 @@ export const findFunctionParameter = (fn: GameFunction, name: string): Stat | un
     return (fn.parameters || []).find(parameter => parameter.name.trim().toLowerCase() === normalizedName);
 };
 
+// Script entity accessors (from actors()/getActor()/getObjects() etc.) passed as arguments stand in for
+// their entity; reference stats store id strings, so unwrap them (and array entries) to ids.
+export const isFunctionScriptEntity = (value: unknown): value is FunctionScriptEntity =>
+    !!value && typeof value === 'object'
+    && typeof (value as FunctionScriptEntity).id === 'string'
+    && typeof (value as FunctionScriptEntity).get === 'function'
+    && typeof (value as FunctionScriptEntity).set === 'function';
+
+const unwrapScriptEntityArgument = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+        return value.map(entry => (isFunctionScriptEntity(entry) ? entry.id : entry));
+    }
+    return isFunctionScriptEntity(value) ? value.id : value;
+};
+
 // Converts script-facing by-name arguments into the stored by-id shape; unknown names are an error.
 export const namedFunctionArguments = (fn: GameFunction, args: Record<string, unknown> | undefined): Record<string, StatValue> | undefined => {
     if (!args || typeof args !== 'object' || Array.isArray(args)) {
@@ -136,7 +151,7 @@ export const namedFunctionArguments = (fn: GameFunction, args: Record<string, un
         if (!parameter) {
             throw new Error(`Function "${fn.name}" has no parameter named ${name}.`);
         }
-        byId[parameter.id] = value as StatValue;
+        byId[parameter.id] = unwrapScriptEntityArgument(value) as StatValue;
     }
     return byId;
 };

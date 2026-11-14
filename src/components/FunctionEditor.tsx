@@ -148,7 +148,8 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                         default through the normal stat pipeline, so defaults may reference functions or global
                         stats. Pass arguments to other functions with
                         <strong> call('Name', {'{'} 'Parameter name': value {'}'})</strong>; value pickers prompt
-                        for arguments when a parameterful function is chosen.
+                        for arguments when a parameterful function is chosen. Entity accessors (or arrays of
+                        them) passed as argument values stand in for their IDs.
                         Use <strong>get(name)</strong> / <strong>set(name, value)</strong> to read or update global stats.
                         Use <strong>getActor(name)</strong>, <strong>getLocation(name)</strong>, and
                         <strong>getItem(name)</strong> to resolve another entity by name.
