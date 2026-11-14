@@ -247,6 +247,17 @@ for (const [kind, id] of [['actor', 'bob'], ['item', 'sword'], ['location', 'par
     });
 }
 
+test('Card labels pass content fields and content stats as function macro arguments', () => {
+    const { stage } = fixture();
+    assert.equal(stage.resolveCardText('{{content:id}}', 'actor', 'bob'), 'bob');
+    assert.equal(stage.resolveCardText('{{Label(content:id, content:Team)}}', 'actor', 'bob'), 'blue:bob');
+    assert.equal(stage.resolveCardText('{{Label(content:id, content:header)}}', 'actor', 'bob', 'Group'), 'Group:bob');
+    assert.equal(stage.resolveCardText('{{Label(content:id, "fixed")}}', 'actor', 'bob'), 'fixed:bob');
+    // An unresolvable argument leaves the whole tag untouched.
+    assert.equal(stage.resolveCardText('{{Label(content:id, content:Missing)}}', 'actor', 'bob'),
+        '{{Label(content:id, content:Missing)}}');
+});
+
 test('Card Control labels render conditional content text', () => {
     const { stage, configuration, save } = fixture();
     configuration.actorStats.push(stat('Enabled', 'boolean', false));

@@ -6,7 +6,7 @@ import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
 import { Stat, StatType, StatValue, formatReferenceStatText, formatStatOptionValueText, isReferenceStatType } from './Stat';
-import { FunctionVariableBindings, functionReference, isStatReturnType, parseFunctionCallText, positionalFunctionArguments } from './Function';
+import { FunctionVariableBindings, functionReference, isFunctionCallTagArgument, isStatReturnType, parseFunctionCallText, positionalFunctionArguments } from './Function';
 
 // Dynamic entry names loaded from configuration lorebook triggers
 const TYPE_MAPPING: Record<LoreType, string[]> = {
@@ -193,6 +193,8 @@ const parseLoreLiteral = (source: string): StatValue | undefined => {
 
 // Resolves template tags in lore and control text for LLM/display use, including {{Name("text", 2, true)}}.
 // Bare names prefer functions, then global stats; calls use positional arguments and parameter defaults.
+// Call arguments may also be tags (e.g. {{Name(content:id)}} or {{Name(char:Stat Name)}}), resolved like
+// any tag expression before the call.
 // Tags in text returned by function calls (e.g. a function returning "{{icon: star, #gold}}") are
 // resolved recursively, up to MAX_LORE_TAG_DEPTH.
 // Unresolvable tags (unknown stat/function, no target actor, void functions) are left untouched.
@@ -249,11 +251,25 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
             if (stat) return resolveStat(stat, content.statMap?.[stat.id]);
         }
         if (!reserved) {
-            const call = parseFunctionCallText(source);
+            const call = parseFunctionCallText(source, { tagArguments: true });
             const name = (call?.name || source).trim().toLowerCase();
             const fn = (configuration.functions || []).find(candidate => candidate.name.trim().toLowerCase() === name);
             if (fn) {
-                const reference = functionReference(fn.id, positionalFunctionArguments(fn, call?.args));
+                // Tag arguments (e.g. content:id or char:Stat Name) resolve like any tag; an unresolvable
+                // argument leaves the whole tag untouched.
+                const args: unknown[] = [];
+                for (const argument of call?.args || []) {
+                    if (!isFunctionCallTagArgument(argument)) {
+                        args.push(argument);
+                        continue;
+                    }
+                    const resolved = resolveExpression(argument.tag, depth);
+                    if (!resolved) {
+                        return undefined;
+                    }
+                    args.push(resolved.value);
+                }
+                const reference = functionReference(fn.id, positionalFunctionArguments(fn, call ? args : undefined));
                 if (fn.returnType === 'textList') {
                     const value = stage.resolveTextList(reference, save, variables);
                     return { value, text: resolveNestedTags(value.join(', '), depth) };

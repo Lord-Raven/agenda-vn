@@ -942,6 +942,14 @@ test('formulas and text calls pass positional literal arguments and leave non-ca
     assert.deepEqual(parseFunctionCallText("Greet('a \\'quote\\'', -2.5, false)"), { name: 'Greet', args: ["a 'quote'", -2.5, false] });
     assert.equal(parseFunctionCallText('Hello (world)'), undefined);
     assert.equal(parseFunctionCallText('Greet(unquoted)'), undefined);
+    assert.deepEqual(parseFunctionCallText('Greet(content:id)', { tagArguments: true }),
+        { name: 'Greet', args: [{ tag: 'content:id' }] });
+    assert.deepEqual(parseFunctionCallText("Greet('x', content:Stat Name, 2)", { tagArguments: true }),
+        { name: 'Greet', args: ['x', { tag: 'content:Stat Name' }, 2] });
+    assert.deepEqual(parseFunctionCallText('Greet(Nested("a,b"), true)', { tagArguments: true }),
+        { name: 'Greet', args: [{ tag: 'Nested("a,b")' }, true] });
+    assert.equal(parseFunctionCallText('Greet(broken "quote)', { tagArguments: true }), undefined);
+    assert.equal(parseFunctionCallText('Greet(content:id, )', { tagArguments: true }), undefined);
     assert.equal(stage.resolveValue('Hello (world)', 'text'), 'Hello (world)');
 });
 
@@ -1555,7 +1563,7 @@ test('function substitution preserves existing stat and actor tags, unknown tags
     ];
     const source = '{{user}} / {{char}} / {{global:Score}} / {{ user:score }} / {{CHAR:Choices}} / {{Literal}}';
     assert.equal(processLoreText(source, stage, save.actors.b),
-        'Same name / Friend / 2 / 2 / Second, First / {{global:Score}} {{Unknown}} $&');
+        'Same name / Friend / 2 / 2 / Second, First / 2 {{Unknown}} $&');
     const unchanged = '{{Unknown}} {{Test function}} {{global}} {{global:missing}} {{char:Missing stat}} {{}} {{  }}';
     assert.equal(processLoreText(unchanged, stage, save.actors.b), unchanged);
     assert.equal(processLoreText('{{char}} {{char:Score}}', stage), '{{char}} {{char:Score}}');

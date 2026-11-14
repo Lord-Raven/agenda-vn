@@ -775,6 +775,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             if (Number.isFinite(years) && years >= 0) age = String(years);
         }
         const fields: Record<string, string> = {
+            id: entity.id,
             name: actor?.displayName || entity.name,
             description: entity.description || '',
             summary: actor?.summary || '',
@@ -783,7 +784,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             meta: [actor?.role, age ? `Age ${age}` : ''].filter(Boolean).join(' • '),
             header,
         };
-        const expanded = text.replace(/\{\{\s*content:(name|description|summary|role|age|meta|header)\s*\}\}/gi, (_match, field: string) => fields[field.toLowerCase()]);
+        const expanded = text.replace(/\{\{\s*content:(id|name|description|summary|role|age|meta|header)\s*\}\}/gi, (_match, field: string) => fields[field.toLowerCase()]);
         const configuration = this.getConfiguration();
         const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
         return processLoreText(expanded, this, actor, { [kind]: id, header }, { fields, stats: stats || [], statMap: entity.statMap }, options);

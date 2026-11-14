@@ -172,16 +172,26 @@ export const positionalFunctionArguments = (fn: GameFunction, args: unknown[] | 
     return byId;
 };
 
+// A non-literal argument captured verbatim for the caller to resolve like a {{tag}} expression (content
+// fields/stats, user/char/global stats, or nested calls); only produced when options.tagArguments is set.
+export type FunctionCallTagArgument = { tag: string };
+export const isFunctionCallTagArgument = (value: unknown): value is FunctionCallTagArgument =>
+    !!value && typeof value === 'object' && typeof (value as FunctionCallTagArgument).tag === 'string';
+
+export type FunctionCallArgument = string | number | boolean | FunctionCallTagArgument;
+
 // Parses text that is exactly one "Name('a', 2, true)"-style call with literal arguments (quoted strings,
 // numbers, booleans); returns undefined for anything else so callers fall back to literal text.
-export const parseFunctionCallText = (text: string): { name: string; args: (string | number | boolean)[] } | undefined => {
+// With options.tagArguments, an unquoted non-literal argument (e.g. content:id) is captured up to the next
+// top-level comma as a FunctionCallTagArgument for the caller to resolve.
+export const parseFunctionCallText = (text: string, options?: { tagArguments?: boolean }): { name: string; args: FunctionCallArgument[] } | undefined => {
     const match = /^\s*([a-z_][a-z0-9_ ]*)\(([\s\S]*)\)\s*$/i.exec(text);
     if (!match) {
         return undefined;
     }
     const name = match[1].trim();
     const inner = match[2];
-    const args: (string | number | boolean)[] = [];
+    const args: FunctionCallArgument[] = [];
     let position = 0;
     const skipSpace = () => { while (/\s/.test(inner[position] || '')) position++; };
     skipSpace();
@@ -201,12 +211,40 @@ export const parseFunctionCallText = (text: string): { name: string; args: (stri
             args.push(value);
         } else {
             const rest = inner.slice(position);
-            const literal = /^(true|false|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)/i.exec(rest);
-            if (!literal) {
+            // A literal must end the argument; anything else is a tag argument when those are allowed.
+            const literal = /^(true|false|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(?=\s*(?:,|$))/i.exec(rest);
+            if (literal) {
+                position += literal[0].length;
+                args.push(/^true$/i.test(literal[0]) ? true : /^false$/i.test(literal[0]) ? false : Number(literal[0]));
+            } else if (options?.tagArguments) {
+                // Capture up to the next top-level comma, respecting quotes and nested parentheses.
+                const start = position;
+                let quote = '';
+                let parens = 0;
+                while (position < inner.length) {
+                    const current = inner[position];
+                    if (quote) {
+                        if (current === '\\') position++;
+                        else if (current === quote) quote = '';
+                    } else if (current === '"' || current === "'") {
+                        quote = current;
+                    } else if (current === '(') {
+                        parens++;
+                    } else if (current === ')') {
+                        if (--parens < 0) return undefined;
+                    } else if (current === ',' && parens === 0) {
+                        break;
+                    }
+                    position++;
+                }
+                const tag = inner.slice(start, position).trim();
+                if (quote || parens || !tag) {
+                    return undefined;
+                }
+                args.push({ tag });
+            } else {
                 return undefined;
             }
-            position += literal[0].length;
-            args.push(/^true$/i.test(literal[0]) ? true : /^false$/i.test(literal[0]) ? false : Number(literal[0]));
         }
         skipSpace();
         if (position >= inner.length) {
