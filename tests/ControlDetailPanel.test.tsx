@@ -20,6 +20,7 @@ import { LocationPortrait } from '../src/components/LocationPortrait';
 import { Actor } from '../src/content/Actor';
 import { getThumbnailUrl } from '../src/utils/ImageCache';
 import { ReferenceMultiSelect } from '../src/components/UiComponents';
+import { createDefaultStatUpdate } from '../src/components/OutcomeEditor';
 
 const createStage = (control: Control) => {
     const configuration: GameConfiguration = {
@@ -464,3 +465,14 @@ for (const type of ['button', 'statDisplay', 'statEditor', 'card', 'statOutcome'
         assert.doesNotMatch(html, /aria-label="Selected icon: star"/);
     });
 }
+
+test('new actions default to a global stat update, falling back to actor stats', () => {
+    const globalStats = [sourceStat('score', 'number')];
+    const actorStats = [sourceStat('mood', 'number')];
+    const update = createDefaultStatUpdate(globalStats, actorStats);
+    assert.equal(update.targetType, 'global');
+    assert.equal(update.statId, 'score');
+    const actorOnly = createDefaultStatUpdate([], actorStats);
+    assert.equal(actorOnly.targetType, 'actor');
+    assert.equal(actorOnly.statId, 'mood');
+});

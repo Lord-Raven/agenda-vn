@@ -33,8 +33,8 @@ interface OutcomeEditorProps extends OutcomeEditorContext {
 
 export const createDefaultStatUpdate = (globalStats: Stat[], actorStats: Stat[] = []): StatUpdate => ({
     id: generateUuid(), kind: 'stat',
-    targetType: actorStats.length ? 'actor' : 'global', targetId: 'any',
-    statId: (actorStats[0] || globalStats[0])?.id || '', operation: 'adjust', value: 0,
+    targetType: globalStats.length || !actorStats.length ? 'global' : 'actor', targetId: 'any',
+    statId: (globalStats[0] || actorStats[0])?.id || '', operation: 'adjust', value: 0,
 });
 
 const selectStyle = {
