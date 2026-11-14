@@ -287,6 +287,23 @@ test('text global stats provide icon sources and controls reevaluate their curre
     assert.throws(() => resolveIcon(reference, stage), /Unknown global stat reference/);
 });
 
+test('button labels are optional: an icon alone renders an icon-only button with an accessible name', () => {
+    const render = (control: Control) => {
+        const stage = createStage(control);
+        return renderToStaticMarkup(<ControlRenderer control={control} stage={() => stage} onActivate={() => {}} />);
+    };
+    const iconOnly = render(new Control({ type: 'button', name: 'Open Map', iconName: 'favorite' }));
+    assert.match(iconOnly, /data-testid="FavoriteBorderIcon"/);
+    assert.match(iconOnly, /aria-label="Open Map"/);
+    assert.doesNotMatch(iconOnly, />Open Map</);
+    assert.doesNotMatch(iconOnly, />Button</);
+    const labeled = render(new Control({ type: 'button', name: 'Open Map', iconName: 'favorite', label: 'Map' }));
+    assert.match(labeled, />Map</);
+    assert.doesNotMatch(labeled, /aria-label/);
+    assert.match(render(new Control({ type: 'button', name: 'Open Map' })), />Open Map</);
+    assert.match(render(new Control({ type: 'button' })), />Button</);
+});
+
 for (const placement of ['top', 'bottom'] as const) {
     for (const type of ['button', 'statDisplay', 'statEditor'] as const) {
         test(`${placement} ${type} uses proportional flex sizing for default, larger and smaller weights`, () => {

@@ -169,10 +169,9 @@ export const theme = createTheme({
         root: {
           backgroundImage: 'none',
           backgroundColor: colors.background.paper,
-          border: '2px solid',
-          borderImageSlice: 1,
-          borderImageSource: 'linear-gradient(135deg, var(--agenda-accent-primary), var(--agenda-highlight))',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          // A plain border keeps corner rounding visible; border-image gradients ignore border-radius.
+          border: '1px solid var(--agenda-panel-border)',
+          boxShadow: 'var(--agenda-shadow)',
         },
       },
     },

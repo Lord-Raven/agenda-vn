@@ -466,8 +466,10 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                 <div>
                                     <div style={fieldHeadingStyle}>
-                                        <label>Label</label>
-                                        <HelpTip title="Control label">{labelHelpText}</HelpTip>
+                                        <label>{isCard ? 'Label' : 'Label (optional)'}</label>
+                                        <HelpTip title="Control label">
+                                            {isCard ? '' : 'Leave empty with a Label Icon for an icon-only button; without an icon, the control name is shown instead. '}{labelHelpText}
+                                        </HelpTip>
                                     </div>
                                     <TextInput
                                         fullWidth

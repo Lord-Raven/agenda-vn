@@ -73,9 +73,12 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
 
     if (control.type === 'button') {
         const Icon = control.iconName ? resolveIcon(control.iconName, stageInstance) : null;
+        // A blank label with an icon renders an icon-only button; without an icon it falls back to the name.
+        const buttonLabel = control.label?.trim() || (Icon ? '' : control.name?.trim() || 'Button');
         return (
             <Button
                 variant="secondary"
+                aria-label={buttonLabel ? undefined : control.name?.trim() || 'Button'}
                 title={processLoreText(control.description, stageInstance).trim() || undefined}
                 onClick={() => {
                     let skit: Skit | null;
@@ -92,7 +95,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
                 style={{ ...sizingStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isVerticalLayout ? 4 : 6, padding: isVerticalLayout ? '4px 6px' : '8px 14px', ...(isVerticalLayout ? { fontSize: '0.8rem', minHeight: 32 } : {}), whiteSpace: 'normal', overflowWrap: 'anywhere' }}
             >
                 {Icon && <Icon fontSize="small" />}
-                {renderLoreTextWithIcons(control.label?.trim() || control.name?.trim() || 'Button', stageInstance)}
+                {buttonLabel && renderLoreTextWithIcons(buttonLabel, stageInstance)}
             </Button>
         );
     }
