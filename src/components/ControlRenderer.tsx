@@ -78,6 +78,7 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
         return (
             <Button
                 variant="secondary"
+                hoverScale={1.01}
                 aria-label={buttonLabel ? undefined : control.name?.trim() || 'Button'}
                 title={processLoreText(control.description, stageInstance).trim() || undefined}
                 onClick={() => {

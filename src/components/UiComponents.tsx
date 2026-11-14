@@ -122,6 +122,8 @@ interface ButtonProps {
 	onMouseEnter?: () => void;
 	onMouseLeave?: () => void;
 	'aria-label'?: string;
+	// Overrides the hover grow factor; useful where the default is too pronounced (e.g., wide control-bar buttons).
+	hoverScale?: number;
 }
 
 export const Button: FC<ButtonProps> = ({ 
@@ -135,6 +137,7 @@ export const Button: FC<ButtonProps> = ({
 	onMouseEnter,
 	onMouseLeave,
 	'aria-label': ariaLabel,
+	hoverScale,
 }) => {
 	const buttonClass = `btn-${variant}`;
 	
@@ -147,7 +150,7 @@ export const Button: FC<ButtonProps> = ({
 			onMouseEnter={onMouseEnter}
 			onMouseLeave={onMouseLeave}
 			aria-label={ariaLabel}
-			whileHover={!disabled ? { scale: variant === 'menu' ? 1 : 1.03 } : {}}
+			whileHover={!disabled ? { scale: hoverScale ?? (variant === 'menu' ? 1 : 1.03) } : {}}
 			whileTap={!disabled ? { scale: 0.98 } : {}}
 			style={{
 				height: 'fit-content',

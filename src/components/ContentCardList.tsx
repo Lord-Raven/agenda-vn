@@ -12,7 +12,7 @@ import { ContentCardControl } from './ContentCardControl';
 import { stripLoreIcons } from '../content/Lore';
 import { renderLoreIcons } from './LoreIconText';
 
-export const CONTENT_CARD_LIST_EDGE_MASK = 'linear-gradient(to bottom, transparent, black 24px, black calc(100% - 24px), transparent)';
+export const CONTENT_CARD_LIST_EDGE_MASK = 'linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent)';
 
 export type ContentCard = {
     key: string;
@@ -102,8 +102,8 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
                     gridTemplateColumns: 'minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)',
                     alignItems: 'center',
                     gap: 1,
-                    mt: 1,
-                    mb: 1.5,
+                    mt: 0,
+                    mb: 0.25,
                     width: '100%',
                     flexShrink: 0,
                 }}
@@ -192,7 +192,7 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
                             overflowX: 'hidden',
                             overflowY: 'auto',
                             // Keep resting cards outside the fades and leave room for the hover shift.
-                            py: '24px',
+                            py: '16px',
                             pr: '14px',
                             ...(layout === 'grid' ? {
                                 display: 'grid',
