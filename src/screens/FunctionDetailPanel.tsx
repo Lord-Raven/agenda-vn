@@ -1,7 +1,6 @@
-import { FC } from 'react';
+import { CSSProperties, FC } from 'react';
 import { v4 as generateUuid } from 'uuid';
 import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
-import { IconButton } from '@mui/material';
 import { GameFunction, FUNCTION_RETURN_TYPES, FunctionReturnType, isStatReturnType } from '../content/Function';
 import { cloneStat, isListStatType, isSourcedOptionStat, Stat, StatType } from '../content/Stat';
 import { Button, GlassPanel, TextArea, TextInput, Title } from '../components/UiComponents';
@@ -29,6 +28,8 @@ export const FUNCTION_RETURN_TYPE_LABELS: Record<FunctionReturnType, string> = {
     locationList: 'Location List',
     contentList: 'Content List (mixed)',
 };
+
+const iconButtonStyle: CSSProperties = { minWidth: 34, padding: 6, flexShrink: 0 };
 
 interface FunctionDetailPanelProps {
     fn: GameFunction;
@@ -77,9 +78,9 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
         <GlassPanel style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '20px' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
                 <Title variant="glow" style={{ flex: 1, fontSize: '24px', margin: 0 }}>Function: {fn.name || '(Unnamed Function)'}</Title>
-                <IconButton size="small" aria-label="Move function up" disabled={index <= 0} onClick={() => onMove(-1)} sx={{ color: 'var(--agenda-text-primary)' }}><ArrowUpward fontSize="small" /></IconButton>
-                <IconButton size="small" aria-label="Move function down" disabled={index < 0 || index === functions.length - 1} onClick={() => onMove(1)} sx={{ color: 'var(--agenda-text-primary)' }}><ArrowDownward fontSize="small" /></IconButton>
-                <IconButton size="small" aria-label="Delete function" onClick={onDelete} sx={{ color: 'var(--agenda-text-primary)' }}><Delete fontSize="small" /></IconButton>
+                <Button variant="secondary" aria-label="Move function up" disabled={index <= 0} onClick={() => onMove(-1)} style={iconButtonStyle}><ArrowUpward fontSize="small" /></Button>
+                <Button variant="secondary" aria-label="Move function down" disabled={index < 0 || index === functions.length - 1} onClick={() => onMove(1)} style={iconButtonStyle}><ArrowDownward fontSize="small" /></Button>
+                <Button variant="danger" aria-label="Delete function" onClick={onDelete} style={iconButtonStyle}><Delete fontSize="small" /></Button>
             </div>
             <div style={{ display: 'grid', gap: 15 }}>
                 <label style={{ color: 'var(--agenda-text-muted)' }}>
@@ -108,9 +109,9 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                                     onChange={event => patchParameter(parameter.id, { type: event.target.value as StatType })}>
                                     {parameterTypes.map(type => <option key={type} value={type}>{FUNCTION_RETURN_TYPE_LABELS[type]}</option>)}
                                 </select>
-                                <IconButton size="small" aria-label="Move parameter up" disabled={parameterIndex === 0} onClick={() => moveParameter(parameter.id, -1)} sx={{ color: 'var(--agenda-text-primary)' }}><ArrowUpward fontSize="small" /></IconButton>
-                                <IconButton size="small" aria-label="Move parameter down" disabled={parameterIndex === parameters.length - 1} onClick={() => moveParameter(parameter.id, 1)} sx={{ color: 'var(--agenda-text-primary)' }}><ArrowDownward fontSize="small" /></IconButton>
-                                <IconButton size="small" aria-label="Delete parameter" onClick={() => onChange({ parameters: parameters.filter(candidate => candidate.id !== parameter.id) })} sx={{ color: 'var(--agenda-text-primary)' }}><Delete fontSize="small" /></IconButton>
+                                <Button variant="secondary" aria-label="Move parameter up" disabled={parameterIndex === 0} onClick={() => moveParameter(parameter.id, -1)} style={iconButtonStyle}><ArrowUpward fontSize="small" /></Button>
+                                <Button variant="secondary" aria-label="Move parameter down" disabled={parameterIndex === parameters.length - 1} onClick={() => moveParameter(parameter.id, 1)} style={iconButtonStyle}><ArrowDownward fontSize="small" /></Button>
+                                <Button variant="danger" aria-label="Delete parameter" onClick={() => onChange({ parameters: parameters.filter(candidate => candidate.id !== parameter.id) })} style={iconButtonStyle}><Delete fontSize="small" /></Button>
                             </div>
                             <label style={{ display: 'grid', gap: 4, color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                 Guidance (shown when entering arguments)
@@ -143,7 +144,7 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                                                 onChange={event => patchParameter(parameter.id, { options: (parameter.options || []).map(candidate => candidate === option ? { ...candidate, name: event.target.value } : candidate) })} />
                                             <TextInput aria-label="Option description" placeholder="Description" value={option.description} style={{ flex: '2 1 160px' }}
                                                 onChange={event => patchParameter(parameter.id, { options: (parameter.options || []).map(candidate => candidate === option ? { ...candidate, description: event.target.value } : candidate) })} />
-                                            <IconButton size="small" aria-label="Delete option" onClick={() => patchParameter(parameter.id, { options: (parameter.options || []).filter(candidate => candidate !== option) })} sx={{ color: 'var(--agenda-text-primary)' }}><Delete fontSize="small" /></IconButton>
+                                            <Button variant="danger" aria-label="Delete option" onClick={() => patchParameter(parameter.id, { options: (parameter.options || []).filter(candidate => candidate !== option) })} style={iconButtonStyle}><Delete fontSize="small" /></Button>
                                         </div>
                                     ))}
                                     <Button variant="secondary" style={{ justifySelf: 'start', display: 'inline-flex', alignItems: 'center', gap: 4 }}

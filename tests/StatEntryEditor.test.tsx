@@ -52,11 +52,13 @@ for (const category of ['global', 'actor', 'location', 'item'] as const) {
     for (const type of ['option', 'optionList'] as const) {
         test(`${category} ${type} options show read-only IDs and accessible bin buttons above their names`, () => {
             const html = renderOptions(type, category);
-            assert.match(html, /ID: first-option<\/div><button[^>]*aria-label="Remove option"[^>]*>.*?data-testid="DeleteIcon".*?<\/button><\/div><div[^>]*><label[^>]*>Option Name<\/label>/);
-            assert.match(html, /ID: second-option<\/div>/);
+            assert.match(html, /ID: first-option<\/div><div[^>]*><button[^>]*disabled=""[^>]*aria-label="Move option up"[^>]*>.*?data-testid="ArrowUpwardIcon".*?<button[^>]*aria-label="Move option down"[^>]*>.*?data-testid="ArrowDownwardIcon".*?<button[^>]*aria-label="Remove option"[^>]*>.*?data-testid="DeleteIcon".*?<\/button><\/div><\/div><div[^>]*><label[^>]*>Option Name<\/label>/);
+            assert.match(html, /ID: second-option<\/div><div[^>]*><button[^>]*aria-label="Move option up"[^>]*>.*?<button[^>]*disabled=""[^>]*aria-label="Move option down"/);
             assert.doesNotMatch(html, /Remove Option/);
             assert.doesNotMatch(html, /<input[^>]*value="(?:first|second)-option"/);
             assert.equal((html.match(/aria-label="Remove option"/g) || []).length, 2);
+            assert.equal((html.match(/aria-label="Move option up"/g) || []).length, 2);
+            assert.equal((html.match(/aria-label="Move option down"/g) || []).length, 2);
             assert.match(html, /value="First option"/);
             assert.match(html, /First description/);
             assert.doesNotMatch(html, /Per Actor|Maps other actors|target actor being considered/);

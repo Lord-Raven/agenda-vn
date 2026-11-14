@@ -1,6 +1,6 @@
 import React, { FC } from 'react';
 import { v4 as generateUuid } from 'uuid';
-import { Add, Delete, KeyboardArrowUp, KeyboardArrowDown } from '@mui/icons-material';
+import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import {
     Stat, StatValue, StatValueRule,
@@ -19,6 +19,8 @@ import { ItemLike } from './ItemPortrait';
 import { LocationLike } from './LocationPortrait';
 
 export type StatEntryCategory = 'global' | 'actor' | 'location' | 'item';
+
+const iconButtonStyle: React.CSSProperties = { minWidth: 34, padding: 6, flexShrink: 0 };
 
 export const resolveStatDefaultValue = (stat: Stat): StatValue => resolveStatDefault(stat);
 
@@ -205,6 +207,15 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
         onPatch({ options: currentOptions });
     };
 
+    const moveOption = (optionIndex: number, offset: -1 | 1) => {
+        const targetIndex = optionIndex + offset;
+        // Materialize ids before swapping so index-derived fallback ids keep referring to the same option.
+        const options = (stat.options || []).map((option, idx) => ({ ...option, id: getStatOptionValue(option, idx) }));
+        if (targetIndex < 0 || targetIndex >= options.length) return;
+        [options[optionIndex], options[targetIndex]] = [options[targetIndex], options[optionIndex]];
+        onPatch({ options });
+    };
+
     const removeOption = (optionIndex: number) => {
         const options = (stat.options || []).filter((_, idx) => idx !== optionIndex);
         if (isOptionListStatType(stat.type) || isValueReference(stat.default)) {
@@ -276,11 +287,11 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                     {stat.name?.trim() || `${typeLabel} ${index + 1}`}
                 </div>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <Button variant="secondary" aria-label="Move stat up" disabled={index === 0} onClick={() => onMove(-1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                        <KeyboardArrowUp fontSize="small" />
+                    <Button variant="secondary" aria-label="Move stat up" disabled={index === 0} onClick={() => onMove(-1)} style={iconButtonStyle}>
+                        <ArrowUpward fontSize="small" />
                     </Button>
-                    <Button variant="secondary" aria-label="Move stat down" disabled={index === total - 1} onClick={() => onMove(1)} style={{ padding: '4px 8px', minWidth: 0 }}>
-                        <KeyboardArrowDown fontSize="small" />
+                    <Button variant="secondary" aria-label="Move stat down" disabled={index === total - 1} onClick={() => onMove(1)} style={iconButtonStyle}>
+                        <ArrowDownward fontSize="small" />
                     </Button>
                     {onToggleCollapse && (
                         <Button variant="secondary" onClick={onToggleCollapse}>
@@ -413,14 +424,34 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                             <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', overflowWrap: 'anywhere' }}>
                                                 ID: {option.id}
                                             </div>
-                                            <Button
-                                                variant="danger"
-                                                onClick={() => removeOption(optionIndex)}
-                                                aria-label="Remove option"
-                                                style={{ minWidth: 34, padding: 6, flexShrink: 0 }}
-                                            >
-                                                <Delete fontSize="small" />
-                                            </Button>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <Button
+                                                    variant="secondary"
+                                                    disabled={optionIndex === 0}
+                                                    onClick={() => moveOption(optionIndex, -1)}
+                                                    aria-label="Move option up"
+                                                    style={iconButtonStyle}
+                                                >
+                                                    <ArrowUpward fontSize="small" />
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    disabled={optionIndex === editableOptionEntries.length - 1}
+                                                    onClick={() => moveOption(optionIndex, 1)}
+                                                    aria-label="Move option down"
+                                                    style={iconButtonStyle}
+                                                >
+                                                    <ArrowDownward fontSize="small" />
+                                                </Button>
+                                                <Button
+                                                    variant="danger"
+                                                    onClick={() => removeOption(optionIndex)}
+                                                    aria-label="Remove option"
+                                                    style={iconButtonStyle}
+                                                >
+                                                    <Delete fontSize="small" />
+                                                </Button>
+                                            </div>
                                         </div>
                                         <div style={inlineFieldStyle}>
                                             <label style={fieldLabelStyle}>Option Name</label>
@@ -572,27 +603,28 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                             variant="secondary"
                                             disabled={ruleIndex === 0}
                                             onClick={() => moveValueRule(rule.id, -1)}
-                                            style={{ padding: '4px 8px', minWidth: 0 }}
+                                            style={{ ...iconButtonStyle, marginLeft: 'auto' }}
                                             aria-label="Move rule up"
                                         >
-                                            <KeyboardArrowUp fontSize="small" />
+                                            <ArrowUpward fontSize="small" />
                                         </Button>
                                         <Button
                                             variant="secondary"
                                             disabled={ruleIndex === valueRules.length - 1}
                                             onClick={() => moveValueRule(rule.id, 1)}
-                                            style={{ padding: '4px 8px', minWidth: 0 }}
+                                            style={iconButtonStyle}
                                             aria-label="Move rule down"
                                         >
-                                            <KeyboardArrowDown fontSize="small" />
+                                            <ArrowDownward fontSize="small" />
                                         </Button>
                                         <Button
                                             variant="danger"
                                             onClick={() => removeValueRule(rule.id)}
-                                            style={{ marginLeft: 'auto' }}
+                                            style={iconButtonStyle}
                                             disabled={rule.id === defaultRuleId}
+                                            aria-label="Delete rule"
                                         >
-                                            Delete
+                                            <Delete fontSize="small" />
                                         </Button>
                                     </div>
                                     {rule.id !== defaultRuleId && (
