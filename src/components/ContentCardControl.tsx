@@ -52,6 +52,9 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
     if (!entity || !state.visible) return null;
 
     const vertical = orientation === 'vertical';
+    // Horizontal cards in landscape have bar heights that dwarf the default text sizes, so their labels
+    // and detail Controls render ~50% larger; compact (portrait) layouts keep the smaller sizes.
+    const large = !vertical && !compact;
     const unavailable = disabled || !state.available;
     const clickable = !!onClick || control.actions.length > 0;
     const text = (value: string) => instance.resolveCardText(value, kind, id, header, { icons: 'token' });
@@ -125,8 +128,8 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
                 {control.useNamePlate ? <NamePlate actor={entity}
                     label={control.label ? renderLoreIcons(labelText, instance) : undefined}
                     subtitle={control.subLabel ? renderLoreIcons(subLabel, instance) : undefined} />
-                    : labelText && <Typography sx={{ fontWeight: 700, fontSize: '1.2rem', overflowWrap: 'anywhere' }}>{renderLoreIcons(labelText, instance)}</Typography>}
-                {!control.useNamePlate && subLabel && <Typography sx={{ fontSize: '0.8rem', color: 'var(--agenda-text-muted)', mt: 0.5 }}>{renderLoreIcons(subLabel, instance)}</Typography>}
+                    : labelText && <Typography sx={{ fontWeight: 700, fontSize: large ? '1.8rem' : '1.2rem', overflowWrap: 'anywhere' }}>{renderLoreIcons(labelText, instance)}</Typography>}
+                {!control.useNamePlate && subLabel && <Typography sx={{ fontSize: large ? '1.2rem' : '0.8rem', color: 'var(--agenda-text-muted)', mt: 0.5 }}>{renderLoreIcons(subLabel, instance)}</Typography>}
                 {description && <Typography sx={{ fontSize: '0.85rem', textAlign: 'left', whiteSpace: 'pre-wrap', mt: 0.75 }}>{renderLoreIcons(description, instance)}</Typography>}
                 {subtitle}
             </Box>
@@ -134,7 +137,7 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
                 <Box sx={{ display: 'flex', flexDirection: vertical ? 'column' : 'row', flexWrap: 'wrap', gap: 0.75,
                         alignItems: vertical ? 'stretch' : 'center', justifyContent: 'flex-end', minWidth: 0, maxWidth: '100%' }}>
                     {details.map(detail => <ListCardDetail key={detail.key} detail={detail} stage={instance}
-                        isVerticalLayout={compact} kind={kind} id={id} header={header} />)}
+                        isVerticalLayout={compact} large={large} kind={kind} id={id} header={header} />)}
                     {trailing && <Box onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{trailing}</Box>}
                 </Box>
             )}
@@ -165,8 +168,10 @@ const formatDetailText = (detail: ResolvedListCardDetail): string => {
 
 export const ListCardDetail: FC<{
     detail: ResolvedListCardDetail; stage: Stage; isVerticalLayout: boolean;
+    // ~50% larger badge text/icons for horizontal landscape cards, whose bar height dwarfs the defaults.
+    large?: boolean;
     kind?: ContentType; id?: string; header?: string;
-}> = ({ detail, stage, isVerticalLayout, kind, id, header }) => {
+}> = ({ detail, stage, isVerticalLayout, large = false, kind, id, header }) => {
     const control = detail.control;
     const text = (value: string, options?: { icons: 'token' }) => kind && id
         ? stage.resolveCardText(value, kind, id, header, options)
@@ -180,7 +185,7 @@ export const ListCardDetail: FC<{
         return values.length ? (
             <Box data-popup-card-detail={detail.key} title={label} sx={{ display: 'flex' }}
                 onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
-                <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={label} variant="overlay" size={isVerticalLayout ? 30 : 36} />
+                <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={label} variant="overlay" size={large ? 48 : isVerticalLayout ? 30 : 36} />
             </Box>
         ) : null;
     }
@@ -191,26 +196,27 @@ export const ListCardDetail: FC<{
         : null;
     const numericValue = Number(detail.value);
     const display = control && detail.stat && detail.type === 'number' && Number.isFinite(numericValue) && (
-        <Box sx={{ width: control.displayType === 'percentage' || control.displayType === 'bar' ? 90
+        <Box sx={{ width: control.displayType === 'percentage' || control.displayType === 'bar' ? (large ? 135 : 90)
                 : control.displayType === 'rating' ? `${Math.max(1, Math.min(10, Math.round(detail.stat.max ?? 5)))}em` : undefined,
-            maxWidth: '100%', minWidth: 0, height: 16, display: 'flex', alignItems: 'center' }}>
+            fontSize: large ? '1.2rem' : undefined,
+            maxWidth: '100%', minWidth: 0, height: large ? 24 : 16, display: 'flex', alignItems: 'center' }}>
             <StatValueDisplay stat={detail.stat} display={{
                 ...control, ratingIconName: String(stage.resolveValue(control.ratingIconName, 'text', stage.getSave(), [], kind && id ? { [kind]: id, header } : undefined)),
-            }} value={numericValue} />
+            }} value={numericValue} style={large ? { fontSize: '1.2rem' } : undefined} />
         </Box>
     );
     return (
         <Box data-popup-card-detail={detail.key} title={control ? text(control.description).trim() || undefined : undefined} sx={{
-            display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5, px: 1, py: 0.4, borderRadius: '999px',
+            display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5, px: large ? 1.25 : 1, py: large ? 0.6 : 0.4, borderRadius: '999px',
             border: '1px solid var(--agenda-line-subtle)', background: 'color-mix(in srgb, var(--agenda-surface-base) 70%, transparent)',
             maxWidth: '100%', minWidth: 0, boxSizing: 'border-box',
         }}>
-            {BadgeIcon && <BadgeIcon sx={{ fontSize: '0.9rem', color: control?.displayColor || 'var(--agenda-text-muted)' }} />}
-            {labelText && <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.7rem', overflowWrap: 'anywhere', minWidth: 0 }}>{renderLoreIcons(labelText, stage)}</Typography>}
+            {BadgeIcon && <BadgeIcon sx={{ fontSize: large ? '1.35rem' : '0.9rem', color: control?.displayColor || 'var(--agenda-text-muted)' }} />}
+            {labelText && <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: large ? '1.05rem' : '0.7rem', overflowWrap: 'anywhere', minWidth: 0 }}>{renderLoreIcons(labelText, stage)}</Typography>}
             {display || (detail.type === 'icon'
-                ? ValueIcon && <ValueIcon sx={{ fontSize: '0.95rem', color: control?.displayColor || 'var(--agenda-text-primary)' }} titleAccess={label || undefined} />
+                ? ValueIcon && <ValueIcon sx={{ fontSize: large ? '1.4rem' : '0.95rem', color: control?.displayColor || 'var(--agenda-text-primary)' }} titleAccess={label || undefined} />
                 : <Typography component="span" sx={{
-                    color: control?.displayColor || 'var(--agenda-text-primary)', fontSize: '0.8rem', fontWeight: 700,
+                    color: control?.displayColor || 'var(--agenda-text-primary)', fontSize: large ? '1.2rem' : '0.8rem', fontWeight: 700,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{formatDetailText(detail)}</Typography>)}
         </Box>
