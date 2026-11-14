@@ -55,6 +55,8 @@ const headerSideTextSx = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    lineHeight: 1.4,
+    py: '0.15em',
 };
 
 // A paged vertical column of horizontal content cards: one header page at a time with previous/next
@@ -97,12 +99,13 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
             <Box
                 sx={{
                     display: 'grid',
-                    gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+                    gridTemplateColumns: 'minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)',
                     alignItems: 'center',
                     gap: 1,
                     mt: 1,
                     mb: 1.5,
                     width: '100%',
+                    flexShrink: 0,
                 }}
             >
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, minWidth: 0 }}>
@@ -133,7 +136,8 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
                             fontWeight: 700,
                             fontSize: { xs: '1.7rem', md: '2.5rem' },
                             letterSpacing: '0.04em',
-                            lineHeight: 1,
+                            lineHeight: 1.3,
+                            py: '0.15em',
                             textShadow: '0 3px 14px color-mix(in srgb, var(--agenda-surface-base) 78%, transparent)',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -192,7 +196,7 @@ export const ContentCardList: FC<ContentCardListProps> = ({ stage, pages, isVert
                             pr: '14px',
                             ...(layout === 'grid' ? {
                                 display: 'grid',
-                                gridTemplateColumns: `repeat(auto-fill, minmax(${isVerticalLayout ? 150 : 220}px, 1fr))`,
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
                                 alignContent: 'start',
                                 alignItems: 'stretch',
                                 gap: 1.25,

@@ -59,6 +59,7 @@ export class Control {
     cardDetails: string[] = [];
     useNamePlate: boolean = false;
     showPortrait: boolean = true;
+    portraitScale: number = 100;
     showSourceLink: boolean = false;
     actions: StatUpdateAction[] = [];
 
@@ -98,6 +99,7 @@ export class Control {
         this.cardDetails = Array.isArray(this.cardDetails) ? this.cardDetails.filter(isControlReference) : [];
         this.useNamePlate = this.useNamePlate === true;
         this.showPortrait = this.showPortrait !== false;
+        this.portraitScale = Number.isFinite(this.portraitScale) ? Math.max(50, Math.min(100, this.portraitScale)) : 100;
         this.showSourceLink = this.showSourceLink === true;
         this.actions = Array.isArray(this.actions) ? this.actions.map(cloneStatUpdateAction) : [];
         this.statId = `${this.statId || ''}`;

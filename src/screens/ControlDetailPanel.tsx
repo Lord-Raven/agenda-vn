@@ -33,6 +33,7 @@ type ControlDraft = {
     cardDetails: string[];
     useNamePlate: boolean;
     showPortrait: boolean;
+    portraitScale: number;
     showSourceLink: boolean;
     visibilityConditions: ConditionCollection[];
     statId: string;
@@ -62,6 +63,7 @@ const createDraft = (control: Control): ControlDraft => ({
     cardDetails: [...control.cardDetails],
     useNamePlate: control.useNamePlate,
     showPortrait: control.showPortrait,
+    portraitScale: control.portraitScale,
     showSourceLink: control.showSourceLink,
     visibilityConditions: control.visibilityConditions.map(collection => collection.map(condition => ({ ...condition }))),
     statId: control.statId,
@@ -148,6 +150,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             cardDetails: [...nextDraft.cardDetails],
             useNamePlate: nextDraft.useNamePlate,
             showPortrait: nextDraft.showPortrait,
+            portraitScale: nextDraft.portraitScale,
             showSourceLink: nextDraft.showSourceLink,
             visibilityConditions: nextDraft.visibilityConditions,
             statId: nextDraft.statId,
@@ -469,7 +472,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             {' With Use NamePlate enabled, the label and sub-label appear inside the NamePlate and support {{icon:star}} macros. The primary label keeps the content\'s theme color and font; an empty label uses its display name or name.'}
                                             {' Use {{content:name}}, {{content:description}}, {{content:header}}, and for Actors {{content:role}}, {{content:age}}, {{content:meta}}, {{content:summary}} or {{char:Stat Name}}.'}
                                             {' Use {{content:Stat Name}} for Card content stats and {{content:Enabled ? content:Label : "fallback"}} for conditional text. Conditions use truthiness (false, zero, and empty text are false).'}
-                                            {' Function arguments can bind "variable:actor", "variable:item", "variable:location", or "variable:header". Cards are horizontal in Lists and vertical in hovers.'}
+                                            {' Function arguments can bind "variable:actor", "variable:item", "variable:location", or "variable:header". Cards are horizontal in Lists and vertical in Grids and hovers.'}
                                         </span>
                                         {([
                                             ['useNamePlate', 'Use NamePlate for label'],
@@ -481,6 +484,17 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                                     onChange={event => setDraft(current => ({ ...current, [field]: event.target.checked }))} /> {label}
                                             </label>
                                         ))}
+                                        {draft.showPortrait && draft.contentType !== 'location' && (
+                                            <div>
+                                                <label htmlFor={`control-portrait-scale-${control.id}`} style={labelStyle}>Portrait size: {draft.portraitScale}%</label>
+                                                <input id={`control-portrait-scale-${control.id}`} type="range" min={50} max={100} step={1}
+                                                    value={draft.portraitScale} style={{ width: '100%' }}
+                                                    onChange={event => setDraft(current => ({ ...current, portraitScale: Number(event.target.value) }))} />
+                                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                                    Percentage of the card's inner width in Grids and hovers, or inner height in Lists. Portraits keep their proportions. Location backgrounds always fill the card.
+                                                </span>
+                                            </div>
+                                        )}
                                         <div>
                                             <label style={labelStyle}>Standalone Controls</label>
                                             <SearchableOptionPicker stage={stage} multiple title="Choose card controls"

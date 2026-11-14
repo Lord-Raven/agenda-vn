@@ -91,6 +91,15 @@ test('cards always use standalone placement and survive export/import', () => {
     }
 });
 
+test('portrait scales default to full size, clamp to 50–100%, and survive export/import', () => {
+    assert.equal(new Control({ type: 'card' }).portraitScale, 100);
+    for (const [portraitScale, expected] of [[25, 50], [50, 50], [75, 75], [100, 100], [150, 100], [NaN, 100], [Infinity, 100]]) {
+        const control = new Control({ type: 'card', portraitScale });
+        assert.equal(control.portraitScale, expected);
+        assert.equal(new Control(JSON.parse(JSON.stringify(control))).portraitScale, expected);
+    }
+});
+
 test('card availability binds identity and stat rules to the displayed actor', () => {
     const control = new Control({
         type: 'card',

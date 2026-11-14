@@ -60,7 +60,8 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
     const description = text(control.description);
     const LabelIcon = control.iconName ? resolveIcon(control.iconName, instance) : null;
     const color = entity.themeColor || 'var(--agenda-accent-primary)';
-    const portraitSize = vertical ? 96 : compact ? 48 : 60;
+    const hasPortrait = control.showPortrait && !location;
+    const portraitRatio = control.portraitScale / 100;
     const details = control.cardDetails
         .map(reference => instance.resolveListCardDetail(reference, kind, id, header))
         .filter((detail): detail is ResolvedListCardDetail => !!detail);
@@ -90,8 +91,10 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
                 }
             } : undefined}
             sx={{
-                position: 'relative', display: 'flex', flexDirection: vertical ? 'column' : 'row',
+                position: 'relative', display: vertical ? 'flex' : 'grid', flexDirection: 'column',
+                gridTemplateColumns: vertical ? undefined : `${hasPortrait ? 'auto ' : ''}minmax(0, 1fr)${details.length || trailing ? ' minmax(0, max-content)' : ''}${control.showSourceLink && actor?.sourcePath ? ' auto' : ''}`,
                 alignItems: vertical ? 'stretch' : 'center', gap: 1.5, p: 2, minWidth: 0,
+                boxSizing: 'border-box',
                 minHeight: location && control.showPortrait ? (vertical ? 240 : compact ? 180 : 210) : undefined,
                 maxWidth: vertical ? 320 : undefined, borderRadius: 2, overflow: 'hidden',
                 border: `1px solid ${color}`, backgroundColor: 'var(--agenda-panel-surface)',
@@ -103,10 +106,18 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
                 cursor: clickable ? unavailable ? 'not-allowed' : 'pointer' : 'default',
                 ...style,
             }}>
-            {control.showPortrait && !location && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-                    {actor ? <ActorPortrait actor={actor} stage={instance} size={portraitSize} borderRadius={12} />
-                        : <ItemPortrait item={item} stage={instance} width={portraitSize} height={portraitSize} borderRadius={12} />}
+            {hasPortrait && (
+                <Box data-card-portrait sx={{
+                    position: 'relative', aspectRatio: vertical ? '1' : `${portraitRatio}`,
+                    width: vertical ? `${control.portraitScale}%` : undefined,
+                    minHeight: vertical ? undefined : compact ? 48 : 60,
+                    alignSelf: 'stretch', justifySelf: 'center', mx: vertical ? 'auto' : undefined,
+                }}>
+                    {actor ? <ActorPortrait actor={actor} stage={instance} size={96} thumbnailSize={640} borderRadius={12}
+                        style={{ position: 'absolute', width: '100%', height: 'auto', aspectRatio: '1', boxSizing: 'border-box',
+                            top: '50%', transform: 'translateY(-50%)' }} />
+                        : <ItemPortrait item={item} stage={instance} width="100%" height="auto" thumbnailSize={640} borderRadius={12}
+                            style={{ position: 'absolute', aspectRatio: '1', boxSizing: 'border-box', top: '50%', transform: 'translateY(-50%)' }} />}
                 </Box>
             )}
             <Box sx={{ flex: 1, minWidth: 0, textAlign: vertical ? 'center' : 'left' }}>
@@ -121,7 +132,7 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
             </Box>
             {(details.length > 0 || trailing) && (
                 <Box sx={{ display: 'flex', flexDirection: vertical ? 'column' : 'row', flexWrap: 'wrap', gap: 0.75,
-                        alignItems: vertical ? 'stretch' : 'center', justifyContent: 'flex-end', minWidth: 0, maxWidth: vertical ? '100%' : '50%' }}>
+                        alignItems: vertical ? 'stretch' : 'center', justifyContent: 'flex-end', minWidth: 0, maxWidth: '100%' }}>
                     {details.map(detail => <ListCardDetail key={detail.key} detail={detail} stage={instance}
                         isVerticalLayout={compact} kind={kind} id={id} header={header} />)}
                     {trailing && <Box onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{trailing}</Box>}
@@ -180,7 +191,9 @@ export const ListCardDetail: FC<{
         : null;
     const numericValue = Number(detail.value);
     const display = control && detail.stat && detail.type === 'number' && Number.isFinite(numericValue) && (
-        <Box sx={{ width: control.displayType === 'percentage' || control.displayType === 'bar' ? 90 : undefined, height: 16, display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ width: control.displayType === 'percentage' || control.displayType === 'bar' ? 90
+                : control.displayType === 'rating' ? `${Math.max(1, Math.min(10, Math.round(detail.stat.max ?? 5)))}em` : undefined,
+            maxWidth: '100%', minWidth: 0, height: 16, display: 'flex', alignItems: 'center' }}>
             <StatValueDisplay stat={detail.stat} display={{
                 ...control, ratingIconName: String(stage.resolveValue(control.ratingIconName, 'text', stage.getSave(), [], kind && id ? { [kind]: id, header } : undefined)),
             }} value={numericValue} />
@@ -188,12 +201,12 @@ export const ListCardDetail: FC<{
     );
     return (
         <Box data-popup-card-detail={detail.key} title={control ? text(control.description).trim() || undefined : undefined} sx={{
-            display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.4, borderRadius: '999px',
+            display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5, px: 1, py: 0.4, borderRadius: '999px',
             border: '1px solid var(--agenda-line-subtle)', background: 'color-mix(in srgb, var(--agenda-surface-base) 70%, transparent)',
-            maxWidth: 220, minWidth: 0,
+            maxWidth: '100%', minWidth: 0, boxSizing: 'border-box',
         }}>
             {BadgeIcon && <BadgeIcon sx={{ fontSize: '0.9rem', color: control?.displayColor || 'var(--agenda-text-muted)' }} />}
-            {labelText && <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.7rem' }}>{renderLoreIcons(labelText, stage)}</Typography>}
+            {labelText && <Typography component="span" sx={{ color: 'var(--agenda-text-muted)', fontSize: '0.7rem', overflowWrap: 'anywhere', minWidth: 0 }}>{renderLoreIcons(labelText, stage)}</Typography>}
             {display || (detail.type === 'icon'
                 ? ValueIcon && <ValueIcon sx={{ fontSize: '0.95rem', color: control?.displayColor || 'var(--agenda-text-primary)' }} titleAccess={label || undefined} />
                 : <Typography component="span" sx={{

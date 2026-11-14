@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } from '../src/Stage';
@@ -356,6 +360,10 @@ test('Card editor persists appearance, attached badges, conditions, and context-
         act(() => textInputs.find(node => node.props.value === '')!.props.onChange({ target: { value: '{{content:header}}' } }));
         act(() => renderer!.root.findByType('textarea').props.onChange({ target: { value: '{{content:description}}' } }));
         act(() => renderer!.root.findAllByType('input').find(node => node.props.type === 'checkbox')!.props.onChange({ target: { checked: true } }));
+        const slider = renderer.root.findByProps({ id: `control-portrait-scale-${card.id}` });
+        assert.equal(slider.props.min, 50);
+        assert.equal(slider.props.max, 100);
+        act(() => slider.props.onChange({ target: { value: '65' } }));
         const picker = renderer.root.findAllByType(SearchableOptionPicker).find(node => node.props.title === 'Choose card controls')!;
         act(() => picker.props.onChange([controlReference(badge.id)]));
         const conditions = renderer.root.findAllByType(ConditionEditor);
@@ -372,6 +380,7 @@ test('Card editor persists appearance, attached badges, conditions, and context-
         assert.equal(saved.subLabel, '{{content:header}}');
         assert.equal(saved.description, '{{content:description}}');
         assert.equal(saved.useNamePlate, true);
+        assert.equal(saved.portraitScale, 65);
         assert.deepEqual(saved.cardDetails, [controlReference(badge.id)]);
         assert.deepEqual(saved.visibilityConditions, visibility);
         assert.deepEqual(saved.availabilityConditions, visibility);
@@ -380,6 +389,83 @@ test('Card editor persists appearance, attached badges, conditions, and context-
         if (renderer) act(() => renderer?.unmount());
         if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
         else Reflect.deleteProperty(globalThis, 'window');
+    }
+});
+
+test('cards scale portraits and keep rating badges and grid headers inside narrow popup layouts', { skip: !process.env.CHROME_BIN }, () => {
+    const { stage, configuration } = fixture();
+    configuration.actorStats.push(stat('Rating', 'number', 7, { max: 10 }));
+    const badge = new Control({ type: 'statBadge', badgeSource: contentStatReference('actor', 'Rating'),
+        label: 'A long rating badge label', displayType: 'rating' });
+    configuration.controls.push(badge);
+    const directory = mkdtempSync(join(tmpdir(), 'agenda-card-layout-'));
+    try {
+        const fixtures: string[] = [];
+        for (const width of [180, 320, 580, 900]) {
+            for (const portraitScale of [50, 75, 100]) {
+                for (const orientation of ['vertical', 'horizontal'] as const) {
+                    for (const [kind, id] of [['actor', 'bob'], ['item', 'sword']] as const) {
+                        const card = new Control({ type: 'card', contentType: kind, label: '{{content:name}}',
+                            description: 'A description that wraps onto several lines in narrow cards.',
+                            portraitScale, cardDetails: kind === 'actor' ? [controlReference(badge.id)] : [] });
+                        const html = renderToStaticMarkup(<ContentCardControl stage={() => stage} control={card} kind={kind} id={id} orientation={orientation} />);
+                        fixtures.push(`<main data-scale="${portraitScale}" data-orientation="${orientation}" style="width:${width}px">${html}</main>`);
+                    }
+                }
+            }
+            const card = new Control({ type: 'card', label: '{{content:name}}', cardDetails: [controlReference(badge.id)] });
+            const html = renderToStaticMarkup(<TooltipProvider><ContentCardList stage={() => stage} layout="grid" isVerticalLayout={width < 600}
+                pages={[{ key: 'grid', title: 'Hanging gyp', cards: Array.from({ length: 4 }, (_, index) => ({ key: `${index}`, kind: 'actor', id: 'bob', control: card })) }]} /></TooltipProvider>);
+            fixtures.push(`<section style="width:${width}px;height:600px;display:flex">${html}</section>`);
+        }
+        const fixturePath = join(directory, 'layout.html');
+        writeFileSync(fixturePath, `<!doctype html><style>
+            body { margin: 0; font-family: sans-serif; }
+            * { animation: none !important; transition: none !important; }
+            </style>${fixtures.join('')}<pre id="result"></pre><script>
+            const errors = [];
+            const check = (condition, message) => { if (!condition) errors.push(message); };
+            const innerSize = (element, axis) => {
+                const style = getComputedStyle(element);
+                return axis === 'width'
+                    ? element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+                    : element.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+            };
+            document.querySelectorAll('main').forEach((main, index) => {
+                const card = main.querySelector('[data-content-card]');
+                const portrait = card.querySelector('[data-card-portrait] > div').getBoundingClientRect();
+                const axis = main.dataset.orientation === 'vertical' ? 'width' : 'height';
+                const expected = innerSize(card, axis) * Number(main.dataset.scale) / 100;
+                check(Math.abs(portrait.width - expected) < 1, index + ': portrait scales to ' + expected + ', got ' + portrait.width);
+                check(Math.abs(portrait.width - portrait.height) < 1, index + ': portrait stays square');
+            });
+            document.querySelectorAll('[data-content-card]').forEach((card, index) => {
+                const bounds = card.getBoundingClientRect();
+                check(card.scrollWidth <= card.clientWidth + 1, index + ': card does not overflow');
+                card.querySelectorAll('[data-popup-card-detail], [role="img"], [role="img"] button').forEach(detail => {
+                    const rect = detail.getBoundingClientRect();
+                    check(rect.left >= bounds.left && rect.right <= bounds.right, index + ': complete badge fits horizontally');
+                });
+            });
+            document.querySelectorAll('section').forEach((section, index) => {
+                const cards = section.querySelectorAll('[data-content-card]');
+                const first = cards[0].getBoundingClientRect();
+                const columns = [...cards].filter(card => Math.abs(card.getBoundingClientRect().top - first.top) < 1).length;
+                check(columns === (section.clientWidth === 900 ? 3 : 1), index + ': grid uses fewer columns in popups');
+                const heading = section.querySelector('h2');
+                const style = getComputedStyle(heading);
+                check(parseFloat(style.lineHeight) >= parseFloat(style.fontSize) * 1.25, index + ': heading has descender space');
+                check(parseFloat(style.paddingBottom) > 0, index + ': heading has extra glyph space');
+                check(heading.getBoundingClientRect().bottom <= heading.parentElement.parentElement.getBoundingClientRect().bottom + 1, index + ': header row does not shrink');
+            });
+            document.getElementById('result').textContent = errors.length ? JSON.stringify(errors) : 'PASS';
+            </script>`);
+        const output = execFileSync(process.env.CHROME_BIN!, [
+            '--headless', '--no-sandbox', '--disable-gpu', '--dump-dom', `file://${fixturePath}`,
+        ], { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 8 * 1024 * 1024 });
+        assert.equal(output.match(/<pre id="result">([^<]*)<\/pre>/)?.[1], 'PASS');
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
     }
 });
 
