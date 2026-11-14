@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { v4 as generateUuid } from 'uuid';
-import { Add, Delete } from '@mui/icons-material';
+import { Add, ArrowDownward, ArrowUpward, Delete } from '@mui/icons-material';
 import { Stage } from '../Stage';
 import { CONTENT_TYPES } from '../content/Condition';
 import { isValueReference } from '../content/Function';
@@ -36,6 +36,14 @@ export const createDefaultStatUpdate = (globalStats: Stat[], actorStats: Stat[] 
     targetType: globalStats.length || !actorStats.length ? 'global' : 'actor', targetId: 'any',
     statId: (globalStats[0] || actorStats[0])?.id || '', operation: 'adjust', value: 0,
 });
+
+const iconButtonStyle = {
+    display: 'grid',
+    placeItems: 'center',
+    minWidth: 30,
+    minHeight: 30,
+    padding: 0,
+};
 
 const selectStyle = {
     minHeight: 38,
@@ -93,10 +101,17 @@ export const OutcomeEditor: FC<OutcomeEditorProps> = ({ actions, onChange, skitT
     const createUpdate = (): StatUpdate => createDefaultStatUpdate(globalStats, statsByType.actor);
     const updateAction = (id: string, patch: Partial<StatUpdateAction>) =>
         onChange(actions.map(action => action.id === id ? cloneStatUpdateAction({ ...action, ...patch }) : action));
+    const moveAction = (index: number, offset: -1 | 1) => {
+        const targetIndex = index + offset;
+        if (targetIndex < 0 || targetIndex >= actions.length) return;
+        const nextActions = [...actions];
+        [nextActions[index], nextActions[targetIndex]] = [nextActions[targetIndex], nextActions[index]];
+        onChange(nextActions);
+    };
 
     return (
         <div style={{ display: 'grid', gap: 8 }}>
-            {actions.map(action => {
+            {actions.map((action, index) => {
                 const isStat = action.kind !== 'function' && action.kind !== 'skit';
                 const availableStats = isStat ? statsByType[action.targetType] : [];
                 const stat = isStat ? availableStats.find(stat => stat.id === action.statId) : undefined;
@@ -137,8 +152,16 @@ export const OutcomeEditor: FC<OutcomeEditorProps> = ({ actions, onChange, skitT
                                 </div>
                             )}
                             <div style={{ flex: '1 1 auto' }} />
+                            <Button variant="secondary" disabled={index === 0} onClick={() => moveAction(index, -1)}
+                                aria-label="Move action up" style={iconButtonStyle}>
+                                <ArrowUpward fontSize="small" />
+                            </Button>
+                            <Button variant="secondary" disabled={index === actions.length - 1} onClick={() => moveAction(index, 1)}
+                                aria-label="Move action down" style={iconButtonStyle}>
+                                <ArrowDownward fontSize="small" />
+                            </Button>
                             <Button variant="danger" onClick={() => onChange(actions.filter(candidate => candidate.id !== action.id))}
-                                aria-label="Delete action" style={{ display: 'grid', placeItems: 'center', minWidth: 30, minHeight: 30, padding: 0 }}>
+                                aria-label="Delete action" style={iconButtonStyle}>
                                 <Delete fontSize="small" />
                             </Button>
                         </div>
