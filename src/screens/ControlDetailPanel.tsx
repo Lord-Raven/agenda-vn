@@ -1,6 +1,6 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Stage } from '../Stage';
-import { ContentListDisplay, Control, ControlPlacement, ControlType, StatDisplayType } from '../content/Control';
+import { ContentListDisplay, Control, ControlPlacement, controlReference, ControlType, StatDisplayType } from '../content/Control';
 import { ConditionCollection, ContentType } from '../content/Condition';
 import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, sharesOptionPool, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
 import { parseContentStatReference, SCREEN_TYPE_LABELS } from '../content/Screen';
@@ -41,6 +41,7 @@ type ControlDraft = {
     badgeSource: string;
     pickerSource?: string[];
     screenId: string;
+    titleBarControls: string[];
     contentListDisplay: ContentListDisplay;
     displayType: StatDisplayType;
     displayColor: string;
@@ -71,6 +72,7 @@ const createDraft = (control: Control): ControlDraft => ({
     badgeSource: control.badgeSource,
     pickerSource: control.pickerSource ? [...control.pickerSource] : undefined,
     screenId: control.screenId,
+    titleBarControls: [...control.titleBarControls],
     contentListDisplay: control.contentListDisplay ?? 'carousel',
     displayType: control.displayType,
     displayColor: control.displayColor,
@@ -128,6 +130,15 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const actors = useMemo(() => stageInstance.getConfiguration().actors || [], [stageInstance]);
     const items = useMemo(() => stageInstance.getConfiguration().items || [], [stageInstance]);
     const locations = useMemo(() => stageInstance.getConfiguration().locations || [], [stageInstance]);
+    // Controls eligible for a pop-up's title bar; the pop-up itself and other non-renderable types are excluded.
+    const titleBarControlOptions = useMemo(() => (stageInstance.getConfiguration().controls || [])
+        .filter(candidate => candidate.active !== false && (candidate.type === 'button' || candidate.type === 'statDisplay' || candidate.type === 'statEditor'))
+        .map(candidate => ({
+            key: controlReference(candidate.id),
+            label: candidate.name || '(Unnamed Control)',
+            category: candidate.type === 'button' ? 'Buttons' : candidate.type === 'statDisplay' ? 'Stat Displays' : 'Stat Editors',
+            description: candidate.description,
+        })), [stageInstance]);
 
     const [draft, setDraft] = useState<ControlDraft>(() => createDraft(control));
     const draftRef = useRef(draft);
@@ -158,6 +169,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             badgeSource: nextDraft.badgeSource,
             pickerSource: nextDraft.pickerSource ? [...nextDraft.pickerSource] : undefined,
             screenId: nextDraft.screenId,
+            titleBarControls: [...nextDraft.titleBarControls],
             contentListDisplay: nextDraft.contentListDisplay,
             displayType: nextDraft.displayType,
             displayColor: nextDraft.displayColor,
@@ -330,7 +342,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     {draft.type === 'statOutcome' && <option value="outcome">Outcomes</option>}
                                     {draft.type === 'settings' && <option value="settings">Settings</option>}
                                     {draft.type === 'popup' && <option value="popup">Pop-up</option>}
-                                    {(isStatBadge || isCard) && <option value="standalone">Standalone</option>}
+                                    {(isStatBadge || isCard || draft.type === 'button' || draft.type === 'statDisplay' || draft.type === 'statEditor') && <option value="standalone">Standalone</option>}
                                 </select>
                             </div>
                             <div>
@@ -344,7 +356,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         setDraft((current) => ({
                                             ...current,
                                             type,
-                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'settings' ? 'settings' : type === 'statBadge' || type === 'card' ? 'standalone' : current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' || current.placement === 'standalone' ? 'bottom' : current.placement,
+                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'settings' ? 'settings' : type === 'statBadge' || type === 'card' ? 'standalone' : current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' ? 'bottom' : current.placement,
                                             statId: '',
                                             badgeSource: '',
                                             pickerSource: undefined,
@@ -415,7 +427,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 The top and bottom status bars remain visible and usable.
                                 Pop-ups animate in and out; switching pop-ups fades only their contents.
                                 Only one pop-up is shown: lower priority numbers win, with configuration order breaking ties.
-                                It cannot be dismissed; use map button or card click actions to change the visibility conditions.
+                                It cannot be dismissed directly; use title bar, map button, or card click actions to change the availability conditions.
                                 {' The selected Screen ignores its normal availability rules, but map links and buttons retain theirs. Define reusable Map, List, and Grid content in Screens.'}
                             </HelpTip>
                         </div>
@@ -433,6 +445,19 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <option key={screen.id} value={screen.id}>{screen.name || 'Unnamed Screen'} ({SCREEN_TYPE_LABELS[screen.type]})</option>
                             ))}
                         </select>
+                        <div style={{ marginTop: 15 }}>
+                            <div style={fieldHeadingStyle}>
+                                <label>Title Bar Controls</label>
+                                <HelpTip title="Pop-up title bar controls">
+                                    Buttons, Stat Displays, and Stat Editors shown beside the title, in selection order.
+                                    Each control's availability conditions apply.
+                                    Use a Standalone-placed button whose actions break this pop-up's availability conditions as a close button.
+                                </HelpTip>
+                            </div>
+                            <SearchableOptionPicker stage={stage} multiple title="Choose title bar controls"
+                                values={draft.titleBarControls} options={titleBarControlOptions}
+                                onChange={value => setDraft(current => ({ ...current, titleBarControls: Array.isArray(value) ? value : [] }))} />
+                        </div>
                     </section>
                 ) : draft.type === 'button' || isCard ? (
                     <>

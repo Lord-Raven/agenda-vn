@@ -5,7 +5,8 @@ import { cloneStatUpdateAction, StatUpdateAction } from './Stat';
 // Settings controls render in SettingsScreen.
 // Pop-ups overlay gameplay; only the first available control in priority order is displayed.
 // 'standalone' controls render nowhere on their own; they are attached to content elsewhere
-// as badges or reusable content cards.
+// as badges or reusable content cards, or placed in a Pop-up's title bar (buttons and stat
+// displays/editors) via titleBarControls.
 export type ControlPlacement = 'top' | 'bottom' | 'outcome' | 'settings' | 'popup' | 'standalone';
 
 // 'button' runs outcomes; 'statDisplay'/'statEditor' show/edit a global stat.
@@ -74,6 +75,10 @@ export class Control {
     pickerSource?: string[];
     // Pop-ups display this Screen regardless of its availability; map link conditions still apply.
     screenId: string = '';
+    // Pop-ups only: control references rendered in the title bar, in selection order. Buttons and
+    // stat displays/editors are eligible; availability conditions apply per control. A button whose
+    // actions break the pop-up's availability conditions acts as a close button.
+    titleBarControls: string[] = [];
     contentListDisplay: ContentListDisplay = 'carousel';
     displayType: StatDisplayType = 'straight';
     displayColor: string = '';
@@ -89,7 +94,7 @@ export class Control {
         this.priority = Number.isFinite(this.priority) ? this.priority : 0;
         this.widthWeight = Number.isFinite(this.widthWeight) && this.widthWeight > 0 ? this.widthWeight : 1;
         this.type = CONTROL_TYPES.includes(this.type) ? this.type : 'button';
-        this.placement = this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'settings' ? 'settings' : this.type === 'statBadge' || this.type === 'card' ? 'standalone' : this.placement === 'top' ? 'top' : 'bottom';
+        this.placement = this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'settings' ? 'settings' : this.type === 'statBadge' || this.type === 'card' ? 'standalone' : this.placement === 'top' ? 'top' : this.placement === 'standalone' ? 'standalone' : 'bottom';
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.visibilityConditions = Array.isArray(this.visibilityConditions) ? this.visibilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.label = `${this.label || ''}`;
@@ -107,6 +112,7 @@ export class Control {
         this.badgeSource = typeof this.badgeSource === 'string' && !isControlReference(this.badgeSource) ? this.badgeSource : '';
         this.pickerSource = Array.isArray(this.pickerSource) ? this.pickerSource.filter((entry): entry is string => typeof entry === 'string') : undefined;
         this.screenId = `${this.screenId || ''}`;
+        this.titleBarControls = Array.isArray(this.titleBarControls) ? this.titleBarControls.filter(isControlReference) : [];
         this.contentListDisplay = this.contentListDisplay === 'abbreviated' ? 'abbreviated' : 'carousel';
         this.displayType = STAT_DISPLAY_TYPES.includes(this.displayType) ? this.displayType : 'straight';
         this.displayColor = `${this.displayColor || ''}`;

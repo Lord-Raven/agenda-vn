@@ -1,10 +1,13 @@
 import { FC } from 'react';
-import { Box, DialogContent, DialogTitle, Paper } from '@mui/material';
+import { Box, DialogContent, Paper, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Stage } from '../Stage';
+import { Control, controlReferenceId, isControlAvailable } from '../content/Control';
+import { ConditionContext } from '../content/Condition';
 import { isScreenAvailable, isSectionScreenType } from '../content/Screen';
 import { Skit } from '../content/Skit';
 import { ScreenType } from '../screens/BaseScreen';
+import { ControlRenderer } from './ControlRenderer';
 import { DefinedMapView } from '../screens/DefinedMapView';
 import { ListScreenView } from '../screens/ListScreenView';
 
@@ -22,6 +25,12 @@ export const PopupControl: FC<PopupControlProps> = ({ stage, isVerticalLayout, s
     const selectedScreen = (save.screens || []).find(screen => screen.id === control?.screenId && screen.active !== false);
     const context = stageInstance.getScheduleContext(save);
     const maps = control ? (save.screens || []).filter(screen => screen.type === 'map' && screen.active !== false && (screen.id === control.screenId || isScreenAvailable(screen, context))) : [];
+    // Resolve the title bar controls in selection order; each control's availability conditions apply.
+    const controlContext: ConditionContext = { ...context, skitState: stageInstance.getSkitConditionState() };
+    const configuredControls = stageInstance.getConfiguration(save).controls || [];
+    const titleBarControls = (control?.titleBarControls || [])
+        .map(reference => configuredControls.find(candidate => candidate.id === controlReferenceId(reference)))
+        .filter((candidate): candidate is Control => Boolean(candidate) && isControlAvailable(candidate!, controlContext));
 
     return (
         <AnimatePresence>
@@ -54,6 +63,7 @@ export const PopupControl: FC<PopupControlProps> = ({ stage, isVerticalLayout, s
                         sx={{
                             display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 1200,
                             height: '100%', maxHeight: 900, minHeight: 0, overflow: 'hidden',
+                            borderRadius: '12px',
                             background: 'var(--agenda-surface-base)', color: 'var(--agenda-text-primary)',
                         }}
                     >
@@ -66,7 +76,29 @@ export const PopupControl: FC<PopupControlProps> = ({ stage, isVerticalLayout, s
                                 transition={{ duration: 0.15 }}
                                 style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
                             >
-                                <DialogTitle id={`popup-control-${control.id}`}>{control.name || 'Pop-up'}</DialogTitle>
+                                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, px: 2, py: 0.75, flexShrink: 0 }}>
+                                    <Typography
+                                        id={`popup-control-${control.id}`}
+                                        component="h2"
+                                        variant="h6"
+                                        sx={{ flex: '1 1 auto', minWidth: 0, lineHeight: 1.3, overflowWrap: 'anywhere' }}
+                                    >
+                                        {control.name || 'Pop-up'}
+                                    </Typography>
+                                    {titleBarControls.length > 0 && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 1, flex: '0 1 auto', minWidth: 0 }}>
+                                            {titleBarControls.map(titleBarControl => (
+                                                <ControlRenderer
+                                                    key={titleBarControl.id}
+                                                    control={titleBarControl}
+                                                    stage={stage}
+                                                    isVerticalLayout
+                                                    onActivate={onAction}
+                                                />
+                                            ))}
+                                        </Box>
+                                    )}
+                                </Box>
                                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, p: { xs: 1, md: 2 } }}>
                                     {selectedScreen && isSectionScreenType(selectedScreen.type) ? (
                                         <ListScreenView stage={stage} screen={selectedScreen} isVerticalLayout={isVerticalLayout} onAction={onAction} />
