@@ -261,7 +261,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                 </Box>}
 
                 <Box ref={mapViewportRef} sx={{ position: 'relative', isolation: 'isolate', flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid var(--agenda-line-strong)', borderRadius: '8px', background: 'color-mix(in srgb, var(--agenda-surface-base) 90%, black 10%)' }}>
-                        <AnimatePresence mode="wait">
+                        {!embedded && <AnimatePresence mode="wait">
                             <motion.div
                                 key={`${displayedMap.id}-label`}
                                 initial={{ opacity: 0 }}
@@ -290,7 +290,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     )}
                                 </Box>
                             </motion.div>
-                        </AnimatePresence>
+                        </AnimatePresence>}
                         <AnimatePresence initial={false}>
                             <motion.div
                                 key={displayedMap.id}
