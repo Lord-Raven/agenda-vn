@@ -5,7 +5,7 @@ import { Stage } from "../Stage";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, buildActorContext, findBestNameMatch, getActorLore, resolveActorSchedule } from "./Actor";
 import { getLocationDescription, getLocationName } from "./Location";
 import { formatTimeSlot } from "./CalendarEvent";
-import { formatLoreEntriesAsContext, isLoreProbabilityActive, MAX_ENTRIES, processLoreText } from "./Lore";
+import { buildLoreEntryBlocks, formatLoreEntriesAsContext, getLorePerContentType, isLoreProbabilityActive, MAX_ENTRIES } from "./Lore";
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
 import {
     buildStructuredExampleResponse,
@@ -317,10 +317,12 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
     );
     const activeConstantLore = lorebook
         .filter((lore) => lore.enabled && lore.constant && passedProbabilityLoreIds.has(lore.id))
-        .filter((lore) => !hasVariableContentTarget(lore.conditionCollections))
-        .filter((lore) => evaluateConditionCollections(lore.conditionCollections, conditionContext))
+        // Per-content entries defer condition evaluation to buildLoreEntryBlocks, where each entity binds the Variable.
+        .filter((lore) => getLorePerContentType(lore)
+            ? true
+            : !hasVariableContentTarget(lore.conditionCollections) && evaluateConditionCollections(lore.conditionCollections, conditionContext))
         .sort((a, b) => a.insertionOrder - b.insertionOrder);
-    const agendaContext = formatLoreEntriesAsContext(activeConstantLore, stage);
+    const agendaContext = formatLoreEntriesAsContext(activeConstantLore, stage, conditionContext);
 
     const settingControls = (agendaConfig?.controls || []).filter((control) => control.active !== false && control.type === 'settings');
     const settingsByStatId = new Map(settingControls.map((control) => [control.statId, control]));
@@ -384,11 +386,12 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
 
     // For lorebook context, we go through lorebook entries and add them 
     let triggeredLore = lorebook.filter(lore => {
-            if (!lore.enabled || hasVariableContentTarget(lore.conditionCollections) || (!['character', 'location', 'other'].includes(lore.type) && !currentActors.some(actor => actor.name.toLowerCase() === lore.type.toLowerCase()))) {
+            if (!lore.enabled || (!getLorePerContentType(lore) && hasVariableContentTarget(lore.conditionCollections)) || (!['character', 'location', 'other'].includes(lore.type) && !currentActors.some(actor => actor.name.toLowerCase() === lore.type.toLowerCase()))) {
                 return false;
             }
 
-            if (!evaluateConditionCollections(lore.conditionCollections, conditionContext)) {
+            // Per-content entries defer condition evaluation to buildLoreEntryBlocks, where each entity binds the Variable.
+            if (!getLorePerContentType(lore) && !evaluateConditionCollections(lore.conditionCollections, conditionContext)) {
                 return false;
             }
 
@@ -437,9 +440,12 @@ export function generateContext(skit: Skit|undefined, stage: Stage, historyLengt
         .addBlock(`Selected Player Settings`, playerSettingContext || '')
         .addBlock(`Global Stats`, globalStatContext || '')
         .addBlock(`Lore Entries`, (builder) => {
-            // Add each lore entry as a separate block, with the title and content.
+            // Add each lore entry as a separate block, with the title and content; per-content entries
+            // expand into one block per matching entity.
             triggeredLore.forEach(lore => {
-                builder.addBlock(`${lore.type}_${lore.title}`, processLoreText(lore.content, stage));
+                buildLoreEntryBlocks(lore, stage, conditionContext).forEach(block => {
+                    builder.addBlock(`${lore.type}_${block.title}`, block.content);
+                });
             });
         }).addBlock(`Recent Events`, (builder) => {
             pastEvents.forEach((event, index) => {

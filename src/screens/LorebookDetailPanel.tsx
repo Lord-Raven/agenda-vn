@@ -3,8 +3,10 @@ import { Add, KeyboardArrowDownRounded, KeyboardArrowUpRounded } from '@mui/icon
 import { Chip } from '@mui/material';
 import { Stage } from '../Stage';
 import { Lore } from '../content/Lore';
+import { ContentType } from '../content/Condition';
 import { Button, TextArea, TextInput } from '../components/UiComponents';
 import { ConditionEditor } from '../components/ConditionEditor';
+import { VariableContentContext } from '../components/VariableContentContext';
 
 interface LorebookDetailPanelProps {
     lore: Lore;
@@ -187,15 +189,18 @@ export const LorebookDetailPanel: FC<LorebookDetailPanelProps> = ({
             </div>
             <div style={{ display: 'grid', gap: '6px' }}>
                 <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Availability</label>
-                <ConditionEditor
-                    conditionCollections={lore.conditionCollections || []}
-                    globalStats={stage().getConfiguration().globalStats || []}
-                    actors={Object.values(stage().getSave().actors || {})}
-                    items={itemOptions}
-                    locations={locationOptions}
-                    stage={stage}
-                    onChange={(conditionCollections) => onChange({ conditionCollections })}
-                />
+                <VariableContentContext.Provider value={lore.perContentType}>
+                    <ConditionEditor
+                        conditionCollections={lore.conditionCollections || []}
+                        globalStats={stage().getConfiguration().globalStats || []}
+                        actors={Object.values(stage().getSave().actors || {})}
+                        items={itemOptions}
+                        locations={locationOptions}
+                        stage={stage}
+                        variableContentType={lore.perContentType}
+                        onChange={(conditionCollections) => onChange({ conditionCollections })}
+                    />
+                </VariableContentContext.Provider>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))', gap: '10px' }}>
                 <div style={{ display: 'grid', gap: '6px' }}>
@@ -215,10 +220,38 @@ export const LorebookDetailPanel: FC<LorebookDetailPanelProps> = ({
                     <NumberStepperInput value={lore.scanDepth} onChange={(scanDepth) => onChange({ scanDepth })} disabled={lore.constant} ariaLabel="Lore scan depth" />
                 </div>
             </div>
-            <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input type="checkbox" checked={lore.updatable ?? true} onChange={(event) => onChange({ updatable: event.target.checked })} />
-                Generatively Maintained
-            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input type="checkbox" checked={lore.updatable ?? true} onChange={(event) => onChange({ updatable: event.target.checked })} />
+                    Generatively Maintained
+                </label>
+                <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                        type="checkbox"
+                        checked={!!lore.perContentType}
+                        onChange={(event) => onChange({ perContentType: event.target.checked ? 'actor' : undefined })}
+                        aria-label="Process per content"
+                    />
+                    Per
+                    <select
+                        value={lore.perContentType || 'actor'}
+                        onChange={(event) => onChange({ perContentType: event.target.value as ContentType })}
+                        disabled={!lore.perContentType}
+                        className="input-base"
+                        style={{ height: '34px' }}
+                        aria-label="Per content type"
+                    >
+                        <option value="actor">Actor</option>
+                        <option value="location">Location</option>
+                        <option value="item">Item</option>
+                    </select>
+                </label>
+            </div>
+            {lore.perContentType && (
+                <div style={{ color: 'var(--agenda-text-muted)', fontSize: '12px', lineHeight: 1.4 }}>
+                    {`This entry is processed once per ${lore.perContentType} whose Availability conditions pass; that ${lore.perContentType} is available as Variable in Availability conditions, and the Title and Content may reference it with {{content}}, {{content:name}}, {{content:description}}, or {{content:Stat Name}}.`}
+                </div>
+            )}
             <div style={{ display: 'grid', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                     <label style={{ color: 'var(--agenda-text-muted)', fontSize: '13px' }}>Triggers</label>

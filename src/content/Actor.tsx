@@ -3,7 +3,7 @@ import { Emotion, EMOTION_PROMPTS, EmotionPack, EmotionPromptMap } from './Emoti
 import { Stage } from '../Stage';
 import { Stat, StatValue, formatReferenceStatText, isNumericDisplayType, isReferenceStatType, isStatLlmSeen, normalizeLocationListValue, normalizeStatValue, resolveStatDefault, resolveStatText } from './Stat';
 import { AspectRatio } from '@chub-ai/stages-ts';
-import { createLoreEntry, formatLoreEntriesAsContext, processLoreText, selectConstantLoreEntries } from './Lore';
+import { createLoreEntry, formatLoreEntriesAsContext, getLorePerContentType, processLoreText, selectConstantLoreEntries } from './Lore';
 import {buildPrompt, PromptBuilder} from "../utils/PromptBuilder.js";
 import {
     buildStructuredExampleResponse,
@@ -414,7 +414,7 @@ export async function distillActor(actor: Actor, definition: any, stage: Stage, 
     // Take this data and use text generation to get an updated distillation of this character, including a physical description.
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
-    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], stage.getScheduleContext(save)), stage) || 'None provided.';
+    const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(save.lorebook || [], stage.getScheduleContext(save)), stage, stage.getScheduleContext(save)) || 'None provided.';
     const otherActorsContext = Object.values(stage.getSave().actors || {})
         .filter(otherActor => otherActor?.id && otherActor.id !== actor.id && otherActor.active !== false && otherActor !== stage.getPlayerActor())
         .map(otherActor => {
@@ -871,7 +871,8 @@ export function getActorLore(actorId: string, stage: Stage) {
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
     const variableLoreText = (stage.getSave().lorebook || [])
-        .filter((entry) => entry?.enabled && entry?.title && hasVariableContentTarget(entry.conditionCollections, 'actor'))
+        // Per-content entries are expanded into shared context blocks instead of injected into actor profiles.
+        .filter((entry) => entry?.enabled && entry?.title && !getLorePerContentType(entry) && hasVariableContentTarget(entry.conditionCollections, 'actor'))
         .filter((entry) => evaluateConditionCollections(entry.conditionCollections, {
             ...stage.getScheduleContext(save),
             actors: [actor],

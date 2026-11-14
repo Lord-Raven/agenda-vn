@@ -4,7 +4,7 @@ import { buildStructuredExampleResponse, buildStructuredResponseFormat, parseStr
 import { Stage } from '../Stage';
 import { generateContext } from './Skit';
 import { buildPrompt } from '../utils/PromptBuilder';
-import { ConditionCollection, ConditionContext, evaluateConditionCollections, hasVariableContentTarget } from './Condition';
+import { CONTENT_TYPES, ConditionCollection, ConditionContext, ContentType, evaluateConditionCollections, getContextContentEntities, hasVariableContentTarget } from './Condition';
 import { Stat, StatType, StatValue, formatReferenceStatText, formatStatOptionValueText, isReferenceStatType } from './Stat';
 import { FunctionVariableBindings, functionReference, isFunctionCallTagArgument, isStatReturnType, parseFunctionCallText, positionalFunctionArguments } from './Function';
 
@@ -62,7 +62,15 @@ export type Lore = {
     priority: number;
     probability: number; // 1 to 100
     conditionCollections: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
+    // When set, the entry is processed once per active entity of this content type: availability conditions
+    // evaluate with that entity bound as the Variable, and {{content}}/{{content:property}} macros in the
+    // title and content resolve against it (like card labels).
+    perContentType?: ContentType;
 }
+
+// The content type a per-content entry expands over, when one is validly set.
+export const getLorePerContentType = (entry: Lore): ContentType | undefined =>
+    entry.perContentType && CONTENT_TYPES.includes(entry.perContentType) ? entry.perContentType : undefined;
 
 const resolveLoreProbability = (entry: Lore): number => {
     const value = Number(entry.probability);
@@ -80,8 +88,10 @@ export const isLoreProbabilityActive = (entry: Lore): boolean => {
 export const selectConstantLoreEntries = (lorebook: Lore[] = [], context: ConditionContext = {}): Lore[] => {
     return lorebook
         .filter((entry) => entry?.enabled && entry?.constant)
-        .filter((entry) => !hasVariableContentTarget(entry.conditionCollections))
-        .filter((entry) => evaluateConditionCollections(entry.conditionCollections, context))
+        // Per-content entries defer condition evaluation to buildLoreEntryBlocks, where each entity binds the Variable.
+        .filter((entry) => getLorePerContentType(entry)
+            ? true
+            : !hasVariableContentTarget(entry.conditionCollections) && evaluateConditionCollections(entry.conditionCollections, context))
         .filter((entry) => isLoreProbabilityActive(entry));
 };
 
@@ -230,7 +240,7 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
 
     const resolveTag = (source: string, depth: number): LoreTextValue | undefined => {
         const reserved = /^(user|char|global)\s*(?::\s*(.*?)\s*)?$/i.exec(source);
-        const contentTag = /^content\s*:\s*(.*?)\s*$/i.exec(source);
+        const contentTag = /^content\s*(?::\s*(.*?))?\s*$/i.exec(source);
         const iconTag = /^icon\s*:\s*(\S[\s\S]*)$/i.exec(source);
         if (iconTag) {
             const [nameSource, colorSource] = splitIconSource(iconTag[1].trim());
@@ -244,7 +254,8 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
             return { value: name, text: `${LORE_ICON_TOKEN_START}${name}${color ? LORE_ICON_TOKEN_COLOR_SEPARATOR + color : ''}${LORE_ICON_TOKEN_END}` };
         }
         if (contentTag && content) {
-            const key = contentTag[1];
+            // A bare {{content}} stands in for the bound content's name.
+            const key = contentTag[1] ?? 'name';
             const field = content.fields[key.toLowerCase()];
             if (field !== undefined) return { value: field, text: field };
             const stat = findStatByKey(content.stats, key);
@@ -327,14 +338,54 @@ export function processLoreText(text: string | undefined, stage: Stage, targetAc
     return resolveTagsInText(String(text || ''), 0);
 }
 
-export const formatLoreEntriesAsContext = (entries: Lore[], stage: Stage): string => {
+export type LoreContextBlock = { title: string; content: string };
+
+// Resolves the prompt blocks an entry contributes. A per-content entry expands into one block per active
+// entity of its content type whose availability conditions pass with that entity bound as the Variable;
+// {{content}}/{{content:property}} macros in its title and content resolve against the entity, like card
+// labels. Other entries yield a single block of their processed content.
+export const buildLoreEntryBlocks = (entry: Lore, stage: Stage, context: ConditionContext = {}): LoreContextBlock[] => {
+    const contentType = getLorePerContentType(entry);
+    if (!contentType) {
+        return [{ title: entry.title, content: processLoreText(entry.content, stage) }];
+    }
+    const currentKey = contentType === 'actor' ? 'currentActor' : contentType === 'location' ? 'currentLocation' : 'currentItem';
+    // A title without content macros gets the entity name appended so expanded blocks stay distinct.
+    const titleHasContentMacro = /\{\{\s*content\b/i.test(entry.title || '');
+    return getContextContentEntities(context, contentType)
+        .filter((entity) => !!entity.id)
+        .filter((entity) => {
+            try {
+                return evaluateConditionCollections(entry.conditionCollections, {
+                    ...context,
+                    [currentKey]: entity,
+                    resolveValue: (value, type, variables) => stage.resolveValue(value, type, stage.getSave(), [], { [contentType]: entity.id, ...variables }),
+                });
+            } catch (error) {
+                console.error(`Per-${contentType} lore entry "${entry.title}" conditions could not be resolved: ${error instanceof Error ? error.message : String(error)}`);
+                return false;
+            }
+        })
+        .map((entity) => {
+            const entityName = String((entity as { displayName?: string }).displayName || entity.name || '');
+            const resolvedTitle = stage.resolveCardText(entry.title || '', contentType, entity.id!);
+            return {
+                title: titleHasContentMacro ? resolvedTitle : [resolvedTitle, entityName].filter(Boolean).join(' - '),
+                content: stage.resolveCardText(entry.content || '', contentType, entity.id!),
+            };
+        });
+};
+
+export const formatLoreEntriesAsContext = (entries: Lore[], stage: Stage, context: ConditionContext = {}): string => {
     const builder = buildPrompt();
     entries.forEach((entry) => {
-        const title = (entry.title || '').trim() || 'Lore';
-        const content = processLoreText(entry.content, stage).trim();
-        if (content) {
-            builder.addBlock(title, content);
-        }
+        buildLoreEntryBlocks(entry, stage, context).forEach((block) => {
+            const title = (block.title || '').trim() || 'Lore';
+            const content = block.content.trim();
+            if (content) {
+                builder.addBlock(title, content);
+            }
+        });
     });
     return builder.formatBlocks();
 };

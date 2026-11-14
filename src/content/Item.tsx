@@ -142,10 +142,11 @@ export async function generateItemDetails(item: Item, stage: Stage, isCreatorMod
 
     const save = stage.getSave();
     const configuration = stage.getConfiguration();
+    const loreContext = { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats };
     const worldContext = formatLoreEntriesAsContext(selectConstantLoreEntries(
         (isCreatorMode ? configuration.lorebook : save.lorebook) || [],
-        { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats },
-    ), stage) || 'None provided.';
+        loreContext,
+    ), stage, loreContext) || 'None provided.';
 
     const request = stage.generateText(buildPrompt()
         .addBlock('Instructions',

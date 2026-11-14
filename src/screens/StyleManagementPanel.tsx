@@ -117,7 +117,8 @@ export const StyleManagementPanel: FC<StyleManagementPanelProps> = ({ stage }) =
             const save = stageInstance.getSave();
             const activeActors = (configuration.actors || []).filter(actor => actor.active !== false);
             const activeLocations = (configuration.locations || []).filter(location => location.active !== false);
-            const contextText = formatLoreEntriesAsContext(selectConstantLoreEntries(configuration.lorebook || [], { ...save, actors: Object.fromEntries(activeActors.map(actor => [actor.id, actor])), globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats }), stageInstance) || 'None provided.';
+            const loreContext = { ...save, actors: Object.fromEntries(activeActors.map(actor => [actor.id, actor])), globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats };
+            const contextText = formatLoreEntriesAsContext(selectConstantLoreEntries(configuration.lorebook || [], loreContext), stageInstance, loreContext) || 'None provided.';
 
             const selectedSettingContext = (configuration.globalStats || []).map((stat) => {
                 const statName = (stat.name || '').trim();
