@@ -4,7 +4,7 @@ import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } fr
 import { Actor, buildActorContext, getActorLore, resolveActorSchedule, resolveInitialActorStatValue } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
 import { getLocationDescription, Location } from '../src/content/Location';
-import { applyStatUpdateValue, buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, OPPOSITE_BOOLEAN_VALUE, resolveAvailableStatOptions, resolveStatDefault, resolveStatValueRule, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
+import { applyStatUpdateValue, buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, OPPOSITE_BOOLEAN_VALUE, resolveAvailableStatOptions, resolveStatDefault, resolveStatOptionPool, resolveStatValueRule, sharesOptionPool, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateContext, generateSkitScript, Skit } from '../src/content/Skit';
 import { cloneGameFunction, functionPickerOptions, functionReference, functionReferenceArguments, functionReferenceId, functionSignature, globalStatReference, parseFunctionCallText, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { evaluateCondition, variableContentValue } from '../src/content/Condition';
@@ -1968,6 +1968,36 @@ test('option lists preserve global references and use their evaluated IDs as act
     save.globalStatValues!.active = [];
     assert.deepEqual(resolveChoices(), ['first']);
     assert.deepEqual(save.globalStatValues!.Choices, stored);
+});
+
+test('option and optionList stats source their options from regular option stats', () => {
+    const { stage, configuration, save } = fixture();
+    configuration.globalStats.push(
+        stat('Mood', 'option', { default: 'happy', options: [
+            { id: 'happy', name: 'Happy', description: '' },
+            { id: 'sad', name: 'Sad', description: '' },
+        ] }),
+        stat('Outlook', 'option', { optionSourceStatId: 'Choices' }),
+    );
+    const context = {
+        sourceStats: configuration.globalStats, globalStatValues: save.globalStatValues,
+        resolveValue: (value: unknown, type: StatType) => stage.resolveValue(value, type),
+    };
+    const mood = configuration.globalStats.find(candidate => candidate.id === 'Mood');
+    save.globalStatValues!.Mood = 'sad';
+    // A non-list source contributes its full pool; its single selected value does not restrict availability.
+    for (const sourced of [stat('selection', 'option', { optionSourceStatId: 'Mood' }),
+        stat('selections', 'optionList', { optionSourceStatId: 'Mood' })]) {
+        assert.deepEqual(resolveStatOptionPool(sourced, context).map(option => option.id), ['happy', 'sad'], sourced.type);
+        assert.deepEqual(resolveAvailableStatOptions(sourced, undefined, context).map(option => option.id), ['happy', 'sad'], sourced.type);
+        assert.equal(sharesOptionPool(sourced, mood, context), true, sourced.type);
+    }
+    // An optionList's active-list filter still applies through an intermediate option-stat source.
+    const chained = stat('chained', 'option', { optionSourceStatId: 'Outlook' });
+    assert.deepEqual(resolveStatOptionPool(chained, context).map(option => option.id), ['first', 'second-2']);
+    save.globalStatValues!.Choices = ['second-2'];
+    assert.deepEqual(resolveAvailableStatOptions(chained, undefined, context).map(option => option.id), ['second-2']);
+    assert.equal(sharesOptionPool(chained, mood, context), false);
 });
 
 test('missing, incompatible, and cyclic global stat references fail explicitly', () => {

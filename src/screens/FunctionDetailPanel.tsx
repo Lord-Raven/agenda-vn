@@ -45,7 +45,7 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
     const parameters = fn.parameters || [];
     const parameterTypes = FUNCTION_RETURN_TYPES.filter(isStatReturnType);
     const save = stage.getSave();
-    const optionListSources = stage.getConfiguration().globalStats.filter(stat => stat.type === 'optionList');
+    const optionSources = stage.getConfiguration().globalStats.filter(stat => stat.type === 'optionList' || stat.type === 'option');
     const parameterActors = Object.values(save.actors || {}).filter(actor => actor.active !== false);
     const parameterItems = (save.inventory || []).filter(item => item.active !== false);
     const parameterLocations = Object.values(save.atlas || {}).filter(location => location.active !== false);
@@ -125,11 +125,11 @@ export const FunctionDetailPanel: FC<FunctionDetailPanelProps> = ({ fn, function
                                             default: parameter.type === 'optionList' ? [] : '',
                                         })}>
                                         <option value="">Own options</option>
-                                        {optionListSources.map(source => (
-                                            <option key={source.id} value={source.id}>{source.name?.trim() || 'Unnamed option list'} (global)</option>
+                                        {optionSources.map(source => (
+                                            <option key={source.id} value={source.id}>{source.name?.trim() || 'Unnamed option stat'} (global)</option>
                                         ))}
-                                        {isSourcedOptionStat(parameter) && !optionListSources.some(source => source.id === parameter.optionSourceStatId) && (
-                                            <option value={parameter.optionSourceStatId}>Missing option list</option>
+                                        {isSourcedOptionStat(parameter) && !optionSources.some(source => source.id === parameter.optionSourceStatId) && (
+                                            <option value={parameter.optionSourceStatId}>Missing option source</option>
                                         )}
                                     </select>
                                 </label>

@@ -352,7 +352,7 @@ test('details show the current function only and preserve reorder availability',
     assert.match(html, /<button(?=[^>]*aria-label="Move function down")(?=[^>]*disabled="")[^>]*>/);
 });
 
-test('option parameters select global list sources, preserve own options and reset defaults on source changes', () => {
+test('option parameters select global option sources, preserve own options and reset defaults on source changes', () => {
     for (const type of ['option', 'optionList'] as const) {
         const { stage, configuration } = fixture();
         const ownOptions = [{ id: 'own', name: 'Own choice', description: '' }];
@@ -363,6 +363,7 @@ test('option parameters select global list sources, preserve own options and res
         });
         configuration.globalStats = [
             makeStat({ id: 'source', name: 'Available choices', type: 'optionList', options: ownOptions }),
+            makeStat({ id: 'single', name: 'Single choice', type: 'option', options: ownOptions }),
             makeStat({ id: 'text', name: 'Not a list', type: 'text', default: '' }),
         ];
         configuration.actorStats = [makeStat({ id: 'actor-source', name: 'Actor choices', type: 'optionList' })];
@@ -383,6 +384,7 @@ test('option parameters select global list sources, preserve own options and res
         };
         const initial = renderToStaticMarkup(panel());
         assert.match(initial, /Available choices \(global\)/);
+        assert.match(initial, /Single choice \(global\)/);
         assert.doesNotMatch(initial, /Not a list|Actor choices/);
         assert.match(initial, /Add option/);
         changeSource('source');
@@ -394,7 +396,7 @@ test('option parameters select global list sources, preserve own options and res
         assert.equal(fn.parameters![0].optionSourceStatId, undefined);
         assert.match(renderToStaticMarkup(panel()), /Add option/);
         changeSource('deleted-source');
-        assert.match(renderToStaticMarkup(panel()), /value="deleted-source" selected="">Missing option list/);
+        assert.match(renderToStaticMarkup(panel()), /value="deleted-source" selected="">Missing option source/);
     }
 });
 

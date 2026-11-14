@@ -34,7 +34,7 @@ export const normalizeStatShape = (stat: Stat): Stat => {
 
 const normalizeStatShapeForType = (stat: Stat): Stat => {
     if (isSourcedOptionStat(stat)) {
-        // Options come from the source list; the stat's own options are kept in case the source is cleared.
+        // Options come from the source stat; the stat's own options are kept in case the source is cleared.
         return {
             ...stat,
             default: stat.type === 'optionList' ? normalizeReferenceListValue(stat.default) : typeof stat.default === 'string' ? stat.default : '',
@@ -160,9 +160,10 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
     // Raw (unfiltered) options, so blank-named rows stay visible and indices match updateOption/removeOption.
     const editableOptionEntries = stat.options || [];
     const isSourcedOption = isSourcedOptionStat(normalizedStat);
-    // Global lists, plus (for entity stats) lists on the same entity, whose active options are that entity's own.
-    const optionListSources = [...globalStats, ...(category === 'global' ? [] : selfStats)]
-        .filter(candidate => isOptionListStatType(candidate.type) && candidate.id !== stat.id);
+    // Global option/optionList stats, plus (for entity stats) those on the same entity, whose active options
+    // are that entity's own.
+    const optionSources = [...globalStats, ...(category === 'global' ? [] : selfStats)]
+        .filter(candidate => (candidate.type === 'option' || isOptionListStatType(candidate.type)) && candidate.id !== stat.id);
     const variableContentType = category === 'actor' ? 'actor' : undefined;
     const conditionStats = category === 'global' ? [...selfStats, ...actorStats] : [...selfStats, ...globalStats];
 
@@ -364,7 +365,7 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                 />
                             </div>
                         )}
-                        {(normalizedStat.type === 'option' || normalizedStat.type === 'optionList') && (optionListSources.length > 0 || isSourcedOption) && (
+                        {(normalizedStat.type === 'option' || normalizedStat.type === 'optionList') && (optionSources.length > 0 || isSourcedOption) && (
                             <div style={{ ...inlineFieldStyle, marginBottom: 10 }}>
                                 <label style={fieldLabelStyle}>Option Source</label>
                                 <select
@@ -373,13 +374,13 @@ export const StatEntryEditor: FC<StatEntryEditorProps> = ({
                                     onChange={(e) => patchStat({ optionSourceStatId: e.target.value || undefined, default: normalizedStat.type === 'optionList' ? [] : '' })}
                                 >
                                     <option value="">Own options</option>
-                                    {optionListSources.map(source => (
+                                    {optionSources.map(source => (
                                         <option key={source.id} value={source.id}>
-                                            {source.name?.trim() || 'Unnamed option list'}{category !== 'global' && !globalStats.includes(source) ? ` (same ${category})` : ' (global)'}
+                                            {source.name?.trim() || 'Unnamed option stat'}{category !== 'global' && !globalStats.includes(source) ? ` (same ${category})` : ' (global)'}
                                         </option>
                                     ))}
-                                    {isSourcedOption && !optionListSources.some(source => source.id === normalizedStat.optionSourceStatId) && (
-                                        <option value={normalizedStat.optionSourceStatId}>Missing option list</option>
+                                    {isSourcedOption && !optionSources.some(source => source.id === normalizedStat.optionSourceStatId) && (
+                                        <option value={normalizedStat.optionSourceStatId}>Missing option source</option>
                                     )}
                                 </select>
                             </div>

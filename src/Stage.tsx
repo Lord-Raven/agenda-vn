@@ -355,7 +355,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     constructor(data: InitialData<InitStateType, ChatStateType, MessageStateType, ConfigType>) {
         super(data);
-        // Registered before any save/config normalization so sourced option stats can see their optionList.
+        // Registered before any save/config normalization so sourced option stats can see their source stat.
         setOptionListSourceResolver((statId) => {
             const save = this.statContextSave || this.saveData?.saves?.[this.saveData.lastSaveSlot];
             const configuration = save?.configuration || this.saveData?.configuration;

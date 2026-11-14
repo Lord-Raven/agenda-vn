@@ -37,7 +37,8 @@ export const resolveConditionalFlag = (flag: ConditionalFlag | undefined, contex
 
 // Reference stats hold content IDs rather than display values. List variants hold a set of IDs.
 // 'optionList' holds a pool of options (Stat.options) whose value is the list of currently active option ids;
-// 'option' stats may pull their choices from one via Stat.optionSourceStatId.
+// 'option' and 'optionList' stats may pull their choices from another 'option' or 'optionList' stat via
+// Stat.optionSourceStatId.
 // 'contentList' is a mixed reference list whose ids may point at actors, items, and locations together.
 // 'icon' is a text value naming a recognized icon (see StatRating's icon pool), or empty for none.
 export type StatType = 'number' | 'option' | 'optionList' | 'text' | 'icon' | 'boolean' | 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'contentList';
@@ -196,8 +197,8 @@ export const resolveStatOptionId = (option: StatOption | undefined, index: numbe
 
 export const getStatOptionValue = resolveStatOptionId;
 
-// Supplies optionList stat definitions (from any stat category, looked up by id) to option stats that source
-// their choices from one; `value` is only known for global lists. Registered by the Stage.
+// Supplies option/optionList stat definitions (from any stat category, looked up by id) to option stats that
+// source their choices from one; `value` is only known for global stats. Registered by the Stage.
 export type OptionListSourceResolver = (statId: string) => { stat: Stat; value?: StatValue; resolveValue?: FunctionValueResolver } | undefined;
 let optionListSourceResolver: OptionListSourceResolver | undefined;
 
@@ -217,7 +218,7 @@ export type OptionListSourceContext = {
 const resolveOptionListSource = (statId: string, context?: OptionListSourceContext): ReturnType<OptionListSourceResolver> => {
     const resolved = optionListSourceResolver?.(statId);
     const stat = context?.sourceStats?.find((candidate) => candidate.id === statId) || resolved?.stat;
-    if (stat?.type !== 'optionList') {
+    if (stat?.type !== 'optionList' && stat?.type !== 'option') {
         return undefined;
     }
     return { stat, value: context?.entityStatValues?.[statId] ?? context?.globalStatValues?.[statId] ?? resolved?.value,
@@ -233,8 +234,8 @@ const materializeOptions = (options: StatOption[] | undefined): StatOption[] => 
     (options || []).map((option, index) => ({ ...option, id: resolveStatOptionId(option, index) }))
 );
 
-// Every option a stat's value may refer to: its own options, or (for a sourced option stat) the source
-// optionList's full pool, including options not currently active.
+// Every option a stat's value may refer to: its own options, or (for a sourced option stat) the full pool
+// of the stat at the end of its source chain, including options not currently active.
 export const resolveStatOptionPool = (stat: Stat | undefined, context?: OptionListSourceContext): StatOption[] => {
     const visited = new Set<string>();
     while (stat && isSourcedOptionStat(stat)) {
@@ -273,8 +274,9 @@ export const sharesOptionPool = (stat: Stat | undefined, candidate: Stat | undef
     return !!root && root === resolveOptionPoolRootId(candidate, context);
 };
 
-// The options currently offered for selection. For a sourced option stat, only those active in the source
-// optionList's value; `currentValue`'s option is always kept so an existing selection still renders.
+// The options currently offered for selection. For a sourced option stat, only those active in any source
+// optionList's value along the chain (an 'option' source contributes its full pool since it has no active
+// list); `currentValue`'s option is always kept so an existing selection still renders.
 export const resolveAvailableStatOptions = (stat: Stat | undefined, currentValue?: unknown, context?: OptionListSourceContext): StatOption[] => {
     const pool = resolveStatOptionPool(stat, context);
     if (!stat || !isSourcedOptionStat(stat)) {
@@ -289,8 +291,10 @@ export const resolveAvailableStatOptions = (stat: Stat | undefined, currentValue
         if (!source) {
             break;
         }
-        const activeIds = new Set(resolveStatValue(source.value, { ...source.stat, options: pool, optionSourceStatId: undefined }, source) as string[]);
-        available = available.filter(option => activeIds.has(option.id!));
+        if (source.stat.type === 'optionList') {
+            const activeIds = new Set(resolveStatValue(source.value, { ...source.stat, options: pool, optionSourceStatId: undefined }, source) as string[]);
+            available = available.filter(option => activeIds.has(option.id!));
+        }
         current = source.stat;
     }
     const availableIds = new Set(available.map(option => option.id!));
@@ -383,7 +387,7 @@ export type Stat = {
     default: StatValue;
     type: StatType;
     options?: StatOption[];
-    // For 'option' and 'optionList': id of an 'optionList' stat to take options from instead of `options`.
+    // For 'option' and 'optionList': id of another 'option' or 'optionList' stat to take options from instead of `options`.
     optionSourceStatId?: string;
     min?: number;
     max?: number; // Numeric maximum, or maximum length for list stats; omitted means unlimited.
