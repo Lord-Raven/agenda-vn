@@ -3006,8 +3006,19 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     endSkit(): Skit | null {
         const save = this.getSave();
         const currentSkit = this.getCurrentSkit();
-        if (currentSkit) {
-            currentSkit.over = true;
+        // Close out every unfinished skit on the timeline so outcomes from scenes that were never
+        // explicitly ended (e.g. another skit was started mid-scene) are still applied.
+        const unfinishedSkits = (save.timeline || [])
+            .map(entry => entry.skit)
+            .filter((skit): skit is Skit => !!skit && !skit.over);
+        for (const skit of unfinishedSkits) {
+            // Discard generated-but-unseen entries so only outcomes the player actually reached are applied.
+            const script = skit.script || [];
+            const clampedIndex = Math.min(Math.max(skit.currentIndex || 0, 0), Math.max(script.length - 1, 0));
+            if (script.length > clampedIndex + 1) {
+                skit.script = script.slice(0, clampedIndex + 1);
+            }
+            skit.over = true;
         }
         const loreUpdatePromises: Promise<unknown>[] = [];
 
@@ -3018,9 +3029,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
 
         // This is where various outcomes of the skit are processed and applied to the save state.
-        // Outcomes are attached to the message where they occurred, so process every entry.
+        // Outcomes are attached to the message where they occurred, so process every entry of
+        // every skit being closed out, in timeline order.
         console.log(`Processing outcomes for skit:`);
-        const outcomes = currentSkit?.script.flatMap(entry => entry.outcomes || []) || [];
+        const outcomes = unfinishedSkits.flatMap(skit => (skit.script || []).flatMap(entry => entry.outcomes || []));
         console.log(outcomes);
         const scheduledLoreIds = new Set<string>();
         for (const outcome of outcomes) {

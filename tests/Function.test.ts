@@ -5,7 +5,7 @@ import { Actor, buildActorContext, getActorLore, resolveActorSchedule, resolveIn
 import { Item } from '../src/content/Item';
 import { getLocationDescription, Location } from '../src/content/Location';
 import { applyStatUpdateValue, buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, OPPOSITE_BOOLEAN_VALUE, resolveAvailableStatOptions, resolveStatDefault, resolveStatOptionPool, resolveStatValueRule, sharesOptionPool, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
-import { generateContext, generateSkitScript, Skit } from '../src/content/Skit';
+import { generateContext, generateSkitScript, ScriptEntry, Skit } from '../src/content/Skit';
 import { cloneGameFunction, functionPickerOptions, functionReference, functionReferenceArguments, functionReferenceId, functionSignature, globalStatReference, parseFunctionCallText, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { evaluateCondition, variableContentValue } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
@@ -13,6 +13,7 @@ import { Control } from '../src/content/Control';
 import { Screen as GameMap } from '../src/content/Screen';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { createLoreEntry, formatLoreEntriesAsContext, LORE_ICON_TOKEN_COLOR_SEPARATOR, LORE_ICON_TOKEN_END, LORE_ICON_TOKEN_START, processLoreText, stripLoreIcons } from '../src/content/Lore';
+import { Outcome, OutcomeType } from '../src/content/Outcome';
 import { buildPrompt } from '../src/utils/PromptBuilder';
 import { evaluateValueExpression, validateValueExpression } from '../src/content/ValueExpression';
 import { normalizeStatShape } from '../src/components/StatEntryEditor';
@@ -1319,6 +1320,52 @@ test('multi-period event completion keeps only the first rule skit while replayi
     assert.equal(save.currentDate, '2026-10-16');
     assert.equal(save.currentTimeOfDay, 'morning');
     assert.equal(save.timeline.length, 2);
+});
+
+test('endSkit applies outcomes from every unfinished skit but not from entries beyond the player\'s progress', () => {
+    const { stage, save, current } = endingSkitFixture(false);
+    const scoreChange = (changeValue: number) => new Outcome({
+        type: OutcomeType.ACTOR_STAT,
+        details: { actorId: 'b', actorName: 'Same name', statName: 'Score', changeValue, statMap: { Score: changeValue } },
+    });
+    const orphan = new Skit({
+        initialLocationId: 'place', initialActors: ['b'], currentIndex: 0,
+        script: [new ScriptEntry({ message: 'Orphaned scene.', outcomes: [scoreChange(1)] })],
+    });
+    save.timeline.unshift({ date: save.currentDate, skit: orphan });
+    current.script = [
+        new ScriptEntry({ message: 'Seen.', outcomes: [scoreChange(3)] }),
+        new ScriptEntry({ message: 'Unseen.', outcomes: [scoreChange(100)] }),
+    ];
+    current.currentIndex = 0;
+    assert.equal(stage.endSkit(), null);
+    assert.equal(save.actors.b.statMap?.Score, 6);
+    assert.equal(orphan.over, true);
+    assert.equal(current.over, true);
+    assert.equal(current.script.length, 1);
+});
+
+test('dropped empty script entries carry their outcomes to a neighboring entry', async () => {
+    const { stage, save, configuration } = fixture();
+    save.actors.b.name = 'Bella';
+    configuration.actorStats.push(stat('Mood', 'number', {
+        min: 0, max: 10, default: 5,
+        llmSees: { value: true, conditions: [] }, llmMaintained: { value: true, conditions: [] },
+    }));
+    const skit = new Skit({ initialLocationId: 'place', initialActors: ['b'], guidance: 'A test scene' });
+    save.timeline.push({ skit, date: '2026-10-15' });
+    stage.pushMessage = () => {};
+    const bellaMood = (amount: number) => `<StatChange><Actor>Bella</Actor><Stat>Mood</Stat><Amount>${amount}</Amount></StatChange>`;
+    stage.generateText = async () =>
+        '<Entry><Speaker>Bella</Speaker><Message>Hello there.</Message></Entry>' +
+        `<Entry><Speaker>Narrator</Speaker><Message></Message>${bellaMood(2)}</Entry>` +
+        `<Entry><Speaker>Narrator</Speaker><Message></Message>${bellaMood(3)}</Entry>` +
+        '<Entry><Speaker>Bella</Speaker><Message>Later.</Message></Entry>' +
+        `<Entry><Speaker>Narrator</Speaker><Message>${bellaMood(1)}</Message></Entry>`;
+    const entries = await generateSkitScript(skit, stage);
+    assert.deepEqual(entries.map(entry => entry.message), ['Hello there.', 'Later.']);
+    assert.deepEqual(entries[1].outcomes.map(outcome => outcome.details?.changeValue), [2, 3, 1]);
+    assert.ok(entries[1].outcomes.every(outcome => outcome.type === OutcomeType.ACTOR_STAT && outcome.details?.actorId === 'b'));
 });
 
 test('automatic guidance preserves the explicit cast, including unscheduled actors and an empty cast', async () => {

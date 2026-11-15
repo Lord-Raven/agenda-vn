@@ -1039,23 +1039,31 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     });
             }
 
-            // Drop empty entries from scriptEntries and adjust speaker to any matching actor's name:
-            for (const entry of scriptEntries) {
-                if (!entry.message || entry.message.trim().length === 0) {
-                    const updatedActors = entry.updatedActors;
-                    const emotions = entry.actorEmotions || {};
-                    const outfitChanges = entry.actorOutfits || {};
-                    const nextEntry = scriptEntries[scriptEntries.indexOf(entry) + 1];
-                    if (nextEntry) {
-                        if (updatedActors) {
-                            nextEntry.updatedActors = [...updatedActors];
-                        }
-                        nextEntry.actorEmotions = {...(nextEntry.actorEmotions || {}), ...emotions};
-                        nextEntry.actorOutfits = {...(nextEntry.actorOutfits || {}), ...outfitChanges};
-                    }
-                    scriptEntries.splice(scriptEntries.indexOf(entry), 1);
+            // Drop empty entries from scriptEntries, carrying their side effects over to a neighboring entry:
+            for (let entryIndex = 0; entryIndex < scriptEntries.length;) {
+                const entry = scriptEntries[entryIndex];
+                if (entry.message && entry.message.trim().length > 0) {
+                    entryIndex++;
                     continue;
                 }
+                const nextEntry = scriptEntries[entryIndex + 1];
+                if (nextEntry) {
+                    if (entry.updatedActors) {
+                        nextEntry.updatedActors = [...entry.updatedActors];
+                    }
+                    nextEntry.actorEmotions = {...(nextEntry.actorEmotions || {}), ...(entry.actorEmotions || {})};
+                    nextEntry.actorOutfits = {...(nextEntry.actorOutfits || {}), ...(entry.actorOutfits || {})};
+                    if (entry.outcomes?.length) {
+                        nextEntry.outcomes = [...entry.outcomes, ...(nextEntry.outcomes || [])];
+                    }
+                } else {
+                    // Trailing empty entry: keep its outcomes on the previous entry so they still apply at skit end.
+                    const previousEntry = scriptEntries[entryIndex - 1];
+                    if (previousEntry && entry.outcomes?.length) {
+                        previousEntry.outcomes = [...(previousEntry.outcomes || []), ...entry.outcomes];
+                    }
+                }
+                scriptEntries.splice(entryIndex, 1);
             }
 
             // If impersonation is disabled, find any player entries and remove it and everything that follows:
