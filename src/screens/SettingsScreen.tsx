@@ -980,7 +980,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 }))}
                                                 style={{
                                                     width: '100%',
-                                                    accentColor: 'var(--agenda-warning)',
+                                                    accentColor: 'var(--agenda-highlight)',
                                                     cursor: 'pointer',
                                                 }}
                                             />
@@ -995,7 +995,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                                 }}
                                             >
                                                 <span>Faster</span>
-                                                <span style={{ color: 'var(--agenda-warning)', fontWeight: 'bold' }}>
+                                                <span style={{ color: 'var(--agenda-highlight)', fontWeight: 'bold' }}>
                                                     {settings.typeOutSpeed} ms/char
                                                 </span>
                                                 <span>Slower</span>
