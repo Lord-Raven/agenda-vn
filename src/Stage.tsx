@@ -202,6 +202,18 @@ const cloneControl = (control: Control): Control => new Control({
     actions: (control.actions || []).map(cloneStatUpdateAction),
 });
 
+// Configured stat values are initial defaults for new content; when replacing content the save already
+// has, keep the save's per-game stat values instead of overwriting them with the configured defaults.
+const withPreservedStatMap = <T extends { statMap: { [key: string]: StatValue } }>(
+    next: T,
+    existing: { statMap?: { [key: string]: StatValue } } | undefined,
+): T => {
+    if (existing?.statMap && typeof existing.statMap === 'object') {
+        next.statMap = { ...existing.statMap };
+    }
+    return next;
+};
+
 const cloneScreen = (map: Screen): Screen => new Screen({
     ...map,
     focalPoint: map.focalPoint ? { ...map.focalPoint } : undefined,
@@ -1000,7 +1012,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (!configuredActor) {
             return false;
         }
-        save.actors[actorId] = cloneActor(configuredActor, true);
+        save.actors[actorId] = withPreservedStatMap(cloneActor(configuredActor, true), save.actors[actorId]);
         this.syncActorStats(save);
         this.saveGame();
         return true;
@@ -1012,7 +1024,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (!configuredLocation) {
             return false;
         }
-        save.atlas[locationId] = cloneLocation(configuredLocation, true);
+        save.atlas[locationId] = withPreservedStatMap(cloneLocation(configuredLocation, true), save.atlas[locationId]);
         this.syncLocationStats(save);
         this.saveGame();
         return true;
@@ -1028,7 +1040,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         if (index === -1) {
             save.inventory = [...(save.inventory || []), cloneItem(configuredItem, true)];
         } else {
-            save.inventory[index] = cloneItem(configuredItem, true);
+            save.inventory[index] = withPreservedStatMap(cloneItem(configuredItem, true), save.inventory[index]);
         }
         this.syncItemStats(save);
         this.saveGame();
@@ -1382,13 +1394,15 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const configuration = cloneConfiguration(this.getPublishedConfiguration());
         copy.configuration = configuration;
         configuration.actors.forEach(actor => {
-            if (actor.id !== copy.playerId) copy.actors[actor.id] = cloneActor(actor, true);
+            if (actor.id !== copy.playerId) copy.actors[actor.id] = withPreservedStatMap(cloneActor(actor, true), copy.actors[actor.id]);
         });
-        configuration.locations.forEach(location => { copy.atlas[location.id] = cloneLocation(location, true); });
+        configuration.locations.forEach(location => {
+            copy.atlas[location.id] = withPreservedStatMap(cloneLocation(location, true), copy.atlas[location.id]);
+        });
         configuration.items.forEach(item => {
             const index = copy.inventory.findIndex(candidate => candidate.id === item.id);
             if (index < 0) copy.inventory.push(cloneItem(item, true));
-            else copy.inventory[index] = cloneItem(item, true);
+            else copy.inventory[index] = withPreservedStatMap(cloneItem(item, true), copy.inventory[index]);
         });
         configuration.screens.forEach(map => {
             const index = copy.screens.findIndex(candidate => candidate.id === map.id);

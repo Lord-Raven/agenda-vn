@@ -140,7 +140,8 @@ test('clone and update replaces published content, preserves progress, and persi
     assert.equal(copy.actors.player.name, 'My player');
     assert.equal(copy.actors.player.statMap.health, 8);
     assert.equal(copy.actors.actor.name, 'Updated actor');
-    assert.equal(copy.actors.actor.statMap.health, 2);
+    assert.equal(copy.actors.actor.statMap.health, 9);
+    assert.equal(copy.actors.added.statMap.health, 1);
     assert.ok(copy.actors.extra && copy.actors.added);
     assert.equal(copy.atlas.place.name, 'Updated place');
     assert.ok(copy.atlas.extra && copy.atlas.added);
@@ -524,6 +525,10 @@ test('global apply replaces the current slot with all draft content even with no
     stage.isOwner = true;
     stage.getPublishedConfiguration().versionId = undefined;
     stage.saveData.saves.fill(source);
+    stage.getPublishedConfiguration().locationStats = [numberStat('mood', 1)];
+    stage.getPublishedConfiguration().itemStats = [numberStat('charge', 1)];
+    source.atlas.place.statMap = { mood: 5 };
+    source.inventory[0].statMap = { charge: 6 };
     const original = JSON.stringify(source);
     await stage.applyConfigurationToSave();
     const applied = stage.getSave();
@@ -531,9 +536,15 @@ test('global apply replaces the current slot with all draft content even with no
     assert.equal(stage.saveData.saves.filter(Boolean).length, 10);
     assert.equal(persisted.length, 1);
     assert.equal(applied.actors.actor.name, 'Updated actor');
+    assert.equal(applied.actors.actor.statMap.health, 9);
+    assert.equal(applied.actors.added.statMap.health, 1);
     assert.equal(applied.actors.player.name, 'My player');
     assert.equal(applied.atlas.place.name, 'Updated place');
+    assert.equal(applied.atlas.place.statMap.mood, 5);
+    assert.equal(applied.atlas.added.statMap.mood, 1);
     assert.equal(applied.inventory[0].name, 'Updated item');
+    assert.equal(applied.inventory[0].statMap.charge, 6);
+    assert.equal(applied.inventory.find(item => item.id === 'added')?.statMap.charge, 1);
     assert.equal(applied.screens[0].name, 'Updated map');
     assert.equal(applied.lorebook?.find(entry => entry.id === 'lore')?.content, 'Updated lore');
     assert.equal(applied.configuration?.functions[0].id, 'fn');
@@ -547,6 +558,31 @@ test('global apply replaces the current slot with all draft content even with no
     stage.saveData.saves.slice(1).forEach(save => assert.equal(save, source));
     await stage.applyConfigurationToSave();
     assert.equal(stage.getSave().actors.actor.name, 'Updated actor');
+});
+
+test('per-entity apply preserves per-game stat values on existing content and seeds defaults for new content', () => {
+    const { stage } = fixture();
+    publishUpdate(stage);
+    stage.isOwner = true;
+    stage.getPublishedConfiguration().locationStats = [numberStat('mood', 1)];
+    stage.getPublishedConfiguration().itemStats = [numberStat('charge', 1)];
+    const save = stage.getSave();
+    // Per-entity apply normalizes stats against the save's configuration snapshot.
+    save.configuration!.locationStats = [numberStat('mood', 1)];
+    save.configuration!.itemStats = [numberStat('charge', 1)];
+    save.atlas.place.statMap = { mood: 5 };
+    save.inventory[0].statMap = { charge: 6 };
+    assert.equal(stage.applyConfigurationActorToSave('actor'), true);
+    assert.equal(save.actors.actor.name, 'Updated actor');
+    assert.equal(save.actors.actor.statMap.health, 9);
+    assert.equal(stage.applyConfigurationActorToSave('added'), true);
+    assert.equal(save.actors.added.statMap.health, 1);
+    assert.equal(stage.applyConfigurationLocationToSave('place'), true);
+    assert.equal(save.atlas.place.name, 'Updated place');
+    assert.equal(save.atlas.place.statMap.mood, 5);
+    assert.equal(stage.applyConfigurationItemToSave('item'), true);
+    assert.equal(save.inventory[0].name, 'Updated item');
+    assert.equal(save.inventory[0].statMap.charge, 6);
 });
 
 test('only creators with an existing current save can use global apply', async () => {
