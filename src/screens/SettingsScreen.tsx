@@ -14,8 +14,18 @@ import { processLoreText } from '../content/Lore';
 import { renderLoreIcons } from '../components/LoreIconText';
 
 export const DEFAULT_PLAYER_THEME_COLOR = '#66bbee';
+export const DEFAULT_TYPE_OUT_SPEED = 10;
 
 const isValidHexColor = (value: string): boolean => /^#[0-9a-f]{6}$/i.test(value.trim());
+const MIN_TYPE_OUT_SPEED = 0;
+const MAX_TYPE_OUT_SPEED = 50;
+
+const clampTypeOutSpeed = (value: number) => {
+    if (Number.isNaN(value)) {
+        return DEFAULT_TYPE_OUT_SPEED;
+    }
+    return Math.min(MAX_TYPE_OUT_SPEED, Math.max(MIN_TYPE_OUT_SPEED, value));
+};
 
 const resolvePlayerThemeColor = (value: string): string => (
     isValidHexColor(value) ? value : DEFAULT_PLAYER_THEME_COLOR
@@ -39,6 +49,7 @@ interface SettingsData {
     enableFontEffects: boolean;
     enableTextToSpeech: boolean;
     enableHaptics: boolean;
+    typeOutSpeed: number;
     betaMode: boolean;
     language: string;
 }
@@ -89,6 +100,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
         enableFontEffects: (stageInstance.getSave()?.enableFontEffects ?? true),
         enableTextToSpeech: (stageInstance.getSave()?.enableTextToSpeech ?? true),
         enableHaptics: (stageInstance.getSave()?.enableHaptics ?? true),
+        typeOutSpeed: clampTypeOutSpeed(stageInstance.getSave()?.typeOutSpeed ?? 10),
         betaMode: (stageInstance.getSave()?.betaMode ?? false),
         language: stageInstance.getSave()?.language || 'English',
     });
@@ -176,6 +188,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                     enableFontEffects: settings.enableFontEffects,
                     enableTextToSpeech: settings.enableTextToSpeech,
                     enableHaptics: settings.enableHaptics,
+                    typeOutSpeed: clampTypeOutSpeed(settings.typeOutSpeed),
                     betaMode: settings.betaMode,
                     language: settings.language,
                     globalStatValues: resolvedGlobalStatValues,
@@ -191,6 +204,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
             saveData.enableFontEffects = settings.enableFontEffects;
             saveData.enableTextToSpeech = settings.enableTextToSpeech;
             saveData.enableHaptics = settings.enableHaptics;
+            saveData.typeOutSpeed = clampTypeOutSpeed(settings.typeOutSpeed);
             saveData.betaMode = settings.betaMode;
             saveData.language = settings.language;
             saveData.globalStatValues = {
@@ -927,6 +941,65 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ stage, onCancel, onCon
                                             Beta Mode (Not Recommended)
                                         </span>
                                     </motion.div>
+
+                                    {/* Type-Out Speed Slider */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <label
+                                            htmlFor="type-out-speed"
+                                            style={{
+                                                color: 'rgba(255, 255, 255, 0.8)',
+                                                fontSize: '12px',
+                                                fontWeight: 'bold',
+                                            }}
+                                        >
+                                            Type-Out Speed
+                                        </label>
+                                        <div
+                                            style={{
+                                                padding: '12px',
+                                                background: 'rgba(0, 20, 40, 0.7)',
+                                                border: '2px solid rgba(255, 255, 255, 0.1)',
+                                                borderRadius: '8px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '10px',
+                                            }}
+                                        >
+                                            <input
+                                                id="type-out-speed"
+                                                type="range"
+                                                min={MIN_TYPE_OUT_SPEED}
+                                                max={MAX_TYPE_OUT_SPEED}
+                                                step={5}
+                                                value={settings.typeOutSpeed}
+                                                onChange={(e) => setSettings(prev => ({
+                                                    ...prev,
+                                                    typeOutSpeed: clampTypeOutSpeed(parseInt(e.target.value, 10))
+                                                }))}
+                                                style={{
+                                                    width: '100%',
+                                                    accentColor: '#00ff88',
+                                                    cursor: 'pointer',
+                                                }}
+                                            />
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    gap: '12px',
+                                                    color: 'rgba(255, 255, 255, 0.75)',
+                                                    fontSize: '12px',
+                                                }}
+                                            >
+                                                <span>Faster</span>
+                                                <span style={{ color: '#00ff88', fontWeight: 'bold' }}>
+                                                    {settings.typeOutSpeed} ms/char
+                                                </span>
+                                                <span>Slower</span>
+                                            </div>
+                                        </div>
+                                    </div>
 
                                     {/* Language Input */}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

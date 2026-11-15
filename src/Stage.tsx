@@ -57,6 +57,7 @@ export type SaveType = {
     enableFontEffects?: boolean;
     enableTextToSpeech?: boolean;
     enableHaptics?: boolean;
+    typeOutSpeed?: number;
     language?: string;
     lorebook?: Lore[];
     currentDate?: string;

@@ -29,6 +29,7 @@ import {
 import { Box, IconButton } from '@mui/material';
 import React from "react";
 import { Emotion } from "../content/Emotion";
+import { DEFAULT_TYPE_OUT_SPEED } from "./SettingsScreen";
 
 interface SkitScreenProps {
     stage: () => Stage;
@@ -346,7 +347,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                                 includeRole={true}
                             />;
                         }}
-                        typingSpeed={10}
+                        typingSpeed={stage().getSave().typeOutSpeed ?? DEFAULT_TYPE_OUT_SPEED}
                         setTooltip={setTooltip}
                         isVerticalLayout={isVerticalLayout}
                         actors={actors}
