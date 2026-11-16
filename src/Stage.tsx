@@ -246,9 +246,10 @@ const cloneCalendarEvent = (event: CalendarEvent): CalendarEvent => ({
 });
 
 
-type TimelineEntry = {
+export type TimelineEntry = {
     calendarEventId?: string;
     date?: string;
+    timeOfDay?: CalendarTimeOfDay; // The slot during which the entry's skit took place; absent on older saves.
     calendarEventEndTimeOfDay?: CalendarTimeOfDay;
     skit?: Skit;
 }
@@ -933,7 +934,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const skitAction = actions.find((action): action is StartSkitAction => action.kind === 'skit');
         const skit = skitAction ? this.createStatUpdateSkit(save, skitAction, variables) : null;
         if (skit) {
-            save.timeline.push({ date: save.currentDate || this.getStartingDate(save), skit });
+            save.timeline.push({ date: save.currentDate || this.getStartingDate(save), timeOfDay: save.currentTimeOfDay, skit });
         }
         return skit;
     }
@@ -1630,7 +1631,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
         this.rebuildUpcomingEvents(save);
         if (nextSkit) {
-            save.timeline.push({ date: save.currentDate, skit: nextSkit });
+            save.timeline.push({ date: save.currentDate, timeOfDay: save.currentTimeOfDay, skit: nextSkit });
         }
         this.saveGame();
         return nextEvent;
@@ -1678,6 +1679,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         save.timeline.push({
             calendarEventId: selectedEvent.id,
             date: selectedEvent.date,
+            timeOfDay: this.getEventStartTimeOfDay(selectedEvent),
             calendarEventEndTimeOfDay: this.getEventEndTimeOfDay(selectedEvent),
             skit,
         });
@@ -1781,6 +1783,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         save.timeline = save.timeline || [];
         save.timeline.push({
             date: save.currentDate || this.getStartingDate(save),
+            timeOfDay: save.currentTimeOfDay,
             skit,
         });
         this.saveGame();
@@ -2997,6 +3000,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         save.timeline.push({
             calendarEventId: calendarEvent?.id,
             date: calendarEvent?.date,
+            timeOfDay: this.getEventStartTimeOfDay(calendarEvent),
             skit,
         });
 
@@ -3150,7 +3154,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }
 
         if (nextSkit) {
-            save.timeline.push({ date: save.currentDate, skit: nextSkit });
+            save.timeline.push({ date: save.currentDate, timeOfDay: save.currentTimeOfDay, skit: nextSkit });
         }
         this.saveGame();
 

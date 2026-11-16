@@ -2,7 +2,7 @@ import React, { FC, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stage } from '../Stage';
-import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2, Code, Rule, CheckCircle, ErrorOutline } from '@mui/icons-material';
+import { Close, Person, Book, Place, Tune, CalendarMonth, Palette, Map as MapIcon, BarChart, Inventory2, Code, Rule, CheckCircle, ErrorOutline, Theaters } from '@mui/icons-material';
 import { Button, GlassPanel, Title } from '../components/UiComponents';
 import { useTooltip } from '../components/TooltipContext';
 import { ActorManagementPanel } from './ActorManagementPanel';
@@ -17,16 +17,19 @@ import { RulesManagementPanel } from './RulesManagementPanel';
 import { ItemManagementPanel } from './ItemManagementPanel';
 import { ControlManagementPanel } from './ControlManagementPanel';
 import { FunctionManagementPanel } from './FunctionManagementPanel';
+import { SkitManagementPanel } from './SkitManagementPanel';
 
 interface ContentManagementScreenProps {
     stage: () => Stage;
     onClose: () => void;
 }
 
-type TabType = 'game' | 'style' | 'stats' | 'rules' | 'functions' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'screens' | 'calendarEvents';
+type TabType = 'game' | 'style' | 'stats' | 'rules' | 'functions' | 'controls' | 'lorebook' | 'actors' | 'locations' | 'items' | 'screens' | 'calendarEvents' | 'skits';
 const tabStorageKey = 'contentManagement.activeTab';
-const tabs: TabType[] = ['game', 'style', 'stats', 'rules', 'functions', 'controls', 'lorebook', 'actors', 'locations', 'items', 'screens', 'calendarEvents'];
+const tabs: TabType[] = ['game', 'style', 'stats', 'rules', 'functions', 'controls', 'lorebook', 'actors', 'locations', 'items', 'screens', 'calendarEvents', 'skits'];
 const creatorTabs: TabType[] = ['game', 'style', 'rules', 'functions', 'controls'];
+// Tabs that surface save-only content and are therefore hidden in create mode.
+const manageTabs: TabType[] = ['skits'];
 
 export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stage, onClose }) => {
     const [isCreateMode, setIsCreateMode] = useState(() => stage().isOwner);
@@ -79,11 +82,11 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
     };
     const [activeTab, setActiveTab] = useState<TabType>(() => {
         const savedTab = sessionStorage.getItem(tabStorageKey) as TabType | null;
-        return savedTab && tabs.includes(savedTab) && (isCreatorMode || !creatorTabs.includes(savedTab)) && (eventsEnabled || savedTab !== 'calendarEvents') ? savedTab : 'actors';
+        return savedTab && tabs.includes(savedTab) && (isCreatorMode || !creatorTabs.includes(savedTab)) && (!isCreatorMode || !manageTabs.includes(savedTab)) && (eventsEnabled || savedTab !== 'calendarEvents') ? savedTab : 'actors';
     });
 
     useEffect(() => {
-        if ((!isCreatorMode && creatorTabs.includes(activeTab)) || (!eventsEnabled && activeTab === 'calendarEvents')) {
+        if ((!isCreatorMode && creatorTabs.includes(activeTab)) || (isCreatorMode && manageTabs.includes(activeTab)) || (!eventsEnabled && activeTab === 'calendarEvents')) {
             setActiveTab('actors');
         }
     }, [activeTab, isCreatorMode, eventsEnabled]);
@@ -438,6 +441,23 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                     Events ({stage().getManagedCalendarEvents(isCreatorMode).length})
                                 </Button>
                                 )}
+                                {!isCreatorMode && (
+                                <Button
+                                    onClick={() => setActiveTab('skits')}
+                                    variant={activeTab === 'skits' ? 'primary' : 'secondary'}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        flex: '0 0 auto',
+                                        gap: '8px',
+                                        opacity: activeTab === 'skits' ? 1 : 0.6,
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    <Theaters />
+                                    Skits ({(stage().getSave().timeline || []).filter(entry => entry.skit).length})
+                                </Button>
+                                )}
                             </div>
 
                             {/* Content Area */}
@@ -467,6 +487,11 @@ export const ContentManagementScreen: FC<ContentManagementScreenProps> = ({ stag
                                 {/* Calendar Events Tab */}
                                 {eventsEnabled && activeTab === 'calendarEvents' && (
                                     <CalendarEventManagementPanel key={isCreatorMode ? 'create' : 'manage'} stage={stage} isCreatorMode={isCreatorMode} />
+                                )}
+
+                                {/* Skits Tab */}
+                                {!isCreatorMode && activeTab === 'skits' && (
+                                    <SkitManagementPanel stage={stage} />
                                 )}
 
                                 {/* Actors Tab */}
