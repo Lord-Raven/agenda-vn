@@ -41,7 +41,7 @@ interface SkitScreenProps {
  * Helper function to get the active scene location ID at a given script index.
  * Applies scene-level location transitions up to and including the index.
  */
-const getSceneLocationIdAtIndex = (skit: Skit, scriptIndex: number): string => {
+export const getSceneLocationIdAtIndex = (skit: Skit, scriptIndex: number): string => {
     let sceneLocationId = skit.initialLocationId;
 
     for (let i = 0; i <= scriptIndex && i < skit.script.length; i++) {
@@ -54,7 +54,7 @@ const getSceneLocationIdAtIndex = (skit: Skit, scriptIndex: number): string => {
     return sceneLocationId;
 };
 
-const getActorsAtIndex = (skit: Skit, scriptIndex: number, stage: Stage): Actor[] => {
+export const getActorsAtIndex = (skit: Skit, scriptIndex: number, stage: Stage): Actor[] => {
 
     return getCurrentActors(skit, scriptIndex).map(actorId => stage.getSave().actors?.[actorId]).filter(actor => actor !== undefined && actor !== stage.getPlayerActor());
 };
@@ -63,7 +63,7 @@ const getActorsAtIndex = (skit: Skit, scriptIndex: number, stage: Stage): Actor[
  * Helper function to get actor outfit IDs at a given script index.
  * Walks from initialActorOutfits and applies per-entry outfitChanges.
  */
-const getActorOutfitsAtIndex = (skit: Skit, scriptIndex: number, allActors: {[key: string]: Actor}): {[actorId: string]: string} => {
+export const getActorOutfitsAtIndex = (skit: Skit, scriptIndex: number, allActors: {[key: string]: Actor}): {[actorId: string]: string} => {
     const currentOutfits = {
         ...Object.values(allActors).reduce((acc, actor) => {
             acc[actor.id] = actor.outfitId;

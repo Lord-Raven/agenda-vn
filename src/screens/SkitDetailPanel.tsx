@@ -1,11 +1,12 @@
 import { CSSProperties, FC, useState } from 'react';
-import { AutoAwesome } from '@mui/icons-material';
+import { AutoAwesome, Theaters } from '@mui/icons-material';
 import { Stage, TimelineEntry } from '../Stage';
 import { formatDateLabel, generateSkitSummary, Skit } from '../content/Skit';
 import { formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
 import { getLocationName } from '../content/Location';
 import { Button, ConfirmDialog, TextArea } from '../components/UiComponents';
 import { useTooltip } from '../components/TooltipContext';
+import { TheaterScreen } from './TheaterScreen';
 
 interface SkitDetailPanelProps {
     stage: () => Stage;
@@ -61,6 +62,7 @@ export const SkitDetailPanel: FC<SkitDetailPanelProps> = ({ stage, entry, skit, 
     const [confirmGeneration, setConfirmGeneration] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [generationError, setGenerationError] = useState('');
+    const [showTheater, setShowTheater] = useState(false);
 
     const save = stage().getSave();
     const dayLabel = stage().getDateMode() === 'calendar'
@@ -100,6 +102,17 @@ export const SkitDetailPanel: FC<SkitDetailPanelProps> = ({ stage, entry, skit, 
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '18px', minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                    variant="secondary"
+                    disabled={!(skit.script || []).length}
+                    onClick={() => setShowTheater(true)}
+                    onMouseEnter={() => setTooltip('Replay this skit in the theater', Theaters)}
+                    onMouseLeave={clearTooltip}
+                >
+                    <Theaters fontSize="small" /> Theater
+                </Button>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '10px' }}>
                 <div style={{ display: 'grid', gap: '6px', alignContent: 'start' }}>
                     <label style={labelStyle}>Day</label>
@@ -156,6 +169,13 @@ export const SkitDetailPanel: FC<SkitDetailPanelProps> = ({ stage, entry, skit, 
                 onConfirm={generate}
                 onCancel={() => setConfirmGeneration(false)}
             />
+            {showTheater && (
+                <TheaterScreen
+                    stage={stage}
+                    skit={skit}
+                    onClose={() => setShowTheater(false)}
+                />
+            )}
         </div>
     );
 };
