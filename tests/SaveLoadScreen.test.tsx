@@ -28,7 +28,7 @@ const event = (id: string, name = id): CalendarEvent => ({
     actorIds: ['actor'], participantActorIds: ['actor'], description: name, guidance: name,
 });
 
-const lore = (id: string, content = '') => ({ ...createLoreEntry({ content }), id });
+const lore = (id: string, content = '') => ({ ...createLoreEntry({ content, updatable: false }), id });
 
 const fixture = () => {
     const stage: Stage = Object.create(Stage.prototype);
@@ -483,6 +483,29 @@ test('creator draft rule edits update only the active snapshot and do not apply 
     assert.equal(JSON.stringify(stage.saveData.saves[1]), other);
     assert.equal(stage.getConfiguration(stage.saveData.saves[1]!).title, 'Old title');
     assert.ok(stage.canUpdateSave(0));
+});
+
+test('save updates preserve generatively maintained lore entries', async () => {
+    for (const updateMode of ['clone', 'apply'] as const) {
+        const { stage, source } = fixture();
+        const maintainedLore = lore('lore', 'Save-specific details');
+        maintainedLore.title = 'Save-specific title';
+        maintainedLore.updatable = true;
+        source.lorebook![0] = maintainedLore;
+        publishUpdate(stage);
+
+        if (updateMode === 'clone') {
+            await stage.cloneAndUpdateSave(0);
+        } else {
+            stage.isOwner = true;
+            await stage.applyConfigurationToSave();
+        }
+
+        const updatedLore = stage.getSave().lorebook?.find(entry => entry.id === 'lore');
+        assert.equal(updatedLore?.title, 'Save-specific title');
+        assert.equal(updatedLore?.content, 'Save-specific details');
+        assert.equal(updatedLore?.updatable, true);
+    }
 });
 
 test('creators clone and update from unpublished drafts without changing the source save', async () => {

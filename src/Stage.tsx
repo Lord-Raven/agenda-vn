@@ -1415,7 +1415,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         configuration.lorebook.forEach(entry => {
             const index = lorebook.findIndex(candidate => candidate.id === entry.id);
             if (index < 0) lorebook.push(cloneLore(entry));
-            else lorebook[index] = cloneLore(entry);
+            else if (lorebook[index].updatable === false) lorebook[index] = cloneLore(entry);
         });
         const seriesIds = new Set(configuration.calendarEvents.map(event => event.recurrenceParentId || event.id));
         copy.upcomingEvents = (copy.upcomingEvents || [])
