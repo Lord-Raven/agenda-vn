@@ -2,7 +2,7 @@ import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Stage } from '../Stage';
 import { ContentListDisplay, Control, ControlPlacement, controlReference, ControlType, StatDisplayType } from '../content/Control';
 import { ConditionCollection, ContentType } from '../content/Condition';
-import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, sharesOptionPool, StatUpdateAction, cloneStatUpdateAction } from '../content/Stat';
+import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, sharesOptionPool, StatUpdateAction, cloneStatUpdateAction, ReferenceKind } from '../content/Stat';
 import { parseContentStatReference, SCREEN_TYPE_LABELS } from '../content/Screen';
 import { functionReferenceId, isFunctionReference } from '../content/Function';
 import { Button, ColorPickerInput, GlassPanel, HelpTip, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
@@ -49,6 +49,9 @@ type ControlDraft = {
     outcomeStatTarget: Control['outcomeStatTarget'];
     availabilityConditions: ConditionCollection[];
     actions: StatUpdateAction[];
+    markerInputType: 'actor' | 'item' | 'location' | 'screen' | 'string';
+    popupControlId: string;
+    contentList: { kind: ReferenceKind | 'mixed'; values: string[] };
 };
 
 const createDraft = (control: Control): ControlDraft => ({
@@ -80,6 +83,9 @@ const createDraft = (control: Control): ControlDraft => ({
     outcomeStatTarget: control.outcomeStatTarget,
     availabilityConditions: (control.availabilityConditions || []).map((collection) => [...collection]),
     actions: (control.actions || []).map(cloneStatUpdateAction),
+    markerInputType: control.markerInputType,
+    popupControlId: control.popupControlId,
+    contentList: { kind: control.contentList?.kind === 'string' ? 'mixed' : (control.contentList?.kind || 'mixed') as ReferenceKind | 'mixed', values: [...(control.contentList?.values || [])] },
 });
 
 const selectStyle: React.CSSProperties = {
@@ -177,6 +183,9 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             outcomeStatTarget: nextDraft.outcomeStatTarget,
             availabilityConditions: nextDraft.availabilityConditions.map((collection) => [...collection]),
             actions: nextDraft.actions.map(cloneStatUpdateAction),
+            markerInputType: nextDraft.markerInputType,
+            popupControlId: nextDraft.popupControlId,
+            contentList: nextDraft.contentList,
         });
         stageInstance.updateConfiguration({
             controls: configuredControls.map((candidate) => candidate.id === control.id ? persistedControl : candidate),
@@ -234,12 +243,13 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const supportsDisplaySettings = draft.type === 'statDisplay' || draft.type === 'statOutcome';
     const isStatBadge = draft.type === 'statBadge';
     const isCard = draft.type === 'card';
+    const isMarker = draft.type === 'marker';
     const conditionProps = {
         globalStats, actorStats, locationStats: updatableLocationStats, itemStats: updatableItemStats,
         actors: actors.filter(actor => actor.active !== false),
         items: items.filter(item => item.active !== false),
         locations: locations.filter(location => location.active !== false),
-        stage, variableContentType: isCard || isStatBadge ? draft.contentType : usesActorStat ? 'actor' as const : undefined,
+        stage, variableContentType: isCard || isStatBadge ? draft.contentType : isMarker && (draft.markerInputType === 'actor' || draft.markerInputType === 'item' || draft.markerInputType === 'location') ? draft.markerInputType : usesActorStat ? 'actor' as const : undefined,
     };
     const contentTypeStats = draft.contentType === 'actor' ? actorStats : draft.contentType === 'location' ? updatableLocationStats : updatableItemStats;
     // The badge source's value type, for gating the numeric display settings.
@@ -334,7 +344,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.placement}
-                                    disabled={isCard || draft.type === 'statOutcome' || draft.type === 'settings' || draft.type === 'popup' || isStatBadge}
+                                    disabled={isCard || isMarker || draft.type === 'statOutcome' || draft.type === 'settings' || draft.type === 'popup' || isStatBadge}
                                     onChange={(e) => setDraft((current) => ({ ...current, placement: e.target.value as ControlPlacement }))}
                                 >
                                     <option value="top">Top (with date/stats)</option>
@@ -342,7 +352,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     {draft.type === 'statOutcome' && <option value="outcome">Outcomes</option>}
                                     {draft.type === 'settings' && <option value="settings">Settings</option>}
                                     {draft.type === 'popup' && <option value="popup">Pop-up</option>}
-                                    {(isStatBadge || isCard || draft.type === 'button' || draft.type === 'statDisplay' || draft.type === 'statEditor') && <option value="standalone">Standalone</option>}
+                                    {(isStatBadge || isCard || isMarker || draft.type === 'button' || draft.type === 'statDisplay' || draft.type === 'statEditor') && <option value="standalone">Standalone</option>}
                                 </select>
                             </div>
                             <div>
@@ -356,7 +366,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         setDraft((current) => ({
                                             ...current,
                                             type,
-                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'settings' ? 'settings' : type === 'statBadge' || type === 'card' ? 'standalone' : current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' ? 'bottom' : current.placement,
+                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'settings' ? 'settings' : type === 'statBadge' || type === 'card' || type === 'marker' ? 'standalone' : current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' ? 'bottom' : current.placement,
                                             statId: '',
                                             badgeSource: '',
                                             pickerSource: undefined,
@@ -371,6 +381,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <option value="statOutcome">Outcome</option>
                                     <option value="settings">Settings</option>
                                     <option value="popup">Pop-up</option>
+                                    <option value="marker">Marker</option>
                                 </select>
                             </div>
                         </div>
@@ -417,6 +428,62 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                     </section>
                 )}
 
+                {isMarker && (
+                    <section>
+                        <h2 style={sectionHeadingStyle}>Marker</h2>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+                            <div>
+                                <label style={labelStyle}>Input Type</label>
+                                <select
+                                    style={selectStyle}
+                                    value={draft.markerInputType}
+                                    onChange={(event) => setDraft(current => ({ ...current, markerInputType: event.target.value as typeof current.markerInputType, contentList: { kind: 'mixed', values: [] } }))}
+                                >
+                                    <option value="actor">Actor</option>
+                                    <option value="item">Item</option>
+                                    <option value="location">Location</option>
+                                    <option value="screen">Screen</option>
+                                    <option value="string">String</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Hover Pop-up Control</label>
+                                <select
+                                    style={selectStyle}
+                                    value={draft.popupControlId}
+                                    onChange={(event) => setDraft(current => ({ ...current, popupControlId: event.target.value }))}
+                                >
+                                    <option value="">None</option>
+                                    {(stageInstance.getConfiguration().controls || []).filter(candidate => candidate.active !== false && candidate.type === 'popup').map(candidate => (
+                                        <option key={candidate.id} value={candidate.id}>{candidate.name || 'Unnamed Pop-up'}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {draft.markerInputType !== 'screen' && draft.markerInputType !== 'string' && (
+                                <div>
+                                    <div style={fieldHeadingStyle}>
+                                        <label>Content below marker</label>
+                                    </div>
+                                    <ReferenceMultiSelect
+                                        kind={draft.markerInputType}
+                                        values={draft.contentList.values}
+                                        onChange={(values) => setDraft(current => {
+                                            const kind = current.markerInputType === 'actor' || current.markerInputType === 'item' || current.markerInputType === 'location'
+                                                ? current.markerInputType
+                                                : 'mixed';
+                                            return { ...current, contentList: { kind, values } };
+                                        })}
+                                        actors={actors.filter(actor => actor.active !== false)}
+                                        items={items.filter(item => item.active !== false)}
+                                        locations={locations.filter(location => location.active !== false)}
+                                        stage={stage}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </section>
+                )}
+
                 {draft.type === 'popup' ? (
                     <section>
                         <h2 style={sectionHeadingStyle}>Pop-up</h2>
@@ -459,10 +526,10 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 onChange={value => setDraft(current => ({ ...current, titleBarControls: Array.isArray(value) ? value : [] }))} />
                         </div>
                     </section>
-                ) : draft.type === 'button' || isCard ? (
+                ) : draft.type === 'button' || isCard || isMarker ? (
                     <>
                         <section>
-                            <h2 style={sectionHeadingStyle}>{isCard ? 'Card Appearance' : 'Button'}</h2>
+                            <h2 style={sectionHeadingStyle}>{isCard ? 'Card Appearance' : isMarker ? 'Marker Appearance' : 'Button'}</h2>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                 <div>
                                     <div style={fieldHeadingStyle}>

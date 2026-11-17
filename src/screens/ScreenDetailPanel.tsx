@@ -15,6 +15,7 @@ import { IconPicker, resolveIcon } from '../components/StatRating';
 import { processLoreText } from '../content/Lore';
 import { Screen, cloneListSection, isSectionScreenType, ScreenType } from '../content/Screen';
 import { ListSectionsEditor } from '../components/ListSectionsEditor';
+import { Control } from '../content/Control';
 
 interface ScreenDetailPanelProps {
     screen: Screen;
@@ -89,6 +90,7 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
     const save = stageInstance.getSave();
     const configuredMaps = stageInstance.getConfiguration().screens || [];
     const configuredLocations = stageInstance.getConfiguration().locations || [];
+    const configuredMarkers = (stageInstance.getConfiguration().controls || []).filter(control => control.active !== false && control.type === 'marker');
     const sourceMaps = isCreatorMode ? configuredMaps : save.screens || [];
     const activeScreens = sourceMaps.filter(candidate => candidate.active !== false && candidate.id !== map.id);
     const activeMaps = activeScreens.filter(candidate => candidate.type === 'map');
@@ -255,7 +257,27 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
         setDraft(current => ({ ...current, [field]: value }));
     };
 
-    const addLink = (type: MapLink['type'] = 'target') => {
+    const addLink = (type: MapLink['type'] = 'marker') => {
+        if (type === 'marker') {
+            const markerControl = configuredMarkers[0];
+            if (!markerControl) {
+                stageInstance.showPriorityMessage('Create a Marker Control before adding a map marker.');
+                return;
+            }
+            persist(() => {
+                map.links.push({
+                    type: 'marker',
+                    markerControlId: markerControl.id,
+                    content: '',
+                    parentId: map.id,
+                    childId: '',
+                    coordinates: { x: 0.5, y: 0.5 },
+                    conditionCollections: [],
+                });
+            });
+            setIsLinksCollapsed(false);
+            return;
+        }
         const firstTarget = activeLocations[0]?.id || activeMaps[0]?.id;
         if (type !== 'button' && !firstTarget) {
             stageInstance.showPriorityMessage('Create another map or location before adding a link.');
@@ -579,16 +601,16 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                         <strong>Links</strong>
                     </button>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <Button variant="secondary" onClick={() => addLink()} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add Link</Button>
-                        <Button variant="secondary" onClick={() => addLink('button')} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add Button</Button>
+                        <Button variant="secondary" onClick={() => addLink('marker')} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add Marker</Button>
                     </div>
                 </div>
                 {!isLinksCollapsed && (
                     <div style={{ display: 'grid', gap: 8 }}>
                         {map.links.map((link, index) => {
                             const isCollapsed = !expandedLinks.includes(index);
-                            const linkName = link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);
-                            const linkTypeLabel = link.type === 'button' ? 'Button' : resolveTargetTypeLabel(link.childId);
+                            const markerControl = link.type === 'marker' ? configuredMarkers.find(control => control.id === (link.markerControlId || link.markerId)) : undefined;
+                            const linkName = link.type === 'marker' ? markerControl?.name || 'Marker' : link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);
+                            const linkTypeLabel = link.type === 'marker' ? 'Marker' : link.type === 'button' ? 'Button' : resolveTargetTypeLabel(link.childId);
                             return (
                                 <div key={index} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -628,7 +650,26 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                                         }} style={{ padding: 7, flexShrink: 0 }}><Delete fontSize="small" /></Button>
                                     </div>
                                     {!isCollapsed && <>
-                                        {link.type === 'button' ? (<>
+                                        {link.type === 'marker' ? (<>
+                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Marker Control</label>
+                                            <select
+                                                style={selectStyle}
+                                                value={link.markerControlId || link.markerId || ''}
+                                                onChange={event => updateLink(index, { markerControlId: event.target.value, markerId: event.target.value })}
+                                            >
+                                                <option value="">Select a Marker...</option>
+                                                {configuredMarkers.map(control => (
+                                                    <option key={control.id} value={control.id}>{control.name || 'Unnamed Marker'}</option>
+                                                ))}
+                                            </select>
+                                            <TextInput
+                                                fullWidth
+                                                aria-label="Marker content"
+                                                placeholder="Content ID or text passed to the Marker"
+                                                value={link.content || link.input || link.markerContent || ''}
+                                                onChange={event => updateLink(index, { content: event.target.value, input: event.target.value, markerContent: event.target.value })}
+                                            />
+                                        </>) : link.type === 'button' ? (<>
                                             <TextInput fullWidth aria-label="Button name" placeholder="Button name" value={link.name || ''} onChange={event => updateLink(index, { name: event.target.value })} />
                                             <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }} htmlFor={`map-button-label-${map.id}-${index}`}>Button Label (optional)</label>
                                             <TextInput fullWidth id={`map-button-label-${map.id}-${index}`} aria-label="Button label" placeholder="Use button name" value={link.label || ''} onChange={event => updateLink(index, { label: event.target.value })} />
@@ -776,9 +817,10 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                         <CenterFocusStrong style={{ fontSize: 18 }} />
                     </div>}
                     {map.links.map((link, index) => {
-                        const locationImageUrl = link.type !== 'button' ? activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl : undefined;
-                        const markerName = link.type === 'button' ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stageInstance) : resolveTargetName(link.childId);
-                        const MarkerIcon = link.type === 'button' ? (link.iconName ? resolveIcon(link.iconName, stageInstance) : TouchApp) : Place;
+                        const markerControl = link.type === 'marker' ? configuredMarkers.find(control => control.id === (link.markerControlId || link.markerId)) : undefined;
+                        const locationImageUrl = link.type !== 'button' && link.type !== 'marker' ? activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl : undefined;
+                        const markerName = link.type === 'marker' ? markerControl?.name || 'Marker' : link.type === 'button' ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stageInstance) : resolveTargetName(link.childId);
+                        const MarkerIcon = link.type === 'marker' ? (markerControl?.iconName ? resolveIcon(markerControl.iconName, stageInstance) : Place) : link.type === 'button' ? (link.iconName ? resolveIcon(link.iconName, stageInstance) : TouchApp) : Place;
                         return (
                             <div
                                 key={`${link.childId}-marker-${index}`}

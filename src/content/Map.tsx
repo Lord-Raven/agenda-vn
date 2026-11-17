@@ -194,6 +194,18 @@ export class Map {
         this.availabilityConditions = (data?.availabilityConditions || []).map((collection) => [...collection]);
         this.links = (data?.links || []).map((link) => ({
             ...link,
+            markerControlId: typeof link.markerControlId === 'string'
+                ? link.markerControlId
+                : typeof link.markerId === 'string'
+                    ? link.markerId
+                    : '',
+            content: typeof link.content === 'string'
+                ? link.content
+                : typeof link.input === 'string'
+                    ? link.input
+                    : typeof link.markerContent === 'string'
+                        ? link.markerContent
+                        : '',
             parentId: data?.id || this.id,
             coordinates: { ...link.coordinates },
             conditionCollections: (link.conditionCollections || []).map((collection) => [...collection]),
@@ -218,7 +230,12 @@ export const getMapLinkAvailability = (link: MapLink, context: ConditionContext)
 };
 
 export interface MapLink {
-    type?: 'target' | 'button'; // Omitted on legacy navigation links.
+    type?: 'target' | 'button' | 'marker'; // Legacy navigation/button entries are retained only for loading old saves.
+    markerControlId?: string;
+    markerId?: string; // Compatibility alias used by older/draft integrations.
+    content?: string;
+    input?: string;
+    markerContent?: string;
     parentId: string; // The ID of the parent Map
     childId: string; // The ID of the child map or location; unused by buttons.
     coordinates: { x: number; y: number }; // Coordinates for the link on the parent Map (x and y are between 0 and 1, representing a percentage of the map's width and height)

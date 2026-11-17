@@ -32,6 +32,7 @@ const TYPE_LABELS: Record<Control['type'], string> = {
     settings: 'Settings',
     popup: 'Pop-up',
     statBadge: 'Stat Badge',
+    marker: 'Marker',
 };
 
 export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage }) => {
@@ -76,7 +77,8 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             { id: 'outcome', title: PLACEMENT_LABELS.outcome, entries: controls.filter((control) => control.placement === 'outcome') },
             { id: 'settings', title: PLACEMENT_LABELS.settings, entries: controls.filter((control) => control.type === 'settings') },
             { id: 'popup', title: PLACEMENT_LABELS.popup, entries: controls.filter((control) => control.type === 'popup') },
-            { id: 'standalone', title: PLACEMENT_LABELS.standalone, entries: controls.filter((control) => control.placement === 'standalone' && control.type !== 'card') },
+            { id: 'marker', title: 'Markers', entries: controls.filter((control) => control.type === 'marker') },
+            { id: 'standalone', title: PLACEMENT_LABELS.standalone, entries: controls.filter((control) => control.placement === 'standalone' && control.type !== 'card' && control.type !== 'marker') },
         ];
         return sections;
     }, [controls]);
@@ -103,7 +105,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             active: true,
             name: candidateName,
             placement: sectionId === 'top' ? 'top' : sectionId === 'settings' ? 'settings' : 'bottom',
-            type: sectionId === 'popup' ? 'popup' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'cards' ? 'card' : sectionId === 'settings' ? 'settings' : sectionId === 'standalone' ? 'statBadge' : 'button',
+            type: sectionId === 'popup' ? 'popup' : sectionId === 'marker' ? 'marker' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'cards' ? 'card' : sectionId === 'settings' ? 'settings' : sectionId === 'standalone' ? 'statBadge' : 'button',
             label: sectionId === 'cards' ? '{{content:name}}' : sectionId === 'outcome' || sectionId === 'settings' || sectionId === 'standalone' ? '' : candidateName,
         });
 

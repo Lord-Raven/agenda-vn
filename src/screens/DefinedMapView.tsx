@@ -1,4 +1,4 @@
-import { CSSProperties, FC, Fragment, ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FC, Fragment, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings, TouchApp } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -19,7 +19,7 @@ import { resolveIcon } from '../components/StatRating';
 import { ContentListPortraits } from '../components/ContentListControl';
 import { normalizeReferenceListValue } from '../content/Stat';
 import { processLoreText, stripLoreIcons } from '../content/Lore';
-import { renderLoreIcons } from '../components/LoreIconText';
+import { isControlAvailable } from '../content/Control';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -33,73 +33,28 @@ interface DefinedMapViewProps {
 }
 
 interface MapMarkerButtonProps {
-    isHovered: boolean;
     isInteractive: boolean;
     markerSize: number;
-    expansionDirection: 'center' | 'left' | 'right';
-    label: string;
-    secondaryLabel?: string;
     disabled: boolean;
     onClick: () => void;
-    onMouseEnter: () => void;
-    onMouseLeave: () => void;
     style: CSSProperties;
     'aria-label': string;
     children: ReactNode;
+    onMouseEnter?: () => void;
+    onMouseLeave?: () => void;
 }
 
-const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, markerSize, expansionDirection, label, secondaryLabel, style, children, ...buttonProps }) => {
-    // Stay elevated through its own collapse animation so a newly hovered neighbor doesn't
-    // cut off the shrink transition mid-flight, which otherwise reads as an instant snap.
-    const [isElevated, setIsElevated] = useState(isHovered);
-    const [expandedMarkerWidth, setExpandedMarkerWidth] = useState(markerSize);
-    const measureRef = useRef<HTMLSpanElement>(null);
-
-    useEffect(() => {
-        if (isHovered) {
-            setIsElevated(true);
-        }
-    }, [isHovered]);
-
-    useLayoutEffect(() => {
-        const measure = measureRef.current;
-        if (!measure) {
-            return;
-        }
-
-        const updateWidth = () => setExpandedMarkerWidth(markerSize + measure.getBoundingClientRect().width + 8);
-        const observer = new ResizeObserver(updateWidth);
-        observer.observe(measure);
-        updateWidth();
-
-        return () => observer.disconnect();
-    }, [label, markerSize, secondaryLabel]);
-
-    // A marker still collapsing (elevated but no longer hovered) must render above a freshly
-    // hovered neighbor that's growing, otherwise the growing marker covers its shrink animation.
-    const zIndex = isElevated && !isHovered ? 3 : isHovered ? 2 : 1;
-    const collapsedTranslateX = expansionDirection === 'center' ? '-50%' : -markerSize / 2;
-    const expandedTranslateX = expansionDirection === 'left' ? -(expandedMarkerWidth - markerSize / 2) : collapsedTranslateX;
-
+const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isInteractive, markerSize, style, children, ...buttonProps }) => {
     return (
         <motion.button
             type="button"
             {...buttonProps}
-            initial={{ opacity: 0, scale: 0.86, x: collapsedTranslateX, y: '-50%', width: markerSize }}
-            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: isHovered ? expandedTranslateX : collapsedTranslateX, y: '-50%', width: isHovered ? expandedMarkerWidth : markerSize }}
+            initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
+            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: '-50%', y: '-50%', width: markerSize }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            onAnimationComplete={() => {
-                if (!isHovered) {
-                    setIsElevated(false);
-                }
-            }}
-            style={{ ...style, transformOrigin: expansionDirection === 'left' ? 'right center' : expansionDirection === 'right' ? 'left center' : 'center', zIndex }}
+            style={{ ...style, zIndex: 1 }}
         >
             {children}
-            <span ref={measureRef} aria-hidden="true" style={{ position: 'absolute', width: 'max-content', visibility: 'hidden', pointerEvents: 'none', whiteSpace: 'nowrap', padding: '0 12px 0 6px', fontSize: '0.82rem', fontWeight: 700 }}>
-                {renderLoreIcons(label)}
-                {secondaryLabel && <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 400 }}>{secondaryLabel}</span>}
-            </span>
         </motion.button>
     );
 };
@@ -107,7 +62,6 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isHovered, isInteractive, m
 export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction: handleAction, setScreenType, isVerticalLayout, embedded = false, initialMapId, overlay }) => {
     const { setTooltip, clearTooltip } = useTooltip();
     const [showContentManagement, setShowContentManagement] = useState(false);
-    const [hoveredLink, setHoveredLink] = useState<string | null>(null);
     const mapViewportRef = useRef<HTMLDivElement>(null);
     const [mapViewportSize, setMapViewportSize] = useState({ width: 0, height: 0 });
     const [mapImageSize, setMapImageSize] = useState({ width: 0, height: 0 });
@@ -204,7 +158,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
         : { x: 0.5, y: 0.5 };
     const focalPoint = { x: clampUnit(rawFocalPoint.x), y: clampUnit(rawFocalPoint.y) };
 
-    const getMarkerPosition = (x: number, y: number, markerSize: number, contentHeight = 0): { style: { left: string; top: string }; expansionDirection: MapMarkerButtonProps['expansionDirection'] } => {
+    const getMarkerPosition = (x: number, y: number, markerSize: number, contentHeight = 0): { style: { left: string; top: string } } => {
         let left = x;
         let top = y;
 
@@ -225,9 +179,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
             top = marginY + Math.max(marginY, bottomMargin) >= 1 ? 0.5 : Math.min(1 - Math.max(marginY, bottomMargin), Math.max(marginY, top));
         }
 
-        const expansionDirection: MapMarkerButtonProps['expansionDirection'] = left < 0.25 ? 'right' : left > 0.75 ? 'left' : 'center';
-
-        return { style: { left: `${left * 100}%`, top: `${top * 100}%` }, expansionDirection };
+        return { style: { left: `${left * 100}%`, top: `${top * 100}%` } };
     };
 
     return (
@@ -302,39 +254,89 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                             >
                                 {displayedMap.links.map((link, index) => {
                                     const isButton = link.type === 'button';
-                                    const childId = isButton ? '' : String(stage().resolveValue(link.childId, 'location', save));
-                                    const linkedLocation = isButton ? undefined : save.atlas?.[childId];
-                                    const linkedMap = isButton ? undefined : sortedMaps.find(map => map.id === childId);
+                                    const isMarker = link.type === 'marker';
+                                    const markerControl = isMarker
+                                        ? (stage().getConfiguration().controls || []).find(control => control.id === (link.markerControlId || link.markerId) && control.type === 'marker')
+                                        : undefined;
+                                    if (isMarker && !markerControl) {
+                                        return null;
+                                    }
+                                    const markerContent = isMarker ? (link.content || link.input || link.markerContent || '') : '';
+                                    const markerContext = isMarker ? {
+                                        ...stage().getScheduleContext(save),
+                                        resolveValue: (value: unknown, type: any) => stage().resolveValue(value, type, save, [], markerControl?.markerInputType === 'actor'
+                                            ? { actor: markerContent }
+                                            : markerControl?.markerInputType === 'item'
+                                                ? { item: markerContent }
+                                                : markerControl?.markerInputType === 'location'
+                                                    ? { location: markerContent }
+                                                    : {}),
+                                        ...(markerControl?.markerInputType === 'actor' ? { currentActor: save.actors?.[markerContent] } : {}),
+                                        ...(markerControl?.markerInputType === 'location' ? { currentLocation: save.atlas?.[markerContent] } : {}),
+                                        ...(markerControl?.markerInputType === 'item' ? { currentItem: save.inventory?.find(item => item.id === markerContent) } : {}),
+                                    } : undefined;
+                                    if (isMarker && markerControl && !isControlAvailable(markerControl, markerContext as any)) {
+                                        return null;
+                                    }
+                                    const childId = isButton || isMarker ? '' : String(stage().resolveValue(link.childId, 'location', save));
+                                    const linkedLocation = isButton || isMarker ? undefined : save.atlas?.[childId];
+                                    const linkedMap = isButton || isMarker ? undefined : sortedMaps.find(map => map.id === childId);
                                     if (!isButton && !linkedLocation && !linkedMap) {
                                         return null;
                                     }
                                     if (linkedLocation && !stage().isLocationVisible(linkedLocation.id)) {
                                         return null;
                                     }
-                                    const availability = getMapLinkAvailability(link, stage().getScheduleContext(save));
+                                    const availability = isMarker
+                                        ? { visible: true, enabled: true }
+                                        : getMapLinkAvailability(link, stage().getScheduleContext(save));
                                     if (!availability.visible) {
                                         return null;
                                     }
                                     const markerKey = `${displayedMap.id}-${index}`;
-                                    const isHovered = hoveredLink === markerKey;
                                     const locationImageUrl = getLocationImageUrl(linkedLocation, stage());
                                     const linkedMapImageUrl = getMapImageUrl(linkedMap, stage());
                                     const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
-                                    const markerName = isButton ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stage(), undefined, undefined, undefined, { icons: 'token' }) : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
+                                    const markerName = isMarker
+                                        ? processLoreText(markerControl?.label?.trim() || markerControl?.name?.trim() || markerContent || 'Marker', stage(), undefined, undefined, undefined, { icons: 'token' })
+                                        : isButton ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stage(), undefined, undefined, undefined, { icons: 'token' }) : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
                                     // Plain-text name for aria/portrait labels, which cannot carry inline icons.
                                     const plainMarkerName = stripLoreIcons(markerName);
-                                    const ButtonIcon = isButton && link.iconName ? resolveIcon(link.iconName, stage()) : TouchApp;
+                                    const ButtonIcon = isMarker
+                                        ? (markerControl?.iconName ? resolveIcon(markerControl.iconName, stage()) : TouchApp)
+                                        : isButton && link.iconName ? resolveIcon(link.iconName, stage()) : TouchApp;
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
-                                    const isInteractive = availability.enabled && Boolean(isButton || linkedMap || canVisitLocation);
-                                    const contentValues = isButton && link.contentList
-                                        ? [...new Set(normalizeReferenceListValue(stage().resolveValue(link.contentList.values, link.contentList.kind === 'mixed' ? 'contentList' : `${link.contentList.kind}List`, save)))]
-                                        : [];
+                                    const isInteractive = availability.enabled && Boolean(isMarker || isButton || linkedMap || canVisitLocation);
+                                    const contentValues = isMarker && markerControl?.contentList
+                                        ? [...new Set(normalizeReferenceListValue(stage().resolveValue(markerControl.contentList.values, markerControl.contentList.kind === 'actor'
+                                            ? 'actorList'
+                                            : markerControl.contentList.kind === 'item'
+                                                ? 'itemList'
+                                                : markerControl.contentList.kind === 'location'
+                                                    ? 'locationList'
+                                                    : 'contentList', save)))]
+                                        : isButton && link.contentList
+                                            ? [...new Set(normalizeReferenceListValue(stage().resolveValue(link.contentList.values, link.contentList.kind === 'mixed' ? 'contentList' : `${link.contentList.kind}List`, save)))]
+                                            : [];
                                     const contentWidth = Math.min(200, Math.max(0, mapViewportSize.width - 16) || 200, 12 + contentValues.length * actorPortraitSize - Math.max(0, contentValues.length - 1) * Math.round(actorPortraitSize * 0.32));
                                     const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize, contentValues.length ? actorPortraitSize * 5 / 6 + 8 : 0);
                                     const handleMarkerClick = () => {
                                         if (!isInteractive) return;
+                                        if (isMarker && markerControl) {
+                                            let skit: Skit | null;
+                                            try {
+                                                skit = stage().runControlActions(markerControl);
+                                            } catch (error) {
+                                                console.error('Failed to run marker actions:', error);
+                                                stage().showPriorityMessage(`Failed to run marker actions: ${error instanceof Error ? error.message : String(error)}`);
+                                                handleAction();
+                                                return;
+                                            }
+                                            handleAction(skit);
+                                            return;
+                                        }
                                         if (isButton) {
                                             let skit: Skit | null;
                                             try {
@@ -373,30 +375,22 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
 
                                                 return (
                                                     <MapMarkerButton
-                                                        isHovered={isHovered}
                                                         aria-label={linkedMap ? `Open map ${plainMarkerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : plainMarkerName}
                                                         disabled={!isInteractive}
                                                         onClick={handleMarkerClick}
-                                                        onMouseEnter={() => setHoveredLink(markerKey)}
-                                                        onMouseLeave={() => setHoveredLink(null)}
+                                                        onMouseEnter={() => isMarker ? setTooltip(processLoreText(markerControl?.description || markerControl?.label || markerName, stage()).trim() || null, markerControl?.iconName ? resolveIcon(markerControl.iconName, stage()) : undefined) : undefined}
+                                                        onMouseLeave={clearTooltip}
                                                         isInteractive={isInteractive}
                                                         markerSize={markerSize}
-                                                        expansionDirection={markerPosition.expansionDirection}
-                                                        label={markerName}
-                                                        secondaryLabel={currentEvent ? linkedLocation?.name : undefined}
                                                         style={{ position: 'absolute', ...markerPosition.style, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed' }}
                                                     >
-                                                        <span style={{ display: 'flex', flexDirection: markerPosition.expansionDirection === 'left' ? 'row-reverse' : 'row', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
+                                                        <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
                                                         <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: markerImageUrl ? `url(${markerImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                                                             {!markerImageUrl && (isButton ? <ButtonIcon sx={{ fontSize: markerSize / 2 }} /> : <MapRounded fontSize="small" />)}
                                                         </span>
-                                                            <span style={{ padding: markerPosition.expansionDirection === 'left' ? '0 6px 0 12px' : '0 12px 0 6px', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 700, flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textAlign: markerPosition.expansionDirection === 'left' ? 'right' : 'left' }}>
-                                                                {renderLoreIcons(markerName, stage())}
-                                                                {currentEvent && <span style={{ display: 'block', color: 'var(--agenda-text-muted)', fontSize: '0.65rem', fontWeight: 400 }}>{linkedLocation?.name}</span>}
-                                                            </span>
                                                         </span>
                                                         {isInteractive && !isButton && (
-                                                            <span style={{ position: 'absolute', top: -2, left: markerPosition.expansionDirection === 'left' ? 'auto' : -2, right: markerPosition.expansionDirection === 'left' ? -2 : 'auto', display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
+                                                            <span style={{ position: 'absolute', top: -2, left: -2, display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
                                                                 {linkedMap ? <ArrowOutward sx={{ fontSize: 11 }} /> : <PlayArrow sx={{ fontSize: 11 }} />}
                                                             </span>
                                                         )}
@@ -405,20 +399,17 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                             }}
                                         </CachedBackgroundUrl>
                                         {linkedLocation && (
-                                            <div style={{ position: 'absolute', ...markerPosition.style, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, zIndex: isHovered ? 5 : 3 }}>
+                                            <div style={{ position: 'absolute', ...markerPosition.style, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, zIndex: 3 }}>
                                                 <LocationActorPortraits
                                                     locationId={linkedLocation.id}
                                                     stage={stage()}
                                                     size={actorPortraitSize}
-                                                    onHoverChange={hovering => setHoveredLink(hovering ? markerKey : null)}
                                                 />
                                             </div>
                                         )}
                                         {isButton && link.contentList && contentValues.length > 0 && (
                                             <div
-                                                onMouseEnter={() => setHoveredLink(markerKey)}
-                                                onMouseLeave={() => setHoveredLink(null)}
-                                                style={{ position: 'absolute', ...markerPosition.style, left: `clamp(${contentWidth / 2 + 8}px, ${markerPosition.style.left}, calc(100% - ${contentWidth / 2 + 8}px))`, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, width: contentWidth, zIndex: isHovered ? 5 : 3 }}
+                                                style={{ position: 'absolute', ...markerPosition.style, left: `clamp(${contentWidth / 2 + 8}px, ${markerPosition.style.left}, calc(100% - ${contentWidth / 2 + 8}px))`, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, width: contentWidth, zIndex: 3 }}
                                             >
                                                 <ContentListPortraits kind={link.contentList.kind === 'mixed' ? undefined : link.contentList.kind} values={contentValues} stage={stage()} label={`${plainMarkerName} contents`} variant="overlay" size={actorPortraitSize} />
                                             </div>

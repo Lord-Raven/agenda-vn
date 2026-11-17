@@ -14,13 +14,14 @@ export type ControlPlacement = 'top' | 'bottom' | 'outcome' | 'settings' | 'popu
 // 'statBadge' is a standalone display for one content type (actor/item/location): it shows a content
 // stat or a function value for the entity it is attached to.
 // 'card' composes labels, standalone badges, conditions, and actions for a content type.
-export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'statOutcome' | 'settings' | 'popup' | 'statBadge' | 'card';
+export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'statOutcome' | 'settings' | 'popup' | 'statBadge' | 'card' | 'marker';
+export type MarkerInputType = 'actor' | 'item' | 'location' | 'screen' | 'string';
 export type ContentListDisplay = 'carousel' | 'abbreviated';
 export const STAT_DISPLAY_TYPES = ['straight', 'percentage', 'bar', 'rating', 'letter grade'] as const;
 export type StatDisplayType = typeof STAT_DISPLAY_TYPES[number];
 export type StatDisplaySettings = Pick<Control, 'displayType' | 'displayColor' | 'ratingIconName'>;
 
-export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'statOutcome', 'settings', 'popup', 'statBadge', 'card'];
+export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'statOutcome', 'settings', 'popup', 'statBadge', 'card', 'marker'];
 
 // References embed standalone stat badges in Card Controls.
 const CONTROL_REFERENCE_PREFIX = 'control:';
@@ -85,6 +86,9 @@ export class Control {
     displayColor: string = '';
     ratingIconName: string = 'star';
     outcomeStatTarget: 'actor' | 'global' = 'global';
+    markerInputType: MarkerInputType = 'string';
+    popupControlId: string = '';
+    contentList: { kind: 'actor' | 'item' | 'location' | 'mixed' | 'string'; values: string[] } = { kind: 'mixed', values: [] };
 
     constructor(props: Partial<Control> = {}) {
         Object.assign(this, props);
@@ -95,7 +99,7 @@ export class Control {
         this.priority = Number.isFinite(this.priority) ? this.priority : 0;
         this.widthWeight = Number.isFinite(this.widthWeight) && this.widthWeight > 0 ? this.widthWeight : 1;
         this.type = CONTROL_TYPES.includes(this.type) ? this.type : 'button';
-        this.placement = this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'settings' ? 'settings' : this.type === 'statBadge' || this.type === 'card' ? 'standalone' : this.placement === 'top' ? 'top' : this.placement === 'standalone' ? 'standalone' : 'bottom';
+        this.placement = this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'settings' ? 'settings' : this.type === 'statBadge' || this.type === 'card' || this.type === 'marker' ? 'standalone' : this.placement === 'top' ? 'top' : this.placement === 'standalone' ? 'standalone' : 'bottom';
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.visibilityConditions = Array.isArray(this.visibilityConditions) ? this.visibilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.label = `${this.label || ''}`;
@@ -119,6 +123,15 @@ export class Control {
         this.displayColor = `${this.displayColor || ''}`;
         this.ratingIconName = `${this.ratingIconName || 'star'}`;
         this.outcomeStatTarget = this.outcomeStatTarget === 'actor' ? 'actor' : 'global';
+        this.markerInputType = ['actor', 'item', 'location', 'screen', 'string'].includes(this.markerInputType) ? this.markerInputType : 'string';
+        this.popupControlId = `${this.popupControlId || ''}`;
+        const contentList = this.contentList as Partial<{ kind: string; values: unknown }> | undefined;
+        this.contentList = {
+            kind: contentList && ['actor', 'item', 'location', 'mixed', 'string'].includes(String(contentList.kind))
+                ? contentList.kind as 'actor' | 'item' | 'location' | 'mixed' | 'string'
+                : 'mixed',
+            values: contentList && Array.isArray(contentList.values) ? contentList.values.filter((entry): entry is string => typeof entry === 'string') : [],
+        };
     }
 }
 
