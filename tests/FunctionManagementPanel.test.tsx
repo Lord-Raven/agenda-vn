@@ -8,6 +8,7 @@ import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { FunctionEditor } from '../src/components/FunctionEditor';
 import { renderStatTypeOptions } from '../src/components/StatEntryEditor';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
+import { ControlManagementPanel } from '../src/screens/ControlManagementPanel';
 import { FunctionManagementPanel } from '../src/screens/FunctionManagementPanel';
 import { GlobalStatManagementPanel } from '../src/screens/GlobalStatManagementPanel';
 import { FunctionDetailPanel, FUNCTION_RETURN_TYPE_LABELS } from '../src/screens/FunctionDetailPanel';
@@ -269,15 +270,21 @@ test('map button labels and control labels resolve parameterized templates while
     assert.match(renderMap(), /aria-label="Button"/);
 });
 
-test('function management shows a return-type sidebar and a selection prompt instead of inline editors', () => {
+test('function management starts with collapsed return-type categories and a selection prompt', () => {
     const { stage } = fixture();
     const html = renderToStaticMarkup(<FunctionManagementPanel stage={() => stage} />);
-    assert.match(html, /Reward player/);
     assert.match(html, /Void \(action only\) \(1\)/);
     assert.match(html, /Location \(0\)/);
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, FUNCTION_RETURN_TYPES.length);
+    assert.doesNotMatch(html, /Reward player/);
     assert.match(html, /Select a function to view and edit details/);
-    assert.match(html, /aria-pressed="false"/);
     assert.doesNotMatch(html, /aria-label="Delete function"|<textarea/);
+});
+
+test('control management starts with all categories collapsed', () => {
+    const { stage } = fixture();
+    const html = renderToStaticMarkup(<ControlManagementPanel stage={() => stage} />);
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 8);
 });
 
 test('function management shows an empty state without definitions', () => {
@@ -287,21 +294,16 @@ test('function management shows an empty state without definitions', () => {
     assert.match(html, /No functions defined/);
 });
 
-test('sidebar groups each function under its declared return type, including list types', () => {
+test('sidebar creates a collapsed category for every function return type, including list types', () => {
     const { stage, configuration } = fixture();
     configuration.functions = FUNCTION_RETURN_TYPES.map(returnType => ({
         id: returnType, name: `${returnType} example`, description: '', script: '', returnType,
     }));
     const html = renderToStaticMarkup(<FunctionManagementPanel stage={() => stage} />);
-    let previousEntryIndex = -1;
     for (const type of FUNCTION_RETURN_TYPES) {
-        const titleIndex = html.indexOf(`${FUNCTION_RETURN_TYPE_LABELS[type]} (1)`);
-        const entryIndex = html.indexOf(`${type} example`);
-        assert.ok(titleIndex > previousEntryIndex, `${type} category follows the previous category`);
-        assert.ok(entryIndex > titleIndex, `${type} function is inside its category`);
-        previousEntryIndex = entryIndex;
+        assert.ok(html.includes(`${FUNCTION_RETURN_TYPE_LABELS[type]} (1)`));
     }
-    assert.equal((html.match(/aria-pressed="false"/g) || []).length, FUNCTION_RETURN_TYPES.length);
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, FUNCTION_RETURN_TYPES.length);
 });
 
 test('orphaned functions remain listed and their unsupported return type can be corrected', () => {

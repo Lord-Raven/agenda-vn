@@ -149,7 +149,7 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
             <CategorizedEntrySidebar
                 sections={sections}
                 collapsedSections={collapsedSections}
-                onToggleSection={sectionId => setCollapsedSections(current => toggleSidebarCollapseState(current, sectionId, false))}
+                onToggleSection={sectionId => setCollapsedSections(current => toggleSidebarCollapseState(current, sectionId, true))}
                 renderEntry={stat => (
                     <button
                         type="button"
@@ -175,7 +175,6 @@ const CreatorStatManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) => {
                 shouldReduceMotion={Boolean(shouldReduceMotion)}
                 emptyListMessage="No stats have been defined yet."
                 sectionEmptyMessage="No stats."
-                defaultCollapsed={false}
                 renderSectionAction={section => handleCreateStat(section.id)}
             />
             <div style={{

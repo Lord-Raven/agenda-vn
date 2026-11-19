@@ -153,14 +153,13 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
                 sections={controlsByPlacement}
                 collapsedSections={collapsedSections}
                 onToggleSection={(sectionId) => {
-                    setCollapsedSections((current) => toggleSidebarCollapseState(current, sectionId, false));
+                    setCollapsedSections((current) => toggleSidebarCollapseState(current, sectionId, true));
                 }}
                 renderEntry={(control) => renderControlButton(control)}
                 getEntryKey={(control) => control.id}
                 shouldReduceMotion={Boolean(shouldReduceMotion)}
                 emptyListMessage="No controls have been defined yet."
                 sectionEmptyMessage="No controls."
-                defaultCollapsed={false}
                 renderSectionAction={(section) => {
                     handleCreateControl(section.id);
                 }}

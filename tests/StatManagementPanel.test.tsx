@@ -37,16 +37,16 @@ const fixture = () => {
     return { stage, configuration };
 };
 
-test('creator stats show four categorized lists and a selection prompt, not inline editors or rules', () => {
+test('creator stats start with four collapsed categories and a selection prompt', () => {
     const { stage } = fixture();
     const html = renderToStaticMarkup(<StatManagementPanel stage={() => stage} isCreatorMode />);
     for (const category of ['Global', 'Actor', 'Location', 'Item']) {
         assert.match(html, new RegExp(`${category} \\(1\\)`));
     }
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 4);
     for (const name of ['Weather', 'Health', 'Danger', 'Weight']) {
-        assert.match(html, new RegExp(name));
+        assert.doesNotMatch(html, new RegExp(name));
     }
-    assert.equal((html.match(/aria-pressed="false"/g) || []).length, 4);
     assert.equal((html.match(/ New<\/button>/g) || []).length, 4);
     assert.match(html, /Select a stat to view and edit details/);
     assert.match(html, /grid-template-columns:minmax\(280px, 360px\) minmax\(0, 1fr\)/);
@@ -60,7 +60,8 @@ test('empty stat categories remain available for creating stats', () => {
     configuration.locationStats = [];
     configuration.itemStats = [];
     const html = renderToStaticMarkup(<StatManagementPanel stage={() => stage} isCreatorMode />);
-    assert.equal((html.match(/No stats\./g) || []).length, 4);
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 4);
+    assert.doesNotMatch(html, /No stats\./);
     assert.equal((html.match(/ New<\/button>/g) || []).length, 4);
 });
 

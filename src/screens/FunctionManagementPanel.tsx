@@ -84,8 +84,7 @@ export const FunctionManagementPanel: FC<{ stage: () => Stage }> = ({ stage }) =
                 <CategorizedEntrySidebar
                     sections={sections}
                     collapsedSections={collapsedCategories}
-                    defaultCollapsed={false}
-                    onToggleSection={id => setCollapsedCategories(current => toggleSidebarCollapseState(current, id, false))}
+                    onToggleSection={id => setCollapsedCategories(current => toggleSidebarCollapseState(current, id, true))}
                     renderEntry={fn => (
                         <button
                             type="button"
