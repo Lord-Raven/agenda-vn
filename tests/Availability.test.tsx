@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
+import { useState } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { GameConfiguration, Stage } from '../src/Stage';
@@ -17,6 +18,7 @@ import { Screen as GameMap } from '../src/content/Screen';
 import { DefinedMapView } from '../src/screens/DefinedMapView';
 import { ScreenDetailPanel } from '../src/screens/ScreenDetailPanel';
 import { ConditionEditor } from '../src/components/ConditionEditor';
+import { SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
 import { ReferenceMultiSelect } from '../src/components/UiComponents';
 import { Control } from '../src/content/Control';
 import { MARKER_VARIABLE_VALUE, functionReference } from '../src/content/Function';
@@ -237,6 +239,91 @@ for (const isCreatorMode of [true, false]) {
             }
         });
     }
+}
+
+for (const isCreatorMode of [true, false]) {
+    test(`map marker instances pick their own typed content (creator: ${isCreatorMode})`, () => {
+        const stage = createStage(new Location({ id: 'initial' }));
+        const configuration = stage.getConfiguration();
+        const prefix = isCreatorMode ? 'config' : 'save';
+        const makeContent = (source: string) => ({
+            actors: [
+                new Actor({ id: `${source}-a`, name: 'Actor A' }),
+                new Actor({ id: `${source}-b`, name: 'Actor B' }),
+                new Actor({ id: `${source}-inactive`, active: false }),
+            ],
+            items: [new Item({ id: `${source}-item`, name: 'An Item' })],
+            locations: [new Location({ id: `${source}-location`, name: 'A Location' })],
+            screens: [new GameMap({ id: `${source}-screen`, name: 'A List', type: 'list' })],
+        });
+        const controls = (['actor', 'item', 'location', 'screen', 'string'] as const).map(markerInputType =>
+            new Control({ id: markerInputType, name: markerInputType, type: 'marker', markerInputType }));
+        controls.push(new Control({ id: 'other-actor', name: 'Other Actor', type: 'marker', markerInputType: 'actor' }));
+        const map = new GameMap({ id: 'map', links: [
+            { ...createMapButton(), type: 'marker', markerControlId: 'actor', input: `${prefix}-a` },
+            { ...createMapButton(), type: 'marker', markerControlId: 'actor' },
+        ] });
+        const configured = makeContent('config');
+        const saved = makeContent('save');
+        Object.assign(configuration, configured, { controls, screens: [...configured.screens, map] });
+        const save = {
+            ...stage.getSave(),
+            actors: Object.fromEntries(saved.actors.map(actor => [actor.id, actor])),
+            inventory: saved.items,
+            atlas: Object.fromEntries(saved.locations.map(location => [location.id, location])),
+            screens: [...saved.screens, map],
+        };
+        stage.getSave = () => save;
+        stage.updateConfiguration = mock.fn();
+        stage.saveGame = mock.fn();
+        const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+        Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout, addEventListener() {}, removeEventListener() {} } });
+        const Editor = () => {
+            const [, setRevision] = useState(0);
+            return <TooltipProvider><ScreenDetailPanel screen={map} stage={() => stage}
+                isCreatorMode={isCreatorMode} onChange={() => setRevision(revision => revision + 1)} onDeactivate={() => {}} /></TooltipProvider>;
+        };
+        let renderer: ReactTestRenderer | undefined;
+        try {
+            act(() => { renderer = create(<Editor />); });
+            assert.ok(renderer);
+            const root = renderer.root;
+            act(() => root.findByProps({ 'aria-label': 'Expand Links' }).props.onClick());
+            act(() => root.findAllByProps({ 'aria-label': 'Expand actor' })[0].props.onClick());
+            act(() => root.findByProps({ 'aria-label': 'Expand actor' }).props.onClick());
+            const pickers = () => root.findAllByType(SearchableOptionPicker).filter(node => node.props.title?.startsWith('Choose marker '));
+            const ids = (index: number) => pickers()[index].props.options.map((option: { key: string }) => option.key);
+            assert.deepEqual(ids(0), [`${prefix}-a`, `${prefix}-b`]);
+            assert.equal(pickers()[0].props.value, `${prefix}-a`);
+            act(() => pickers()[1].props.onChange(`${prefix}-b`));
+            assert.deepEqual(new GameMap(JSON.parse(JSON.stringify(map))).links.map(link => link.content), [`${prefix}-a`, `${prefix}-b`]);
+            act(() => pickers()[0].props.onChange(undefined));
+            assert.equal(pickers()[0].props.value, '');
+            assert.equal(map.links[1].content, `${prefix}-b`);
+
+            const switchControl = (id: string) => act(() => root.findByProps({ id: 'map-marker-control-map-1' }).props.onChange({ target: { value: id } }));
+            switchControl('other-actor');
+            assert.equal(pickers()[1].props.value, `${prefix}-b`);
+            for (const kind of ['item', 'location', 'screen'] as const) {
+                switchControl(kind);
+                assert.equal(pickers()[1].props.value, '');
+                const id = `${prefix}-${kind}`;
+                assert.deepEqual(ids(1), kind === 'screen' ? [id, 'map'] : [id]);
+                act(() => pickers()[1].props.onChange(id));
+                assert.equal(map.links[1].content, id);
+            }
+            switchControl('string');
+            const text = root.findAllByType('input').find(node => node.props['aria-label'] === 'Marker content');
+            assert.ok(text);
+            assert.equal(text.props.value, '');
+            act(() => text.props.onChange({ target: { value: 'Free text' } }));
+            assert.equal(map.links[1].content, 'Free text');
+        } finally {
+            if (renderer) act(() => renderer?.unmount());
+            if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+            else Reflect.deleteProperty(globalThis, 'window');
+        }
+    });
 }
 
 test('map buttons evaluate visibility and enabled groups independently', () => {

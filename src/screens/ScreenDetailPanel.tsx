@@ -15,7 +15,7 @@ import { IconPicker, resolveIcon } from '../components/StatRating';
 import { processLoreText } from '../content/Lore';
 import { Screen, cloneListSection, isSectionScreenType, ScreenType } from '../content/Screen';
 import { ListSectionsEditor } from '../components/ListSectionsEditor';
-import { Control, markerVariableBindings } from '../content/Control';
+import { MarkerInputType, markerVariableBindings } from '../content/Control';
 import { isValueReference } from '../content/Function';
 
 interface ScreenDetailPanelProps {
@@ -89,9 +89,10 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
     const didMountRef = useRef(false);
     const stageInstance = stage();
     const save = stageInstance.getSave();
-    const configuredMaps = stageInstance.getConfiguration().screens || [];
-    const configuredLocations = stageInstance.getConfiguration().locations || [];
-    const configuredMarkers = (stageInstance.getConfiguration().controls || []).filter(control => control.active !== false && control.type === 'marker');
+    const configuration = stageInstance.getConfiguration();
+    const configuredMaps = configuration.screens || [];
+    const configuredLocations = configuration.locations || [];
+    const configuredMarkers = (configuration.controls || []).filter(control => control.active !== false && control.type === 'marker');
     const sourceMaps = isCreatorMode ? configuredMaps : save.screens || [];
     const activeScreens = sourceMaps.filter(candidate => candidate.active !== false && candidate.id !== map.id);
     const activeMaps = activeScreens.filter(candidate => candidate.type === 'map');
@@ -305,6 +306,40 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                     : map.links[index].coordinates,
             };
         });
+    };
+
+    const renderMarkerContent = (index: number, link: MapLink, inputType: MarkerInputType) => {
+        const value = link.content || link.input || link.markerContent || '';
+        const onChange = (content: string) => updateLink(index, { content, input: content, markerContent: content });
+        if (inputType === 'string') {
+            return <TextInput fullWidth aria-label="Marker content" placeholder="Text passed to the Marker"
+                value={value} onChange={event => onChange(event.target.value)} />;
+        }
+
+        const candidates = inputType === 'actor' ? (isCreatorMode ? configuration.actors || [] : Object.values(save.actors || {}))
+            : inputType === 'item' ? (isCreatorMode ? configuration.items || [] : save.inventory || [])
+                : inputType === 'location' ? activeLocations : sourceMaps;
+        // Marker rules bind the saved ID directly, so offer concrete targets rather than dynamic references.
+        const options = candidates.filter(candidate => candidate.active !== false).map(candidate => ({
+            key: candidate.id,
+            label: candidate.name || `Unnamed ${inputType}`,
+            category: candidate.category?.trim() || 'Uncategorized',
+            imageUrl: 'imageUrl' in candidate ? candidate.imageUrl : undefined,
+        })).sort((a, b) => a.label.localeCompare(b.label));
+        if (value && !options.some(option => option.key === value)) {
+            options.push({ key: value, label: `Unavailable ${inputType} (${value})`, category: 'Unavailable', imageUrl: undefined });
+        }
+
+        return <SearchableOptionPicker
+            key={inputType}
+            value={value}
+            onChange={next => onChange(typeof next === 'string' ? next : '')}
+            options={options}
+            allowClear
+            emptyLabel={`No ${inputType} selected`}
+            title={`Choose marker ${inputType}`}
+            placeholder={`Search ${inputType}s`}
+        />;
     };
 
     const moveLink = (index: number, offset: -1 | 1) => {
@@ -652,24 +687,28 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                                     </div>
                                     {!isCollapsed && <>
                                         {link.type === 'marker' ? (<>
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Marker Control</label>
+                                            <label htmlFor={`map-marker-control-${map.id}-${index}`} style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Marker Control</label>
                                             <select
+                                                id={`map-marker-control-${map.id}-${index}`}
                                                 style={selectStyle}
                                                 value={link.markerControlId || link.markerId || ''}
-                                                onChange={event => updateLink(index, { markerControlId: event.target.value, markerId: event.target.value })}
+                                                onChange={event => {
+                                                    const markerControlId = event.target.value;
+                                                    const nextControl = configuredMarkers.find(control => control.id === markerControlId);
+                                                    updateLink(index, {
+                                                        markerControlId,
+                                                        markerId: markerControlId,
+                                                        ...(markerControl?.markerInputType !== nextControl?.markerInputType
+                                                            ? { content: '', input: '', markerContent: '' } : {}),
+                                                    });
+                                                }}
                                             >
                                                 <option value="">Select a Marker...</option>
                                                 {configuredMarkers.map(control => (
                                                     <option key={control.id} value={control.id}>{control.name || 'Unnamed Marker'}</option>
                                                 ))}
                                             </select>
-                                            <TextInput
-                                                fullWidth
-                                                aria-label="Marker content"
-                                                placeholder="Content ID or text passed to the Marker"
-                                                value={link.content || link.input || link.markerContent || ''}
-                                                onChange={event => updateLink(index, { content: event.target.value, input: event.target.value, markerContent: event.target.value })}
-                                            />
+                                            {markerControl && renderMarkerContent(index, link, markerControl.markerInputType)}
                                         </>) : link.type === 'button' ? (<>
                                             <TextInput fullWidth aria-label="Button name" placeholder="Button name" value={link.name || ''} onChange={event => updateLink(index, { name: event.target.value })} />
                                             <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }} htmlFor={`map-button-label-${map.id}-${index}`}>Button Label (optional)</label>

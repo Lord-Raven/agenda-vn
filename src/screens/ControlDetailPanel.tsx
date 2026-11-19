@@ -438,9 +438,9 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <div style={fieldHeadingStyle}>
                                     <label>Input Type</label>
                                     <HelpTip title="Marker input">
-                                        Each marker instance on a Map Screen supplies this value.
+                                        Each marker instance on a Map Screen picks its own actor, item, location, or screen, or enters its own text.
                                         Variable offers it in compatible condition, action, and function parameter inputs.
-                                        Screen and String inputs supply text values.
+                                        Screen inputs supply the selected screen ID as text.
                                     </HelpTip>
                                 </div>
                                 <select
