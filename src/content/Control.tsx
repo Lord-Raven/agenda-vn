@@ -90,11 +90,12 @@ export class Control {
     ratingIconName: string = 'star';
     outcomeStatTarget: 'actor' | 'global' = 'global';
     markerInputType: MarkerInputType = 'string';
-    popupControlId: string = '';
+    cardControlId: string = '';
     contentList: { kind: 'actor' | 'item' | 'location' | 'mixed' | 'string'; values: string[] } = { kind: 'mixed', values: [] };
 
     constructor(props: Partial<Control> = {}) {
-        Object.assign(this, props);
+        const { popupControlId: _legacyPopupControlId, ...currentProps } = props as Partial<Control> & { popupControlId?: unknown };
+        Object.assign(this, currentProps);
         if (!this.id) {
             this.id = generateUuid();
         }
@@ -127,7 +128,7 @@ export class Control {
         this.ratingIconName = `${this.ratingIconName || 'star'}`;
         this.outcomeStatTarget = this.outcomeStatTarget === 'actor' ? 'actor' : 'global';
         this.markerInputType = ['actor', 'item', 'location', 'screen', 'string'].includes(this.markerInputType) ? this.markerInputType : 'string';
-        this.popupControlId = `${this.popupControlId || ''}`;
+        this.cardControlId = typeof this.cardControlId === 'string' ? this.cardControlId : '';
         const contentList = this.contentList as Partial<{ kind: string; values: unknown }> | undefined;
         this.contentList = {
             kind: this.type !== 'marker' && contentList && ['actor', 'item', 'location', 'mixed', 'string'].includes(String(contentList.kind))

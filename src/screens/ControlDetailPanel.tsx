@@ -10,7 +10,7 @@ import { ConditionEditor } from '../components/ConditionEditor';
 import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker } from '../components/StatRating';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
-import { contentDetailSourceOptions, listDetailOptions } from '../components/ListSectionsEditor';
+import { cardControlOptions, contentDetailSourceOptions, listDetailOptions } from '../components/ListSectionsEditor';
 import { HeaderVariableContext, MarkerTextVariableContext, VariableContentContext } from '../components/VariableContentContext';
 
 interface ControlDetailPanelProps {
@@ -50,7 +50,7 @@ type ControlDraft = {
     availabilityConditions: ConditionCollection[];
     actions: StatUpdateAction[];
     markerInputType: 'actor' | 'item' | 'location' | 'screen' | 'string';
-    popupControlId: string;
+    cardControlId: string;
     contentList: { kind: ReferenceKind | 'mixed'; values: string[] };
 };
 
@@ -84,7 +84,7 @@ const createDraft = (control: Control): ControlDraft => ({
     availabilityConditions: (control.availabilityConditions || []).map((collection) => [...collection]),
     actions: (control.actions || []).map(cloneStatUpdateAction),
     markerInputType: control.markerInputType,
-    popupControlId: control.popupControlId,
+    cardControlId: control.cardControlId,
     contentList: { kind: control.contentList?.kind === 'string' ? 'mixed' : (control.contentList?.kind || 'mixed') as ReferenceKind | 'mixed', values: [...(control.contentList?.values || [])] },
 });
 
@@ -184,7 +184,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             availabilityConditions: nextDraft.availabilityConditions.map((collection) => [...collection]),
             actions: nextDraft.actions.map(cloneStatUpdateAction),
             markerInputType: nextDraft.markerInputType,
-            popupControlId: nextDraft.popupControlId,
+            cardControlId: nextDraft.cardControlId,
             contentList: nextDraft.contentList,
         });
         stageInstance.updateConfiguration({
@@ -446,7 +446,11 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.markerInputType}
-                                    onChange={(event) => setDraft(current => ({ ...current, markerInputType: event.target.value as typeof current.markerInputType }))}
+                                    onChange={(event) => setDraft(current => ({
+                                        ...current,
+                                        markerInputType: event.target.value as typeof current.markerInputType,
+                                        cardControlId: event.target.value === current.markerInputType ? current.cardControlId : '',
+                                    }))}
                                 >
                                     <option value="actor">Actor</option>
                                     <option value="item">Item</option>
@@ -456,17 +460,23 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 </select>
                             </div>
                             <div>
-                                <label style={labelStyle}>Hover Pop-up Control</label>
+                                <label style={labelStyle} htmlFor={`marker-card-${control.id}`}>Hover Card Control</label>
                                 <select
+                                    id={`marker-card-${control.id}`}
                                     style={selectStyle}
-                                    value={draft.popupControlId}
-                                    onChange={(event) => setDraft(current => ({ ...current, popupControlId: event.target.value }))}
+                                    value={draft.cardControlId}
+                                    disabled={draft.markerInputType === 'screen' || draft.markerInputType === 'string'}
+                                    onChange={(event) => setDraft(current => ({ ...current, cardControlId: event.target.value }))}
                                 >
                                     <option value="">None</option>
-                                    {(stageInstance.getConfiguration().controls || []).filter(candidate => candidate.active !== false && candidate.type === 'popup').map(candidate => (
-                                        <option key={candidate.id} value={candidate.id}>{candidate.name || 'Unnamed Pop-up'}</option>
-                                    ))}
+                                    {(draft.markerInputType === 'actor' || draft.markerInputType === 'item' || draft.markerInputType === 'location')
+                                        && cardControlOptions(stageInstance, draft.markerInputType).map(option => (
+                                            <option key={option.key} value={option.key}>{option.label}</option>
+                                        ))}
                                 </select>
+                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                    Cards require an Actor, Item, or Location input and receive the marker instance's value.
+                                </span>
                             </div>
                             <div>
                                 <div style={fieldHeadingStyle}>

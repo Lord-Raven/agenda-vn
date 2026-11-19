@@ -526,6 +526,48 @@ test('marker content below stays mixed and survives input type changes', () => {
     }
 });
 
+test('marker card picker saves matching cards and clears them when input type changes', () => {
+    const marker = new Control({ type: 'marker', markerInputType: 'actor' });
+    const stage = createStage(marker);
+    const configuration = stage.getConfiguration();
+    configuration.controls.push(
+        new Control({ id: 'actor-card', name: 'Actor card', type: 'card', contentType: 'actor' }),
+        new Control({ id: 'item-card', name: 'Item card', type: 'card', contentType: 'item' }),
+        new Control({ id: 'inactive-card', name: 'Inactive card', type: 'card', contentType: 'actor', active: false }),
+        new Control({ id: 'popup', name: 'Popup', type: 'popup' }),
+    );
+    stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: Object.assign(new EventTarget(), { setTimeout, clearTimeout }) });
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+        act(() => { renderer = create(<ControlDetailPanel control={marker} stage={() => stage} />); });
+        const picker = () => renderer!.root.findByProps({ id: `marker-card-${marker.id}` });
+        const optionValues = picker().findAllByType('option').map(option => option.props.value);
+        assert.ok(optionValues.includes('actor-card'));
+        assert.ok(optionValues.includes('default-actor-card'));
+        assert.ok(!optionValues.includes('item-card') && !optionValues.includes('inactive-card') && !optionValues.includes('popup'));
+        act(() => picker().props.onChange({ target: { value: 'actor-card' } }));
+        act(() => renderer!.unmount());
+        renderer = undefined;
+        assert.equal(configuration.controls[0].cardControlId, 'actor-card');
+
+        act(() => { renderer = create(<ControlDetailPanel control={configuration.controls[0]} stage={() => stage} />); });
+        const input = renderer!.root.findAllByType('select').find(select =>
+            select.findAllByType('option').some(option => option.props.value === 'screen'))!;
+        act(() => input.props.onChange({ target: { value: 'string' } }));
+        assert.equal(picker().props.value, '');
+        assert.equal(picker().props.disabled, true);
+        act(() => renderer!.unmount());
+        renderer = undefined;
+        assert.equal(configuration.controls[0].cardControlId, '');
+    } finally {
+        if (renderer) act(() => renderer?.unmount());
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else Reflect.deleteProperty(globalThis, 'window');
+    }
+});
+
 test('marker availability function parameters can select the matching input variable', () => {
     for (const kind of ['actor', 'item', 'location', 'string', 'screen'] as const) {
         const parameterType = kind === 'screen' || kind === 'string' ? 'text' : kind;

@@ -20,6 +20,8 @@ import { ConditionEditor } from '../src/components/ConditionEditor';
 import { ReferenceMultiSelect } from '../src/components/UiComponents';
 import { Control } from '../src/content/Control';
 import { MARKER_VARIABLE_VALUE, functionReference } from '../src/content/Function';
+import { Tooltip } from '@mui/material';
+import { ContentCardControl } from '../src/components/ContentCardControl';
 
 const stat = cloneStat({
     id: 'score', name: 'Local Score', type: 'number', default: 0, guidance: '',
@@ -328,6 +330,74 @@ test('location markers bind content for availability, icon functions, portraits 
     }
     location.statMap.score = 0;
     assert.doesNotMatch(renderToStaticMarkup(view), /aria-label="Marker"/);
+});
+
+for (const kind of ['actor', 'item', 'location'] as const) {
+    test(`${kind} marker hover cards receive each marker instance and run card actions`, () => {
+        const stage = createStage(new Location({ id: 'local' }));
+        const first = kind === 'actor' ? new Actor({ id: 'first', name: 'First', statMap: { score: 0 } })
+            : kind === 'item' ? new Item({ id: 'first', name: 'First', statMap: { score: 0 } })
+                : new Location({ id: 'first', name: 'First', statMap: { score: 0 } });
+        const second = kind === 'actor' ? new Actor({ id: 'second', name: 'Second', statMap: { score: 0 } })
+            : kind === 'item' ? new Item({ id: 'second', name: 'Second', statMap: { score: 0 } })
+                : new Location({ id: 'second', name: 'Second', statMap: { score: 0 } });
+        const save = stage.getSave();
+        if (kind === 'actor') { save.actors.first = first as Actor; save.actors.second = second as Actor; }
+        else if (kind === 'item') { save.inventory.push(first as Item, second as Item); }
+        else { save.atlas.first = first as Location; save.atlas.second = second as Location; }
+        stage.getSave = () => save;
+        stage.getConfiguration()[`${kind}Stats`] = [stat];
+        stage.saveGame = mock.fn();
+        const card = new Control({ id: 'card', type: 'card', contentType: kind, label: '{{content:name}}', showPortrait: false,
+            actions: [{ id: 'action', kind: 'stat', targetType: kind, targetId: `variable:${kind}`, statId: 'score', operation: 'set', value: 9 }] });
+        const marker = new Control({ id: 'marker', name: 'Marker', type: 'marker', markerInputType: kind, cardControlId: card.id });
+        stage.getConfiguration().controls = [marker, card];
+        const map = new GameMap({ id: 'map', links: ['first', 'second'].map(content =>
+            createMapButton({ type: 'marker', markerControlId: marker.id, content })) });
+        const onAction = mock.fn();
+        const renderer = create(<TooltipProvider><DefinedMapView stage={() => stage} maps={[map]} onAction={onAction} setScreenType={() => {}} isVerticalLayout={false} embedded /></TooltipProvider>);
+        let cardRenderer: ReactTestRenderer | undefined;
+        try {
+            const tooltips = renderer.root.findAllByType(Tooltip);
+            assert.equal(tooltips.length, 2);
+            const titles = tooltips.map(tooltip => tooltip.props.title);
+            assert.deepEqual(titles.map(title => title.props.id), ['first', 'second']);
+            assert.ok(titles.every(title => title.type === ContentCardControl && title.props.control === card && title.props.kind === kind && title.props.orientation === 'vertical'));
+            assert.match(renderToStaticMarkup(titles[1]), /Second/);
+            act(() => { cardRenderer = create(titles[1]); });
+            act(() => cardRenderer!.root.findByProps({ 'data-card-control': card.id }).props.onClick());
+            assert.equal(first.statMap.score, 0);
+            assert.equal(second.statMap.score, 9);
+            assert.equal(onAction.mock.callCount(), 1);
+        } finally {
+            if (cardRenderer) act(() => cardRenderer!.unmount());
+            act(() => renderer.unmount());
+        }
+    });
+}
+
+test('marker hover ignores missing, incompatible, inactive, or hidden cards', () => {
+    const stage = createStage(new Location({ id: 'local', name: 'Local' }));
+    const save = stage.getSave();
+    stage.getSave = () => save;
+    const card = new Control({ id: 'card', type: 'card', contentType: 'location' });
+    const marker = new Control({ id: 'marker', name: 'Marker', type: 'marker', markerInputType: 'location', cardControlId: card.id });
+    stage.getConfiguration().controls = [marker, card];
+    const map = new GameMap({ id: 'map', links: [createMapButton({ type: 'marker', markerControlId: marker.id, content: 'local' })] });
+    const view = <TooltipProvider><DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={false} embedded /></TooltipProvider>;
+    for (const change of [
+        () => { marker.cardControlId = 'missing'; },
+        () => { marker.cardControlId = card.id; card.contentType = 'actor'; },
+        () => { card.contentType = 'location'; card.active = false; },
+        () => { card.active = true; card.visibilityConditions = [[ownStatCondition('location')]]; },
+        () => { card.visibilityConditions = []; map.links[0].content = 'missing'; },
+        () => { map.links[0].content = 'local'; marker.markerInputType = 'string'; },
+    ]) {
+        change();
+        const renderer = create(view);
+        try { assert.equal(renderer.root.findAllByType(Tooltip).length, 0); }
+        finally { act(() => renderer.unmount()); }
+    }
 });
 
 for (const kind of ['actor', 'item'] as const) {

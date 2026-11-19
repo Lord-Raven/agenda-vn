@@ -1,6 +1,6 @@
-import { CSSProperties, FC, Fragment, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FC, forwardRef, Fragment, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings, TouchApp } from '@mui/icons-material';
-import { Box, Typography } from '@mui/material';
+import { Box, Tooltip, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getMapImageRect, getMapImageUrl, getMapLinkAvailability, Map as GameMap, MapFitMode, previewToImageCoordinates } from '../content/Map';
 import { getLocationImageUrl, getLocationName } from '../content/Location';
@@ -20,6 +20,7 @@ import { ContentListPortraits } from '../components/ContentListControl';
 import { normalizeReferenceListValue, StatType } from '../content/Stat';
 import { processLoreText, stripLoreIcons } from '../content/Lore';
 import { isControlAvailable, markerVariableBindings } from '../content/Control';
+import { ContentCardControl } from '../components/ContentCardControl';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -44,10 +45,11 @@ interface MapMarkerButtonProps {
     onMouseLeave?: () => void;
 }
 
-const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isInteractive, markerSize, style, children, ...buttonProps }) => {
+const MapMarkerButton = forwardRef<HTMLButtonElement, MapMarkerButtonProps>(({ isInteractive, markerSize, style, children, ...buttonProps }, ref) => {
     return (
         <motion.button
             type="button"
+            ref={ref}
             {...buttonProps}
             initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
             animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: '-50%', y: '-50%', width: markerSize }}
@@ -57,7 +59,7 @@ const MapMarkerButton: FC<MapMarkerButtonProps> = ({ isInteractive, markerSize, 
             {children}
         </motion.button>
     );
-};
+});
 
 export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction: handleAction, setScreenType, isVerticalLayout, embedded = false, initialMapId, overlay }) => {
     const { setTooltip, clearTooltip } = useTooltip();
@@ -274,6 +276,11 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     if (isMarker && markerControl && markerContext && !isControlAvailable(markerControl, markerContext)) {
                                         return null;
                                     }
+                                    const cardKind = markerControl?.markerInputType === 'actor' || markerControl?.markerInputType === 'item' || markerControl?.markerInputType === 'location'
+                                        ? markerControl.markerInputType : undefined;
+                                    const markerCard = cardKind && markerControl?.cardControlId
+                                        ? stage().getCardControl(cardKind, markerControl.cardControlId, save) : undefined;
+                                    const showMarkerCard = markerCard && cardKind && stage().resolveCardState(markerCard, cardKind, markerContent, '', save).visible;
                                     const childId = isButton || isMarker ? '' : String(stage().resolveValue(link.childId, 'location', save));
                                     const linkedLocation = isButton || isMarker ? undefined : save.atlas?.[childId];
                                     const linkedMap = isButton || isMarker ? undefined : sortedMaps.find(map => map.id === childId);
@@ -369,12 +376,12 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                     return null;
                                                 }
 
-                                                return (
+                                                const button = (
                                                     <MapMarkerButton
                                                         aria-label={linkedMap ? `Open map ${plainMarkerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : plainMarkerName}
                                                         disabled={!isInteractive}
                                                         onClick={handleMarkerClick}
-                                                        onMouseEnter={() => isMarker ? setTooltip(processLoreText(markerControl?.description || markerControl?.label || markerName, stage(), undefined, markerVariables).trim() || null, markerControl?.iconName ? ButtonIcon : undefined) : undefined}
+                                                        onMouseEnter={() => isMarker && !showMarkerCard ? setTooltip(processLoreText(markerControl?.description || markerControl?.label || markerName, stage(), undefined, markerVariables).trim() || null, markerControl?.iconName ? ButtonIcon : undefined) : undefined}
                                                         onMouseLeave={clearTooltip}
                                                         isInteractive={isInteractive}
                                                         markerSize={markerSize}
@@ -392,6 +399,17 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                         )}
                                                     </MapMarkerButton>
                                                 );
+                                                return showMarkerCard && markerCard && cardKind ? (
+                                                    <Tooltip
+                                                        title={<ContentCardControl stage={stage} control={markerCard} kind={cardKind} id={markerContent} orientation="vertical" onAction={handleAction} />}
+                                                        describeChild
+                                                        placement="bottom"
+                                                        enterTouchDelay={0}
+                                                        slotProps={{ tooltip: { sx: { backgroundColor: 'transparent', padding: 0, maxWidth: 'none' } } }}
+                                                    >
+                                                        {button}
+                                                    </Tooltip>
+                                                ) : button;
                                             }}
                                         </CachedBackgroundUrl>
                                         {linkedLocation && (

@@ -43,6 +43,15 @@ test('marker content lists normalize legacy kinds to mixed without losing their 
     }
 });
 
+test('marker card selection survives serialization and discards the obsolete pop-up property', () => {
+    const restored = new Control(JSON.parse(JSON.stringify({
+        type: 'marker', cardControlId: 'card', popupControlId: 'old-popup',
+    })));
+    assert.equal(restored.cardControlId, 'card');
+    assert.equal('popupControlId' in restored, false);
+    assert.equal(new Control({ type: 'marker' }).cardControlId, '');
+});
+
 test('new and legacy controls default to priority zero', () => {
     assert.equal(new Control({}).priority, 0);
     assert.equal(new Control({ name: 'Legacy control' }).priority, 0);
