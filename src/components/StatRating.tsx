@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import type { Stage } from '../Stage';
-import { isValueReference } from '../content/Function';
+import { isValueReference, MARKER_VARIABLE_VALUE } from '../content/Function';
 import { SearchableOptionPicker, type PickerOption } from './SearchableOptionPicker';
 import {
     AttachMoney,
@@ -652,7 +652,7 @@ interface IconPickerProps {
 export const IconPicker: FC<IconPickerProps> = ({ value, onChange, allowClear = false, placeholder = 'Search icon', stage }) => {
     // Icons sit alongside text-returning functions and global text stats, which SearchableOptionPicker merges in
     // (functionType="text") with lettered abbreviations and a parameter step for parameterful functions.
-    const options = value && !isValueReference(value) && !ICON_PICKER_OPTIONS.some(option => option.key === value)
+    const options = value && value !== MARKER_VARIABLE_VALUE && !isValueReference(value) && !ICON_PICKER_OPTIONS.some(option => option.key === value)
         ? [...ICON_PICKER_OPTIONS, { key: value, label: value, category: 'Icons', icon: resolveIcon(value) }]
         : ICON_PICKER_OPTIONS;
     return (

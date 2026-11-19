@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { GameConfiguration, Stage } from '../src/Stage';
 import { Actor, ACTOR_SCHEDULE_UNAVAILABLE, resolveActorSchedule } from '../src/content/Actor';
+import { Item } from '../src/content/Item';
 import { ConditionContext, ContentStatCondition } from '../src/content/Condition';
 import { isLocationAvailable, isLocationDisabled, isLocationInactive, Location } from '../src/content/Location';
 import { cloneStat } from '../src/content/Stat';
@@ -17,6 +18,8 @@ import { DefinedMapView } from '../src/screens/DefinedMapView';
 import { ScreenDetailPanel } from '../src/screens/ScreenDetailPanel';
 import { ConditionEditor } from '../src/components/ConditionEditor';
 import { ReferenceMultiSelect } from '../src/components/UiComponents';
+import { Control } from '../src/content/Control';
+import { MARKER_VARIABLE_VALUE, functionReference } from '../src/content/Function';
 
 const stat = cloneStat({
     id: 'score', name: 'Local Score', type: 'number', default: 0, guidance: '',
@@ -292,6 +295,102 @@ test('map rendering hides invisible buttons and their content while keeping disa
     assert.match(html, /aria-label="Enabled Button"/);
     assert.doesNotMatch(html, /aria-label="Enabled Button" disabled/);
 });
+
+test('location markers bind content for availability, icon functions, portraits and actions', () => {
+    const location = new Location({ id: 'local', name: 'Local', statMap: { score: 5 } });
+    const stage = createStage(location);
+    const parameter = cloneStat({ ...stat, id: 'place', name: 'Place', type: 'location', default: '' });
+    const marker = new Control({
+        id: 'marker', name: 'Marker', type: 'marker', markerInputType: 'location',
+        iconName: functionReference('icon', { place: 'variable:location' }),
+        availabilityConditions: [[ownStatCondition('location')]],
+        contentList: { kind: 'location', values: ['variable:location'] },
+        actions: [{ id: 'update', kind: 'stat', targetType: 'location', targetId: 'variable:location', statId: 'score', operation: 'set', value: 9 }],
+    });
+    stage.getConfiguration().controls = [marker];
+    stage.getConfiguration().functions = [{ id: 'icon', name: 'Icon', description: '', returnType: 'text', script: "return arg('Place') === 'local' ? 'favorite' : 'star';", parameters: [parameter] }];
+    const save = stage.getSave();
+    stage.getSave = () => save;
+    stage.saveGame = mock.fn();
+    const map = new GameMap({ id: 'map', links: [createMapButton({ type: 'marker', markerControlId: marker.id, content: 'local' })] });
+    const view = <TooltipProvider><DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={false} embedded /></TooltipProvider>;
+    const html = renderToStaticMarkup(view);
+    assert.match(html, /aria-label="Marker"/);
+    assert.match(html, /data-testid="FavoriteBorderIcon"/);
+    assert.match(html, /aria-label="Marker contents"/);
+    marker.contentList.values = [];
+    const renderer = create(view);
+    try {
+        act(() => renderer.root.findByProps({ 'aria-label': 'Marker' }).props.onClick());
+        assert.equal(location.statMap.score, 9);
+    } finally {
+        act(() => renderer.unmount());
+    }
+    location.statMap.score = 0;
+    assert.doesNotMatch(renderToStaticMarkup(view), /aria-label="Marker"/);
+});
+
+for (const kind of ['actor', 'item'] as const) {
+    test(`${kind} marker actions target the supplied entity`, () => {
+        const stage = createStage(new Location({ id: 'local' }));
+        const entity = kind === 'actor'
+            ? new Actor({ id: 'entry', name: 'Entry', statMap: { score: 5 } })
+            : new Item({ id: 'entry', name: 'Entry', statMap: { score: 5 } });
+        const marker = new Control({
+            id: 'marker', name: 'Marker', type: 'marker', markerInputType: kind,
+            availabilityConditions: [[{ type: 'contentStat', contentType: kind, targetId: 'variable', statId: 'score', comparison: 'equals', value: 5 }]],
+            actions: [{ id: 'update', kind: 'stat', targetType: kind, targetId: `variable:${kind}`, statId: 'score', operation: 'set', value: 9 }],
+        });
+        const configuration = stage.getConfiguration();
+        configuration.controls = [marker];
+        if (kind === 'item') configuration.itemStats = [stat];
+        const save = stage.getSave();
+        if (entity instanceof Actor) save.actors[entity.id] = entity;
+        else save.inventory.push(entity);
+        stage.getSave = () => save;
+        stage.saveGame = mock.fn();
+        const map = new GameMap({ id: 'map', links: [createMapButton({ type: 'marker', markerControlId: marker.id, content: entity.id })] });
+        const view = <TooltipProvider><DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={false} embedded /></TooltipProvider>;
+        const renderer = create(view);
+        try {
+            act(() => renderer.root.findByProps({ 'aria-label': 'Marker' }).props.onClick());
+            assert.equal(entity.statMap.score, 9);
+        } finally {
+            act(() => renderer.unmount());
+        }
+    });
+}
+
+for (const kind of ['string', 'screen'] as const) {
+    test(`${kind} marker content binds as text in availability, icons and actions`, () => {
+        const stage = createStage(new Location({ id: 'local' }));
+        const textStat = cloneStat({ ...stat, id: 'text', type: 'text', default: '' });
+        const marker = new Control({
+            id: 'marker', name: 'Marker', type: 'marker', markerInputType: kind, iconName: MARKER_VARIABLE_VALUE,
+            availabilityConditions: [[{ type: 'globalStat', statId: 'text', comparison: 'equals', value: MARKER_VARIABLE_VALUE }]],
+            actions: [{ id: 'update', kind: 'stat', targetType: 'global', targetId: 'any', statId: 'text', operation: 'set', value: MARKER_VARIABLE_VALUE }],
+        });
+        stage.getConfiguration().controls = [marker];
+        stage.getConfiguration().globalStats = [textStat];
+        const save = stage.getSave();
+        save.globalStatValues.text = 'favorite';
+        stage.getSave = () => save;
+        stage.saveGame = mock.fn();
+        const map = new GameMap({ id: 'map', links: [createMapButton({ type: 'marker', markerControlId: marker.id, content: 'favorite' })] });
+        const view = <TooltipProvider><DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={false} embedded /></TooltipProvider>;
+        assert.match(renderToStaticMarkup(view), /data-testid="FavoriteBorderIcon"/);
+        const renderer = create(view);
+        try {
+            save.globalStatValues.text = 'other';
+            act(() => renderer.root.findByProps({ 'aria-label': 'Marker' }).props.onClick());
+            assert.equal(save.globalStatValues.text, 'favorite');
+        } finally {
+            act(() => renderer.unmount());
+        }
+        save.globalStatValues.text = 'other';
+        assert.doesNotMatch(renderToStaticMarkup(view), /aria-label="Marker"/);
+    });
+}
 
 for (const isVerticalLayout of [false, true]) {
     test(`map button contents use unique, overlapping portraits in ${isVerticalLayout ? 'vertical' : 'horizontal'} layouts`, () => {

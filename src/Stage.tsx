@@ -6,7 +6,7 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, OPPOSITE_BOOLEAN_VALUE, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, matchesValueType, validateFunctionResult, HEADER_VARIABLE_VALUE, isStatReturnType } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, matchesValueType, validateFunctionResult, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE, isStatReturnType } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
@@ -574,6 +574,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {
+        if (value === MARKER_VARIABLE_VALUE && (type === 'text' || type === 'icon')) {
+            if (variables?.marker === undefined) {
+                throw new Error('No marker content is bound for Variable.');
+            }
+            return variables.marker;
+        }
         if (value === HEADER_VARIABLE_VALUE && type === 'text') {
             if (variables?.header === undefined) {
                 throw new Error('No header is bound for Variable.');
@@ -910,8 +916,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .sort(compareControlPriority);
     }
 
-    runControlActions(control: Control): Skit | null {
-        return this.runButtonActions(control.actions || []);
+    runControlActions(control: Control, variables?: FunctionVariableBindings): Skit | null {
+        return this.runButtonActions(control.actions || [], variables);
     }
 
     // Resolve the first skit only after every stat/function action has finished. Variables bind

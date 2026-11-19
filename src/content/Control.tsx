@@ -1,6 +1,7 @@
 import { v4 as generateUuid } from 'uuid';
 import { ConditionCollection, ConditionContext, CONTENT_TYPES, ContentType, evaluateConditionCollections } from './Condition';
 import { cloneStatUpdateAction, StatUpdateAction } from './Stat';
+import type { FunctionVariableBindings } from './Function';
 
 // Settings controls render in SettingsScreen.
 // Pop-ups overlay gameplay; only the first available control in priority order is displayed.
@@ -16,6 +17,8 @@ export type ControlPlacement = 'top' | 'bottom' | 'outcome' | 'settings' | 'popu
 // 'card' composes labels, standalone badges, conditions, and actions for a content type.
 export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'statOutcome' | 'settings' | 'popup' | 'statBadge' | 'card' | 'marker';
 export type MarkerInputType = 'actor' | 'item' | 'location' | 'screen' | 'string';
+export const markerVariableBindings = (type: MarkerInputType, content: string): FunctionVariableBindings =>
+    type === 'actor' || type === 'item' || type === 'location' ? { [type]: content } : { marker: content };
 export type ContentListDisplay = 'carousel' | 'abbreviated';
 export const STAT_DISPLAY_TYPES = ['straight', 'percentage', 'bar', 'rating', 'letter grade'] as const;
 export type StatDisplayType = typeof STAT_DISPLAY_TYPES[number];

@@ -4,10 +4,10 @@ import { DoNotDisturb, SwapHoriz } from '@mui/icons-material';
 import { Box } from '@mui/material';
 import type { Stage } from '../Stage';
 import { resolveStatDefault, type Stat, type StatType, type StatValue } from '../content/Stat';
-import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction, HEADER_VARIABLE_VALUE } from '../content/Function';
+import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
 import { variableContentValue } from '../content/Condition';
-import { HeaderVariableContext, VariableContentContext } from './VariableContentContext';
+import { HeaderVariableContext, MarkerTextVariableContext, VariableContentContext } from './VariableContentContext';
 
 const MAX_SELECTED_PREVIEW = 6;
 
@@ -78,6 +78,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
 }) => {
     const variableContentType = useContext(VariableContentContext);
     const headerVariableAvailable = useContext(HeaderVariableContext);
+    const markerTextAvailable = useContext(MarkerTextVariableContext);
     const allowedOptions = useContext(PickerAllowedOptionsContext);
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const pickerFunctions: GameFunction[] = stageInstance?.getConfiguration().functions || [];
@@ -96,10 +97,14 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         && !options.some(option => option.key === 'variable')) {
         const key = variableContentValue(variableContentType);
         options = [
-            { key, label: 'Variable', icon: SwapHoriz, description: `The ${variableContentType} this schedule rule applies to.` },
+            { key, label: 'Variable', icon: SwapHoriz, description: `The bound ${variableContentType}.` },
             ...options.filter(option => option.key !== key),
         ];
         defaultOptionKeys = [key, ...defaultOptionKeys.filter(value => value !== key)];
+    }
+    if (markerTextAvailable && functionType === 'text') {
+        options = [{ key: MARKER_VARIABLE_VALUE, label: 'Variable', icon: SwapHoriz, description: 'The content passed to this marker.' }, ...options.filter(option => option.key !== MARKER_VARIABLE_VALUE)];
+        defaultOptionKeys = [MARKER_VARIABLE_VALUE, ...defaultOptionKeys.filter(key => key !== MARKER_VARIABLE_VALUE)];
     }
     const selected = multiple ? values || [] : value ? [value] : [];
     // Selected references need their own entries whether sources were merged in (functionType) or the caller

@@ -15,7 +15,8 @@ import { IconPicker, resolveIcon } from '../components/StatRating';
 import { processLoreText } from '../content/Lore';
 import { Screen, cloneListSection, isSectionScreenType, ScreenType } from '../content/Screen';
 import { ListSectionsEditor } from '../components/ListSectionsEditor';
-import { Control } from '../content/Control';
+import { Control, markerVariableBindings } from '../content/Control';
+import { isValueReference } from '../content/Function';
 
 interface ScreenDetailPanelProps {
     screen: Screen;
@@ -818,9 +819,10 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                     </div>}
                     {map.links.map((link, index) => {
                         const markerControl = link.type === 'marker' ? configuredMarkers.find(control => control.id === (link.markerControlId || link.markerId)) : undefined;
+                        const markerContent = link.content || link.input || link.markerContent || '';
                         const locationImageUrl = link.type !== 'button' && link.type !== 'marker' ? activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl : undefined;
                         const markerName = link.type === 'marker' ? markerControl?.name || 'Marker' : link.type === 'button' ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stageInstance) : resolveTargetName(link.childId);
-                        const MarkerIcon = link.type === 'marker' ? (markerControl?.iconName ? resolveIcon(markerControl.iconName, stageInstance) : Place) : link.type === 'button' ? (link.iconName ? resolveIcon(link.iconName, stageInstance) : TouchApp) : Place;
+                        const MarkerIcon = link.type === 'marker' ? (markerControl?.iconName && (markerContent || !isValueReference(markerControl.iconName) || markerControl.markerInputType === 'screen' || markerControl.markerInputType === 'string') ? resolveIcon(String(stageInstance.resolveValue(markerControl.iconName, 'text', stageInstance.getSave(), [], markerVariableBindings(markerControl.markerInputType, markerContent)))) : Place) : link.type === 'button' ? (link.iconName ? resolveIcon(link.iconName, stageInstance) : TouchApp) : Place;
                         return (
                             <div
                                 key={`${link.childId}-marker-${index}`}

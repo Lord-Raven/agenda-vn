@@ -11,7 +11,7 @@ import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker } from '../components/StatRating';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { contentDetailSourceOptions, listDetailOptions } from '../components/ListSectionsEditor';
-import { HeaderVariableContext, VariableContentContext } from '../components/VariableContentContext';
+import { HeaderVariableContext, MarkerTextVariableContext, VariableContentContext } from '../components/VariableContentContext';
 
 interface ControlDetailPanelProps {
     control: Control;
@@ -271,6 +271,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
 
             <VariableContentContext.Provider value={conditionProps.variableContentType}>
             <HeaderVariableContext.Provider value={isCard || isStatBadge}>
+            <MarkerTextVariableContext.Provider value={isMarker && (draft.markerInputType === 'string' || draft.markerInputType === 'screen')}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 <section>
                     <h2 style={sectionHeadingStyle}>Basic Information</h2>
@@ -309,7 +310,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 }}
                             />
                         </div>
-                        {!isCard && draft.type !== 'statOutcome' && draft.type !== 'settings' && draft.type !== 'popup' && !isStatBadge && (
+                        {!isCard && !isMarker && draft.type !== 'statOutcome' && draft.type !== 'settings' && draft.type !== 'popup' && !isStatBadge && (
                             <div>
                                 <div style={fieldHeadingStyle}>
                                     <label htmlFor={`control-width-weight-${control.id}`}>Width Weight</label>
@@ -414,6 +415,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <HelpTip title="Control availability">
                                 {isCard ? 'Visible cards are disabled unless these conditions and the content availability rules pass.' : 'Leave conditions empty to always render this control.'}
                                 {isStatBadge && ' Evaluated per entry. Variable targets refer to the entry this badge is attached to.'}
+                                {isMarker && ' Variable refers to the content passed to this marker.'}
                             </HelpTip>
                         </div>
                         <ConditionEditor
@@ -835,6 +837,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                     </section>
                 )}
             </div>
+            </MarkerTextVariableContext.Provider>
             </HeaderVariableContext.Provider>
             </VariableContentContext.Provider>
         </GlassPanel>

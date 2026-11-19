@@ -8,7 +8,7 @@ import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
 import { ControlRenderer } from '../src/components/ControlRenderer';
 import { cloneStat, StatType } from '../src/content/Stat';
-import { globalStatReference } from '../src/content/Function';
+import { globalStatReference, MARKER_VARIABLE_VALUE } from '../src/content/Function';
 import { PickerAllowedOptionsContext, SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
 import { StatValueInput } from '../src/components/StatValueInput';
 import { normalizeStatShape } from '../src/components/StatEntryEditor';
@@ -465,6 +465,35 @@ for (const type of ['button', 'statDisplay', 'statEditor', 'card', 'statOutcome'
         assert.doesNotMatch(html, /aria-label="Selected icon: star"/);
     });
 }
+
+test('marker editors hide width weight and offer the bound entity in conditions and actions', () => {
+    for (const kind of ['actor', 'item', 'location'] as const) {
+        const control = new Control({
+            type: 'marker', markerInputType: kind,
+            availabilityConditions: [[{ type: 'contentStat', contentType: kind, targetId: 'variable', statId: 'score', comparison: 'equals', value: 1 }]],
+            actions: [{ id: 'action', kind: 'stat', targetType: kind, targetId: `variable:${kind}`, statId: 'score', operation: 'set', value: 1 }],
+        });
+        const stage = createStage(control);
+        stage.getConfiguration()[`${kind}Stats`] = [sourceStat('score', 'number')];
+        const html = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
+        assert.doesNotMatch(html, /Width Weight/);
+        assert.equal((html.match(/>Variable</g) || []).length, 2);
+    }
+});
+
+test('string and screen marker editors expose Variable for icon and text values', () => {
+    for (const kind of ['string', 'screen'] as const) {
+        const control = new Control({
+            type: 'marker', markerInputType: kind, iconName: MARKER_VARIABLE_VALUE,
+            availabilityConditions: [[{ type: 'globalStat', statId: 'text', comparison: 'equals', value: MARKER_VARIABLE_VALUE }]],
+        });
+        const stage = createStage(control);
+        stage.getConfiguration().globalStats = [sourceStat('text', 'text')];
+        const html = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
+        assert.doesNotMatch(html, /Width Weight/);
+        assert.equal((html.match(/>Variable</g) || []).length, 2);
+    }
+});
 
 test('new actions default to a global stat update, falling back to actor stats', () => {
     const globalStats = [sourceStat('score', 'number')];

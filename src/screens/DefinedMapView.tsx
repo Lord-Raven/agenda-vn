@@ -17,9 +17,9 @@ import { useCachedImageUrl } from '../utils/ImageCache';
 import { CachedBackgroundUrl } from '../components/CachedImage';
 import { resolveIcon } from '../components/StatRating';
 import { ContentListPortraits } from '../components/ContentListControl';
-import { normalizeReferenceListValue } from '../content/Stat';
+import { normalizeReferenceListValue, StatType } from '../content/Stat';
 import { processLoreText, stripLoreIcons } from '../content/Lore';
-import { isControlAvailable } from '../content/Control';
+import { isControlAvailable, markerVariableBindings } from '../content/Control';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -262,26 +262,22 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                         return null;
                                     }
                                     const markerContent = isMarker ? (link.content || link.input || link.markerContent || '') : '';
+                                    const markerVariables = markerControl ? markerVariableBindings(markerControl.markerInputType, markerContent) : undefined;
                                     const markerContext = isMarker ? {
                                         ...stage().getScheduleContext(save),
-                                        resolveValue: (value: unknown, type: any) => stage().resolveValue(value, type, save, [], markerControl?.markerInputType === 'actor'
-                                            ? { actor: markerContent }
-                                            : markerControl?.markerInputType === 'item'
-                                                ? { item: markerContent }
-                                                : markerControl?.markerInputType === 'location'
-                                                    ? { location: markerContent }
-                                                    : {}),
+                                        skitState: stage().getSkitConditionState(),
+                                        resolveValue: (value: unknown, type: StatType) => stage().resolveValue(value, type, save, [], markerVariables),
                                         ...(markerControl?.markerInputType === 'actor' ? { currentActor: save.actors?.[markerContent] } : {}),
                                         ...(markerControl?.markerInputType === 'location' ? { currentLocation: save.atlas?.[markerContent] } : {}),
                                         ...(markerControl?.markerInputType === 'item' ? { currentItem: save.inventory?.find(item => item.id === markerContent) } : {}),
                                     } : undefined;
-                                    if (isMarker && markerControl && !isControlAvailable(markerControl, markerContext as any)) {
+                                    if (isMarker && markerControl && markerContext && !isControlAvailable(markerControl, markerContext)) {
                                         return null;
                                     }
                                     const childId = isButton || isMarker ? '' : String(stage().resolveValue(link.childId, 'location', save));
                                     const linkedLocation = isButton || isMarker ? undefined : save.atlas?.[childId];
                                     const linkedMap = isButton || isMarker ? undefined : sortedMaps.find(map => map.id === childId);
-                                    if (!isButton && !linkedLocation && !linkedMap) {
+                                    if (!isButton && !isMarker && !linkedLocation && !linkedMap) {
                                         return null;
                                     }
                                     if (linkedLocation && !stage().isLocationVisible(linkedLocation.id)) {
@@ -299,12 +295,12 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
                                     const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
                                     const markerName = isMarker
-                                        ? processLoreText(markerControl?.label?.trim() || markerControl?.name?.trim() || markerContent || 'Marker', stage(), undefined, undefined, undefined, { icons: 'token' })
+                                        ? processLoreText(markerControl?.label?.trim() || markerControl?.name?.trim() || markerContent || 'Marker', stage(), undefined, markerVariables, undefined, { icons: 'token' })
                                         : isButton ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stage(), undefined, undefined, undefined, { icons: 'token' }) : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
                                     // Plain-text name for aria/portrait labels, which cannot carry inline icons.
                                     const plainMarkerName = stripLoreIcons(markerName);
                                     const ButtonIcon = isMarker
-                                        ? (markerControl?.iconName ? resolveIcon(markerControl.iconName, stage()) : TouchApp)
+                                        ? (markerControl?.iconName ? resolveIcon(String(stage().resolveValue(markerControl.iconName, 'text', save, [], markerVariables))) : TouchApp)
                                         : isButton && link.iconName ? resolveIcon(link.iconName, stage()) : TouchApp;
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
@@ -316,7 +312,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                 ? 'itemList'
                                                 : markerControl.contentList.kind === 'location'
                                                     ? 'locationList'
-                                                    : 'contentList', save)))]
+                                                    : 'contentList', save, [], markerVariables)))]
                                         : isButton && link.contentList
                                             ? [...new Set(normalizeReferenceListValue(stage().resolveValue(link.contentList.values, link.contentList.kind === 'mixed' ? 'contentList' : `${link.contentList.kind}List`, save)))]
                                             : [];
@@ -327,7 +323,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                         if (isMarker && markerControl) {
                                             let skit: Skit | null;
                                             try {
-                                                skit = stage().runControlActions(markerControl);
+                                                skit = stage().runControlActions(markerControl, markerVariables);
                                             } catch (error) {
                                                 console.error('Failed to run marker actions:', error);
                                                 stage().showPriorityMessage(`Failed to run marker actions: ${error instanceof Error ? error.message : String(error)}`);
@@ -378,7 +374,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                         aria-label={linkedMap ? `Open map ${plainMarkerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : plainMarkerName}
                                                         disabled={!isInteractive}
                                                         onClick={handleMarkerClick}
-                                                        onMouseEnter={() => isMarker ? setTooltip(processLoreText(markerControl?.description || markerControl?.label || markerName, stage()).trim() || null, markerControl?.iconName ? resolveIcon(markerControl.iconName, stage()) : undefined) : undefined}
+                                                        onMouseEnter={() => isMarker ? setTooltip(processLoreText(markerControl?.description || markerControl?.label || markerName, stage(), undefined, markerVariables).trim() || null, markerControl?.iconName ? ButtonIcon : undefined) : undefined}
                                                         onMouseLeave={clearTooltip}
                                                         isInteractive={isInteractive}
                                                         markerSize={markerSize}
@@ -386,10 +382,10 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                     >
                                                         <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
                                                         <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: markerImageUrl ? `url(${markerImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                                                            {!markerImageUrl && (isButton ? <ButtonIcon sx={{ fontSize: markerSize / 2 }} /> : <MapRounded fontSize="small" />)}
+                                                            {!markerImageUrl && (isButton || isMarker ? <ButtonIcon sx={{ fontSize: markerSize / 2 }} /> : <MapRounded fontSize="small" />)}
                                                         </span>
                                                         </span>
-                                                        {isInteractive && !isButton && (
+                                                        {isInteractive && !isButton && !isMarker && (
                                                             <span style={{ position: 'absolute', top: -2, left: -2, display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
                                                                 {linkedMap ? <ArrowOutward sx={{ fontSize: 11 }} /> : <PlayArrow sx={{ fontSize: 11 }} />}
                                                             </span>
@@ -407,11 +403,11 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                 />
                                             </div>
                                         )}
-                                        {isButton && link.contentList && contentValues.length > 0 && (
+                                        {(isMarker || (isButton && link.contentList)) && contentValues.length > 0 && (
                                             <div
                                                 style={{ position: 'absolute', ...markerPosition.style, left: `clamp(${contentWidth / 2 + 8}px, ${markerPosition.style.left}, calc(100% - ${contentWidth / 2 + 8}px))`, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, width: contentWidth, zIndex: 3 }}
                                             >
-                                                <ContentListPortraits kind={link.contentList.kind === 'mixed' ? undefined : link.contentList.kind} values={contentValues} stage={stage()} label={`${plainMarkerName} contents`} variant="overlay" size={actorPortraitSize} />
+                                                <ContentListPortraits kind={isMarker ? (markerControl?.contentList.kind === 'actor' || markerControl?.contentList.kind === 'item' || markerControl?.contentList.kind === 'location' ? markerControl.contentList.kind : undefined) : link.contentList?.kind === 'mixed' ? undefined : link.contentList?.kind} values={contentValues} stage={stage()} label={`${plainMarkerName} contents`} variant="overlay" size={actorPortraitSize} />
                                             </div>
                                         )}
                                         </Fragment>

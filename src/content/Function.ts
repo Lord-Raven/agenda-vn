@@ -49,9 +49,10 @@ export const isGlobalStatReference = (value: unknown): value is string =>
 export const globalStatReferenceId = (value: string): string => value.slice(GLOBAL_STAT_REFERENCE_PREFIX.length);
 export const isValueReference = (value: unknown): value is string => isFunctionReference(value) || isGlobalStatReference(value);
 
-// Content variables bind "variable:<kind>" to an id; 'header' binds HEADER_VARIABLE_VALUE to a pop-up header.
-export type FunctionVariableBindings = Partial<Record<ContentType, string>> & { header?: string };
+// Content variables bind "variable:<kind>" to an id; header and marker bind their respective text values.
+export type FunctionVariableBindings = Partial<Record<ContentType, string>> & { header?: string; marker?: string };
 export const HEADER_VARIABLE_VALUE = 'variable:header';
+export const MARKER_VARIABLE_VALUE = 'variable:marker';
 export type FunctionValueResolver = (value: unknown, type: StatType, variables?: FunctionVariableBindings) => StatValue;
 
 // The scalar type of one element of a single-kind list type. The mixed 'contentList' has no single element
