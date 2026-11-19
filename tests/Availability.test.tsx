@@ -242,7 +242,7 @@ for (const isCreatorMode of [true, false]) {
 }
 
 for (const isCreatorMode of [true, false]) {
-    test(`map marker instances pick their own typed content (creator: ${isCreatorMode})`, () => {
+    test(`map marker instances have independent names and typed content (creator: ${isCreatorMode})`, () => {
         const stage = createStage(new Location({ id: 'initial' }));
         const configuration = stage.getConfiguration();
         const prefix = isCreatorMode ? 'config' : 'save';
@@ -260,8 +260,8 @@ for (const isCreatorMode of [true, false]) {
             new Control({ id: markerInputType, name: markerInputType, type: 'marker', markerInputType }));
         controls.push(new Control({ id: 'other-actor', name: 'Other Actor', type: 'marker', markerInputType: 'actor' }));
         const map = new GameMap({ id: 'map', links: [
-            { ...createMapButton(), type: 'marker', markerControlId: 'actor', input: `${prefix}-a` },
-            { ...createMapButton(), type: 'marker', markerControlId: 'actor' },
+            createMapButton({ type: 'marker', markerControlId: 'actor', name: undefined, input: `${prefix}-a` }),
+            createMapButton({ type: 'marker', markerControlId: 'actor', name: undefined }),
         ] });
         const configured = makeContent('config');
         const saved = makeContent('save');
@@ -289,8 +289,21 @@ for (const isCreatorMode of [true, false]) {
             assert.ok(renderer);
             const root = renderer.root;
             act(() => root.findByProps({ 'aria-label': 'Expand Links' }).props.onClick());
+            const heading = (label: string, index = 0) => {
+                const title = root.findAllByProps({ 'aria-label': label })[index].findByType('strong');
+                return title.children.slice(0, 2).join('') + title.findByType('span').children.join('');
+            };
+            assert.equal(heading('Expand actor'), 'actor (Marker)');
             act(() => root.findAllByProps({ 'aria-label': 'Expand actor' })[0].props.onClick());
             act(() => root.findByProps({ 'aria-label': 'Expand actor' }).props.onClick());
+            const rename = (index: number, value: string) => act(() => root.findAllByType('input')
+                .find(node => node.props.id === `map-marker-name-map-${index}`)!.props.onChange({ target: { value } }));
+            rename(0, ' North Entrance ');
+            rename(1, 'South Entrance');
+            assert.equal(heading('Collapse North Entrance'), 'North Entrance (actor Marker)');
+            assert.equal(heading('Collapse South Entrance'), 'South Entrance (actor Marker)');
+            assert.deepEqual(new GameMap(JSON.parse(JSON.stringify(map))).links.map(link => link.name), [' North Entrance ', 'South Entrance']);
+
             const pickers = () => root.findAllByType(SearchableOptionPicker).filter(node => node.props.title?.startsWith('Choose marker '));
             const ids = (index: number) => pickers()[index].props.options.map((option: { key: string }) => option.key);
             assert.deepEqual(ids(0), [`${prefix}-a`, `${prefix}-b`]);
@@ -303,6 +316,7 @@ for (const isCreatorMode of [true, false]) {
 
             const switchControl = (id: string) => act(() => root.findByProps({ id: 'map-marker-control-map-1' }).props.onChange({ target: { value: id } }));
             switchControl('other-actor');
+            assert.equal(heading('Collapse South Entrance'), 'South Entrance (Other Actor Marker)');
             assert.equal(pickers()[1].props.value, `${prefix}-b`);
             for (const kind of ['item', 'location', 'screen'] as const) {
                 switchControl(kind);
@@ -318,6 +332,8 @@ for (const isCreatorMode of [true, false]) {
             assert.equal(text.props.value, '');
             act(() => text.props.onChange({ target: { value: 'Free text' } }));
             assert.equal(map.links[1].content, 'Free text');
+            rename(1, ' ');
+            assert.equal(heading('Collapse string'), 'string (Marker)');
         } finally {
             if (renderer) act(() => renderer?.unmount());
             if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);

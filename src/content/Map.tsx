@@ -241,7 +241,7 @@ export interface MapLink {
     coordinates: { x: number; y: number }; // Coordinates for the link on the parent Map (x and y are between 0 and 1, representing a percentage of the map's width and height)
     conditionCollections?: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
     availabilityModes?: MapLinkAvailabilityMode[]; // New button groups default to visible in the editor; omitted legacy entries mean enabled.
-    name?: string;
+    name?: string; // For marker instances, this names the entry in the editor without changing its in-game label.
     // Read-only template text, e.g. {{Greeting("Alex", 2)}}. Blank labels fall back to name.
     label?: string;
     iconName?: string;

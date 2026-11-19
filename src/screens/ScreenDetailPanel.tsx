@@ -645,8 +645,10 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                         {map.links.map((link, index) => {
                             const isCollapsed = !expandedLinks.includes(index);
                             const markerControl = link.type === 'marker' ? configuredMarkers.find(control => control.id === (link.markerControlId || link.markerId)) : undefined;
-                            const linkName = link.type === 'marker' ? markerControl?.name || 'Marker' : link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);
-                            const linkTypeLabel = link.type === 'marker' ? 'Marker' : link.type === 'button' ? 'Button' : resolveTargetTypeLabel(link.childId);
+                            const markerInstanceName = link.type === 'marker' ? link.name?.trim() : undefined;
+                            const markerControlName = markerControl?.name?.trim();
+                            const linkName = link.type === 'marker' ? markerInstanceName || markerControlName || 'Marker' : link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);
+                            const linkTypeLabel = link.type === 'marker' ? (markerInstanceName && markerControlName ? `${markerControlName} Marker` : 'Marker') : link.type === 'button' ? 'Button' : resolveTargetTypeLabel(link.childId);
                             return (
                                 <div key={index} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -687,6 +689,8 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                                     </div>
                                     {!isCollapsed && <>
                                         {link.type === 'marker' ? (<>
+                                            <label htmlFor={`map-marker-name-${map.id}-${index}`} style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Marker Name (optional)</label>
+                                            <TextInput fullWidth id={`map-marker-name-${map.id}-${index}`} value={link.name || ''} onChange={event => updateLink(index, { name: event.target.value })} />
                                             <label htmlFor={`map-marker-control-${map.id}-${index}`} style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Marker Control</label>
                                             <select
                                                 id={`map-marker-control-${map.id}-${index}`}
@@ -860,7 +864,7 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                         const markerControl = link.type === 'marker' ? configuredMarkers.find(control => control.id === (link.markerControlId || link.markerId)) : undefined;
                         const markerContent = link.content || link.input || link.markerContent || '';
                         const locationImageUrl = link.type !== 'button' && link.type !== 'marker' ? activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl : undefined;
-                        const markerName = link.type === 'marker' ? markerControl?.name || 'Marker' : link.type === 'button' ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stageInstance) : resolveTargetName(link.childId);
+                        const markerName = link.type === 'marker' ? link.name?.trim() || markerControl?.name?.trim() || 'Marker' : link.type === 'button' ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stageInstance) : resolveTargetName(link.childId);
                         const MarkerIcon = link.type === 'marker' ? (markerControl?.iconName && (markerContent || !isValueReference(markerControl.iconName) || markerControl.markerInputType === 'screen' || markerControl.markerInputType === 'string') ? resolveIcon(String(stageInstance.resolveValue(markerControl.iconName, 'text', stageInstance.getSave(), [], markerVariableBindings(markerControl.markerInputType, markerContent)))) : Place) : link.type === 'button' ? (link.iconName ? resolveIcon(link.iconName, stageInstance) : TouchApp) : Place;
                         return (
                             <div
