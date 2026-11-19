@@ -8,7 +8,7 @@ import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
 import { ControlRenderer } from '../src/components/ControlRenderer';
 import { cloneStat, StatType } from '../src/content/Stat';
-import { globalStatReference, MARKER_VARIABLE_VALUE } from '../src/content/Function';
+import { functionReference, functionReferenceArguments, globalStatReference, MARKER_VARIABLE_VALUE } from '../src/content/Function';
 import { PickerAllowedOptionsContext, SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
 import { StatValueInput } from '../src/components/StatValueInput';
 import { normalizeStatShape } from '../src/components/StatEntryEditor';
@@ -492,6 +492,96 @@ test('string and screen marker editors expose Variable for icon and text values'
         const html = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
         assert.doesNotMatch(html, /Width Weight/);
         assert.equal((html.match(/>Variable</g) || []).length, 2);
+    }
+});
+
+test('marker content below stays mixed and survives input type changes', () => {
+    const control = new Control({ type: 'marker', markerInputType: 'actor', contentList: { kind: 'actor', values: ['actor-id'] } });
+    const stage = createStage(control);
+    const configuration = stage.getConfiguration();
+    stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: Object.assign(new EventTarget(), { setTimeout, clearTimeout }) });
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+        act(() => { renderer = create(<ControlDetailPanel control={control} stage={() => stage} />); });
+        const root = renderer!.root;
+        const values = ['actor-id', 'item-id', 'location-id', functionReference('contents')];
+        act(() => root.findByType(ReferenceMultiSelect).props.onChange(values));
+        for (const kind of ['actor', 'item', 'location', 'string', 'screen']) {
+            const inputType = root.findAllByType('select').find(select =>
+                select.findAllByType('option').some(option => option.props.value === 'string'))!;
+            act(() => inputType.props.onChange({ target: { value: kind } }));
+            const picker = root.findByType(ReferenceMultiSelect);
+            assert.equal(picker.props.kind, undefined);
+            assert.deepEqual(picker.props.values, values);
+        }
+        act(() => renderer!.unmount());
+        renderer = undefined;
+        assert.deepEqual(configuration.controls[0].contentList, { kind: 'mixed', values });
+    } finally {
+        if (renderer) act(() => renderer?.unmount());
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else Reflect.deleteProperty(globalThis, 'window');
+    }
+});
+
+test('marker availability function parameters can select the matching input variable', () => {
+    for (const kind of ['actor', 'item', 'location', 'string', 'screen'] as const) {
+        const parameterType = kind === 'screen' || kind === 'string' ? 'text' : kind;
+        const variable = parameterType === 'text' ? MARKER_VARIABLE_VALUE : `variable:${kind}`;
+        const control = new Control({
+            type: 'marker', markerInputType: kind,
+            availabilityConditions: [[{ type: 'function', reference: functionReference('available'), comparison: 'equals', value: true }]],
+        });
+        const stage = createStage(control);
+        const configuration = stage.getConfiguration();
+        configuration.functions = [{
+            id: 'available', name: 'Available', description: '', returnType: 'boolean', script: 'return true;',
+            parameters: [sourceStat('input', parameterType)],
+        }];
+        stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
+        const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+        const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+        Object.defineProperty(globalThis, 'window', { configurable: true, value: Object.assign(new EventTarget(), { setTimeout, clearTimeout }) });
+        let renderer: ReturnType<typeof create> | undefined;
+        try {
+            act(() => { renderer = create(<ControlDetailPanel control={control} stage={() => stage} />); });
+            const root = renderer!.root;
+            Object.defineProperty(globalThis, 'document', { configurable: true, value: { body: { nodeType: 1, children: [] } } });
+            const functionPicker = root.findAllByType(SearchableOptionPicker).find(picker => picker.props.title === 'Choose function')!;
+            act(() => functionPicker.findByType('button').props.onClick());
+            const functionOption = functionPicker.findAllByType('button').find(button =>
+                !button.props['aria-label'] && button.findAllByType('span').some(span =>
+                    typeof span.props.children === 'string' && span.props.children.startsWith('Available(')))!;
+            act(() => functionOption.props.onClick());
+            const parameter = functionPicker.findByType(StatValueInput);
+            if (parameterType === 'text') {
+                act(() => parameter.findAllByType('button').find(button => button.props.children === 'Use Variable')!.props.onClick());
+            } else {
+                const picker = parameter.findByType(SearchableOptionPicker);
+                act(() => picker.findByType('button').props.onClick());
+                const variableOption = picker.findAllByType('button').find(button =>
+                    !button.props['aria-label'] && button.findAllByType('span').some(span => span.props.children === 'Variable'))!;
+                assert.ok(variableOption, `${kind} parameter should offer Variable`);
+                act(() => variableOption.props.onClick());
+            }
+            assert.equal(functionPicker.findByType(StatValueInput).props.value, variable);
+            const confirm = functionPicker.findAllByType('button').find(button => button.props.children === 'Confirm')!;
+            act(() => confirm.props.onClick());
+            Reflect.deleteProperty(globalThis, 'document');
+            act(() => renderer!.unmount());
+            renderer = undefined;
+            const condition = configuration.controls[0].availabilityConditions[0][0];
+            assert.equal(condition.type, 'function');
+            if (condition.type === 'function') assert.equal(functionReferenceArguments(condition.reference)?.input, variable);
+        } finally {
+            Reflect.deleteProperty(globalThis, 'document');
+            if (renderer) act(() => renderer?.unmount());
+            if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+            else Reflect.deleteProperty(globalThis, 'window');
+            if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+        }
     }
 });
 

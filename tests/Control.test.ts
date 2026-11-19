@@ -33,6 +33,16 @@ test('picker sources preserve an empty restriction and dynamic references throug
     }
 });
 
+test('marker content lists normalize legacy kinds to mixed without losing their values', () => {
+    for (const kind of ['actor', 'item', 'location', 'string', 'mixed'] as const) {
+        const values = ['actor-id', 'item-id', 'location-id', 'function:contents'];
+        const control = new Control({ type: 'marker', contentList: { kind, values } });
+        const restored = new Control(JSON.parse(JSON.stringify(control)));
+        assert.deepEqual(restored.contentList, { kind: 'mixed', values });
+        assert.equal(new Control({ type: 'button', contentList: { kind, values } }).contentList.kind, kind);
+    }
+});
+
 test('new and legacy controls default to priority zero', () => {
     assert.equal(new Control({}).priority, 0);
     assert.equal(new Control({ name: 'Legacy control' }).priority, 0);

@@ -435,11 +435,18 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                         <h2 style={sectionHeadingStyle}>Marker</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
                             <div>
-                                <label style={labelStyle}>Input Type</label>
+                                <div style={fieldHeadingStyle}>
+                                    <label>Input Type</label>
+                                    <HelpTip title="Marker input">
+                                        Each marker instance on a Map Screen supplies this value.
+                                        Variable offers it in compatible condition, action, and function parameter inputs.
+                                        Screen and String inputs supply text values.
+                                    </HelpTip>
+                                </div>
                                 <select
                                     style={selectStyle}
                                     value={draft.markerInputType}
-                                    onChange={(event) => setDraft(current => ({ ...current, markerInputType: event.target.value as typeof current.markerInputType, contentList: { kind: 'mixed', values: [] } }))}
+                                    onChange={(event) => setDraft(current => ({ ...current, markerInputType: event.target.value as typeof current.markerInputType }))}
                                 >
                                     <option value="actor">Actor</option>
                                     <option value="item">Item</option>
@@ -461,27 +468,22 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     ))}
                                 </select>
                             </div>
-                            {draft.markerInputType !== 'screen' && draft.markerInputType !== 'string' && (
-                                <div>
-                                    <div style={fieldHeadingStyle}>
-                                        <label>Content below marker</label>
-                                    </div>
-                                    <ReferenceMultiSelect
-                                        kind={draft.markerInputType}
-                                        values={draft.contentList.values}
-                                        onChange={(values) => setDraft(current => {
-                                            const kind = current.markerInputType === 'actor' || current.markerInputType === 'item' || current.markerInputType === 'location'
-                                                ? current.markerInputType
-                                                : 'mixed';
-                                            return { ...current, contentList: { kind, values } };
-                                        })}
-                                        actors={actors.filter(actor => actor.active !== false)}
-                                        items={items.filter(item => item.active !== false)}
-                                        locations={locations.filter(location => location.active !== false)}
-                                        stage={stage}
-                                    />
+                            <div>
+                                <div style={fieldHeadingStyle}>
+                                    <label>Content below marker</label>
+                                    <HelpTip title="Content below marker">
+                                        A mixed list of Actors, Items, and Locations, independent of the marker input type.
+                                    </HelpTip>
                                 </div>
-                            )}
+                                <ReferenceMultiSelect
+                                    values={draft.contentList.values}
+                                    onChange={(values) => setDraft(current => ({ ...current, contentList: { kind: 'mixed', values } }))}
+                                    actors={actors.filter(actor => actor.active !== false)}
+                                    items={items.filter(item => item.active !== false)}
+                                    locations={locations.filter(location => location.active !== false)}
+                                    stage={stage}
+                                />
+                            </div>
                         </div>
                     </section>
                 )}

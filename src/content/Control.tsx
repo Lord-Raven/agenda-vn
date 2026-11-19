@@ -130,7 +130,7 @@ export class Control {
         this.popupControlId = `${this.popupControlId || ''}`;
         const contentList = this.contentList as Partial<{ kind: string; values: unknown }> | undefined;
         this.contentList = {
-            kind: contentList && ['actor', 'item', 'location', 'mixed', 'string'].includes(String(contentList.kind))
+            kind: this.type !== 'marker' && contentList && ['actor', 'item', 'location', 'mixed', 'string'].includes(String(contentList.kind))
                 ? contentList.kind as 'actor' | 'item' | 'location' | 'mixed' | 'string'
                 : 'mixed',
             values: contentList && Array.isArray(contentList.values) ? contentList.values.filter((entry): entry is string => typeof entry === 'string') : [],
