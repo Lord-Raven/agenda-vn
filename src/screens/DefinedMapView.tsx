@@ -281,8 +281,9 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     const markerCard = cardKind && markerControl?.cardControlId
                                         ? stage().getCardControl(cardKind, markerControl.cardControlId, save) : undefined;
                                     console.log(`Marker name: ${markerContent}`);
-                                    console.log(markerCard, cardKind, markerContent);
+                                    
                                     const showMarkerCard = markerCard && cardKind && stage().resolveCardState(markerCard, cardKind, markerContent, '', save).visible;
+                                    console.log(markerCard, cardKind, markerContent, showMarkerCard);
                                     const childId = isButton || isMarker ? '' : String(stage().resolveValue(link.childId, 'location', save));
                                     const linkedLocation = isButton || isMarker ? undefined : save.atlas?.[childId];
                                     const linkedMap = isButton || isMarker ? undefined : sortedMaps.find(map => map.id === childId);
