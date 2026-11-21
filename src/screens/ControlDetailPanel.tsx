@@ -673,7 +673,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <div style={fieldHeadingStyle}>
                                     <label>Label (optional)</label>
                                     <HelpTip title="Badge label">
-                                        Leave empty to show no label. {labelHelpText}
+                                        Leave empty to show no label. Reference-list labels appear above the portraits on cards. {labelHelpText}
                                     </HelpTip>
                                 </div>
                                 <TextInput fullWidth value={draft.label} placeholder="No label"

@@ -783,6 +783,41 @@ test('plain list stat details retain their source labels', () => {
     assert.match(html, />5<\/span>/);
 });
 
+test('location cards show reference-list badge labels above portraits in every layout', () => {
+    const { stage, configuration } = fixture();
+    const badge = new Control({
+        type: 'statBadge', contentType: 'location', badgeSource: globalStatReference('Crew'),
+        label: 'Visitors at {{content:name}} {{icon:star}}',
+    });
+    const card = new Control({
+        type: 'card', contentType: 'location', showPortrait: false,
+        cardDetails: [controlReference(badge.id)],
+    });
+    configuration.controls = [card, badge];
+    for (const compact of [false, true]) {
+        for (const orientation of ['horizontal', 'vertical'] as const) {
+            const render = () => renderToStaticMarkup(
+                <ContentCardControl stage={() => stage} control={card} kind="location" id="park"
+                    orientation={orientation} compact={compact} />,
+            );
+            const html = render();
+            const labelIndex = html.indexOf('>Visitors at Park ');
+            assert.ok(labelIndex >= 0, 'the context-bound label is visible text');
+            assert.ok(labelIndex < html.indexOf('role="list"'), 'the label precedes the portraits');
+            assert.match(html, /data-testid="StarIcon"/);
+            const detailClass = html.match(/data-popup-card-detail="[^"]+"[^>]*class="([^"]+)"/)?.[1].match(/css-[\w-]+/)?.[0];
+            assert.ok(detailClass);
+            assert.match(html, new RegExp(`\\.${detailClass}\\{[^}]*flex-direction:column`));
+            assert.match(html, /role="listitem"[^>]*aria-label="Bob"/);
+            badge.label = '   ';
+            const unlabeled = render();
+            assert.doesNotMatch(unlabeled, /Visitors at Park|data-testid="StarIcon"/);
+            assert.match(unlabeled, /role="listitem"[^>]*aria-label="Bob"/);
+            badge.label = 'Visitors at {{content:name}} {{icon:star}}';
+        }
+    }
+});
+
 test('stat badge editor uses standalone placement and help icons instead of inline guidance', () => {
     const { stage, configuration } = fixture();
     const badge = new Control({

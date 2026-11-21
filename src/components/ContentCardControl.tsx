@@ -183,9 +183,16 @@ export const ListCardDetail: FC<{
     const isReference = ['actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList'].includes(detail.type);
     if (isReference) {
         const values = (Array.isArray(detail.value) ? detail.value : [detail.value]).map(String).filter(Boolean);
+        const showLabel = !!control && !!labelText;
         return values.length ? (
-            <Box data-popup-card-detail={detail.key} title={label} sx={{ display: 'flex' }}
+            <Box data-popup-card-detail={detail.key} title={label} sx={{
+                display: 'flex', flexDirection: showLabel ? 'column' : 'row', gap: showLabel ? 0.5 : undefined, minWidth: 0,
+            }}
                 onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+                {showLabel && <Typography sx={{
+                    color: 'var(--agenda-text-muted)', fontSize: large ? '1.05rem' : '0.66rem', letterSpacing: '0.1em',
+                    textTransform: 'uppercase', lineHeight: 1.2, overflowWrap: 'anywhere',
+                }}>{renderLoreIcons(labelText, stage)}</Typography>}
                 <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={label} variant="overlay" size={large ? 48 : isVerticalLayout ? 30 : 36} />
             </Box>
         ) : null;
