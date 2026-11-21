@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { act, create } from 'react-test-renderer';
 import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { Actor } from '../src/content/Actor';
 import { CalendarEvent, getActiveTimeMode } from '../src/content/CalendarEvent';
@@ -11,7 +12,9 @@ import { Location } from '../src/content/Location';
 import { Screen as GameMap, createListSection } from '../src/content/Screen';
 import { createLoreEntry } from '../src/content/Lore';
 import { cloneStat } from '../src/content/Stat';
-import { TooltipProvider } from '../src/components/TooltipContext';
+import { TooltipProvider, useTooltip } from '../src/components/TooltipContext';
+import { resolveIcon } from '../src/components/StatRating';
+import { DefinedMapView } from '../src/screens/DefinedMapView';
 import { SaveLoadScreen } from '../src/screens/SaveLoadScreen';
 import { MenuScreen } from '../src/screens/MenuScreen';
 import { SettingsScreen } from '../src/screens/SettingsScreen';
@@ -73,6 +76,40 @@ const fixture = () => {
     stage.getConfiguration();
     return { stage, source, configuration, persisted };
 };
+
+test('applied marker controls render their configured icon and hover text on the map', async () => {
+    const { stage } = fixture();
+    stage.isOwner = true;
+    const control = new Control({
+        id: 'marker-control', type: 'marker', name: 'New Control',
+        label: 'Visit market', description: 'Browse the stalls', iconName: 'favorite',
+    });
+    const map = new GameMap({
+        id: 'map', links: [{
+            type: 'marker', parentId: 'map', childId: '', markerControlId: control.id,
+            content: 'market', coordinates: { x: 0.5, y: 0.5 }, conditionCollections: [],
+        }],
+    });
+    stage.updateConfiguration({ controls: [control], screens: [map] });
+    await stage.applyConfigurationToSave();
+    const TooltipMessage = () => <span data-testid="marker-tooltip">{useTooltip().message}</span>;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+        act(() => {
+            renderer = create(<TooltipProvider>
+                <DefinedMapView stage={() => stage} maps={stage.getSave().screens} onAction={() => {}}
+                    setScreenType={() => {}} isVerticalLayout={false} embedded />
+                <TooltipMessage />
+            </TooltipProvider>);
+        });
+        const button = renderer!.root.findByProps({ 'aria-label': 'Visit market' });
+        assert.ok(button.findAllByType(resolveIcon('favorite')).length > 0);
+        act(() => button.props.onMouseEnter());
+        assert.deepEqual(renderer!.root.findByProps({ 'data-testid': 'marker-tooltip' }).children, ['Browse the stalls']);
+    } finally {
+        if (renderer) act(() => renderer?.unmount());
+    }
+});
 
 test('Screen types, List rules, and Control selections survive portable export and save normalization', () => {
     const { stage } = fixture();

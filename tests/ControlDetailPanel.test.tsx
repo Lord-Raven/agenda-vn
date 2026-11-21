@@ -466,6 +466,33 @@ for (const type of ['button', 'statDisplay', 'statEditor', 'card', 'statOutcome'
     });
 }
 
+test('marker appearance edits survive editor autosave and reopening', () => {
+    const control = new Control({ type: 'marker', name: 'New Control' });
+    const stage = createStage(control);
+    const configuration = stage.getConfiguration();
+    stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: Object.assign(new EventTarget(), { setTimeout, clearTimeout }) });
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+        act(() => { renderer = create(<ControlDetailPanel control={control} stage={() => stage} />); });
+        act(() => renderer!.root.findByType(IconPicker).props.onChange('favorite'));
+        const label = renderer!.root.findAllByType('input').find(input => input.props.placeholder === 'Text shown on the button')!;
+        act(() => label.props.onChange({ target: { value: 'Visit market' } }));
+        act(() => renderer!.unmount());
+        renderer = undefined;
+        assert.equal(configuration.controls[0].iconName, 'favorite');
+        assert.equal(configuration.controls[0].label, 'Visit market');
+        const html = renderToStaticMarkup(<ControlDetailPanel control={configuration.controls[0]} stage={() => stage} />);
+        assert.match(html, /Selected icon: favorite/);
+        assert.match(html, /Visit market/);
+    } finally {
+        if (renderer) act(() => renderer?.unmount());
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else Reflect.deleteProperty(globalThis, 'window');
+    }
+});
+
 test('marker editors hide width weight and offer the bound entity in conditions and actions', () => {
     for (const kind of ['actor', 'item', 'location'] as const) {
         const control = new Control({

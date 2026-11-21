@@ -304,11 +304,14 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     const markerName = isMarker
                                         ? processLoreText(markerControl?.label?.trim() || markerControl?.name?.trim() || markerContent || 'Marker', stage(), undefined, markerVariables, undefined, { icons: 'token' })
                                         : isButton ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stage(), undefined, undefined, undefined, { icons: 'token' }) : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
+                                    console.log(markerControl);
+                                    console.log(markerName);
                                     // Plain-text name for aria/portrait labels, which cannot carry inline icons.
                                     const plainMarkerName = stripLoreIcons(markerName);
                                     const ButtonIcon = isMarker
                                         ? (markerControl?.iconName ? resolveIcon(String(stage().resolveValue(markerControl.iconName, 'text', save, [], markerVariables))) : TouchApp)
                                         : isButton && link.iconName ? resolveIcon(link.iconName, stage()) : TouchApp;
+                                    console.log(ButtonIcon);
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
                                     const isInteractive = availability.enabled && Boolean(isMarker || isButton || linkedMap || canVisitLocation);
