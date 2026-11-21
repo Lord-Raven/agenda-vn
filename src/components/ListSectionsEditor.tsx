@@ -3,7 +3,7 @@ import { Stage } from '../Stage';
 import { ContentType } from '../content/Condition';
 import { contentStatReference, createListSection, ListSection, listContentKind } from '../content/Screen';
 import { controlReference, createDefaultCardControls } from '../content/Control';
-import { functionReference, functionSignature, isStatReturnType, valuePickerOptions } from '../content/Function';
+import { functionReference, functionSignature, valuePickerOptions } from '../content/Function';
 import { OutcomeEditorContext } from './OutcomeEditor';
 import { PickerOption, SearchableOptionPicker } from './SearchableOptionPicker';
 import { Button, TextInput } from './UiComponents';
@@ -36,13 +36,12 @@ export const listContentSourceOptions = (stage: Stage): PickerOption[] => {
     return [...valuePickerOptions(configuration, 'actorList'), ...valuePickerOptions(configuration, 'itemList'), ...valuePickerOptions(configuration, 'locationList')];
 };
 
-// Stat badge sources for a content kind: value functions taking a parameter of that kind, and that kind's stats.
+// Stat badge sources: all functions and the chosen content kind's stats.
 export const contentDetailSourceOptions = (stage: Stage, kind: ContentType): PickerOption[] => {
     const configuration = stage.getConfiguration();
     const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
     return [
         ...(configuration.functions || [])
-            .filter(fn => isStatReturnType(fn.returnType) && (fn.parameters || []).some(parameter => parameter.type === kind))
             .map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description })),
         ...(stats || []).map(stat => ({ key: contentStatReference(kind, stat.id), label: stat.name, category: `${CONTENT_LABELS[kind]} Stats`, description: stat.guidance })),
     ];

@@ -856,7 +856,7 @@ test('content card lists hide empty pages and show an empty state', () => {
     assert.match(locations, /Unavailable/);
 });
 
-test('editor pickers offer header, content, and kind-filtered detail sources', () => {
+test('editor pickers offer header, content, and badge detail sources', () => {
     const { stage } = fixture();
     const headers = listHeaderSourceOptions(stage).map(option => option.key);
     assert.ok(headers.includes(functionReference('teams')));
@@ -864,9 +864,29 @@ test('editor pickers offer header, content, and kind-filtered detail sources', (
     assert.ok(headers.includes(globalStatReference('Title')));
     assert.ok(!headers.includes(functionReference('members')));
     assert.deepEqual(listContentSourceOptions(stage).map(option => option.key), [functionReference('members'), globalStatReference('Crew')]);
-    assert.deepEqual(contentDetailSourceOptions(stage, 'actor').map(option => option.key), [functionReference('label'), 'actorStat:Mood', 'actorStat:Team']);
+    const functions = stage.getConfiguration().functions.map(fn => functionReference(fn.id));
+    assert.deepEqual(contentDetailSourceOptions(stage, 'actor').map(option => option.key), [...functions, 'actorStat:Mood', 'actorStat:Team']);
+    assert.deepEqual(contentDetailSourceOptions(stage, 'item').map(option => option.key), functions);
     assert.deepEqual(listDetailOptions(stage, 'actor'), []);
     assert.deepEqual(listDetailOptions(stage, 'item'), []);
+});
+
+test('badge source options include void functions and nested function values bind to the card', () => {
+    const { stage, configuration } = fixture();
+    configuration.functions.push(
+        { id: 'inner', name: 'Inner', description: '', returnType: 'number',
+            parameters: [stat('Who', 'actor', '')], script: "return arg('Who') === 'bob' ? 7 : 0;" },
+        { id: 'outer', name: 'Outer', description: '', returnType: 'number',
+            parameters: [stat('Value', 'number', 0)], script: "return arg('Value') * 2;" },
+        { id: 'void', name: 'Void', description: '', returnType: 'void', script: '' },
+    );
+    const control = new Control({ type: 'statBadge', contentType: 'actor',
+        badgeSource: functionReference('outer', { Value: functionReference('inner', { Who: variableContentValue('actor') }) }) });
+    configuration.controls.push(control);
+    const options = contentDetailSourceOptions(stage, 'actor').map(option => option.key);
+    assert.ok(options.includes(functionReference('outer')));
+    assert.ok(options.includes(functionReference('void')));
+    assert.equal(stage.resolveListCardDetail(controlReference(control.id), 'actor', 'bob', '')?.value, 14);
 });
 
 test('list detail pickers offer active stat badges matching the content kind', () => {

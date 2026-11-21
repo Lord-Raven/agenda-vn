@@ -657,7 +657,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <div style={fieldHeadingStyle}>
                                     <label>Value Source</label>
                                     <HelpTip title="Badge value source">
-                                        A stat of the chosen content type, or a function whose Variable parameter binds to the entry this badge is attached to.
+                                        A stat of the chosen content type, or any function. Matching Variable parameters can bind to the entry this badge is attached to. Functions returning Void or String List cannot display a badge.
                                     </HelpTip>
                                 </div>
                                 <VariableContentContext.Provider value={draft.contentType}>
