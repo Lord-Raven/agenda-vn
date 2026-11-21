@@ -374,6 +374,50 @@ for (const kind of ['actor', 'item', 'location'] as const) {
     });
 }
 
+test('marker hover card availability follows the marker instead of the card or location', () => {
+    const location = new Location({ id: 'local', name: 'Local', statMap: { score: 0 } });
+    const stage = createStage(location);
+    const save = stage.getSave();
+    stage.getSave = () => save;
+    stage.saveGame = mock.fn();
+    const card = new Control({
+        id: 'card', type: 'card', contentType: 'location', showPortrait: false,
+        availabilityConditions: [[ownStatCondition('location')]],
+        actions: [{ id: 'action', kind: 'stat', targetType: 'location', targetId: 'variable:location', statId: 'score', operation: 'set', value: 1 }],
+    });
+    const marker = new Control({ id: 'marker', name: 'Marker', type: 'marker', markerInputType: 'location', cardControlId: card.id });
+    stage.getConfiguration().controls = [marker, card];
+    const map = new GameMap({ id: 'map', links: [createMapMarker({ markerControlId: marker.id, content: location.id })] });
+    const view = <TooltipProvider><DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={false} embedded /></TooltipProvider>;
+    for (const availability of ['disabled', 'unavailable'] as const) {
+        location.statMap.score = 0;
+        location.availabilityConditions = { unavailable: [], disabled: [], [availability]: [[{ ...ownStatCondition('location'), value: availability === 'disabled' ? 0 : 5 }]] };
+        const renderer = create(view);
+        let cardRenderer: ReactTestRenderer | undefined;
+        try {
+            const title = renderer.root.findByType(Tooltip).props.title;
+            act(() => { cardRenderer = create(title); });
+            const cardElement = cardRenderer!.root.findByProps({ 'data-card-control': card.id });
+            assert.equal(cardElement.props.sx.opacity, 1);
+            assert.equal(cardElement.props['aria-disabled'], false);
+            const click = cardElement.props.onClick;
+            act(() => click());
+            assert.equal(location.statMap.score, 1);
+            marker.availabilityConditions = [[ownStatCondition('location')]];
+            act(() => click());
+            assert.equal(location.statMap.score, 1);
+            marker.availabilityConditions = [];
+            const normalCard = create(<ContentCardControl stage={() => stage} control={card} kind="location" id={location.id} />);
+            try {
+                assert.equal(normalCard.root.findByProps({ 'data-card-control': card.id }).props.sx.opacity, 0.56);
+            } finally { act(() => normalCard.unmount()); }
+        } finally {
+            if (cardRenderer) act(() => cardRenderer!.unmount());
+            act(() => renderer.unmount());
+        }
+    }
+});
+
 test('map markers use controls from the active save configuration', () => {
     const stage = createStage(new Location({ id: 'local', name: 'Local' }));
     const save = stage.getSave();

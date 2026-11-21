@@ -28,6 +28,7 @@ interface ContentCardControlProps {
     orientation?: 'horizontal' | 'vertical';
     compact?: boolean;
     disabled?: boolean;
+    isAvailable?: () => boolean;
     subtitle?: ReactNode;
     trailing?: ReactNode;
     onClick?: () => void;
@@ -38,7 +39,7 @@ interface ContentCardControlProps {
 
 export const ContentCardControl: FC<ContentCardControlProps> = ({
     stage, control, kind, id, header = '', orientation = 'horizontal', compact = false,
-    disabled = false, subtitle, trailing, onClick, onAction, style, className,
+    disabled = false, isAvailable, subtitle, trailing, onClick, onAction, style, className,
 }) => {
     const globalOnAction = useContext(CardActionContext);
     const [, refresh] = useState(0);
@@ -48,14 +49,14 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
     const item = kind === 'item' ? save.inventory.find(candidate => candidate.id === id) : undefined;
     const location = kind === 'location' ? save.atlas[id] : undefined;
     const entity = actor || item || location;
-    const state = instance.resolveCardState(control, kind, id, header);
+    const state = instance.resolveCardState(control, kind, id, header, save, !!isAvailable);
     if (!entity || !state.visible) return null;
 
     const vertical = orientation === 'vertical';
     // Horizontal cards in landscape have bar heights that dwarf the default text sizes, so their labels
     // and detail Controls render ~50% larger; compact (portrait) layouts keep the smaller sizes.
     const large = !vertical && !compact;
-    const unavailable = disabled || !state.available;
+    const unavailable = disabled || !state.available || (isAvailable ? !isAvailable() : false);
     const clickable = !!onClick || control.actions.length > 0;
     const text = (value: string) => instance.resolveCardText(value, kind, id, header, { icons: 'token' });
     const labelText = text(control.label);
@@ -69,10 +70,10 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
         .map(reference => instance.resolveListCardDetail(reference, kind, id, header))
         .filter((detail): detail is ResolvedListCardDetail => !!detail);
     const activate = () => {
-        const current = instance.resolveCardState(control, kind, id, header);
-        if (disabled || !current.visible || !current.available) return;
+        const current = instance.resolveCardState(control, kind, id, header, instance.getSave(), !!isAvailable);
+        if (disabled || !current.visible || !current.available || (isAvailable && !isAvailable())) return;
         try {
-            const skit = control.actions.length ? instance.runCardActions(control, kind, id, header) : null;
+            const skit = control.actions.length ? instance.runCardActions(control, kind, id, header, !!isAvailable) : null;
             if (!skit) onClick?.();
             (onAction || globalOnAction)?.(skit);
         } catch (error) {

@@ -228,22 +228,28 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     }
                                     const markerContent = link.content || link.input || link.markerContent || '';
                                     const markerVariables = markerVariableBindings(markerControl.markerInputType, markerContent);
-                                    const markerContext = {
-                                        ...stage().getScheduleContext(save),
-                                        skitState: stage().getSkitConditionState(),
-                                        resolveValue: (value: unknown, type: StatType) => stage().resolveValue(value, type, save, [], markerVariables),
-                                        ...(markerControl?.markerInputType === 'actor' ? { currentActor: save.actors?.[markerContent] } : {}),
-                                        ...(markerControl?.markerInputType === 'location' ? { currentLocation: save.atlas?.[markerContent] } : {}),
-                                        ...(markerControl?.markerInputType === 'item' ? { currentItem: save.inventory?.find(item => item.id === markerContent) } : {}),
+                                    const isMarkerAvailable = () => {
+                                        const currentSave = stage().getSave();
+                                        const currentMarker = (stage().getConfiguration(currentSave).controls || []).find(control => control.id === markerControl.id && control.type === 'marker');
+                                        if (!currentMarker) return false;
+                                        const variables = markerVariableBindings(currentMarker.markerInputType, markerContent);
+                                        return isControlAvailable(currentMarker, {
+                                            ...stage().getScheduleContext(currentSave),
+                                            skitState: stage().getSkitConditionState(),
+                                            resolveValue: (value: unknown, type: StatType) => stage().resolveValue(value, type, currentSave, [], variables),
+                                            ...(currentMarker.markerInputType === 'actor' ? { currentActor: currentSave.actors?.[markerContent] } : {}),
+                                            ...(currentMarker.markerInputType === 'location' ? { currentLocation: currentSave.atlas?.[markerContent] } : {}),
+                                            ...(currentMarker.markerInputType === 'item' ? { currentItem: currentSave.inventory?.find(item => item.id === markerContent) } : {}),
+                                        });
                                     };
-                                    if (!isControlAvailable(markerControl, markerContext)) {
+                                    if (!isMarkerAvailable()) {
                                         return null;
                                     }
                                     const cardKind = markerControl?.markerInputType === 'actor' || markerControl?.markerInputType === 'item' || markerControl?.markerInputType === 'location'
                                         ? markerControl.markerInputType : undefined;
                                     const markerCard = cardKind && markerControl?.cardControlId
                                         ? stage().getCardControl(cardKind, markerControl.cardControlId, save) : undefined;
-                                    const showMarkerCard = markerCard && cardKind && stage().resolveCardState(markerCard, cardKind, markerContent, '', save).visible;
+                                    const showMarkerCard = markerCard && cardKind && stage().resolveCardState(markerCard, cardKind, markerContent, '', save, true).visible;
                                     const markerKey = `${displayedMap.id}-${index}`;
                                     const markerName = processLoreText(markerControl.label?.trim() || markerControl.name?.trim() || markerContent || 'Marker', stage(), undefined, markerVariables, undefined, { icons: 'token' });
                                     // Plain-text name for aria/portrait labels, which cannot carry inline icons.
@@ -295,7 +301,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                         <Fragment key={markerKey}>
                                         {showMarkerCard && markerCard && cardKind ? (
                                                     <Tooltip
-                                                        title={<ContentCardControl stage={stage} control={markerCard} kind={cardKind} id={markerContent} orientation="vertical" onAction={handleAction} />}
+                                                        title={<ContentCardControl stage={stage} control={markerCard} kind={cardKind} id={markerContent} orientation="vertical" isAvailable={isMarkerAvailable} onAction={handleAction} />}
                                                         describeChild
                                                         placement="bottom"
                                                         enterTouchDelay={0}

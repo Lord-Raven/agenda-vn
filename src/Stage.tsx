@@ -757,7 +757,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return control;
     }
 
-    resolveCardState(card: Control, kind: ContentType, id: string, header = '', save: SaveType = this.getSave()): { visible: boolean; available: boolean } {
+    resolveCardState(card: Control, kind: ContentType, id: string, header = '', save: SaveType = this.getSave(), ignoreAvailability = false): { visible: boolean; available: boolean } {
         const entity = this.getActiveContent(kind, id, save);
         if (!entity || card.active === false || card.type !== 'card' || card.contentType !== kind) {
             return { visible: false, available: false };
@@ -771,6 +771,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             };
             const visible = evaluateConditionCollections(card.visibilityConditions, context);
             if (!visible) return { visible: false, available: false };
+            if (ignoreAvailability) return { visible: true, available: true };
             const contentAvailable = kind === 'location' ? this.canVisitLocation(id, save)
                 : kind === 'actor' ? resolveActorSchedule(entity as Actor, this.getScheduleContext(save)) !== ACTOR_SCHEDULE_UNAVAILABLE
                     : isItemAvailable(entity as Item, context);
@@ -869,8 +870,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     // Re-check conditions at activation time, not just when the card was rendered.
-    runCardActions(card: Control, kind: ContentType, id: string, header = ''): Skit | null {
-        const state = this.resolveCardState(card, kind, id, header);
+    runCardActions(card: Control, kind: ContentType, id: string, header = '', ignoreAvailability = false): Skit | null {
+        const state = this.resolveCardState(card, kind, id, header, this.getSave(), ignoreAvailability);
         if (!state.visible || !state.available) return null;
         return this.runButtonActions(card.actions, { [kind]: id, header });
     }

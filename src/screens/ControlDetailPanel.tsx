@@ -476,7 +476,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         ))}
                                 </select>
                                 <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                    Cards require an Actor, Item, or Location input and receive the marker instance's value.
+                                    Cards require an Actor, Item, or Location input and receive the marker instance's value. Their availability follows the marker, not the card or content availability rules.
                                 </span>
                             </div>
                             <div>
