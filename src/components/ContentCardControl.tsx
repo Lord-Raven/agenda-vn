@@ -180,24 +180,30 @@ export const ListCardDetail: FC<{
     const labelText = control ? text(control.label.trim(), { icons: 'token' }) : detail.label;
     // Plain-text label for tooltip/aria strings, which cannot carry inline icons.
     const label = stripLoreIcons(labelText);
+    const BadgeIcon = control?.iconName ? resolveIcon(control.iconName, stage) : null;
     const isReference = ['actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList'].includes(detail.type);
     if (isReference) {
         const values = (Array.isArray(detail.value) ? detail.value : [detail.value]).map(String).filter(Boolean);
         const showLabel = !!control && !!labelText;
         return values.length ? (
             <Box data-popup-card-detail={detail.key} title={label} sx={{
-                display: 'flex', flexDirection: showLabel ? 'column' : 'row', gap: showLabel ? 0.5 : undefined, minWidth: 0,
+                display: 'flex', flexDirection: showLabel ? 'column' : 'row',
+                alignItems: showLabel ? 'stretch' : 'center', gap: showLabel || BadgeIcon ? 0.5 : undefined, minWidth: 0,
             }}
                 onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
-                {showLabel && <Typography sx={{
-                    color: 'var(--agenda-text-muted)', fontSize: large ? '1.05rem' : '0.66rem', letterSpacing: '0.1em',
-                    textTransform: 'uppercase', lineHeight: 1.2, overflowWrap: 'anywhere',
-                }}>{renderLoreIcons(labelText, stage)}</Typography>}
+                {(showLabel || BadgeIcon) && <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                    {BadgeIcon && <BadgeIcon sx={{
+                        fontSize: large ? '1.35rem' : '0.9rem', color: control?.displayColor || 'var(--agenda-text-muted)', flexShrink: 0,
+                    }} />}
+                    {showLabel && <Typography sx={{
+                        color: 'var(--agenda-text-muted)', fontSize: large ? '1.05rem' : '0.66rem', letterSpacing: '0.1em',
+                        textTransform: 'uppercase', lineHeight: 1.2, overflowWrap: 'anywhere', minWidth: 0,
+                    }}>{renderLoreIcons(labelText, stage)}</Typography>}
+                </Box>}
                 <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={label} variant="overlay" size={large ? 48 : isVerticalLayout ? 30 : 36} />
             </Box>
         ) : null;
     }
-    const BadgeIcon = control?.iconName ? resolveIcon(control.iconName, stage) : null;
     // Icon stats render their value as the named icon itself (empty value shows nothing).
     const ValueIcon = detail.type === 'icon' && typeof detail.value === 'string' && detail.value.trim()
         ? resolveIcon(detail.value, stage)

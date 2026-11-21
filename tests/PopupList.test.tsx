@@ -787,7 +787,7 @@ test('location cards show reference-list badge labels above portraits in every l
     const { stage, configuration } = fixture();
     const badge = new Control({
         type: 'statBadge', contentType: 'location', badgeSource: globalStatReference('Crew'),
-        label: 'Visitors at {{content:name}} {{icon:star}}',
+        label: 'Visitors at {{content:name}} {{icon:star}}', iconName: 'favorite',
     });
     const card = new Control({
         type: 'card', contentType: 'location', showPortrait: false,
@@ -805,6 +805,7 @@ test('location cards show reference-list badge labels above portraits in every l
             assert.ok(labelIndex >= 0, 'the context-bound label is visible text');
             assert.ok(labelIndex < html.indexOf('role="list"'), 'the label precedes the portraits');
             assert.match(html, /data-testid="StarIcon"/);
+            assert.ok(html.indexOf('data-testid="FavoriteIcon"') < labelIndex, 'the configured icon precedes the label');
             const detailClass = html.match(/data-popup-card-detail="[^"]+"[^>]*class="([^"]+)"/)?.[1].match(/css-[\w-]+/)?.[0];
             assert.ok(detailClass);
             assert.match(html, new RegExp(`\\.${detailClass}\\{[^}]*flex-direction:column`));
@@ -813,7 +814,15 @@ test('location cards show reference-list badge labels above portraits in every l
             const unlabeled = render();
             assert.doesNotMatch(unlabeled, /Visitors at Park|data-testid="StarIcon"/);
             assert.match(unlabeled, /role="listitem"[^>]*aria-label="Bob"/);
+            assert.ok(unlabeled.indexOf('data-testid="FavoriteIcon"') < unlabeled.indexOf('role="list"'), 'the icon precedes the content');
+            const iconOnlyClass = unlabeled.match(/data-popup-card-detail="[^"]+"[^>]*class="([^"]+)"/)?.[1].match(/css-[\w-]+/)?.[0];
+            assert.ok(iconOnlyClass);
+            assert.match(unlabeled, new RegExp(`\\.${iconOnlyClass}\\{[^}]*flex-direction:row`));
+            badge.iconName = '';
+            assert.doesNotMatch(render(), /data-testid="FavoriteIcon"/);
             badge.label = 'Visitors at {{content:name}} {{icon:star}}';
+            assert.match(render(), />Visitors at Park /);
+            badge.iconName = 'favorite';
         }
     }
 });
