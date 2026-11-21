@@ -258,7 +258,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     const isButton = link.type === 'button';
                                     const isMarker = link.type === 'marker';
                                     const markerControl = isMarker
-                                        ? (stage().getConfiguration().controls || []).find(control => control.id === (link.markerControlId || link.markerId) && control.type === 'marker')
+                                        ? (stage().getConfiguration(save).controls || []).find(control => control.id === (link.markerControlId || link.markerId) && control.type === 'marker')
                                         : undefined;
                                     if (isMarker && !markerControl) {
                                         return null;

@@ -479,6 +479,31 @@ for (const kind of ['actor', 'item', 'location'] as const) {
     });
 }
 
+test('map markers use controls from the active save configuration', () => {
+    const stage = createStage(new Location({ id: 'local', name: 'Local' }));
+    const save = stage.getSave();
+    stage.getSave = () => save;
+    const draft = stage.getConfiguration();
+    const card = new Control({ id: 'card', type: 'card', contentType: 'location', label: '{{content:name}}' });
+    const marker = new Control({ id: 'marker', name: 'Saved Marker', type: 'marker', markerInputType: 'location', cardControlId: card.id, iconName: 'favorite' });
+    draft.controls = [new Control({ id: 'marker', name: 'New Control', type: 'marker' })];
+    const snapshot = { ...draft, controls: [marker, card] };
+    stage.getConfiguration = currentSave => currentSave ? snapshot : draft;
+    const map = new GameMap({ id: 'map', links: [createMapButton({ type: 'marker', markerControlId: marker.id, content: 'local' })] });
+    const view = <TooltipProvider><DefinedMapView stage={() => stage} maps={[map]} onAction={() => {}} setScreenType={() => {}} isVerticalLayout={false} embedded /></TooltipProvider>;
+    const html = renderToStaticMarkup(view);
+    assert.match(html, /aria-label="Saved Marker"/);
+    assert.match(html, /data-testid="FavoriteBorderIcon"/);
+    const renderer = create(view);
+    try {
+        const tooltip = renderer.root.findByType(Tooltip);
+        assert.equal(tooltip.props.title.props.control, card);
+        assert.equal(tooltip.props.title.props.id, 'local');
+    } finally {
+        act(() => renderer.unmount());
+    }
+});
+
 test('marker hover ignores missing, incompatible, inactive, or hidden cards', () => {
     const stage = createStage(new Location({ id: 'local', name: 'Local' }));
     const save = stage.getSave();
