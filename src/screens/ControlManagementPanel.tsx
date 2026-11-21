@@ -106,7 +106,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             name: candidateName,
             placement: sectionId === 'top' ? 'top' : sectionId === 'settings' ? 'settings' : 'bottom',
             type: sectionId === 'popup' ? 'popup' : sectionId === 'marker' ? 'marker' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'cards' ? 'card' : sectionId === 'settings' ? 'settings' : sectionId === 'standalone' ? 'statBadge' : 'button',
-            label: sectionId === 'cards' ? '{{content:name}}' : sectionId === 'outcome' || sectionId === 'settings' || sectionId === 'standalone' ? '' : candidateName,
+            label: sectionId === 'cards' ? '{{content:name}}' : sectionId === 'outcome' || sectionId === 'settings' || sectionId === 'standalone' || sectionId === 'marker' ? '' : candidateName,
         });
 
         stage().updateConfiguration({ controls: [...configuredControls, control] });

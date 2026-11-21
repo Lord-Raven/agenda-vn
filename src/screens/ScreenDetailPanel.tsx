@@ -89,6 +89,10 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
     const didMountRef = useRef(false);
     const stageInstance = stage();
     const save = stageInstance.getSave();
+    const savedScreen = isCreatorMode ? save.screens?.find(screen => screen.id === map.id) : undefined;
+    const hasUnappliedChanges = isCreatorMode && (!savedScreen
+        || JSON.stringify(new Screen(map)) !== JSON.stringify(new Screen(savedScreen))
+        || JSON.stringify(createScreenDraft(map)) !== JSON.stringify(draft));
     const configuration = stageInstance.getConfiguration();
     const configuredMaps = configuration.screens || [];
     const configuredLocations = configuration.locations || [];
@@ -1046,6 +1050,10 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                 zIndex: 1,
             }}>
                 {isCreatorMode && (
+                    <>
+                    {hasUnappliedChanges && (
+                        <span role="status" style={{ color: 'var(--agenda-highlight)', fontSize: 13 }}>Not applied to active save</span>
+                    )}
                     <Button
                         variant="secondary"
                         onClick={() => {
@@ -1067,6 +1075,7 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                     >
                         Apply
                     </Button>
+                    </>
                 )}
                 <Button variant="danger" onClick={() => persist(() => { map.active = false; onDeactivate(); })}>Deactivate Screen</Button>
             </div>

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
-import { Children, ComponentProps, isValidElement, ReactElement, ReactNode } from 'react';
+import { Children, ComponentProps, isValidElement, ReactElement, ReactNode, useState } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create } from 'react-test-renderer';
-import { BoxProps, PaperProps } from '@mui/material';
+import { BoxProps, PaperProps, Tooltip } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { GameConfiguration, Stage } from '../src/Stage';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
@@ -22,6 +22,11 @@ import { ScreenType } from '../src/screens/BaseScreen';
 import { createListSection } from '../src/content/Screen';
 import { globalStatReference } from '../src/content/Function';
 import { ListScreenView } from '../src/screens/ListScreenView';
+import { ScreenDetailPanel } from '../src/screens/ScreenDetailPanel';
+import { SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
+import { ContentCardControl } from '../src/components/ContentCardControl';
+import { ControlManagementPanel } from '../src/screens/ControlManagementPanel';
+import { CategorizedEntrySidebar } from '../src/components/CategorizedEntrySidebar';
 
 const makeStage = () => {
     const configuration: GameConfiguration = {
@@ -195,6 +200,78 @@ test('selected maps bypass map visibility and priority; map links still use the 
     const html = renderToStaticMarkup(<TooltipProvider>{element}</TooltipProvider>);
     assert.match(html, /Selected Map/);
     assert.doesNotMatch(html, /Other Map|Main menu|Manage configuration|100vw|100dvh/);
+});
+
+test('new marker controls use their name instead of a fixed default label', () => {
+    const { stage, configuration } = makeStage();
+    stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout, addEventListener() {}, removeEventListener() {} } });
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+        act(() => { renderer = create(<TooltipProvider><ControlManagementPanel stage={() => stage} /></TooltipProvider>); });
+        const sidebar = renderer!.root.findByType(CategorizedEntrySidebar);
+        const markers = sidebar.props.sections.find((section: { id: string }) => section.id === 'marker');
+        act(() => sidebar.props.renderSectionAction(markers));
+        assert.equal(configuration.controls[0].type, 'marker');
+        assert.equal(configuration.controls[0].name, 'New Control');
+        assert.equal(configuration.controls[0].label, '');
+    } finally {
+        if (renderer) act(() => renderer!.unmount());
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else Reflect.deleteProperty(globalThis, 'window');
+    }
+});
+
+test('applying a map marker selection updates the map shown in a pop-up', () => {
+    const { stage, configuration, save } = makeStage();
+    const generic = new Control({ id: 'generic', name: 'New Control', type: 'marker' });
+    const card = new Control({ id: 'card', type: 'card', contentType: 'location', label: '{{content:name}}' });
+    const marker = new Control({ id: 'marker', name: 'Park Marker', type: 'marker', markerInputType: 'location', iconName: 'favorite', cardControlId: card.id });
+    const popup = new Control({ type: 'popup', screenId: 'map' });
+    const map = new GameMap({ id: 'map', links: [{ type: 'marker', markerControlId: generic.id, parentId: 'map', childId: '', coordinates: { x: 0.5, y: 0.5 } }] });
+    configuration.controls = [generic, marker, card, popup];
+    configuration.screens = [map];
+    save.screens = [new GameMap(map)];
+    save.atlas.park = new Location({ id: 'park', name: 'Park' });
+    stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
+    stage.saveGame = () => {};
+    stage.showPriorityMessage = () => {};
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout, addEventListener() {}, removeEventListener() {} } });
+    const Editor = () => {
+        const [, setRevision] = useState(0);
+        return <TooltipProvider><ScreenDetailPanel screen={configuration.screens[0]} stage={() => stage} isCreatorMode
+            onChange={() => setRevision(revision => revision + 1)} onDeactivate={() => {}} /></TooltipProvider>;
+    };
+    let editor: ReturnType<typeof create> | undefined;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+        act(() => { editor = create(<Editor />); });
+        act(() => editor!.root.findByProps({ 'aria-label': 'Expand Links' }).props.onClick());
+        act(() => editor!.root.findByProps({ 'aria-label': 'Expand New Control' }).props.onClick());
+        act(() => editor!.root.findByProps({ id: 'map-marker-control-map-0' }).props.onChange({ target: { value: marker.id } }));
+        act(() => editor!.root.findByType(SearchableOptionPicker).props.onChange('park'));
+        assert.equal(editor!.root.findByProps({ role: 'status' }).children.join(''), 'Not applied to active save');
+        const apply = editor!.root.findAllByType('button').find(button => button.children.includes('Apply'));
+        assert.ok(apply);
+        act(() => apply.props.onClick());
+        assert.equal(save.screens[0].links[0].markerControlId, marker.id);
+        assert.equal(save.screens[0].links[0].content, 'park');
+        assert.equal(editor!.root.findAllByProps({ role: 'status' }).length, 0);
+        act(() => { renderer = create(<TooltipProvider><PopupControl stage={() => stage} isVerticalLayout={false} onAction={() => {}} setScreenType={() => {}} /></TooltipProvider>); });
+        assert.ok(renderer!.root.findByProps({ 'aria-label': 'Park Marker' }));
+        assert.ok(renderer!.root.findByProps({ 'data-testid': 'FavoriteBorderIcon' }));
+        const tooltip = renderer!.root.findByType(Tooltip);
+        assert.equal(tooltip.props.title.type, ContentCardControl);
+        assert.equal(tooltip.props.title.props.control, card);
+        assert.equal(tooltip.props.title.props.id, 'park');
+    } finally {
+        if (renderer) act(() => renderer!.unmount());
+        if (editor) act(() => editor!.unmount());
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else Reflect.deleteProperty(globalThis, 'window');
+    }
 });
 
 test('missing and unselected maps show explicit configuration errors', () => {
