@@ -759,7 +759,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     resolveCardState(card: Control, kind: ContentType, id: string, header = '', save: SaveType = this.getSave()): { visible: boolean; available: boolean } {
         const entity = this.getActiveContent(kind, id, save);
-        if (!entity || card.active === false || card.type !== 'card' || card.contentType !== kind) return { visible: false, available: false };
+        if (!entity || card.active === false || card.type !== 'card' || card.contentType !== kind) {
+            return { visible: false, available: false };
+        }
         try {
             const context: ConditionContext = {
                 ...this.getScheduleContext(save),
@@ -767,8 +769,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 ...(kind === 'actor' ? { currentActor: entity } : kind === 'location' ? { currentLocation: entity } : { currentItem: entity }),
                 resolveValue: (value, type) => this.resolveValue(value, type, save, [], { [kind]: id, header }),
             };
-            const visible = (kind !== 'location' || this.isLocationVisible(id, save))
-                && evaluateConditionCollections(card.visibilityConditions, context);
+            const visible = evaluateConditionCollections(card.visibilityConditions, context);
             if (!visible) return { visible: false, available: false };
             const contentAvailable = kind === 'location' ? this.canVisitLocation(id, save)
                 : kind === 'actor' ? resolveActorSchedule(entity as Actor, this.getScheduleContext(save)) !== ACTOR_SCHEDULE_UNAVAILABLE
