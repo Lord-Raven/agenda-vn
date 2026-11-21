@@ -314,8 +314,8 @@ test('nested calls and action invocations use independent reproducible random se
     assert.equal(save.globalStatValues!.Score, values[0]);
 });
 
-test('map and control buttons apply all writes before resolving only the first requested skit', () => {
-    for (const source of ['map', 'control'] as const) {
+test('control buttons apply all writes before resolving only the first requested skit', () => {
+    {
         const { stage, save, configuration } = fixture();
         save.currentDate = '2026-10-19';
         configuration.globalStats.push(stat('Scene guidance', 'text', { default: '' }));
@@ -332,8 +332,7 @@ test('map and control buttons apply all writes before resolving only the first r
             { id: 'adjust', kind: 'stat' as const, targetType: 'global' as const, targetId: 'any', statId: 'Score', operation: 'adjust' as const, value: 1 },
         ];
         const control = new Control({ actions });
-        const map = new GameMap({ links: [{ type: 'button', parentId: '', childId: '', coordinates: { x: .5, y: .5 }, actions }] });
-        const skit = source === 'control' ? stage.runControlActions(control) : stage.runButtonActions(map.links[0].actions || []);
+        const skit = stage.runControlActions(control);
         assert.ok(skit);
         assert.equal(skit.guidance, 'Final score: 8');
         assert.deepEqual(skit.initialActors, ['b']);
@@ -367,7 +366,7 @@ test('invalid button skits report an error instead of appending or saving a brok
     assert.equal(saves, 0);
 });
 
-test('map button lists resolve literal, scalar and list sources dynamically for every content kind', () => {
+test('content lists resolve literal, scalar and list sources dynamically for every content kind', () => {
     for (const kind of ['actor', 'item', 'location'] as const) {
         const { stage, configuration, save } = fixture();
         const type = `${kind}List` as const;
@@ -375,11 +374,7 @@ test('map button lists resolve literal, scalar and list sources dynamically for 
         save.globalStatValues!.Content = ['first'];
         save.globalStatValues!.Single = 'single';
         configuration.functions = [{ id: 'list', name: 'List', description: '', returnType: type, script: 'return get("Content");' }];
-        const map = new GameMap({ links: [{
-            type: 'button', parentId: '', childId: '', coordinates: { x: .5, y: .5 },
-            contentList: { kind, values: ['literal', globalStatReference('Single'), functionReference('list'), globalStatReference('Content')] },
-        }] });
-        const list = map.links[0].contentList!;
+        const list = { kind, values: ['literal', globalStatReference('Single'), functionReference('list'), globalStatReference('Content')] };
         assert.deepEqual(stage.resolveValue(list.values, type), ['literal', 'single', 'first', 'first']);
         save.globalStatValues!.Content = ['updated', 'another'];
         assert.deepEqual(stage.resolveValue(list.values, type), ['literal', 'single', 'updated', 'another', 'updated', 'another']);
@@ -431,48 +426,6 @@ test('mixed content lists accept sources of every kind, format across collection
     }, configuration.functions);
     assert.deepEqual(objects.value, ['item:Sword', 'location:Town']);
     assert.deepEqual(objects.errors, []);
-});
-
-test('map buttons and control skits retain independent outcomes through cloning and portable export', () => {
-    const { configuration } = fixture();
-    const map = new GameMap({
-        id: 'map',
-        links: [
-            { parentId: 'map', childId: 'place', coordinates: { x: .2, y: .3 } },
-            { type: 'button', parentId: 'map', childId: '', name: 'Rest', iconName: 'hotel', coordinates: { x: .7, y: .8 },
-                actions: [
-                    { id: 'stat', targetType: 'global', targetId: 'any', statId: 'Party', operation: 'set', value: ['b'] },
-                    { id: 'invoke', kind: 'function', functionId: 'rest' },
-                    { id: 'skit', kind: 'skit', locationId: 'place', actorIds: ['b'], guidance: { targetType: 'global', targetId: 'any', statId: 'Guidance' } },
-                ], contentList: { kind: 'actor', values: [globalStatReference('Party')] },
-                conditionCollections: [[{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'night' }]] },
-        ],
-    });
-    configuration.screens = [map];
-    configuration.controls = [new Control({ actions: map.links[1].actions })];
-    const exported = buildPortableGameConfiguration(configuration);
-    for (const copy of [new GameMap(map), new GameMap(JSON.parse(JSON.stringify(map))), exported.screens[0]]) {
-        assert.equal(copy.links[0].type, undefined);
-        assert.equal(copy.links[0].childId, 'place');
-        const link = copy.links[1];
-        assert.equal(link.type, 'button');
-        assert.equal(link.name, 'Rest');
-        assert.equal(link.iconName, 'hotel');
-        assert.equal(link.parentId, 'map');
-        assert.deepEqual(link.contentList, map.links[1].contentList);
-        assert.notEqual(link.contentList!.values, map.links[1].contentList!.values);
-        assert.notEqual(link.actions, map.links[1].actions);
-        assert.notEqual(link.coordinates, map.links[1].coordinates);
-        const skit = link.actions![2];
-        assert.equal(skit.kind, 'skit');
-        if (skit.kind !== 'skit') assert.fail('Expected a skit action');
-        assert.notEqual(skit.actorIds, (map.links[1].actions![2] as StartSkitAction).actorIds);
-        assert.deepEqual(skit.guidance, { targetType: 'global', targetId: 'any', statId: 'Guidance' });
-    }
-    assert.equal(exported.controls[0].actions[2].kind, 'skit');
-    assert.equal(new Control(JSON.parse(JSON.stringify(exported.controls[0]))).actions[2].kind, 'skit');
-    exported.screens[0].links[1].contentList!.values.push('other');
-    assert.deepEqual(map.links[1].contentList!.values, [globalStatReference('Party')]);
 });
 
 test('numeric formulas share precedence, parentheses, decimals, dice, and named lookups', () => {
@@ -1509,20 +1462,6 @@ test('parameterized label functions propagate errors and cannot write game state
     assert.throws(() => processLoreText('{{Label(9)}}', stage), /Broken label/);
     fn.script = 'return arg("Amount");';
     assert.throws(() => processLoreText('{{Label(9)}}', stage), /Expected a text/);
-});
-
-test('map button labels survive cloning and portable JSON without evaluating source text', () => {
-    const { configuration } = fixture();
-    const label = 'Visit {{Greeting("Alex", 2)}}';
-    const map = new GameMap({ links: [{
-        type: 'button', parentId: '', childId: '', name: 'Visit', label, coordinates: { x: .5, y: .5 },
-    }] });
-    configuration.screens = [map];
-    for (const copy of [new GameMap(map), new GameMap(JSON.parse(JSON.stringify(map))),
-        buildPortableGameConfiguration(configuration).screens[0]]) {
-        assert.equal(copy.links[0].label, label);
-        assert.equal(copy.links[0].name, 'Visit');
-    }
 });
 
 test('bare global stat tags resolve current values, defaults, references and formatted options', () => {

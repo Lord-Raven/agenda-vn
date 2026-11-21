@@ -439,6 +439,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <label>Input Type</label>
                                     <HelpTip title="Marker input">
                                         Each marker instance on a Map Screen picks its own actor, item, location, or screen, or enters its own text.
+                                        Location availability does not hide or disable the marker; use the Marker Control's availability conditions instead.
                                         Variable offers it in compatible condition, action, and function parameter inputs.
                                         Screen inputs supply the selected screen ID as text.
                                     </HelpTip>
@@ -508,8 +509,8 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 The top and bottom status bars remain visible and usable.
                                 Pop-ups animate in and out; switching pop-ups fades only their contents.
                                 Only one pop-up is shown: lower priority numbers win, with configuration order breaking ties.
-                                It cannot be dismissed directly; use title bar, map button, or card click actions to change the availability conditions.
-                                {' The selected Screen ignores its normal availability rules, but map links and buttons retain theirs. Define reusable Map, List, and Grid content in Screens.'}
+                                It cannot be dismissed directly; use title bar, marker, or card click actions to change the availability conditions.
+                                {' The selected Screen ignores its normal availability rules, but marker controls retain theirs. Define reusable Map, List, and Grid content in Screens.'}
                             </HelpTip>
                         </div>
                         <select

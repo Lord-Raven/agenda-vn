@@ -948,7 +948,7 @@ for (const isCreatorMode of [true, false]) {
             assert.ok(addButton);
             act(() => addButton.props.onClick());
             act(() => renderer!.root.findByProps({ 'aria-label': 'Screen Type' }).props.onChange({ target: { value: 'list' } }));
-            assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Expand Links' }).length, 0);
+            assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Expand Markers' }).length, 0);
             configureCard(stage, section);
             const editor = renderer.root.findByType(ListSectionsEditor);
             act(() => editor.props.onChange([section]));

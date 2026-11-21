@@ -8,7 +8,7 @@ export type ScreenType = 'map' | 'list' | 'grid';
 
 export const SCREEN_TYPE_LABELS: Record<ScreenType, string> = { map: 'Map', list: 'List', grid: 'Grid' };
 
-// List and Grid Screens share the section-driven card content model; Maps use links.
+// List and Grid Screens share the section-driven card content model; Maps use markers.
 export const isSectionScreenType = (type: ScreenType): boolean => type === 'list' || type === 'grid';
 
 // Each resolved header yields a page; pages without content are hidden.

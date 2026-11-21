@@ -9,16 +9,13 @@ import { GameConfiguration, Stage } from '../src/Stage';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { cloneStat } from '../src/content/Stat';
 import { Control } from '../src/content/Control';
-import { MapLink } from '../src/content/Map';
 import { Screen as GameMap } from '../src/content/Screen';
 import { Location } from '../src/content/Location';
 import { Actor } from '../src/content/Actor';
-import { Skit } from '../src/content/Skit';
 import { PopupControl } from '../src/components/PopupControl';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { DefinedMapView } from '../src/screens/DefinedMapView';
 import { ControlDetailPanel } from '../src/screens/ControlDetailPanel';
-import { ScreenType } from '../src/screens/BaseScreen';
 import { createListSection } from '../src/content/Screen';
 import { globalStatReference } from '../src/content/Function';
 import { ListScreenView } from '../src/screens/ListScreenView';
@@ -229,7 +226,7 @@ test('applying a map marker selection updates the map shown in a pop-up', () => 
     const card = new Control({ id: 'card', type: 'card', contentType: 'location', label: '{{content:name}}' });
     const marker = new Control({ id: 'marker', name: 'Park Marker', type: 'marker', markerInputType: 'location', iconName: 'favorite', cardControlId: card.id });
     const popup = new Control({ type: 'popup', screenId: 'map' });
-    const map = new GameMap({ id: 'map', links: [{ type: 'marker', markerControlId: generic.id, parentId: 'map', childId: '', coordinates: { x: 0.5, y: 0.5 } }] });
+    const map = new GameMap({ id: 'map', links: [{ type: 'marker', markerControlId: generic.id, parentId: 'map', coordinates: { x: 0.5, y: 0.5 } }] });
     configuration.controls = [generic, marker, card, popup];
     configuration.screens = [map];
     save.screens = [new GameMap(map)];
@@ -248,7 +245,7 @@ test('applying a map marker selection updates the map shown in a pop-up', () => 
     let renderer: ReturnType<typeof create> | undefined;
     try {
         act(() => { editor = create(<Editor />); });
-        act(() => editor!.root.findByProps({ 'aria-label': 'Expand Links' }).props.onClick());
+        act(() => editor!.root.findByProps({ 'aria-label': 'Expand Markers' }).props.onClick());
         act(() => editor!.root.findByProps({ 'aria-label': 'Expand New Control' }).props.onClick());
         act(() => editor!.root.findByProps({ id: 'map-marker-control-map-0' }).props.onChange({ target: { value: marker.id } }));
         act(() => editor!.root.findByType(SearchableOptionPicker).props.onChange('park'));
@@ -322,83 +319,31 @@ test('pop-up editor exposes maps, hides stat and width settings, and explains vi
     assert.doesNotMatch(html, /Width Weight|Select a stat/);
 });
 
-test('embedded map buttons refresh visibility, and map links navigate within the pop-up', () => {
-    const { stage, configuration } = makeStage();
-    const button: MapLink = {
-        type: 'button', parentId: 'map', childId: '', name: 'Continue', label: 'Continue',
-        coordinates: { x: 0.5, y: 0.5 }, conditionCollections: [], actions: [],
-    };
-    const map = new GameMap({ id: 'map', name: 'Initial', links: [
-        button, { type: 'target', parentId: 'map', childId: 'next', coordinates: { x: 0.7, y: 0.5 }, conditionCollections: [] },
-    ] });
-    const next = new GameMap({ id: 'next', name: 'Next Map', links: [{ ...button, name: 'Arrived', label: 'Arrived' }] });
-    configuration.screens.push(map, next);
-    const onAction = mock.fn();
-    stage.resolveValue = value => String(value);
-    stage.runButtonActions = mock.fn(() => null);
-    let renderer: ReturnType<typeof create> | undefined;
-    act(() => {
-        renderer = create(<TooltipProvider>
-            <DefinedMapView stage={() => stage} maps={[next, map]} embedded initialMapId="map"
-                onAction={onAction} setScreenType={() => {}} isVerticalLayout={false} />
-        </TooltipProvider>);
+test('embedded maps render the selected map and refresh marker availability after actions', () => {
+    const { stage, configuration, save } = makeStage();
+    const marker = new Control({
+        id: 'marker', name: 'Continue', type: 'marker',
+        availabilityConditions: [[{ type: 'globalStat', statId: 'visible', comparison: 'equals', value: true }]],
     });
-
-    const mounted = renderer;
-    if (!mounted) {
-        throw new Error('Expected mounted map renderer');
-    }
+    configuration.controls.push(marker);
+    const selected = new GameMap({ id: 'selected', links: [
+        { type: 'marker', parentId: 'selected', markerControlId: marker.id, coordinates: { x: .5, y: .5 } },
+    ] });
+    const other = new GameMap({ id: 'other', priority: -1 });
+    const onAction = mock.fn();
+    stage.runControlActions = mock.fn(() => { save.globalStatValues.visible = false; return null; });
+    const view = <TooltipProvider><DefinedMapView stage={() => stage} maps={[other, selected]} embedded initialMapId="selected"
+        onAction={onAction} setScreenType={() => {}} isVerticalLayout={false} /></TooltipProvider>;
+    const renderer = create(view);
     try {
-        act(() => mounted.root.findByProps({ 'aria-label': 'Continue' }).props.onClick());
+        act(() => renderer.root.findByProps({ 'aria-label': 'Continue' }).props.onClick());
         assert.equal(onAction.mock.callCount(), 1);
         assert.equal(onAction.mock.calls[0].arguments[0], null);
-        act(() => mounted.root.findByProps({ 'aria-label': 'Open map Next Map' }).props.onClick());
-        assert.ok(mounted.root.findAllByProps({ 'aria-label': 'Arrived' }).length > 0);
+        act(() => renderer.update(<TooltipProvider><DefinedMapView stage={() => stage} maps={[other, selected]} embedded initialMapId="selected"
+            onAction={onAction} setScreenType={() => {}} isVerticalLayout={false} /></TooltipProvider>));
+        assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Continue' }).length, 0);
     } finally {
-        act(() => mounted.unmount());
-    }
-});
-
-test('embedded maps preserve button conditions and location visits can replace an active skit', () => {
-    const { stage, save } = makeStage();
-    save.atlas.local = new Location({ id: 'local', name: 'Local' });
-    const map = new GameMap({ id: 'map', links: [
-        { type: 'target', parentId: 'map', childId: 'local', coordinates: { x: 0.2, y: 0.5 }, conditionCollections: [] },
-        { type: 'button', parentId: 'map', childId: '', name: 'Hidden', label: 'Hidden', coordinates: { x: 0.5, y: 0.5 },
-            conditionCollections: [[{ type: 'globalStat', statId: 'visible', comparison: 'equals', value: false }]],
-            availabilityModes: ['visible'] },
-        { type: 'button', parentId: 'map', childId: '', name: 'Disabled', label: 'Disabled', coordinates: { x: 0.7, y: 0.5 },
-            conditionCollections: [[{ type: 'globalStat', statId: 'visible', comparison: 'equals', value: false }]],
-            availabilityModes: ['enabled'] },
-    ] });
-    const skit = new Skit({ initialLocationId: 'local' });
-    const onAction = mock.fn();
-    const setScreenType = mock.fn();
-    stage.resolveValue = value => String(value);
-    stage.getPlayerActor = () => new Actor({ id: 'player', name: 'Player' });
-    stage.isLocationVisible = () => true;
-    stage.canVisitLocation = () => true;
-    stage.getCurrentLocationEvent = () => null;
-    stage.startLocationVisit = mock.fn(() => skit);
-    let renderer: ReturnType<typeof create> | undefined;
-    act(() => {
-        renderer = create(<TooltipProvider>
-            <DefinedMapView stage={() => stage} maps={[map]} embedded
-                onAction={onAction} setScreenType={setScreenType} isVerticalLayout />
-        </TooltipProvider>);
-    });
-    const mounted = renderer;
-    if (!mounted) {
-        throw new Error('Expected mounted map renderer');
-    }
-    try {
-        assert.equal(mounted.root.findAllByProps({ 'aria-label': 'Hidden' }).length, 0);
-        assert.equal(mounted.root.findByProps({ 'aria-label': 'Disabled' }).props.disabled, true);
-        act(() => mounted.root.findByProps({ 'aria-label': 'Local' }).props.onClick());
-        assert.equal(onAction.mock.calls[0].arguments[0], skit);
-        assert.equal(setScreenType.mock.calls[0].arguments[0], ScreenType.SKIT);
-    } finally {
-        act(() => mounted.unmount());
+        act(() => renderer.unmount());
     }
 });
 

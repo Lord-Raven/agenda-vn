@@ -2,7 +2,6 @@ import { v4 as generateUuid } from 'uuid';
 import { ConditionCollection, ConditionContext, evaluateConditionCollections } from './Condition';
 import type { Stage } from '../Stage';
 import { AlternativeImage, createAlternativeImage, getMatchingAlternativeImage } from './AlternativeImage';
-import { cloneStatUpdateAction, ReferenceKind, StatUpdateAction } from './Stat';
 import { buildPrompt } from '../utils/PromptBuilder.js';
 import {
     buildStructuredExampleResponse,
@@ -135,7 +134,7 @@ export async function generateMapAlternativeImage(map: Map, alternative: Alterna
 
 export type MapFitMode = 'cover' | 'contain';
 
-// Link coordinates are stored in the editor's 16:9 preview space, where the image is centered.
+// Marker coordinates are stored in the editor's 16:9 preview space, where the image is centered.
 export const MAP_PREVIEW_SIZE = { width: 16, height: 9 } as const;
 
 type Size = { width: number; height: number };
@@ -168,7 +167,7 @@ export const imageToPreviewCoordinates = (fitMode: MapFitMode, image: Size, x: n
     };
 };
 
-// A map contains navigation links and action buttons.
+// A map contains marker instances.
 export class Map {
     id: string = generateUuid();
     active: boolean = true; // Soft-delete flag. Inactive maps are hidden from management UIs.
@@ -192,8 +191,8 @@ export class Map {
         this.fitMode = data?.fitMode === 'contain' ? 'contain' : 'cover';
         this.fillColor = data?.fillColor || '';
         this.availabilityConditions = (data?.availabilityConditions || []).map((collection) => [...collection]);
-        this.links = (data?.links || []).map((link) => ({
-            ...link,
+        this.links = (data?.links || []).filter((link) => link.type === 'marker').map((link) => ({
+            type: 'marker',
             markerControlId: typeof link.markerControlId === 'string'
                 ? link.markerControlId
                 : typeof link.markerId === 'string'
@@ -208,45 +207,22 @@ export class Map {
                         : '',
             parentId: data?.id || this.id,
             coordinates: { ...link.coordinates },
-            conditionCollections: (link.conditionCollections || []).map((collection) => [...collection]),
-            ...(link.availabilityModes ? { availabilityModes: [...link.availabilityModes] } : {}),
-            ...(link.actions ? { actions: link.actions.map(cloneStatUpdateAction) } : {}),
-            ...(link.contentList ? { contentList: { ...link.contentList, values: [...link.contentList.values] } } : {}),
+            ...(link.name !== undefined ? { name: link.name } : {}),
+            ...(link.markerId !== undefined ? { markerId: link.markerId } : {}),
+            ...(link.input !== undefined ? { input: link.input } : {}),
+            ...(link.markerContent !== undefined ? { markerContent: link.markerContent } : {}),
         }));
     }
 }
 
-export type MapLinkAvailabilityMode = 'enabled' | 'visible';
-
-export const getMapLinkAvailability = (link: MapLink, context: ConditionContext): { visible: boolean; enabled: boolean } => {
-    const collections = link.conditionCollections || [];
-    if (link.type !== 'button') {
-        return { visible: true, enabled: evaluateConditionCollections(collections, context) };
-    }
-    return {
-        visible: evaluateConditionCollections(collections.filter((_, index) => link.availabilityModes?.[index] === 'visible'), context),
-        enabled: evaluateConditionCollections(collections.filter((_, index) => link.availabilityModes?.[index] !== 'visible'), context),
-    };
-};
-
 export interface MapLink {
-    type?: 'target' | 'button' | 'marker'; // Legacy navigation/button entries are retained only for loading old saves.
+    type: 'marker';
     markerControlId?: string;
     markerId?: string; // Compatibility alias used by older/draft integrations.
     content?: string;
     input?: string;
     markerContent?: string;
     parentId: string; // The ID of the parent Map
-    childId: string; // The ID of the child map or location; unused by buttons.
     coordinates: { x: number; y: number }; // Coordinates for the link on the parent Map (x and y are between 0 and 1, representing a percentage of the map's width and height)
-    conditionCollections?: ConditionCollection[]; // Any collection may pass; all conditions within a collection must pass.
-    availabilityModes?: MapLinkAvailabilityMode[]; // New button groups default to visible in the editor; omitted legacy entries mean enabled.
     name?: string; // For marker instances, this names the entry in the editor without changing its in-game label.
-    // Read-only template text, e.g. {{Greeting("Alex", 2)}}. Blank labels fall back to name.
-    label?: string;
-    iconName?: string;
-    actions?: StatUpdateAction[];
-    // Entities displayed beneath a button marker. 'mixed' lists may combine actors, items, and locations
-    // (including via function/global-stat references of any content kind).
-    contentList?: { kind: ReferenceKind | 'mixed'; values: string[] };
 }

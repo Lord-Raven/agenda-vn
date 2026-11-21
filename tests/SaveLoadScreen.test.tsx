@@ -86,7 +86,7 @@ test('applied marker controls render their configured icon and hover text on the
     });
     const map = new GameMap({
         id: 'map', links: [{
-            type: 'marker', parentId: 'map', childId: '', markerControlId: control.id,
+            type: 'marker', parentId: 'map', markerControlId: control.id,
             content: 'market', coordinates: { x: 0.5, y: 0.5 }, conditionCollections: [],
         }],
     });

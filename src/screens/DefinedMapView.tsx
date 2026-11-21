@@ -1,20 +1,17 @@
 import { CSSProperties, FC, forwardRef, Fragment, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowOutward, EditNote, EventAvailable, MapRounded, MenuRounded, PlayArrow, Settings, TouchApp } from '@mui/icons-material';
+import { EditNote, EventAvailable, MenuRounded, TouchApp } from '@mui/icons-material';
 import { Box, Tooltip, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
-import { getMapImageRect, getMapImageUrl, getMapLinkAvailability, Map as GameMap, MapFitMode, previewToImageCoordinates } from '../content/Map';
-import { getLocationImageUrl, getLocationName } from '../content/Location';
-import { getCurrentLocation, Skit } from '../content/Skit';
+import { getMapImageRect, getMapImageUrl, Map as GameMap, MapFitMode, previewToImageCoordinates } from '../content/Map';
+import { Skit } from '../content/Skit';
 import { Stage } from '../Stage';
 import { ScreenType } from './BaseScreen';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { useTooltip } from '../components/TooltipContext';
 import { Button } from '../components/UiComponents';
-import { LocationActorPortraits } from '../components/LocationActorPortraits';
 import { GlobalStatBar } from '../components/GlobalStatBar';
 import { ControlDock } from '../components/ControlDock';
 import { useCachedImageUrl } from '../utils/ImageCache';
-import { CachedBackgroundUrl } from '../components/CachedImage';
 import { resolveIcon } from '../components/StatRating';
 import { ContentListPortraits } from '../components/ContentListControl';
 import { normalizeReferenceListValue, StatType } from '../content/Stat';
@@ -34,9 +31,7 @@ interface DefinedMapViewProps {
 }
 
 interface MapMarkerButtonProps {
-    isInteractive: boolean;
     markerSize: number;
-    disabled: boolean;
     onClick: () => void;
     style: CSSProperties;
     'aria-label': string;
@@ -45,14 +40,14 @@ interface MapMarkerButtonProps {
     onMouseLeave?: () => void;
 }
 
-const MapMarkerButton = forwardRef<HTMLButtonElement, MapMarkerButtonProps>(({ isInteractive, markerSize, style, children, ...buttonProps }, ref) => {
+const MapMarkerButton = forwardRef<HTMLButtonElement, MapMarkerButtonProps>(({ markerSize, style, children, ...buttonProps }, ref) => {
     return (
         <motion.button
             type="button"
             ref={ref}
             {...buttonProps}
             initial={{ opacity: 0, scale: 0.86, x: '-50%', y: '-50%', width: markerSize }}
-            animate={{ opacity: isInteractive ? 1 : 0.5, scale: 1, x: '-50%', y: '-50%', width: markerSize }}
+            animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%', width: markerSize }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             style={{ ...style, zIndex: 1 }}
         >
@@ -71,38 +66,7 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
     const sortedMaps = useMemo(() => [...maps]
         .sort((left, right) => left.priority - right.priority), [maps]);
 
-    let latestLocationId = '';
-    for (let index = save.timeline.length - 1; index >= 0; index -= 1) {
-        const skit = save.timeline[index]?.skit;
-        if (skit) {
-            latestLocationId = getCurrentLocation(skit, Math.max(-1, (skit.script?.length || 0) - 1));
-            break;
-        }
-    }
-
-    const preferredMap = useMemo(() => {
-        const initialMap = sortedMaps.find(map => map.id === initialMapId);
-        if (initialMap) {
-            return initialMap;
-        }
-        if (latestLocationId) {
-            const linkedMap = sortedMaps.find(map => map.links.some(link => link.type !== 'button' && stage().resolveValue(link.childId, 'location') === latestLocationId));
-            if (linkedMap) {
-                return linkedMap;
-            }
-        }
-        return sortedMaps[0];
-    }, [initialMapId, latestLocationId, sortedMaps]);
-
-    const [displayedMapId, setDisplayedMapId] = useState(preferredMap?.id || '');
-
-    useEffect(() => {
-        if (!displayedMapId || !sortedMaps.some(map => map.id === displayedMapId)) {
-            setDisplayedMapId(preferredMap?.id || '');
-        }
-    }, [displayedMapId, preferredMap, sortedMaps]);
-
-    const displayedMap = sortedMaps.find(map => map.id === displayedMapId) || preferredMap;
+    const displayedMap = sortedMaps.find(map => map.id === initialMapId) || sortedMaps[0];
     const configuredBackgroundImageUrl = stage().getConfiguration().backgroundImageUrl?.trim();
     const cachedBackgroundImageUrl = useCachedImageUrl(configuredBackgroundImageUrl);
     const screenBackgroundImage = cachedBackgroundImageUrl
@@ -255,25 +219,24 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                 style={{ position: 'absolute', inset: 0, backgroundImage: displayedMapImageUrl ? `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16)), url(${displayedMapImageUrl})` : 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.16))', backgroundColor: isContained && displayedMap.fillColor ? displayedMap.fillColor : undefined, backgroundSize: fitMode, backgroundPosition: `${focalPoint.x * 100}% ${focalPoint.y * 100}%`, backgroundRepeat: 'no-repeat' }}
                             >
                                 {displayedMap.links.map((link, index) => {
-                                    const isButton = link.type === 'button';
-                                    const isMarker = link.type === 'marker';
-                                    const markerControl = isMarker
-                                        ? (stage().getConfiguration(save).controls || []).find(control => control.id === (link.markerControlId || link.markerId) && control.type === 'marker')
-                                        : undefined;
-                                    if (isMarker && !markerControl) {
+                                    if (link.type !== 'marker') {
                                         return null;
                                     }
-                                    const markerContent = isMarker ? (link.content || link.input || link.markerContent || '') : '';
-                                    const markerVariables = markerControl ? markerVariableBindings(markerControl.markerInputType, markerContent) : undefined;
-                                    const markerContext = isMarker ? {
+                                    const markerControl = (stage().getConfiguration(save).controls || []).find(control => control.id === (link.markerControlId || link.markerId) && control.type === 'marker');
+                                    if (!markerControl) {
+                                        return null;
+                                    }
+                                    const markerContent = link.content || link.input || link.markerContent || '';
+                                    const markerVariables = markerVariableBindings(markerControl.markerInputType, markerContent);
+                                    const markerContext = {
                                         ...stage().getScheduleContext(save),
                                         skitState: stage().getSkitConditionState(),
                                         resolveValue: (value: unknown, type: StatType) => stage().resolveValue(value, type, save, [], markerVariables),
                                         ...(markerControl?.markerInputType === 'actor' ? { currentActor: save.actors?.[markerContent] } : {}),
                                         ...(markerControl?.markerInputType === 'location' ? { currentLocation: save.atlas?.[markerContent] } : {}),
                                         ...(markerControl?.markerInputType === 'item' ? { currentItem: save.inventory?.find(item => item.id === markerContent) } : {}),
-                                    } : undefined;
-                                    if (isMarker && markerControl && markerContext && !isControlAvailable(markerControl, markerContext)) {
+                                    };
+                                    if (!isControlAvailable(markerControl, markerContext)) {
                                         return null;
                                     }
                                     const cardKind = markerControl?.markerInputType === 'actor' || markerControl?.markerInputType === 'item' || markerControl?.markerInputType === 'location'
@@ -281,38 +244,14 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     const markerCard = cardKind && markerControl?.cardControlId
                                         ? stage().getCardControl(cardKind, markerControl.cardControlId, save) : undefined;
                                     const showMarkerCard = markerCard && cardKind && stage().resolveCardState(markerCard, cardKind, markerContent, '', save).visible;
-                                    const childId = isButton || isMarker ? '' : String(stage().resolveValue(link.childId, 'location', save));
-                                    const linkedLocation = isButton || isMarker ? undefined : save.atlas?.[childId];
-                                    const linkedMap = isButton || isMarker ? undefined : sortedMaps.find(map => map.id === childId);
-                                    if (!isButton && !isMarker && !linkedLocation && !linkedMap) {
-                                        return null;
-                                    }
-                                    if (linkedLocation && !stage().isLocationVisible(linkedLocation.id)) {
-                                        return null;
-                                    }
-                                    const availability = isMarker
-                                        ? { visible: true, enabled: true }
-                                        : getMapLinkAvailability(link, stage().getScheduleContext(save));
-                                    if (!availability.visible) {
-                                        return null;
-                                    }
                                     const markerKey = `${displayedMap.id}-${index}`;
-                                    const locationImageUrl = getLocationImageUrl(linkedLocation, stage());
-                                    const linkedMapImageUrl = getMapImageUrl(linkedMap, stage());
-                                    const currentEvent = linkedLocation ? stage().getCurrentLocationEvent(linkedLocation.id) : null;
-                                    const canVisitLocation = linkedLocation ? stage().canVisitLocation(linkedLocation.id) : false;
-                                    const markerName = isMarker
-                                        ? processLoreText(markerControl?.label?.trim() || markerControl?.name?.trim() || markerContent || 'Marker', stage(), undefined, markerVariables, undefined, { icons: 'token' })
-                                        : isButton ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stage(), undefined, undefined, undefined, { icons: 'token' }) : currentEvent?.name || (linkedLocation?.name ? getLocationName(linkedLocation.id, stage()) : linkedMap?.name) || 'Unnamed';
+                                    const markerName = processLoreText(markerControl.label?.trim() || markerControl.name?.trim() || markerContent || 'Marker', stage(), undefined, markerVariables, undefined, { icons: 'token' });
                                     // Plain-text name for aria/portrait labels, which cannot carry inline icons.
                                     const plainMarkerName = stripLoreIcons(markerName);
-                                    const ButtonIcon = isMarker
-                                        ? (markerControl?.iconName ? resolveIcon(String(stage().resolveValue(markerControl.iconName, 'text', save, [], markerVariables))) : TouchApp)
-                                        : isButton && link.iconName ? resolveIcon(link.iconName, stage()) : TouchApp;
+                                    const ButtonIcon = markerControl.iconName ? resolveIcon(String(stage().resolveValue(markerControl.iconName, 'text', save, [], markerVariables))) : TouchApp;
                                     const markerSize = isVerticalLayout ? 48 : 64;
                                     const actorPortraitSize = isVerticalLayout ? 28 : 40;
-                                    const isInteractive = availability.enabled && Boolean(isMarker || isButton || linkedMap || canVisitLocation);
-                                    const contentValues = isMarker && markerControl?.contentList
+                                    const contentValues = markerControl.contentList
                                         ? [...new Set(normalizeReferenceListValue(stage().resolveValue(markerControl.contentList.values, markerControl.contentList.kind === 'actor'
                                             ? 'actorList'
                                             : markerControl.contentList.kind === 'item'
@@ -320,86 +259,41 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                 : markerControl.contentList.kind === 'location'
                                                     ? 'locationList'
                                                     : 'contentList', save, [], markerVariables)))]
-                                        : isButton && link.contentList
-                                            ? [...new Set(normalizeReferenceListValue(stage().resolveValue(link.contentList.values, link.contentList.kind === 'mixed' ? 'contentList' : `${link.contentList.kind}List`, save)))]
-                                            : [];
+                                        : [];
                                     const contentWidth = Math.min(200, Math.max(0, mapViewportSize.width - 16) || 200, 12 + contentValues.length * actorPortraitSize - Math.max(0, contentValues.length - 1) * Math.round(actorPortraitSize * 0.32));
                                     const markerPosition = getMarkerPosition(link.coordinates.x, link.coordinates.y, markerSize, contentValues.length ? actorPortraitSize * 5 / 6 + 8 : 0);
                                     const handleMarkerClick = () => {
-                                        if (!isInteractive) return;
-                                        if (isMarker && markerControl) {
-                                            let skit: Skit | null;
-                                            try {
-                                                skit = stage().runControlActions(markerControl, markerVariables);
-                                            } catch (error) {
-                                                console.error('Failed to run marker actions:', error);
-                                                stage().showPriorityMessage(`Failed to run marker actions: ${error instanceof Error ? error.message : String(error)}`);
-                                                handleAction();
-                                                return;
-                                            }
-                                            handleAction(skit);
+                                        let skit: Skit | null;
+                                        try {
+                                            skit = stage().runControlActions(markerControl, markerVariables);
+                                        } catch (error) {
+                                            console.error('Failed to run marker actions:', error);
+                                            stage().showPriorityMessage(`Failed to run marker actions: ${error instanceof Error ? error.message : String(error)}`);
+                                            handleAction();
                                             return;
                                         }
-                                        if (isButton) {
-                                            let skit: Skit | null;
-                                            try {
-                                                skit = stage().runButtonActions(link.actions || []);
-                                            } catch (error) {
-                                                console.error('Failed to run map button actions:', error);
-                                                stage().showPriorityMessage(`Failed to run button actions: ${error instanceof Error ? error.message : String(error)}`);
-                                                handleAction();
-                                                return;
-                                            }
-                                            handleAction(skit);
-                                            return;
-                                        }
-                                        if (linkedMap) {
-                                            setDisplayedMapId(linkedMap.id);
-                                            return;
-                                        }
-                                        if (linkedLocation) {
-                                            const skit = stage().startLocationVisit(linkedLocation.id);
-                                            if (skit) {
-                                                if (embedded) {
-                                                    handleAction(skit);
-                                                }
-                                                setScreenType(ScreenType.SKIT);
-                                            }
-                                        }
+                                        handleAction(skit);
                                     };
 
+                                    const button = (
+                                        <MapMarkerButton
+                                            aria-label={plainMarkerName}
+                                            onClick={handleMarkerClick}
+                                            onMouseEnter={() => !showMarkerCard ? setTooltip(processLoreText(markerControl.description || markerControl.label || markerName, stage(), undefined, markerVariables).trim() || null, markerControl.iconName ? ButtonIcon : undefined) : undefined}
+                                            onMouseLeave={clearTooltip}
+                                            markerSize={markerSize}
+                                            style={{ position: 'absolute', ...markerPosition.style, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: '2px solid var(--agenda-text-primary)', background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: 'pointer' }}
+                                        >
+                                            <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
+                                                <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%' }}>
+                                                    <ButtonIcon sx={{ fontSize: markerSize / 2 }} />
+                                                </span>
+                                            </span>
+                                        </MapMarkerButton>
+                                    );
                                     return (
                                         <Fragment key={markerKey}>
-                                        <CachedBackgroundUrl url={locationImageUrl || linkedMapImageUrl} thumbnailSize={markerSize * 2}>
-                                            {(markerImageUrl) => {
-                                                if ((locationImageUrl || linkedMapImageUrl) && !markerImageUrl) {
-                                                    return null;
-                                                }
-
-                                                const button = (
-                                                    <MapMarkerButton
-                                                        aria-label={linkedMap ? `Open map ${plainMarkerName}` : currentEvent ? `${linkedLocation?.name}: ${currentEvent.name}` : plainMarkerName}
-                                                        disabled={!isInteractive}
-                                                        onClick={handleMarkerClick}
-                                                        onMouseEnter={() => isMarker && !showMarkerCard ? setTooltip(processLoreText(markerControl?.description || markerControl?.label || markerName, stage(), undefined, markerVariables).trim() || null, markerControl?.iconName ? ButtonIcon : undefined) : undefined}
-                                                        onMouseLeave={clearTooltip}
-                                                        isInteractive={isInteractive}
-                                                        markerSize={markerSize}
-                                                        style={{ position: 'absolute', ...markerPosition.style, height: markerSize, padding: 0, display: 'flex', alignItems: 'center', overflow: 'visible', borderRadius: markerSize / 2, border: `2px solid ${currentEvent ? 'var(--agenda-highlight)' : 'var(--agenda-text-primary)'}`, background: 'color-mix(in srgb, var(--agenda-surface-base) 82%, transparent)', boxShadow: '0 4px 14px rgba(0,0,0,.7)', color: 'var(--agenda-text-primary)', cursor: isInteractive ? 'pointer' : 'not-allowed' }}
-                                                    >
-                                                        <span style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', borderRadius: markerSize / 2 }}>
-                                                        <span style={{ position: 'relative', width: markerSize - 4, height: markerSize - 4, flex: `0 0 ${markerSize - 4}px`, display: 'grid', placeItems: 'center', borderRadius: '50%', backgroundImage: markerImageUrl ? `url(${markerImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                                                            {!markerImageUrl && (isButton || isMarker ? <ButtonIcon sx={{ fontSize: markerSize / 2 }} /> : <MapRounded fontSize="small" />)}
-                                                        </span>
-                                                        </span>
-                                                        {isInteractive && !isButton && !isMarker && (
-                                                            <span style={{ position: 'absolute', top: -2, left: -2, display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: '50%', background: 'var(--agenda-highlight)', color: 'var(--agenda-surface-base)', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
-                                                                {linkedMap ? <ArrowOutward sx={{ fontSize: 11 }} /> : <PlayArrow sx={{ fontSize: 11 }} />}
-                                                            </span>
-                                                        )}
-                                                    </MapMarkerButton>
-                                                );
-                                                return showMarkerCard && markerCard && cardKind ? (
+                                        {showMarkerCard && markerCard && cardKind ? (
                                                     <Tooltip
                                                         title={<ContentCardControl stage={stage} control={markerCard} kind={cardKind} id={markerContent} orientation="vertical" onAction={handleAction} />}
                                                         describeChild
@@ -409,23 +303,12 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                                     >
                                                         {button}
                                                     </Tooltip>
-                                                ) : button;
-                                            }}
-                                        </CachedBackgroundUrl>
-                                        {linkedLocation && (
-                                            <div style={{ position: 'absolute', ...markerPosition.style, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, zIndex: 3 }}>
-                                                <LocationActorPortraits
-                                                    locationId={linkedLocation.id}
-                                                    stage={stage()}
-                                                    size={actorPortraitSize}
-                                                />
-                                            </div>
-                                        )}
-                                        {(isMarker || (isButton && link.contentList)) && contentValues.length > 0 && (
+                                                ) : button}
+                                        {contentValues.length > 0 && (
                                             <div
                                                 style={{ position: 'absolute', ...markerPosition.style, left: `clamp(${contentWidth / 2 + 8}px, ${markerPosition.style.left}, calc(100% - ${contentWidth / 2 + 8}px))`, transform: `translate(-50%, calc(-50% + ${markerSize / 2 + actorPortraitSize / 3}px))`, width: contentWidth, zIndex: 3 }}
                                             >
-                                                <ContentListPortraits kind={isMarker ? (markerControl?.contentList.kind === 'actor' || markerControl?.contentList.kind === 'item' || markerControl?.contentList.kind === 'location' ? markerControl.contentList.kind : undefined) : link.contentList?.kind === 'mixed' ? undefined : link.contentList?.kind} values={contentValues} stage={stage()} label={`${plainMarkerName} contents`} variant="overlay" size={actorPortraitSize} />
+                                                <ContentListPortraits kind={markerControl.contentList.kind === 'actor' || markerControl.contentList.kind === 'item' || markerControl.contentList.kind === 'location' ? markerControl.contentList.kind : undefined} values={contentValues} stage={stage()} label={`${plainMarkerName} contents`} variant="overlay" size={actorPortraitSize} />
                                             </div>
                                         )}
                                         </Fragment>

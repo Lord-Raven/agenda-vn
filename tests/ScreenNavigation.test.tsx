@@ -6,6 +6,7 @@ import { GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { TooltipProvider } from '../src/components/TooltipContext';
 import { Screen as GameMap, createListSection } from '../src/content/Screen';
 import { Actor } from '../src/content/Actor';
+import { Location } from '../src/content/Location';
 import { cloneStat } from '../src/content/Stat';
 import { globalStatReference } from '../src/content/Function';
 import { Control } from '../src/content/Control';
@@ -123,6 +124,18 @@ test('equal Screen priorities use configuration order, not names', () => {
     stage.getSave().screens = [map, list];
     assert.doesNotMatch(renderMapScreen(stage), /Custom Header/);
     assert.match(renderMapScreen(stage), /A Map/);
+});
+
+test('a selected map renders markers without evaluating fallback location visibility', () => {
+    const stage = createStage(true);
+    const map = makeScreenAvailable(stage, stage.getSave().screens[0]);
+    const location = new Location({ id: 'local', name: 'Local' });
+    stage.getSave().atlas[location.id] = location;
+    const marker = new Control({ id: 'marker', name: 'Marker', type: 'marker', markerInputType: 'location' });
+    stage.getConfiguration().controls.push(marker);
+    map.links.push({ type: 'marker', parentId: map.id, markerControlId: marker.id, content: location.id, coordinates: { x: .5, y: .5 } });
+    stage.isLocationVisible = () => { throw new Error('fallback location list should not be evaluated'); };
+    assert.match(renderMapScreen(stage), /aria-label="Marker"/);
 });
 
 test('Screens without conditions, inactive Screens, and unavailable Screens retain the default List fallback', () => {

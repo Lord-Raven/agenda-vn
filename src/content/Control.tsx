@@ -78,7 +78,7 @@ export class Control {
     badgeSource: string = '';
     // Undefined uses the normal picker options; an array is resolved as a list of allowed option IDs.
     pickerSource?: string[];
-    // Pop-ups display this Screen regardless of its availability; map link conditions still apply.
+    // Pop-ups display this Screen regardless of its availability; marker control conditions still apply.
     screenId: string = '';
     // Pop-ups only: control references rendered in the title bar, in selection order. Buttons and
     // stat displays/editors are eligible; availability conditions apply per control. A button whose

@@ -1,18 +1,15 @@
 import { FC, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AspectRatio } from '@chub-ai/stages-ts';
-import { Add, ArrowDownward, ArrowUpward, AutoAwesome, CenterFocusStrong, Delete, ExpandMore, Image as ImageIcon, Map as MapIcon, Place, TouchApp } from '@mui/icons-material';
-import { generateMapAlternativeImage, imageToPreviewCoordinates, MapFitMode, MapLink, MapLinkAvailabilityMode, previewToImageCoordinates } from '../content/Map';
+import { Add, ArrowDownward, ArrowUpward, AutoAwesome, CenterFocusStrong, Delete, ExpandMore, Image as ImageIcon, Place } from '@mui/icons-material';
+import { generateMapAlternativeImage, imageToPreviewCoordinates, MapFitMode, MapLink, previewToImageCoordinates } from '../content/Map';
 import { Stage } from '../Stage';
-import { buildHexColorSwatches, Button, ColorPickerInput, HelpTip, ReferenceMultiSelect, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
+import { buildHexColorSwatches, Button, ColorPickerInput, HelpTip, TextArea, TextInput, TextInputWithOptions, Title } from '../components/UiComponents';
 import { ImageUrlUploadField } from '../components/ImageUrlUploadField';
-import { ConditionEditor, createDefaultCondition } from '../components/ConditionEditor';
+import { ConditionEditor } from '../components/ConditionEditor';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { AlternativeImage, createAlternativeImage } from '../content/AlternativeImage';
 import { ConditionCollection } from '../content/Condition';
-import { getLocationName } from '../content/Location';
-import { createDefaultStatUpdate, OutcomeEditor } from '../components/OutcomeEditor';
-import { IconPicker, resolveIcon } from '../components/StatRating';
-import { processLoreText } from '../content/Lore';
+import { resolveIcon } from '../components/StatRating';
 import { Screen, cloneListSection, isSectionScreenType, ScreenType } from '../content/Screen';
 import { ListSectionsEditor } from '../components/ListSectionsEditor';
 import { MarkerInputType, markerVariableBindings } from '../content/Control';
@@ -28,11 +25,6 @@ interface ScreenDetailPanelProps {
 
 const clampCoordinate = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 
-const BUTTON_AVAILABILITY_OPTIONS: Array<{ value: MapLinkAvailabilityMode; label: string }> = [
-    { value: 'visible', label: 'Visible (hidden when unmet)' },
-    { value: 'enabled', label: 'Enabled (grayed out when unmet)' },
-];
-
 const selectStyle = {
     minHeight: 38,
     width: '100%',
@@ -43,11 +35,7 @@ const selectStyle = {
     padding: '0 8px',
 };
 
-const sectionHeaderRowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 };
-
 const sectionHeaderTitleStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 };
-
-const addNewButtonStyle: React.CSSProperties = { padding: '4px 10px', fontSize: '12px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 };
 
 type ScreenDraft = Pick<Screen, 'type' | 'sections' | 'name' | 'description' | 'priority' | 'category' | 'imagePrompt' | 'imageUrl' | 'alternativeImages' | 'fitMode' | 'fillColor'> & { focalX: number; focalY: number; availabilityConditions: ConditionCollection[] };
 
@@ -99,7 +87,6 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
     const configuredMarkers = (configuration.controls || []).filter(control => control.active !== false && control.type === 'marker');
     const sourceMaps = isCreatorMode ? configuredMaps : save.screens || [];
     const activeScreens = sourceMaps.filter(candidate => candidate.active !== false && candidate.id !== map.id);
-    const activeMaps = activeScreens.filter(candidate => candidate.type === 'map');
     const activeLocations = (isCreatorMode ? configuredLocations : Object.values(save.atlas || {})).filter(location => location.active !== false);
     const categoryOptions = useMemo(() => {
         const seenCategories = new Set<string>();
@@ -240,7 +227,7 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
         ...sourceMaps.filter(candidate => candidate.id !== map.id).map(candidate => candidate.fillColor),
     ]), [draft.fillColor, map.id, sourceMaps]);
 
-    // Links are stored in the preview's 16:9 space, so re-project them when the fit changes to keep
+    // Markers are stored in the preview's 16:9 space, so re-project them when the fit changes to keep
     // each marker over the same spot on the image.
     const changeFitMode = (nextFitMode: MapFitMode) => {
         if (nextFitMode === draft.fitMode) {
@@ -263,37 +250,16 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
         setDraft(current => ({ ...current, [field]: value }));
     };
 
-    const addLink = (type: MapLink['type'] = 'marker') => {
-        if (type === 'marker') {
-            const markerControl = configuredMarkers[0];
-            if (!markerControl) {
-                stageInstance.showPriorityMessage('Create a Marker Control before adding a map marker.');
-                return;
-            }
-            persist(() => {
-                map.links.push({
-                    type: 'marker',
-                    markerControlId: markerControl.id,
-                    content: '',
-                    parentId: map.id,
-                    childId: '',
-                    coordinates: { x: 0.5, y: 0.5 },
-                    conditionCollections: [],
-                });
-            });
-            setIsLinksCollapsed(false);
-            return;
-        }
-        const firstTarget = activeLocations[0]?.id || activeMaps[0]?.id;
-        if (type !== 'button' && !firstTarget) {
-            stageInstance.showPriorityMessage('Create another map or location before adding a link.');
+    const addLink = () => {
+        const markerControl = configuredMarkers[0];
+        if (!markerControl) {
+            stageInstance.showPriorityMessage('Create a Marker Control before adding a map marker.');
             return;
         }
         persist(() => {
             map.links.push({
-                type, parentId: map.id, childId: type === 'button' ? '' : firstTarget || '',
-                coordinates: { x: 0.5, y: 0.5 }, conditionCollections: [],
-                ...(type === 'button' ? { name: 'New Button', actions: [] } : {}),
+                type: 'marker', markerControlId: markerControl.id, content: '', parentId: map.id,
+                coordinates: { x: 0.5, y: 0.5 },
             });
         });
         setIsLinksCollapsed(false);
@@ -355,15 +321,6 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
             [map.links[index], map.links[targetIndex]] = [map.links[targetIndex], map.links[index]];
         });
         setExpandedLinks(current => current.map(linkIndex => linkIndex === index ? targetIndex : linkIndex === targetIndex ? index : linkIndex));
-    };
-
-    const addLinkCondition = (index: number, link: MapLink) => {
-        updateLink(index, {
-            conditionCollections: [...(link.conditionCollections || []), [createDefaultCondition(stageInstance.getConfiguration().globalStats || [])]],
-            ...(link.type === 'button' ? {
-                availabilityModes: [...(link.conditionCollections || []).map((_, collectionIndex) => link.availabilityModes?.[collectionIndex] || 'enabled'), BUTTON_AVAILABILITY_OPTIONS[0].value],
-            } : {}),
-        });
     };
 
     const uploadImage = async (file: File) => {
@@ -474,32 +431,6 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
         } finally {
             setIsGeneratingVariants(current => ({ ...current, [index]: false }));
         }
-    };
-
-    const resolveTargetName = (childId: string) => {
-        childId = String(stageInstance.resolveValue(childId, 'location'));
-        const mapTarget = activeMaps.find(candidate => candidate.id === childId);
-        if (mapTarget) {
-            return mapTarget.name;
-        }
-
-        const locationTarget = activeLocations.find(location => location.id === childId);
-        if (locationTarget) {
-            return getLocationName(locationTarget.id, stageInstance);
-        }
-
-        return 'Missing target';
-    };
-
-    const resolveTargetTypeLabel = (childId: string) => {
-        childId = String(stageInstance.resolveValue(childId, 'location'));
-        if (activeMaps.some(candidate => candidate.id === childId)) {
-            return 'Map';
-        }
-        if (activeLocations.some(location => location.id === childId)) {
-            return 'Location';
-        }
-        return 'Link';
     };
 
     const updateLinkFromPointer = (index: number, event: PointerEvent<HTMLElement>) => {
@@ -629,7 +560,7 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <button
                         type="button"
-                        aria-label={`${isLinksCollapsed ? 'Expand' : 'Collapse'} Links`}
+                        aria-label={`${isLinksCollapsed ? 'Expand' : 'Collapse'} Markers`}
                         aria-expanded={!isLinksCollapsed}
                         onClick={() => {
                             setIsLinksCollapsed(current => !current);
@@ -638,21 +569,21 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                         style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 0, border: 0, background: 'transparent', color: 'var(--agenda-text-primary)', cursor: 'pointer' }}
                     >
                         <ExpandMore style={{ transform: isLinksCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
-                        <strong>Links</strong>
+                        <strong>Markers</strong>
                     </button>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <Button variant="secondary" onClick={() => addLink('marker')} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add Marker</Button>
+                        <Button variant="secondary" onClick={addLink} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '6px 10px' }}><Add fontSize="small" /> Add Marker</Button>
                     </div>
                 </div>
                 {!isLinksCollapsed && (
                     <div style={{ display: 'grid', gap: 8 }}>
                         {map.links.map((link, index) => {
                             const isCollapsed = !expandedLinks.includes(index);
-                            const markerControl = link.type === 'marker' ? configuredMarkers.find(control => control.id === (link.markerControlId || link.markerId)) : undefined;
-                            const markerInstanceName = link.type === 'marker' ? link.name?.trim() : undefined;
+                            const markerControl = configuredMarkers.find(control => control.id === (link.markerControlId || link.markerId));
+                            const markerInstanceName = link.name?.trim();
                             const markerControlName = markerControl?.name?.trim();
-                            const linkName = link.type === 'marker' ? markerInstanceName || markerControlName || 'Marker' : link.type === 'button' ? link.name || 'Button' : resolveTargetName(link.childId);
-                            const linkTypeLabel = link.type === 'marker' ? (markerInstanceName && markerControlName ? `${markerControlName} Marker` : 'Marker') : link.type === 'button' ? 'Button' : resolveTargetTypeLabel(link.childId);
+                            const linkName = markerInstanceName || markerControlName || 'Marker';
+                            const linkTypeLabel = markerInstanceName && markerControlName ? `${markerControlName} Marker` : 'Marker';
                             return (
                                 <div key={index} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--agenda-line-subtle)', borderRadius: 8 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -692,7 +623,6 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                                         }} style={{ padding: 7, flexShrink: 0 }}><Delete fontSize="small" /></Button>
                                     </div>
                                     {!isCollapsed && <>
-                                        {link.type === 'marker' ? (<>
                                             <label htmlFor={`map-marker-name-${map.id}-${index}`} style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Marker Name (optional)</label>
                                             <TextInput fullWidth id={`map-marker-name-${map.id}-${index}`} value={link.name || ''} onChange={event => updateLink(index, { name: event.target.value })} />
                                             <label htmlFor={`map-marker-control-${map.id}-${index}`} style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Marker Control</label>
@@ -717,95 +647,10 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                                                 ))}
                                             </select>
                                             {markerControl && renderMarkerContent(index, link, markerControl.markerInputType)}
-                                        </>) : link.type === 'button' ? (<>
-                                            <TextInput fullWidth aria-label="Button name" placeholder="Button name" value={link.name || ''} onChange={event => updateLink(index, { name: event.target.value })} />
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }} htmlFor={`map-button-label-${map.id}-${index}`}>Button Label (optional)</label>
-                                            <TextInput fullWidth id={`map-button-label-${map.id}-${index}`} aria-label="Button label" placeholder="Use button name" value={link.label || ''} onChange={event => updateLink(index, { label: event.target.value })} />
-                                        </>) : <SearchableOptionPicker
-                                            value={link.childId}
-                                            onChange={nextValue => updateLink(index, { childId: (nextValue as string) || link.childId })}
-                                            options={[
-                                                ...activeLocations.map(location => ({ key: location.id, label: getLocationName(location.id, stageInstance), category: location.category?.trim() || 'Uncategorized', imageUrl: location.imageUrl, icon: Place, description: 'Location' })),
-                                                ...activeMaps.map(candidate => ({ key: candidate.id, label: candidate.name, category: candidate.category?.trim() || 'Uncategorized', imageUrl: candidate.imageUrl, icon: MapIcon, description: 'Map' })),
-                                            ]}
-                                            title="Choose link target"
-                                            placeholder="Search locations and screens"
-                                            functionType="location"
-                                            stage={stage}
-                                        />}
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignItems: 'center' }}>
                                             <TextInput type="number" min="0" max="1" step="0.01" aria-label="X coordinate" value={link.coordinates.x} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, x: Number(event.target.value) } })} />
                                             <TextInput type="number" min="0" max="1" step="0.01" aria-label="Y coordinate" value={link.coordinates.y} onChange={event => updateLink(index, { coordinates: { ...link.coordinates, y: Number(event.target.value) } })} />
                                         </div>
-                                        {link.type === 'button' && <>
-                                            <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>Button Icon (optional)</label>
-                                            <IconPicker stage={stage} value={link.iconName || undefined} allowClear onChange={iconName => updateLink(index, { iconName: iconName || '' })} />
-                                            <div style={sectionHeaderRowStyle}>
-                                                <strong style={{ color: 'var(--agenda-text-primary)' }}>Outcomes (on click)</strong>
-                                                <Button variant="secondary" aria-label="Add outcome" onClick={() => updateLink(index, {
-                                                    actions: [...(link.actions || []), createDefaultStatUpdate(stageInstance.getConfiguration().globalStats || [], stageInstance.getConfiguration().actorStats || [])],
-                                                })} style={addNewButtonStyle}><Add style={{ fontSize: '16px' }} /> New</Button>
-                                            </div>
-                                            <OutcomeEditor actions={link.actions || []} onChange={actions => updateLink(index, { actions })}
-                                                globalStats={stageInstance.getConfiguration().globalStats || []}
-                                                actorStats={stageInstance.getConfiguration().actorStats || []}
-                                                locationStats={stageInstance.getConfiguration().locationStats || []}
-                                                itemStats={stageInstance.getConfiguration().itemStats || []}
-                                                actors={(isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})).filter(actor => actor.active !== false)}
-                                                locations={activeLocations}
-                                                items={(isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []).filter(item => item.active !== false)}
-                                                stage={stage}
-                                                showAddActionButton={false}
-                                            />
-                                            <div>
-                                                <div style={{ ...sectionHeaderTitleStyle, color: 'var(--agenda-text-muted)', fontSize: 13 }}>
-                                                    <span>Content below button (optional)</span>
-                                                    <HelpTip title="Content below button">
-                                                        Combine actors, items, and locations, including via functions or global stats of any content type.
-                                                        The list is reevaluated after button actions and displayed beneath the marker.
-                                                        Leave the list empty to display no content.
-                                                    </HelpTip>
-                                                </div>
-                                            </div>
-                                            <ReferenceMultiSelect
-                                                values={link.contentList?.values || []}
-                                                onChange={values => updateLink(index, { contentList: { kind: 'mixed', values } })}
-                                                actors={isCreatorMode ? stageInstance.getConfiguration().actors : Object.values(save.actors || {})}
-                                                items={isCreatorMode ? stageInstance.getConfiguration().items : save.inventory || []}
-                                                locations={activeLocations} stage={stage}
-                                            />
-                                        </>}
-                                        <div style={sectionHeaderRowStyle}>
-                                            <div style={sectionHeaderTitleStyle}>
-                                                <strong style={{ color: 'var(--agenda-text-primary)' }}>Conditions</strong>
-                                                {link.type === 'button' && (
-                                                    <HelpTip title="Button conditions">
-                                                        Enabled conditions control whether the button can be clicked. Visible conditions control whether the button and its content list appear.
-                                                        At least one group of each configured kind must pass; all conditions within a group must pass.
-                                                    </HelpTip>
-                                                )}
-                                            </div>
-                                            <Button variant="secondary" aria-label="Add condition" onClick={() => addLinkCondition(index, link)} style={addNewButtonStyle}><Add style={{ fontSize: '16px' }} /> New</Button>
-                                        </div>
-                                        <ConditionEditor
-                                            conditionCollections={link.conditionCollections || []}
-                                            globalStats={stageInstance.getConfiguration().globalStats || []}
-                                            actorStats={stageInstance.getConfiguration().actorStats || []}
-                                            locationStats={stageInstance.getConfiguration().locationStats || []}
-                                            itemStats={stageInstance.getConfiguration().itemStats || []}
-                                            actors={Object.values(stageInstance.getSave().actors || {})}
-                                            stage={stage}
-                                            locations={Object.values(stageInstance.getSave().atlas || {})}
-                                            items={stageInstance.getSave().inventory || []}
-                                            variableContentType="actor"
-                                            onChange={(conditionCollections) => updateLink(index, { conditionCollections })}
-                                            collectionCategories={link.type === 'button' ? BUTTON_AVAILABILITY_OPTIONS : undefined}
-                                            collectionCategoryValues={link.type === 'button' ? (link.conditionCollections || []).map((_, collectionIndex) => link.availabilityModes?.[collectionIndex] || 'enabled') : undefined}
-                                            onCollectionCategoryValuesChange={link.type === 'button' ? (values) => updateLink(index, {
-                                                availabilityModes: values.map(value => value === 'visible' ? 'visible' : 'enabled'),
-                                            }) : undefined}
-                                            showAddConditionButton={false}
-                                        />
                                     </>}
                                 </div>
                             );
@@ -818,8 +663,8 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                 <strong style={{ display: 'block', color: 'var(--agenda-text-primary)', marginBottom: 8 }}>Preview</strong>
                 <p style={{ color: 'var(--agenda-text-muted)', fontSize: 13, margin: '0 0 8px' }}>
                     {isContained
-                        ? 'Drag link markers to position them. The entire map image always displays; the fill color covers any empty edges.'
-                        : 'Drag link markers to position them. Drag the crosshair to set the focal point kept in view when the map image is cropped.'}
+                        ? 'Drag markers to position them. The entire map image always displays; the fill color covers any empty edges.'
+                        : 'Drag markers to position them. Drag the crosshair to set the focal point kept in view when the map image is cropped.'}
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: isContained ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 1fr)', gap: 12, marginBottom: 10 }}>
                     <label style={{ color: 'var(--agenda-text-muted)', fontSize: 13 }}>
@@ -865,14 +710,13 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                         <CenterFocusStrong style={{ fontSize: 18 }} />
                     </div>}
                     {map.links.map((link, index) => {
-                        const markerControl = link.type === 'marker' ? configuredMarkers.find(control => control.id === (link.markerControlId || link.markerId)) : undefined;
+                        const markerControl = configuredMarkers.find(control => control.id === (link.markerControlId || link.markerId));
                         const markerContent = link.content || link.input || link.markerContent || '';
-                        const locationImageUrl = link.type !== 'button' && link.type !== 'marker' ? activeLocations.find(location => location.id === stageInstance.resolveValue(link.childId, 'location'))?.imageUrl : undefined;
-                        const markerName = link.type === 'marker' ? link.name?.trim() || markerControl?.name?.trim() || 'Marker' : link.type === 'button' ? processLoreText(link.label?.trim() || link.name?.trim() || 'Button', stageInstance) : resolveTargetName(link.childId);
-                        const MarkerIcon = link.type === 'marker' ? (markerControl?.iconName && (markerContent || !isValueReference(markerControl.iconName) || markerControl.markerInputType === 'screen' || markerControl.markerInputType === 'string') ? resolveIcon(String(stageInstance.resolveValue(markerControl.iconName, 'text', stageInstance.getSave(), [], markerVariableBindings(markerControl.markerInputType, markerContent)))) : Place) : link.type === 'button' ? (link.iconName ? resolveIcon(link.iconName, stageInstance) : TouchApp) : Place;
+                        const markerName = link.name?.trim() || markerControl?.name?.trim() || 'Marker';
+                        const MarkerIcon = markerControl?.iconName && (markerContent || !isValueReference(markerControl.iconName) || markerControl.markerInputType === 'screen' || markerControl.markerInputType === 'string') ? resolveIcon(String(stageInstance.resolveValue(markerControl.iconName, 'text', stageInstance.getSave(), [], markerVariableBindings(markerControl.markerInputType, markerContent)))) : Place;
                         return (
                             <div
-                                key={`${link.childId}-marker-${index}`}
+                                key={`marker-${index}`}
                                 role="button"
                                 tabIndex={0}
                                 aria-label={`Drag ${markerName} marker`}
@@ -886,9 +730,9 @@ export const ScreenDetailPanel: FC<ScreenDetailPanelProps> = ({ screen: map, sta
                                         updateLinkFromPointer(index, event);
                                     }
                                 }}
-                                style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: '50%', color: 'var(--agenda-text-primary)', backgroundColor: 'var(--agenda-active)', backgroundImage: locationImageUrl ? `url(${locationImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '2px solid var(--agenda-text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,.65)', cursor: 'grab', userSelect: 'none' }}
+                                style={{ position: 'absolute', left: `${link.coordinates.x * 100}%`, top: `${link.coordinates.y * 100}%`, transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: '50%', color: 'var(--agenda-text-primary)', backgroundColor: 'var(--agenda-active)', border: '2px solid var(--agenda-text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,.65)', cursor: 'grab', userSelect: 'none' }}
                             >
-                                {!locationImageUrl && <MarkerIcon style={{ fontSize: 18 }} />}
+                                <MarkerIcon style={{ fontSize: 18 }} />
                             </div>
                         );
                     })}

@@ -91,147 +91,7 @@ test('control clicks forward the newly started skit to their screen callback', (
     assert.equal(started, stage.getSave().timeline[0].skit);
 });
 
-test('maps can offer action buttons even without another map or location', () => {
-    const { stage } = fixture();
-    const map = new GameMap({ links: [{
-        type: 'button', parentId: '', childId: '', name: 'Rest', iconName: 'hotel', coordinates: { x: .5, y: .5 }, actions: [],
-    }] });
-    const html = renderToStaticMarkup(<ScreenDetailPanel map={map} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />);
-    assert.match(html, /Add Button/);
-    assert.match(html, /Drag Rest marker/);
-    assert.match(html, /data-testid="HotelIcon"/);
-    assert.doesNotMatch(html, /Drag Missing target marker/);
-});
-
-test('map link disclosures start collapsed, expand independently and reset when Links reopens', () => {
-    const { stage, configuration } = fixture();
-    const destination = new GameMap({ id: 'destination', name: 'World' });
-    const map = new GameMap({ id: 'map', links: [
-        { type: 'button', parentId: 'map', childId: '', name: 'Rest', coordinates: { x: .5, y: .5 }, actions: [] },
-        { parentId: 'map', childId: destination.id, coordinates: { x: .3, y: .3 } },
-        { type: 'button', parentId: 'map', childId: '', coordinates: { x: .7, y: .7 } },
-    ] });
-    configuration.screens = [map, destination];
-    const states: unknown[] = [];
-    let hookIndex = 0;
-    let inspectingPanel = false;
-    let panel: ReactNode;
-    const useState = React.useState;
-    const stateMock = mock.method(React, 'useState', (initial: unknown) => {
-        if (!inspectingPanel) return useState(initial);
-        const index = hookIndex++;
-        if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
-        return [states[index], (next: unknown) => {
-            states[index] = typeof next === 'function' ? next(states[index]) : next;
-        }];
-    });
-    const Probe = () => {
-        hookIndex = 0;
-        inspectingPanel = true;
-        try {
-            panel = ScreenDetailPanel({ map, stage: () => stage, isCreatorMode: true, onChange: () => {}, onDeactivate: () => {} });
-            return panel;
-        } finally {
-            inspectingPanel = false;
-        }
-    };
-    const render = () => renderToStaticMarkup(<Probe />);
-    const click = (label: string) => {
-        let handler: (() => void) | undefined;
-        const visit = (children: ReactNode) => React.Children.forEach(children, child => {
-            if (!isValidElement<{ children?: ReactNode; 'aria-label'?: string; onClick?: () => void }>(child)) return;
-            if (child.props['aria-label'] === label) handler = child.props.onClick;
-            visit(child.props.children);
-        });
-        visit(panel);
-        assert.ok(handler, `Missing button: ${label}`);
-        handler();
-    };
-    try {
-        assert.match(render(), /aria-label="Expand Links" aria-expanded="false"/);
-        click('Expand Links');
-        let html = render();
-        for (const name of ['Rest', 'World', 'Button']) {
-            assert.ok(html.includes(`aria-label="Expand ${name}" aria-expanded="false"`));
-        }
-        assert.doesNotMatch(html, /aria-label="Button name"|aria-label="Link type"|Outcomes \(on click\)/);
-
-        click('Expand Rest');
-        html = render();
-        assert.match(html, /aria-label="Collapse Rest" aria-expanded="true"/);
-        assert.match(html, /aria-label="Expand World" aria-expanded="false"/);
-        assert.ok(html.indexOf('aria-label="Button name"') < html.indexOf('aria-label="Link type"'));
-        assert.match(html, /Outcomes \(on click\)/);
-        assert.match(html, /aria-label="X coordinate"/);
-        assert.match(html, /aria-label="Button label"/);
-        assert.match(html, /Arguments follow parameter order; omitted arguments use defaults/);
-
-        click('Expand World');
-        html = render();
-        assert.match(html, /aria-label="Collapse Rest" aria-expanded="true"/);
-        assert.match(html, /aria-label="Collapse World" aria-expanded="true"/);
-        const worldEditor = html.slice(html.indexOf('aria-label="Collapse World"'));
-        assert.ok(worldEditor.indexOf('Choose link target') < worldEditor.indexOf('aria-label="Link type"'));
-
-        click('Collapse Rest');
-        html = render();
-        assert.match(html, /aria-label="Expand Rest" aria-expanded="false"/);
-        assert.match(html, /aria-label="Collapse World" aria-expanded="true"/);
-        assert.doesNotMatch(html, /aria-label="Button name"|Outcomes \(on click\)/);
-
-        click('Collapse Links');
-        assert.doesNotMatch(render(), /aria-label="Collapse World"/);
-        click('Expand Links');
-        html = render();
-        assert.match(html, /aria-label="Expand World" aria-expanded="false"/);
-        assert.doesNotMatch(html, /aria-label="Link type"/);
-
-        click('Expand Rest');
-        render();
-        click('Expand World');
-        render();
-        const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
-        Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout: () => 1 } });
-        try {
-            click('Delete Rest');
-        } finally {
-            if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor);
-            else Reflect.deleteProperty(globalThis, 'window');
-        }
-        html = render();
-        assert.equal(map.links.length, 2);
-        assert.match(html, /aria-label="Collapse World" aria-expanded="true"/);
-        assert.match(html, /aria-label="Expand Button" aria-expanded="false"/);
-    } finally {
-        stateMock.mock.restore();
-    }
-});
-
-test('defined maps show named action icons, fallback icons, disabled conditions and resolved content portraits', () => {
-    const { stage, configuration } = fixture();
-    configuration.useEvents = false;
-    configuration.globalStats = [cloneStat({ id: 'places', name: 'Places', type: 'locationList', default: ['place'] })];
-    stage.getSave().atlas.place = new Location({ id: 'place', name: 'Town' });
-    const map = new GameMap({ id: 'map', name: 'World', links: [
-        { type: 'button', parentId: 'map', childId: 'function:missing', name: 'Rest', iconName: 'hotel', coordinates: { x: .5, y: .5 },
-            contentList: { kind: 'location', values: [globalStatReference('places')] } },
-        { type: 'button', parentId: 'map', childId: '', name: 'Unavailable', coordinates: { x: .3, y: .3 },
-            conditionCollections: [[{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'night' }]] },
-    ] });
-    const render = () => renderToStaticMarkup(<TooltipProvider><DefinedMapView stage={() => stage} maps={[map]} setScreenType={() => {}} isVerticalLayout={false} /></TooltipProvider>);
-    const html = render();
-    assert.match(html, /aria-label="Rest"/);
-    assert.match(html, /data-testid="HotelIcon"/);
-    assert.match(html, /data-testid="TouchAppIcon"/);
-    assert.match(html, /aria-label="Unavailable" disabled=""/);
-    assert.match(html, /aria-label="Rest contents"/);
-    assert.match(html, /aria-label="Town"/);
-    assert.doesNotMatch(html, /data-testid="ArrowOutwardIcon"|data-testid="PlayArrowIcon"/);
-    stage.getSave().globalStatValues!.places = [];
-    assert.doesNotMatch(render(), /aria-label="Rest contents"/);
-});
-
-test('map button labels and control labels resolve parameterized templates while editors keep source text', () => {
+test('marker and control labels resolve parameterized templates while editors keep source text', () => {
     const { stage, configuration } = fixture();
     configuration.useEvents = false;
     configuration.globalStats = [cloneStat({ id: 'score', name: 'Score', type: 'number', default: 2 })];
@@ -242,9 +102,10 @@ test('map button labels and control labels resolve parameterized templates while
     }];
     const label = 'Visit {{Greeting("Alex")}}';
     const control = new Control({ name: 'Internal control', label });
+    const marker = new Control({ id: 'marker', name: 'Internal marker', type: 'marker', label, contentList: { kind: 'mixed', values: ['missing'] } });
+    configuration.controls = [marker];
     const map = new GameMap({ name: 'World', links: [{
-        type: 'button', parentId: '', childId: '', name: 'Internal button', label,
-        coordinates: { x: .5, y: .5 }, contentList: { kind: 'location', values: ['missing'] },
+        type: 'marker', parentId: '', markerControlId: marker.id, coordinates: { x: .5, y: .5 },
     }] });
     configuration.screens = [map];
     const renderMap = () => renderToStaticMarkup(<TooltipProvider>
@@ -256,18 +117,17 @@ test('map button labels and control labels resolve parameterized templates while
     assert.match(renderControl(), /Visit Alex: 2/);
     const panel = renderToStaticMarkup(<ControlDetailPanel control={control} stage={() => stage} />);
     assert.ok(panel.includes('value="Visit {{Greeting(&quot;Alex&quot;)}}"'));
-    assert.match(panel, /Arguments follow parameter order; omitted arguments use defaults/);
-    const mapPanel = renderToStaticMarkup(<ScreenDetailPanel map={map} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />);
-    assert.match(mapPanel, /Drag Visit Alex: 2 marker/);
+    const mapPanel = renderToStaticMarkup(<ScreenDetailPanel screen={map} stage={() => stage} isCreatorMode onChange={() => {}} onDeactivate={() => {}} />);
+    assert.match(mapPanel, /Drag Internal marker marker/);
     stage.getSave().globalStatValues!.score = 7;
     assert.match(renderMap(), /aria-label="Visit Alex: 7"/);
     assert.match(renderControl(), /Visit Alex: 7/);
-    assert.equal(map.links[0].label, label);
+    assert.equal(marker.label, label);
     assert.equal(control.label, label);
-    map.links[0].label = ' ';
-    assert.match(renderMap(), /aria-label="Internal button"/);
-    map.links[0].name = '';
-    assert.match(renderMap(), /aria-label="Button"/);
+    marker.label = ' ';
+    assert.match(renderMap(), /aria-label="Internal marker"/);
+    marker.name = '';
+    assert.match(renderMap(), /aria-label="Marker"/);
 });
 
 test('function management starts with collapsed return-type categories and a selection prompt', () => {
