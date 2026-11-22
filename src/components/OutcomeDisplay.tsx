@@ -243,6 +243,7 @@ export const OutcomeDisplay: FC<OutcomeDisplayProps> = ({ outcomes, stage }) => 
                             gap: 1,
                             width: '100%',
                             minHeight: 70,
+                            flexShrink: 0,
                             padding: '0.5rem 0.75rem',
                             borderRadius: 2,
                             border: '1px solid color-mix(in srgb, var(--agenda-accent-primary) 35%, transparent)',
