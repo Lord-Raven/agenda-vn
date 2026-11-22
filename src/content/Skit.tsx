@@ -1106,8 +1106,80 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     entry.speechUrl = '';
                 }
             });
+            if (scriptEntries.length > 0) {
+                ttsPromises.push((async () => {
+                    try {
+                        const revisedResponse = await stage.generateText(
+                            buildPrompt()
+                                .addBlock('Original Generation Context', prompt)
+                                .addBlock('Original Generated Script', text)
+                                .addBlock('Entries to Revise', builder => {
+                                    scriptEntries.forEach((entry, index) => builder.addBlock('Entry', entryBuilder => entryBuilder
+                                        .addBlock('Index', String(index))
+                                        .addBlock('Speaker', save.actors?.[entry.speakerId]?.name || 'NARRATOR')
+                                        .addBlock('Message', entry.message)));
+                                })
+                                .addBlock('Cue Revision Instructions',
+                                    'The script has already been generated. Override the original instructions to generate or extend prose: ' +
+                                    'review only the indexed Entries to Revise using the exact original context and generated script above. ' +
+                                    'Inject missing and correct existing Expression, Movement, OutfitChange, and StatChange tags based on what happens in each entry. ' +
+                                    'Use the original tag formats, known characters, outfits, locations, and updatable stats. ' +
+                                    'Track scene location and character presence from the end of Current Scene through these entries in order. ' +
+                                    'Return the complete replacement set of these four cue types for every indexed entry, not just additions. ' +
+                                    'Do not change or return speakers, messages, text styles, LoreUpdate, or NewEvent tags; do not add, remove, or combine entries. ' +
+                                    'Return exactly one <Entry><Index>0</Index>[All revised cues for this entry]</Entry> for each supplied index. ' +
+                                    'Keep an Entry with its Index even when no cues are needed. Return only these XML entries.')
+                                .format(),
+                            10,
+                            2000,
+                        );
+                        const revisedMatches = [...revisedResponse.matchAll(/<Entry>([\s\S]*?)<\/Entry>/gi)];
+                        if (revisedMatches.length !== scriptEntries.length) {
+                            throw new Error('Cue revision did not return exactly one entry per original entry.');
+                        }
 
-            // Wait for all TTS generation to complete
+                        const revisedBodies = new Map<number, string>();
+                        for (const match of revisedMatches) {
+                            const indices = [...match[1].matchAll(/<Index>\s*(\d+)\s*<\/Index>/gi)];
+                            const index = indices.length === 1 ? Number(indices[0][1]) : NaN;
+                            if (!Number.isSafeInteger(index) || index < 0 || index >= scriptEntries.length || revisedBodies.has(index)) {
+                                throw new Error('Cue revision returned a missing, duplicate, or invalid entry index.');
+                            }
+                            const cues = [...match[1].matchAll(/<(Expression|OutfitChange|Movement|StatChange)>[\s\S]*?<\/\1>/gi)]
+                                .map(cue => cue[0]).join('\n');
+                            const unexpectedContent = match[1]
+                                .replace(/<Index>\s*\d+\s*<\/Index>/gi, '')
+                                .replace(/<(Expression|OutfitChange|Movement|StatChange)>[\s\S]*?<\/\1>/gi, '')
+                                .trim();
+                            if (unexpectedContent) {
+                                throw new Error('Cue revision returned malformed cues or unsupported entry content.');
+                            }
+                            revisedBodies.set(index, cues);
+                        }
+
+                        // Reparse from the scene's original state, not the state left by parsing the first pass.
+                        parsedSceneLocationId = getCurrentLocation(skit, skit.script.length - 1);
+                        parsedCurrentActors = getCurrentActors(skit, skit.script.length - 1);
+                        const revisedEntries = parseXmlScriptEntries(scriptEntries
+                            .map((_, index) => `<Entry>${revisedBodies.get(index)}</Entry>`).join('\n'));
+                        revisedEntries.forEach((revisedEntry, index) => {
+                            const entry = scriptEntries[index];
+                            entry.actorEmotions = revisedEntry.actorEmotions;
+                            entry.actorOutfits = revisedEntry.actorOutfits;
+                            entry.updatedActors = revisedEntry.updatedActors;
+                            entry.updatedLocationId = revisedEntry.updatedLocationId;
+                            entry.outcomes = [
+                                ...entry.outcomes.filter(outcome => outcome.type !== OutcomeType.ACTOR_STAT && outcome.type !== OutcomeType.PLAYER_STAT),
+                                ...revisedEntry.outcomes,
+                            ];
+                        });
+                    } catch (error) {
+                        console.error('Error revising skit cues; retaining original cues:', error);
+                    }
+                })());
+            }
+
+            // Wait for both speech generation and cue revision before returning playable entries.
             await Promise.all(ttsPromises);
 
             stage.pushMessage(text);
