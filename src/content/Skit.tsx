@@ -1111,24 +1111,68 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
                     try {
                         const revisedResponse = await stage.generateText(
                             buildPrompt()
-                                .addBlock('Original Generation Context', prompt)
-                                .addBlock('Original Generated Script', text)
+                                .addBlock(`Instructions`,
+                                    `This is a visual novel skit within a video game. The below script represents a new chunk of the current scene, ` +
+                                    `but it may not fully capture all nuances of the scene. ` +
+                                    `Review the indexed Entries in the context of the current scene and tagging rules, ` +
+                                    'then inject missing and correct existing Expression, Movement, OutfitChange, and StatChange tags based on what happens in each entry. ' +
+                                    'Use the original tag formats, known characters, outfits, locations, and updatable stats. ' +
+                                    'Track scene location and character presence from the end of Current Scene through these entries in order. ' +
+                                    'Return the complete replacement set of these four cue types for every indexed entry, not just additions. ' +
+                                    'Do not change or return speakers, messages, text styles, LoreUpdate, or NewEvent tags; do not add, remove, or combine entries. ' +
+                                    'Return exactly one <Entry><Index>0</Index>[All revised cues for this entry]</Entry> for each supplied index. ' +
+                                    'Keep an Entry with its Index even when no additional cues are needed. Return only these XML entries.')
+                                .addBlock('Entry Format',
+                                    `<Entry><Message>Prose with "embedded dialogue" and actions.</Message><Speaker>[Speaker Name]</Speaker>[Appropriate Tags]</Entry>`)
+                                
+                                .addBlock('Tags', (builder) => {
+                                    const tagsBuilder = builder.addBlock('Tag Instruction',
+                                        `Embedded within this script, you may employ special tags to trigger various game mechanics. These tags are not presented to users, so the narrative content of the script should also organically mention characters entering, exiting, or relocating.`)
+                                        .addBlock('Emotion Tags',
+                                        `Emotion tags ("<Expression><Actor>[Character Name]</Actor><Mood>[Emotion]</Mood></Expression>") should be used to indicate visible emotional shifts in a character's appearance using a single-word emotion name.`)
+                                        .addBlock('Outfit Tags',
+                                        `Outfit tags ("<OutfitChange><Actor>[Character Name]</Actor><Outfit>[Outfit Name]</Outfit></OutfitChange>") should be used when a character changes outfit. ` +
+                                            `When establishing a character at the beginning of a scene or when moving to this location with a movement tag, give special consideration to the inclusion of an <OutfitChange> tag to explicitly call out an appropriate look. ` +
+                                            `Outfit Name must be found under the specified character—either their current outfit or one of their listed alternatives.`)
+                                        .addBlock('Movement Tags',
+                                            `A Character movement element ("<Movement><Actor>[Character Name]</Actor><Location>[Here|Away|Location Name|Location ID]</Location></Movement>") must be included when a character enters or leaves the scene or the scene itself moves to another location. ` +
+                                            `\n\nA Scene movement tag ("<Movement><Scene/><Location>[Here|Away|Location Name|Location ID]</Location></Movement>") may be used when the scene transitions to another location. ` +
+                                            `When this <Scene/> element is used, all characters currently present in the scene are treated as relocating together; if anyone splits up, they will require a separate movement tag. ` +
+                                            `\n\nFor movement tags, LOCATION should be the name of an existing location, or simply "Here" to move to the scene's location, or "Away" to leave this area. ` +
+                                            `The game engine relies upon movement tags to update character locations and visually display character presence in scenes, so it is essential to use these tags when characters come or go or when the scene itself relocates. ` +
+                                            `Consider the`)
+                                        .addBlock('Stat Change Tags',
+                                            `Stat change tags ("<StatChange><Actor>[Character Name]</Actor><Stat>[STAT NAME]</Stat><Amount>+/-x</Amount></StatChange>") should be used to indicate changes in a character's numeric stats as a result of events in the skit. ` +
+                                            `For stats that hold text or a selectable option rather than a number, use <Value>[NEW VALUE]</Value> instead of <Amount> to set the stat directly (e.g. "<StatChange><Actor>[Character Name]</Actor><Stat>[STAT NAME]</Stat><Value>[NEW VALUE]</Value></StatChange>"); NEW VALUE must match one of that stat's known options when applicable. ` +
+                                            `For global/world stats that aren't tied to any one character, omit the <Actor> element entirely (e.g. "<StatChange><Stat>[STAT NAME]</Stat><Amount>+/-x</Amount></StatChange>"). ` +
+                                            `Attach these tags to the specific entry where the change occurs, so the change reflects the moment it happens rather than being held until the scene ends. ` +
+                                            `See each character's stats for reference and use the known stat list for guidance on how to apply relevant changes based on skit activity or the implications thereof.`
+                                        )
+                                        .addBlock('Lore Update Tags',
+                                            `Lore update tags flag existing lore entries that should be revised based on events in this entry. Include concise, specific guidance for the later lore revision. ` +
+                                            `Use the exact lore entry title in <Entry>: <LoreUpdate><Entry>Lore Entry Name</Entry><Guidance>Specific revision guidance based on this entry's events.</Guidance></LoreUpdate>`
+                                        )
+                                    return tagsBuilder;
+                                })
+                                
+                                // Include all LLMSees Actor Stats here, with guidance. This gives the LLM information for how the stats impact Actor behavior and serves as a reference for StatChange tags.
+                                .addBlock('Actor Stat Context', () => actorStatContext)
+                                .addBlock('Global Stat Context', () => globalStatContext)
+                                .addBlock('Scene Prompt',
+                                    `Scene Prompt: ${skit.guidance}`)
+                                .addBlock('Context',
+                                    generateContext(skit, stage, 7 - retry * 2))
+                                .addBlock('Example Response',
+                                    `System:\n<Entry>\n  <Index>0</Index>\n   <Expression><Actor>Cyanea</Actor><Mood>Determination</Mood></Expression>\n</Entry>\n` +
+                                    `<Entry>\n  <Index>1</Index>\n  <StatChange>\n    <Actor>\n      Cyanea\n    </Actor>\n    <Stat>\n      Resolve\n    </Stat>\n    <Amount>+1</Amount>\n  </StatChange>\n</Entry>\n` +
+                                    `<Entry>\n  <Index>0</Index>\n  <Movement>\n    <Actor>\n      Red Hood\n    </Actor>\n    <Location>Here</Location>\n  </Movement>\n</Entry>\n`
+                                ).addBlock('Current Scene', buildScriptLog(skit, [], stage))
                                 .addBlock('Entries to Revise', builder => {
                                     scriptEntries.forEach((entry, index) => builder.addBlock('Entry', entryBuilder => entryBuilder
                                         .addBlock('Index', String(index))
                                         .addBlock('Speaker', save.actors?.[entry.speakerId]?.name || 'NARRATOR')
                                         .addBlock('Message', entry.message)));
                                 })
-                                .addBlock('Cue Revision Instructions',
-                                    'The script has already been generated. Override the original instructions to generate or extend prose: ' +
-                                    'review only the indexed Entries to Revise using the exact original context and generated script above. ' +
-                                    'Inject missing and correct existing Expression, Movement, OutfitChange, and StatChange tags based on what happens in each entry. ' +
-                                    'Use the original tag formats, known characters, outfits, locations, and updatable stats. ' +
-                                    'Track scene location and character presence from the end of Current Scene through these entries in order. ' +
-                                    'Return the complete replacement set of these four cue types for every indexed entry, not just additions. ' +
-                                    'Do not change or return speakers, messages, text styles, LoreUpdate, or NewEvent tags; do not add, remove, or combine entries. ' +
-                                    'Return exactly one <Entry><Index>0</Index>[All revised cues for this entry]</Entry> for each supplied index. ' +
-                                    'Keep an Entry with its Index even when no cues are needed. Return only these XML entries.')
                                 .format(),
                             10,
                             2000,
