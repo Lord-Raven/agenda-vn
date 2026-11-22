@@ -2,8 +2,13 @@ import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { act, create } from 'react-test-renderer';
+import { NovelVisualizer } from '@lord-raven/novel-visualizer';
 import { GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { TooltipProvider } from '../src/components/TooltipContext';
+import { ControlDock } from '../src/components/ControlDock';
+import { GlobalStatBar } from '../src/components/GlobalStatBar';
+import { PopupControl } from '../src/components/PopupControl';
 import { Screen as GameMap, createListSection } from '../src/content/Screen';
 import { Actor } from '../src/content/Actor';
 import { Location } from '../src/content/Location';
@@ -229,13 +234,77 @@ for (const isVerticalLayout of [false, true]) {
             assert.doesNotMatch(html, /MuiModal-root|MuiBackdrop-root/);
             const overlayIndex = html.indexOf('data-popup-control-overlay="true"');
             assert.ok(html.indexOf('Top Bar Action') < overlayIndex);
-            if (screen !== 'calendar' && screen !== 'turn-calendar') {
+            if (screen === 'skit') {
+                assert.ok(html.indexOf('Bottom Bar Action') < overlayIndex);
+            } else if (screen !== 'calendar' && screen !== 'turn-calendar') {
                 assert.ok(html.indexOf('Bottom Bar Action') > overlayIndex);
             }
             assert.match(html, /position:absolute;inset:0;z-index:20;pointer-events:auto/);
             assert.match(html, /isolation:isolate/);
         });
     }
+
+    test(`skit embeds the bottom dock in a full-height visualizer in ${isVerticalLayout ? 'vertical' : 'horizontal'} layout`, () => {
+        const stage = createStage();
+        stage.getCurrentSkit = () => new Skit({ id: 'test-skit', script: [{ message: '', outcomes: [] }] });
+        const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+        const originalResizeObserver = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver');
+        let footerHeight = 40;
+        let footerTop = 700;
+        let updateMeasurements = () => {};
+        Object.defineProperty(globalThis, 'window', {
+            configurable: true,
+            value: { addEventListener() {}, removeEventListener() {} },
+        });
+        Object.defineProperty(globalThis, 'ResizeObserver', {
+            configurable: true,
+            value: class {
+                constructor(callback: () => void) { updateMeasurements = callback; }
+                observe() {}
+                disconnect() {}
+            },
+        });
+        let renderer: ReturnType<typeof create> | undefined;
+        try {
+            act(() => {
+                renderer = create(
+                    <TooltipProvider><SkitScreen stage={() => stage} setScreenType={() => {}} isVerticalLayout={isVerticalLayout} /></TooltipProvider>,
+                    { createNodeMock: element => {
+                        if (element.type === 'div' && element.props.children?.type === ControlDock) {
+                            return { getBoundingClientRect: () => ({ height: footerHeight, top: footerTop }) };
+                        }
+                        if (element.type === 'div' && element.props.children?.[0]?.props?.children?.type === GlobalStatBar) {
+                            return { getBoundingClientRect: () => ({ bottom: 800 }) };
+                        }
+                        return null;
+                    } },
+                );
+            });
+            assert.ok(renderer);
+            const visualizer = renderer.root.findByType(NovelVisualizer);
+            assert.equal(visualizer.parent?.props.style.bottom, 0);
+            const dock = visualizer.findByType(ControlDock);
+            assert.equal(dock.props.isVerticalLayout, isVerticalLayout);
+            assert.ok(React.isValidElement(visualizer.props.belowMessageBoxElements));
+            assert.equal(visualizer.props.belowMessageBoxElements.props.children.type, ControlDock);
+            assert.equal(renderer.root.findAllByType(ControlDock).length, 1);
+            const popup = renderer.root.findByType(PopupControl);
+            assert.equal(popup.parent?.props.style.bottom, 108);
+            footerTop = 650;
+            act(() => updateMeasurements());
+            assert.equal(popup.parent?.props.style.bottom, 158);
+            assert.equal(visualizer.parent?.props.style.bottom, 0);
+            footerHeight = 0;
+            act(() => updateMeasurements());
+            assert.equal(popup.parent?.props.style.bottom, 0);
+        } finally {
+            if (renderer) act(() => renderer?.unmount());
+            if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+            else Reflect.deleteProperty(globalThis, 'window');
+            if (originalResizeObserver) Object.defineProperty(globalThis, 'ResizeObserver', originalResizeObserver);
+            else Reflect.deleteProperty(globalThis, 'ResizeObserver');
+        }
+    });
 
     for (const screen of ['calendar', 'locations', 'map', 'skit'] as const) {
         test(`${screen} ${isVerticalLayout ? 'hides' : 'retains'} the content shortcut in ${isVerticalLayout ? 'vertical' : 'horizontal'} layout`, () => {

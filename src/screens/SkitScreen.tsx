@@ -128,20 +128,22 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
     // lands where it did when the visualizer started below the header.
     const overlayTopOffset = headerHeight * (1 - (isVerticalLayout ? 0.01 : 0.05));
 
-    // Bottom controls sit below the visualizer, which shrinks to leave room for them (and its input row).
+    // Keep the popup above the dock without shrinking the visualizer's actor area.
+    const screenRef = React.useRef<HTMLDivElement>(null);
     const footerRef = React.useRef<HTMLDivElement>(null);
     const [footerSpace, setFooterSpace] = React.useState(0);
     useLayoutEffect(() => {
         const footer = footerRef.current;
-        if (!footer) return;
+        const screen = screenRef.current;
+        if (!footer || !screen) return;
         const updateSpace = () => {
-            const parentHeight = footer.offsetParent instanceof HTMLElement ? footer.offsetParent.clientHeight : 0;
-            setFooterSpace(footer.offsetHeight > 0 ? Math.max(parentHeight - footer.offsetTop, 0) + 8 : 0);
+            const footerRect = footer.getBoundingClientRect();
+            setFooterSpace(footerRect.height > 0 ? Math.max(screen.getBoundingClientRect().bottom - footerRect.top, 0) + 8 : 0);
         };
         updateSpace();
         const observer = new ResizeObserver(updateSpace);
         observer.observe(footer);
-        if (footer.offsetParent) observer.observe(footer.offsetParent);
+        observer.observe(screen);
         return () => observer.disconnect();
     }, [isVerticalLayout]);
 
@@ -249,7 +251,7 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
             imageUrl={locationImageUrl}
             // overlay="linear-gradient(130deg, rgba(5, 24, 34, 0.78) 0%, rgba(18, 47, 32, 0.72) 50%, rgba(37, 24, 57, 0.78) 100%)"
         >
-            <div style={{
+            <div ref={screenRef} style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
@@ -330,10 +332,15 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                         }
                     />
                 </div>
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: footerSpace }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
                     <NovelVisualizer
                         skit={skit}
                         loading={isLoading}
+                        belowMessageBoxElements={
+                            <div ref={footerRef}>
+                                <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleControlActivate} />
+                            </div>
+                        }
                         renderNameplate={(actor: any) => {
                             if (!actor || !actor.name) return null;
                             return <NamePlate
@@ -426,15 +433,6 @@ export const SkitScreen: FC<SkitScreenProps> = ({ stage, setScreenType, isVertic
                 </div>
                 <div style={{ position: 'absolute', top: headerHeight, left: 0, right: 0, bottom: footerSpace, isolation: 'isolate', zIndex: 9, pointerEvents: 'none' }}>
                     <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleControlActivate} />
-                </div>
-                <div ref={footerRef} style={{
-                    position: 'absolute',
-                    left: isVerticalLayout ? '1%' : 16,
-                    right: isVerticalLayout ? '1%' : 16,
-                    bottom: isVerticalLayout ? '1%' : 12,
-                    zIndex: 10
-                }}>
-                    <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleControlActivate} />
                 </div>
             </div>
 

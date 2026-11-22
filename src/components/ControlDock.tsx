@@ -10,8 +10,8 @@ interface ControlDockProps {
     onActivate?: (skit?: Skit | null) => void;
 }
 
-// Renders every available 'bottom' placement Control (buttons, stat displays, stat editors) in a row below
-// the main map or skit content. Renders nothing when there are no available bottom controls.
+// Renders available 'bottom' placement Controls in a row at the bottom of the map or skit.
+// Renders nothing when there are no available bottom controls.
 export const ControlDock: FC<ControlDockProps> = ({ stage, onActivate, isVerticalLayout = false }) => {
     // Bumped after a control fires/edits a stat, forcing this dock to re-render with the resulting state.
     const [revision, setRevision] = useState(0);
