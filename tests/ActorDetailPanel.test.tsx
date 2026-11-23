@@ -8,6 +8,8 @@ import { Emotion } from '../src/content/Emotion';
 import { Stage, GameConfiguration, SaveType } from '../src/Stage';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { Button } from '../src/components/UiComponents';
+import { SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
+import { ACTOR_VOICES } from '@lord-raven/novel-visualizer';
 
 const fixture = () => {
     const actor = new Actor({
@@ -117,6 +119,42 @@ function mountPanel(props: React.ComponentProps<typeof ActorDetailPanel>, alpha 
         },
     };
 }
+
+test('voice picker previews available sample URLs without selecting a voice and reports playback errors', async () => {
+    const { actor, stage } = fixture();
+    const sampleVoice = ACTOR_VOICES.find(voice => voice.sample);
+    const unsampledVoice = ACTOR_VOICES.find(voice => !voice.sample);
+    assert.ok(sampleVoice?.sample);
+    assert.ok(unsampledVoice);
+    const fetchSample = mock.method(globalThis, 'fetch', async () => new Response(null, { status: 503 }));
+    const errors = mock.method(console, 'error', () => {});
+    const panel = mountPanel({ actor, stage: () => stage, isCreatorMode: true });
+    Object.assign(window, { AudioContext: class { close() { return Promise.resolve(); } } });
+    try {
+        panel.render();
+        const picker = panel.find(SearchableOptionPicker, props => props.title === 'Select voice');
+        assert.ok(picker?.optionAction);
+        const sampledOption = picker.options.find(option => option.key === sampleVoice.id);
+        const unsampledOption = picker.options.find(option => option.key === unsampledVoice.id);
+        assert.ok(sampledOption);
+        assert.ok(unsampledOption);
+        assert.equal(picker.optionAction(unsampledOption), undefined);
+        const action = picker.optionAction(sampledOption);
+        assert.ok(action);
+        action.onClick();
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(fetchSample.mock.calls[0].arguments[0], sampleVoice.sample);
+        assert.equal(actor.voiceId, '');
+        panel.render();
+        assert.equal(panel.find(SearchableOptionPicker, props => props.title === 'Select voice')?.value, undefined);
+        assert.equal(errors.mock.callCount(), 1);
+        assert.equal((stage.showPriorityMessage as ReturnType<typeof mock.fn>).mock.callCount(), 1);
+    } finally {
+        panel.restore();
+        fetchSample.mock.restore();
+        errors.mock.restore();
+    }
+});
 
 for (const isCreatorMode of [false, true]) {
     for (const outcome of ['success', 'transparent', 'removal-error', 'download-error', 'upload-error'] as const) {

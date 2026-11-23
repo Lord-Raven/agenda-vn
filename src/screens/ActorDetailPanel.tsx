@@ -341,6 +341,11 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     }, [actorDetailGenerationSelection]);
     const [isGeneratingDemoSpeech, setIsGeneratingDemoSpeech] = useState(false);
     const audioRef = useRef<VoiceAudioPlayback | null>(null);
+    const audioRequestRef = useRef(0);
+    useEffect(() => () => {
+        audioRequestRef.current++;
+        audioRef.current?.stop();
+    }, []);
     const [regeneratingImages, setRegeneratingImages] = useState<Set<string>>(new Set());
     const [isFillingMissingEmotions, setIsFillingMissingEmotions] = useState(false);
     const [isGeneratingActorDetails, setIsGeneratingActorDetails] = useState(false);
@@ -1019,16 +1024,19 @@ export const ActorDetailPanel: FC<ActorDetailPanelProps> = ({ actor, stage, isCr
     const getVoiceSampleCacheKey = (actorId: string, voiceId: string): string => `${actorId}:${voiceId}`;
 
     const playSampleUrl = async (sampleUrl: string, voiceModulation: NovelVoiceModulation) => {
-        if (!sampleUrl) {
-            return;
-        }
-
+        const request = ++audioRequestRef.current;
         try {
             if (audioRef.current) {
                 audioRef.current.stop();
+                audioRef.current = null;
             }
 
-            audioRef.current = await playVoiceAudio(sampleUrl, voiceModulation);
+            const playback = await playVoiceAudio(sampleUrl, voiceModulation);
+            if (request !== audioRequestRef.current) {
+                playback.stop();
+                return;
+            }
+            audioRef.current = playback;
         } catch (error) {
             console.error('Failed to play demo speech sample:', error);
             stage().showPriorityMessage('Unable to play voice sample. Please try again.');
@@ -2395,6 +2403,18 @@ ${indent}}`;
                                                     title="Select voice"
                                                     placeholder="Search voices (e.g. female, british, deep)"
                                                     initialSearch={getVoiceSearchSeed(editedActor.voiceId)}
+                                                    optionAction={(option) => {
+                                                        const voice = getActorVoice(option.key);
+                                                        const sample = voice?.sample;
+                                                        if (!voice || !sample) return undefined;
+                                                        return {
+                                                            label: `Play sample for ${formatActorVoiceLabel(voice)}`,
+                                                            icon: <PlayArrow style={{ fontSize: 20 }} />,
+                                                            onClick: () => {
+                                                                void playSampleUrl(sample, { ...editedActor.voiceModulation, volume: getActorVoiceVolume(voice.id) });
+                                                            },
+                                                        };
+                                                    }}
                                                     renderButton={(value) => {
                                                         const voice = getActorVoice(typeof value === 'string' ? value : undefined);
                                                         const Icon = voice ? VOICE_GENDER_ICONS[voice.gender] : RecordVoiceOver;

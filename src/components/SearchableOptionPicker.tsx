@@ -40,6 +40,7 @@ export interface SearchableOptionPickerProps {
     emptyLabel?: string;
     title?: string;
     renderButton?: (selectedValue: string | string[] | undefined) => ReactNode;
+    optionAction?: (option: PickerOption) => { label: string; icon: ReactNode; onClick: () => void } | undefined;
     buttonAriaLabel?: string;
     disabled?: boolean;
     functionType?: StatType;
@@ -67,6 +68,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     emptyLabel = 'None',
     title = 'Choose option',
     renderButton,
+    optionAction,
     buttonAriaLabel,
     disabled = false,
     functionType,
@@ -314,18 +316,20 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         const active = multiple ? selectedValues.includes(option.key) : selectedValue === option.key;
         const atLimit = multiple && !active && maxSelections !== undefined && selectedValues.length >= maxSelections;
         const selectionIndex = multiple && active ? selectedValues.indexOf(option.key) : -1;
-        return (
+        const action = optionAction?.(option);
+        const button = (
             <button
-                key={`picker-option-${option.key}`}
                 type="button"
                 disabled={atLimit}
                 onClick={() => handleSelect(option.key)}
                 style={{
                     position: 'relative',
                     display: 'flex',
+                    width: '100%',
+                    height: '100%',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    justifyContent: action ? 'flex-start' : 'center',
                     gap: '6px',
                     background: active ? 'color-mix(in srgb, var(--agenda-highlight) 16%, transparent)' : 'var(--agenda-surface-raised)',
                     border: active ? '1px solid var(--agenda-highlight)' : '1px solid var(--agenda-line-subtle)',
@@ -366,9 +370,42 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                         {selectionIndex + 1}
                     </span>
                 )}
-                {renderOptionAvatar(option, active, 30)}
+                {action
+                    ? <span style={{ display: 'inline-flex', transform: 'translateX(-14px)' }}>{renderOptionAvatar(option, active, 30)}</span>
+                    : renderOptionAvatar(option, active, 30)}
                 <span style={{ maxWidth: '100%' }}>{option.label}</span>
             </button>
+        );
+        return (
+            <div key={`picker-option-${option.key}`} style={{ position: 'relative' }}>
+                {button}
+                {action && (
+                    <button
+                        type="button"
+                        aria-label={action.label}
+                        title={action.label}
+                        onClick={action.onClick}
+                        style={{
+                            position: 'absolute',
+                            top: '10px',
+                            left: 'calc(50% + 1px)',
+                            width: '30px',
+                            height: '30px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: 0,
+                            borderRadius: '4px',
+                            padding: 0,
+                            background: 'transparent',
+                            color: 'var(--agenda-text-primary)',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        {action.icon}
+                    </button>
+                )}
+            </div>
         );
     };
 

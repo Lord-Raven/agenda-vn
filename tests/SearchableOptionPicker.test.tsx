@@ -145,3 +145,38 @@ test('single-value picker does not show a current-elements section', () => {
     assert.doesNotMatch(html, /Current elements/);
     assert.match(html, /<input/);
 });
+
+test('option actions are separate from selection and remain available at the selection limit', () => {
+    const changes: Array<string | string[] | undefined> = [];
+    const actions: string[] = [];
+    let actionClick: (() => void) | undefined;
+    let selectionClick: (() => void) | undefined;
+    const html = renderOpenPicker({
+        multiple: true, maxSelections: 1, values: ['first'],
+        options: [{ key: 'first', label: 'First' }, { key: 'second', label: 'Second' }],
+        onChange: value => changes.push(value),
+        optionAction: option => option.key === 'second'
+            ? { label: 'Play Second', icon: 'Play', onClick: () => actions.push(option.key) }
+            : undefined,
+    }, children => {
+        const visit = (nodes: ReactNode) => {
+            React.Children.forEach(nodes, child => {
+                if (!React.isValidElement<{ children?: ReactNode; 'aria-label'?: string; onClick?: () => void }>(child)) return;
+                if (child.type === 'button' && child.props['aria-label'] === 'Play Second') actionClick = child.props.onClick;
+                if (child.type === 'button' && React.Children.toArray(child.props.children).some(
+                    item => React.isValidElement<{ children?: ReactNode }>(item) && item.props.children === 'First',
+                )) selectionClick = child.props.onClick;
+                visit(child.props.children);
+            });
+        };
+        visit(children);
+    });
+    assert.match(html, /<button[^>]*disabled=""[^>]*>.*?Second<\/span><\/button><button[^>]*aria-label="Play Second"/);
+    assert.ok(actionClick);
+    actionClick();
+    assert.deepEqual(actions, ['second']);
+    assert.deepEqual(changes, []);
+    assert.ok(selectionClick);
+    selectionClick();
+    assert.deepEqual(changes, [[]]);
+});
