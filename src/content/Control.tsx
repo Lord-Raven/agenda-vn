@@ -5,10 +5,9 @@ import type { FunctionVariableBindings } from './Function';
 
 // Settings controls render in SettingsScreen.
 // Pop-ups overlay gameplay; only the first available control in priority order is displayed.
-// 'standalone' controls render nowhere on their own; they are attached to content elsewhere
-// as badges or reusable content cards, or placed in a Pop-up's title bar (buttons and stat
-// displays/editors) via titleBarControls.
-export type ControlPlacement = 'top' | 'bottom' | 'outcome' | 'settings' | 'popup' | 'standalone';
+// Standalone controls render only when referenced by a Bar, Card, or Pop-up.
+export type ControlPlacement = 'bar' | 'outcome' | 'settings' | 'popup' | 'standalone';
+export type BarOrientation = 'top' | 'bottom';
 
 // 'button' runs outcomes; 'statDisplay'/'statEditor' show/edit a global stat.
 // 'settings' exposes a global stat as a player-editable setting.
@@ -18,7 +17,7 @@ export type ControlPlacement = 'top' | 'bottom' | 'outcome' | 'settings' | 'popu
 // On Drop runs before the source's On Drag. An optional read-only boolean validator highlights
 // receivers and suppresses On Drop when false; the source's On Drag still runs.
 // 'card' composes labels, standalone badges, conditions, and actions for a content type.
-export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'statOutcome' | 'settings' | 'popup' | 'statBadge' | 'dragDropDisplay' | 'card' | 'marker';
+export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'statOutcome' | 'settings' | 'popup' | 'statBadge' | 'dragDropDisplay' | 'card' | 'marker' | 'bar' | 'day';
 export type MarkerInputType = 'actor' | 'item' | 'location' | 'screen' | 'string';
 export const markerVariableBindings = (type: MarkerInputType, content: string): FunctionVariableBindings =>
     type === 'actor' || type === 'item' || type === 'location' ? { [type]: content } : { marker: content };
@@ -27,7 +26,12 @@ export const STAT_DISPLAY_TYPES = ['straight', 'percentage', 'bar', 'rating', 'l
 export type StatDisplayType = typeof STAT_DISPLAY_TYPES[number];
 export type StatDisplaySettings = Pick<Control, 'displayType' | 'displayColor' | 'ratingIconName'>;
 
-export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'statOutcome', 'settings', 'popup', 'statBadge', 'dragDropDisplay', 'card', 'marker'];
+export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'statOutcome', 'settings', 'popup', 'statBadge', 'dragDropDisplay', 'card', 'marker', 'bar', 'day'];
+
+export const isPopupTitleControl = (control: Control): boolean =>
+    control.placement === 'standalone' && (control.type === 'button' || control.type === 'statDisplay' || control.type === 'statEditor');
+export const isBarContentControl = (control: Control): boolean =>
+    isPopupTitleControl(control) || (control.placement === 'standalone' && control.type === 'day');
 
 export type ContentDisplayType = Extract<StatType, 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'contentList'>;
 export const isContentDisplayType = (type: string | undefined): type is ContentDisplayType =>
@@ -55,8 +59,10 @@ export class Control {
     name: string = ''; // Internal/admin label shown in ControlManagementPanel; not necessarily displayed in-game.
     priority: number = 0; // Lower numbers display first; ties keep configuration order.
     widthWeight: number = 1; // Relative width within a top/bottom control row.
-    placement: ControlPlacement = 'bottom';
+    placement: ControlPlacement = 'standalone';
     type: ControlType = 'button';
+    barOrientation: BarOrientation = 'top';
+    barControls: string[] = [];
     availabilityConditions: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
     visibilityConditions: ConditionCollection[] = []; // Cards only; unavailable visible cards remain disabled.
 
@@ -116,7 +122,9 @@ export class Control {
         this.priority = Number.isFinite(this.priority) ? this.priority : 0;
         this.widthWeight = Number.isFinite(this.widthWeight) && this.widthWeight > 0 ? this.widthWeight : 1;
         this.type = CONTROL_TYPES.includes(this.type) ? this.type : 'button';
-        this.placement = this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'settings' ? 'settings' : this.type === 'statBadge' || this.type === 'dragDropDisplay' || this.type === 'card' || this.type === 'marker' ? 'standalone' : this.placement === 'top' ? 'top' : this.placement === 'standalone' ? 'standalone' : 'bottom';
+        this.placement = this.type === 'bar' ? 'bar' : this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'settings' ? 'settings' : 'standalone';
+        this.barOrientation = this.barOrientation === 'bottom' ? 'bottom' : 'top';
+        this.barControls = Array.isArray(this.barControls) ? this.barControls.filter(isControlReference) : [];
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.visibilityConditions = Array.isArray(this.visibilityConditions) ? this.visibilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.label = `${this.label || ''}`;

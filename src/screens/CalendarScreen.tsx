@@ -23,6 +23,7 @@ import { GlobalStatBar } from "../components/GlobalStatBar";
 import { useCachedImageUrl } from "../utils/ImageCache";
 import { CachedBackgroundUrl } from "../components/CachedImage";
 import { PopupControl } from "../components/PopupControl";
+import { ControlDock } from "../components/ControlDock";
 import { Skit } from "../content/Skit";
 
 interface CalendarScreenProps {
@@ -711,6 +712,7 @@ export const CalendarScreen: FC<CalendarScreenProps> = ({ stage, setScreenType, 
                 )}
                 <PopupControl stage={stage} isVerticalLayout={isVerticalLayout} setScreenType={setScreenType} onAction={handleAction} />
                 </Box>
+                <ControlDock stage={stage} isVerticalLayout={isVerticalLayout} onActivate={handleAction} />
             </Box>
 
             <AnimatePresence>

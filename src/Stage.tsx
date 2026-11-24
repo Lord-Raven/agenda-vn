@@ -12,7 +12,7 @@ import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item, isItemAvailable } from "./content/Item";
-import { compareControlPriority, ContentDisplayContext, Control, ControlPlacement, controlReference, controlReferenceId, createDefaultCardControls, DEFAULT_CARD_IDS, isContentDisplayType, isControlAvailable, isControlReference } from "./content/Control";
+import { BarOrientation, compareControlPriority, ContentDisplayContext, Control, ControlPlacement, controlReference, controlReferenceId, createDefaultCardControls, DEFAULT_CARD_IDS, isBarContentControl, isContentDisplayType, isControlAvailable, isControlReference } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, getCurrentActors, getCurrentLocation, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Screen, ListSection, parseContentStatReference, listContentKind, LIST_CONTENT_TYPES } from "./content/Screen";
@@ -955,6 +955,19 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return (this.getConfiguration(this.getSave()).controls || [])
             .filter((control) => control.placement === placement && isControlAvailable(control, context))
             .sort(compareControlPriority);
+    }
+
+    getVisibleBars(orientation: BarOrientation): Control[] {
+        return this.getVisibleControls('bar').filter(control => control.type === 'bar' && control.barOrientation === orientation);
+    }
+
+    getBarControls(bar: Control): Control[] {
+        const save = this.getSave();
+        const context: ConditionContext = { ...this.getScheduleContext(save), skitState: this.getSkitConditionState() };
+        const controls = this.getConfiguration(save).controls || [];
+        return bar.barControls
+            .map(reference => controls.find(control => control.id === controlReferenceId(reference)))
+            .filter((control): control is Control => !!control && isBarContentControl(control) && isControlAvailable(control, context));
     }
 
     runControlActions(control: Control, variables?: FunctionVariableBindings): Skit | null {

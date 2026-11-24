@@ -13,6 +13,7 @@ import { Skit } from '../content/Skit';
 import { processLoreText, stripLoreIcons } from '../content/Lore';
 import { renderLoreIcons, renderLoreTextWithIcons } from './LoreIconText';
 import { PickerAllowedOptionsContext } from './SearchableOptionPicker';
+import { DayControl } from './DayControl';
 
 interface ControlRendererProps {
     control: Control;
@@ -51,13 +52,16 @@ const resolveDisplayValue = (stat: Stat, value: unknown, atlas?: { [key: string]
 };
 
 // Renders a single Control per its type: 'button' as a clickable action, 'statDisplay'/'statEditor' as the
-// labeled boxes, or an inline icon and value in vertical layouts. Used by both GlobalStatBar (placement
-// 'top') and the bottom control dock (placement 'bottom').
+// labeled boxes, or an inline icon and value in vertical layouts.
 export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onActivate, isVerticalLayout = false }) => {
     const stageInstance = stage();
     const fontSize = isVerticalLayout ? 'clamp(0.8rem, 10cqi, 1rem)' : valueFontSize;
 
-    if (control.type === 'card' || control.type === 'statOutcome' || control.type === 'popup' || control.type === 'statBadge' || control.type === 'dragDropDisplay' || control.type === 'marker') {
+    if (control.type === 'day') {
+        return <DayControl stage={stage} isVerticalLayout={isVerticalLayout} />;
+    }
+
+    if (control.type !== 'button' && control.type !== 'statDisplay' && control.type !== 'statEditor') {
         return null;
     }
 

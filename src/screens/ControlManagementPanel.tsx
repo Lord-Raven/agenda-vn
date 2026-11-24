@@ -15,8 +15,7 @@ interface ControlManagementPanelProps {
 }
 
 const PLACEMENT_LABELS: Record<Control['placement'], string> = {
-    top: 'Top',
-    bottom: 'Bottom',
+    bar: 'Bars',
     outcome: 'Outcomes',
     settings: 'Settings',
     popup: 'Pop-ups',
@@ -34,6 +33,8 @@ const TYPE_LABELS: Record<Control['type'], string> = {
     statBadge: 'Stat Badge',
     dragDropDisplay: 'Drag and Drop Display',
     marker: 'Marker',
+    bar: 'Bar',
+    day: 'Day',
 };
 
 export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage }) => {
@@ -72,8 +73,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
 
     const controlsByPlacement = useMemo<CategorizedEntrySection<Control>[]>(() => {
         const sections: CategorizedEntrySection<Control>[] = [
-            { id: 'top', title: PLACEMENT_LABELS.top, entries: controls.filter((control) => control.placement === 'top') },
-            { id: 'bottom', title: PLACEMENT_LABELS.bottom, entries: controls.filter((control) => control.placement === 'bottom') },
+            { id: 'bar', title: PLACEMENT_LABELS.bar, entries: controls.filter((control) => control.type === 'bar') },
             { id: 'cards', title: 'Cards', entries: controls.filter(control => control.type === 'card') },
             { id: 'outcome', title: PLACEMENT_LABELS.outcome, entries: controls.filter((control) => control.placement === 'outcome') },
             { id: 'settings', title: PLACEMENT_LABELS.settings, entries: controls.filter((control) => control.type === 'settings') },
@@ -105,8 +105,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
         const control = new Control({
             active: true,
             name: candidateName,
-            placement: sectionId === 'top' ? 'top' : sectionId === 'settings' ? 'settings' : 'bottom',
-            type: sectionId === 'popup' ? 'popup' : sectionId === 'marker' ? 'marker' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'cards' ? 'card' : sectionId === 'settings' ? 'settings' : sectionId === 'standalone' ? 'statBadge' : 'button',
+            type: sectionId === 'bar' ? 'bar' : sectionId === 'popup' ? 'popup' : sectionId === 'marker' ? 'marker' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'cards' ? 'card' : sectionId === 'settings' ? 'settings' : sectionId === 'standalone' ? 'statBadge' : 'button',
             label: sectionId === 'cards' ? '{{content:name}}' : sectionId === 'outcome' || sectionId === 'settings' || sectionId === 'standalone' || sectionId === 'marker' ? '' : candidateName,
         });
 
