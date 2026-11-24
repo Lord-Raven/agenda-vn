@@ -31,6 +31,7 @@ import { OutcomeEditor } from '../src/components/OutcomeEditor';
 import { GameManagementPanel } from '../src/screens/GameManagementPanel';
 import { ActorCard } from '../src/components/ActorCard';
 import { NamePlate } from '../src/components/UiComponents';
+import { DragDropDisplay } from '../src/components/DragDropDisplay';
 
 const stat = (id: string, type: StatType, defaultValue: StatValue, extra: Partial<Stat> = {}): Stat => cloneStat({
     id, name: id, type, guidance: '', default: defaultValue,
@@ -85,6 +86,190 @@ const fixture = () => {
     stage.getCurrentLocationEvent = () => null;
     return { stage, configuration, save };
 };
+
+const dragDropFixture = () => {
+    const result = fixture();
+    const { configuration } = result;
+    configuration.actorStats.push(stat('Contents', 'actorList', ['bob']));
+    configuration.functions.push(
+        { id: 'drag', name: 'Drag', description: '', returnType: 'void', parameters: [stat('Moved', 'actor', '')],
+            script: "set('Title', get('Title') + ':drag:' + arg('Moved')); getActor('Alice').set('Contents', []);" },
+        { id: 'drop', name: 'Drop', description: '', returnType: 'void',
+            parameters: [stat('Moved', 'actor', ''), stat('Owner', 'actor', ''), stat('Header', 'text', '')],
+            script: "set('Title', getActor('Alice').get('Contents').join(',') + ':drop:' + arg('Moved') + ':' + arg('Owner') + ':' + arg('Header'));" },
+        { id: 'validate', name: 'Validate', description: '', returnType: 'boolean', parameters: [stat('Moved', 'actor', '')],
+            script: "return arg('Moved') === 'bob';" },
+    );
+    const source = new Control({ type: 'dragDropDisplay', name: 'Source', badgeSource: contentStatReference('actor', 'Contents'),
+        onDragFunction: functionReference('drag') });
+    const target = new Control({ type: 'dragDropDisplay', name: 'Target', badgeSource: contentStatReference('actor', 'Contents'),
+        onDropFunction: functionReference('drop', { Owner: 'variable:actor', Header: HEADER_VARIABLE_VALUE }),
+        dropValidationFunction: functionReference('validate') });
+    configuration.controls.push(source, target);
+    return { ...result, source: { control: source, kind: 'actor' as const, id: 'alice', header: 'Source' },
+        target: { control: target, kind: 'actor' as const, id: 'alice', header: 'Receiver' } };
+};
+
+test('drag/drop runs the receiver before the source and passes moved content, owner, and header arguments', () => {
+    const { stage, save, source, target } = dragDropFixture();
+    assert.equal(stage.canReceiveContentDrop(target, 'actor', 'bob'), true);
+    stage.runContentDrop(source, 'actor', 'bob', target);
+    assert.equal(save.globalStatValues.Title, 'bob:drop:bob:alice:Receiver:drag:bob');
+    assert.deepEqual(save.actors.alice.statMap.Contents, []);
+});
+
+test('drop validation rejects only the receiver and is read-only', () => {
+    const { stage, save, source, target, configuration } = dragDropFixture();
+    assert.equal(stage.canReceiveContentDrop(target, 'actor', 'alice'), false);
+    stage.runContentDrop(source, 'actor', 'alice', target);
+    assert.equal(save.globalStatValues.Title, 'Squad:drag:alice');
+    configuration.functions.find(fn => fn.id === 'validate')!.script = "set('Title', 'Changed'); return true;";
+    assert.throws(() => stage.canReceiveContentDrop(target, 'actor', 'bob'), /read.only/i);
+    assert.equal(save.globalStatValues.Title, 'Squad:drag:alice');
+});
+
+for (const kind of ['item', 'location'] as const) {
+    test(`drag/drop passes ${kind} content rather than the owning actor to each function`, () => {
+        const { stage, source, target, configuration, save } = dragDropFixture();
+        const id = kind === 'item' ? 'sword' : 'park';
+        const contents = configuration.actorStats.find(stat => stat.id === 'Contents')!;
+        contents.type = kind === 'item' ? 'itemList' : 'locationList';
+        contents.default = [id];
+        for (const fn of configuration.functions.filter(fn => ['drag', 'drop', 'validate'].includes(fn.id))) {
+            fn.parameters![0].type = kind;
+        }
+        configuration.functions.find(fn => fn.id === 'validate')!.script = `return arg('Moved') === '${id}';`;
+        assert.equal(stage.canReceiveContentDrop(target, kind, id), true);
+        stage.runContentDrop(source, kind, id, target);
+        assert.equal(save.globalStatValues.Title, `${id}:drop:${id}:alice:Receiver:drag:${id}`);
+    });
+}
+
+test('drop receivers require On Drop, compatible content, and availability; validation is optional', () => {
+    const { stage, source, target } = dragDropFixture();
+    assert.equal(stage.canReceiveContentDrop(target, 'item', 'sword'), false);
+    target.control.dropValidationFunction = '';
+    assert.equal(stage.canReceiveContentDrop(target, 'actor', 'alice'), true);
+    target.control.active = false;
+    assert.equal(stage.canReceiveContentDrop(target, 'actor', 'bob'), false);
+    target.control.active = true;
+    target.control.onDropFunction = '';
+    assert.equal(stage.canReceiveContentDrop(target, 'actor', 'bob'), false);
+    source.control.onDragFunction = '';
+    stage.runContentDrop(source, 'actor', 'bob', target);
+    assert.equal(stage.getSave().globalStatValues.Title, 'Squad');
+});
+
+test('drag/drop editor offers only content sources and appropriately typed callbacks', () => {
+    const { stage, source, configuration } = dragDropFixture();
+    stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout } });
+    configuration.functions.push({ id: 'wrong', name: 'Wrong', description: '', returnType: 'boolean',
+        script: 'return true;', parameters: [stat('Item', 'item', '')] });
+    let renderer: ReactTestRenderer | undefined;
+    try {
+        act(() => { renderer = create(<ControlDetailPanel control={source.control} stage={() => stage} />); });
+        const pickers = renderer!.root.findAllByType(SearchableOptionPicker);
+        const value = pickers.find(picker => picker.props.title === 'Choose badge source')!;
+        assert.deepEqual(value.props.options.map((option: { key: string }) => option.key),
+            [functionReference('members'), 'actorStat:Contents']);
+        const onDrag = pickers.find(picker => picker.props.title === 'Choose On Drag function')!;
+        assert.ok(onDrag.props.options.some((option: { key: string }) => option.key === functionReference('drag')));
+        assert.ok(!onDrag.props.options.some((option: { key: string }) => option.key === functionReference('wrong')));
+        const validate = pickers.find(picker => picker.props.title === 'Choose drop validation function')!;
+        assert.deepEqual(validate.props.options.map((option: { key: string }) => option.key), [functionReference('validate')]);
+        const onDrop = pickers.find(picker => picker.props.title === 'Choose On Drop function')!;
+        act(() => onDrop.props.onChange(functionReference('drop')));
+        act(() => validate.props.onChange(functionReference('validate')));
+        act(() => renderer!.unmount());
+        renderer = undefined;
+        const saved = configuration.controls.find(control => control.id === source.control.id)!;
+        assert.equal(saved.type, 'dragDropDisplay');
+        assert.equal(saved.placement, 'standalone');
+        assert.equal(saved.onDragFunction, functionReference('drag'));
+        assert.equal(saved.onDropFunction, functionReference('drop'));
+        assert.equal(saved.dropValidationFunction, functionReference('validate'));
+    } finally {
+        if (renderer) act(() => renderer!.unmount());
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else Reflect.deleteProperty(globalThis, 'window');
+    }
+});
+
+test('drag/drop displays retain empty drop targets and make dragging opt-in', () => {
+    const { stage, source, save } = dragDropFixture();
+    const render = () => {
+        const detail = stage.resolveListCardDetail(controlReference(source.control.id), 'actor', 'alice', '')!;
+        return renderToStaticMarkup(<ListCardDetail detail={detail} stage={stage} kind="actor" id="alice" isVerticalLayout={false} />);
+    };
+    assert.match(render(), /draggable="true"/);
+    source.control.onDragFunction = '';
+    assert.doesNotMatch(render(), /draggable="true"/);
+    save.actors.alice.statMap.Contents = [];
+    assert.match(render(), /data-drag-drop-display=/);
+    assert.match(render(), />None<\/span>/);
+});
+
+test('drag gestures highlight valid receivers, skip invalid receivers, and clean up on drop or cancel', () => {
+    const { stage, source, target, save } = dragDropFixture();
+    const originalNode = Object.getOwnPropertyDescriptor(globalThis, 'Node');
+    Object.defineProperty(globalThis, 'Node', { configurable: true, value: class {} });
+    const listeners = new Map<string, EventListener>();
+    const ownerDocument = {
+        addEventListener: (type: string, listener: EventListener) => listeners.set(type, listener),
+        removeEventListener: (type: string) => listeners.delete(type),
+    };
+    const sourceElement = { ownerDocument };
+    const targetElement = { ownerDocument };
+    const event = (id = 'bob') => ({
+        currentTarget: sourceElement,
+        target: { closest: () => ({ dataset: { dragContentId: id, dragContentKind: 'actor' } }) },
+        preventDefault: mock.fn(), stopPropagation: mock.fn(),
+        dataTransfer: { setData: mock.fn(), effectAllowed: '', dropEffect: '' },
+    });
+    let renderer: ReactTestRenderer | undefined;
+    try {
+        act(() => { renderer = create(<>
+            <DragDropDisplay stage={stage} context={source} accepts="actor"><span>Source</span></DragDropDisplay>
+            <DragDropDisplay stage={stage} context={target} accepts="actor"><span>Target</span></DragDropDisplay>
+        </>); });
+        const displays = () => renderer!.root.findAllByType('div').filter(node => node.props['data-drag-drop-display']);
+        act(() => displays()[0].props.onDragStart(event()));
+        assert.equal(displays()[1].props['data-drop-highlighted'], true);
+        assert.equal(save.globalStatValues.Title, 'Squad', 'drag start and validation do not run actions');
+        act(() => displays()[0].props.onDragEnd());
+        assert.equal(displays()[1].props['data-drop-highlighted'], undefined);
+        assert.equal(listeners.size, 0);
+        act(() => displays()[0].props.onDragStart(event()));
+        act(() => displays()[0].props.onDrop({ ...event(), currentTarget: sourceElement }));
+        assert.equal(save.globalStatValues.Title, 'Squad', 'dropping into the same instance does nothing');
+        act(() => displays()[0].props.onDragStart(event()));
+        act(() => listeners.get('drop')!(new Event('drop')));
+        assert.equal(save.globalStatValues.Title, 'Squad:drag:bob', 'dropping outside all displays runs only On Drag');
+        save.globalStatValues.Title = 'Squad';
+        delete save.actors.alice.statMap.Contents;
+        act(() => displays()[0].props.onDragStart(event('alice')));
+        assert.equal(displays()[1].props['data-drop-highlighted'], undefined);
+        act(() => displays()[1].props.onDrop({ ...event('alice'), currentTarget: targetElement }));
+        assert.equal(save.globalStatValues.Title, 'Squad:drag:alice');
+        assert.equal(listeners.size, 0);
+        act(() => displays()[0].props.onDragStart(event()));
+        assert.equal(displays()[1].props['data-drop-highlighted'], true);
+        act(() => displays()[1].props.onDrop({ ...event(), currentTarget: targetElement }));
+        assert.equal(save.globalStatValues.Title, ':drop:bob:alice:Receiver:drag:bob');
+        assert.equal(displays()[1].props['data-drop-highlighted'], undefined);
+        source.control.onDragFunction = '';
+        const noDrag = event();
+        act(() => displays()[0].props.onDragStart(noDrag));
+        assert.equal(noDrag.preventDefault.mock.callCount(), 1);
+        assert.equal(listeners.size, 0);
+    } finally {
+        if (renderer) act(() => renderer!.unmount());
+        if (originalNode) Object.defineProperty(globalThis, 'Node', originalNode);
+        else Reflect.deleteProperty(globalThis, 'Node');
+    }
+});
 
 const membersByHeader = functionReference('members', { Team: HEADER_VARIABLE_VALUE });
 

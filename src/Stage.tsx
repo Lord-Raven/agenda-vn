@@ -12,7 +12,7 @@ import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
 import { ALL_DAY_DURATION, CalendarEvent, CalendarEventRecurrence, CalendarEventRecurrenceFrequency, CalendarTimeOfDay, TimeMode, setActiveTimeMode } from "./content/CalendarEvent";
 import { Item, isItemAvailable } from "./content/Item";
-import { compareControlPriority, Control, ControlPlacement, controlReferenceId, createDefaultCardControls, DEFAULT_CARD_IDS, isControlAvailable, isControlReference } from "./content/Control";
+import { compareControlPriority, ContentDisplayContext, Control, ControlPlacement, controlReference, controlReferenceId, createDefaultCardControls, DEFAULT_CARD_IDS, isContentDisplayType, isControlAvailable, isControlReference } from "./content/Control";
 import { buildScriptLog, generateContext, generateSkitScript, generateSkitSummary, getCurrentActors, getCurrentLocation, Skit } from "./content/Skit";
 import { createDefaultAtlas, isLocationAvailable, isLocationDisabled, Location } from "./content/Location";
 import { Screen, ListSection, parseContentStatReference, listContentKind, LIST_CONTENT_TYPES } from "./content/Screen";
@@ -820,7 +820,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             const configuration = this.getConfiguration(save);
             if (isControlReference(detail)) {
                 const control = (configuration.controls || []).find(candidate => candidate.id === controlReferenceId(detail));
-                if (!control || control.type !== 'statBadge' || control.contentType !== kind || isControlReference(control.badgeSource)) {
+                if (!control || (control.type !== 'statBadge' && control.type !== 'dragDropDisplay') || control.contentType !== kind || isControlReference(control.badgeSource)) {
                     return undefined;
                 }
                 const entity = this.getActiveContent(kind, id, save);
@@ -839,6 +839,10 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 }
                 const resolved = this.resolveListCardDetail(control.badgeSource, kind, id, header, save);
                 if (!resolved) {
+                    return undefined;
+                }
+                if (control.type === 'dragDropDisplay' && !isContentDisplayType(resolved.type)) {
+                    console.error(`Drag and Drop Display "${control.name}" requires a content value source.`);
                     return undefined;
                 }
                 // Function sources have no stat; synthesize one so numeric display settings have a range.
@@ -874,6 +878,41 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const state = this.resolveCardState(card, kind, id, header, this.getSave(), ignoreAvailability);
         if (!state.visible || !state.available) return null;
         return this.runButtonActions(card.actions, { [kind]: id, header });
+    }
+
+    private runContentDisplayFunction(display: ContentDisplayContext, reference: string, kind: ContentType, id: string, readOnly = false): unknown {
+        const save = this.getSave();
+        const fn = this.getConfiguration(save).functions.find(candidate => candidate.id === functionReferenceId(reference));
+        const parameter = fn?.parameters?.find(candidate => candidate.type === kind);
+        if (!fn || !parameter || (readOnly && fn.returnType !== 'boolean')) {
+            throw new Error(`"${display.control.name}" requires a ${readOnly ? 'boolean ' : ''}function with a ${kind} parameter.`);
+        }
+        const errors: string[] = [];
+        const result = this.runGameFunction(save, fn, 0, message => errors.push(message), {
+            readOnly, stack: [], variables: { [display.kind]: display.id, header: display.header || '' },
+        }, { ...functionReferenceArguments(reference), [parameter.id]: id });
+        if (errors.length) throw new Error(errors.join('\n'));
+        return result;
+    }
+
+    canReceiveContentDrop(display: ContentDisplayContext, kind: ContentType, id: string): boolean {
+        const { control } = display;
+        if (control.type !== 'dragDropDisplay' || !control.onDropFunction) return false;
+        const detail = this.resolveListCardDetail(controlReference(control.id), display.kind, display.id, display.header || '');
+        if (!detail || (resolveReferenceKind(detail.type) && resolveReferenceKind(detail.type) !== kind)) return false;
+        return !control.dropValidationFunction
+            || this.runContentDisplayFunction(display, control.dropValidationFunction, kind, id, true) === true;
+    }
+
+    runContentDrop(source: ContentDisplayContext, kind: ContentType, id: string, target?: ContentDisplayContext): void {
+        if (!source.control.onDragFunction) return;
+        const receive = target && this.canReceiveContentDrop(target, kind, id);
+        try {
+            if (target && receive) this.runContentDisplayFunction(target, target.control.onDropFunction, kind, id);
+            this.runContentDisplayFunction(source, source.control.onDragFunction, kind, id);
+        } finally {
+            this.saveGame();
+        }
     }
 
     readStatValue(value: unknown, stat: Stat, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {

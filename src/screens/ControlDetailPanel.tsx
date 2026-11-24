@@ -1,10 +1,10 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Stage } from '../Stage';
-import { ContentListDisplay, Control, ControlPlacement, controlReference, ControlType, StatDisplayType } from '../content/Control';
+import { ContentListDisplay, Control, ControlPlacement, controlReference, ControlType, isContentDisplayType, StatDisplayType } from '../content/Control';
 import { ConditionCollection, ContentType } from '../content/Condition';
 import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, sharesOptionPool, StatUpdateAction, cloneStatUpdateAction, ReferenceKind } from '../content/Stat';
 import { parseContentStatReference, SCREEN_TYPE_LABELS } from '../content/Screen';
-import { functionReferenceId, isFunctionReference } from '../content/Function';
+import { functionReference, functionReferenceId, functionSignature, isFunctionReference } from '../content/Function';
 import { Button, ColorPickerInput, GlassPanel, HelpTip, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { OutcomeEditor } from '../components/OutcomeEditor';
@@ -39,6 +39,9 @@ type ControlDraft = {
     statId: string;
     contentType: ContentType;
     badgeSource: string;
+    onDragFunction: string;
+    onDropFunction: string;
+    dropValidationFunction: string;
     pickerSource?: string[];
     screenId: string;
     titleBarControls: string[];
@@ -73,6 +76,9 @@ const createDraft = (control: Control): ControlDraft => ({
     statId: control.statId,
     contentType: control.contentType,
     badgeSource: control.badgeSource,
+    onDragFunction: control.onDragFunction,
+    onDropFunction: control.onDropFunction,
+    dropValidationFunction: control.dropValidationFunction,
     pickerSource: control.pickerSource ? [...control.pickerSource] : undefined,
     screenId: control.screenId,
     titleBarControls: [...control.titleBarControls],
@@ -173,6 +179,9 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             statId: nextDraft.statId,
             contentType: nextDraft.contentType,
             badgeSource: nextDraft.badgeSource,
+            onDragFunction: nextDraft.onDragFunction,
+            onDropFunction: nextDraft.onDropFunction,
+            dropValidationFunction: nextDraft.dropValidationFunction,
             pickerSource: nextDraft.pickerSource ? [...nextDraft.pickerSource] : undefined,
             screenId: nextDraft.screenId,
             titleBarControls: [...nextDraft.titleBarControls],
@@ -241,7 +250,8 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const selectableStats = usesActorStat ? updatableActorStats : updatableGlobalStats;
     const selectedStat = selectableStats.find((stat) => stat.id === draft.statId);
     const supportsDisplaySettings = draft.type === 'statDisplay' || draft.type === 'statOutcome';
-    const isStatBadge = draft.type === 'statBadge';
+    const isDragDrop = draft.type === 'dragDropDisplay';
+    const isStatBadge = draft.type === 'statBadge' || isDragDrop;
     const isCard = draft.type === 'card';
     const isMarker = draft.type === 'marker';
     const conditionProps = {
@@ -259,6 +269,18 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         : isFunctionReference(draft.badgeSource)
             ? (stageInstance.getConfiguration().functions || []).find((fn) => fn.id === functionReferenceId(draft.badgeSource))?.returnType
             : undefined;
+    const badgeSourceOptions = contentDetailSourceOptions(stageInstance, draft.contentType).filter(option => {
+        if (!isDragDrop) return true;
+        const reference = parseContentStatReference(option.key);
+        const type = reference ? contentTypeStats.find(stat => stat.id === reference.statId)?.type
+            : stageInstance.getConfiguration().functions.find(fn => fn.id === functionReferenceId(option.key))?.returnType;
+        return isContentDisplayType(type);
+    });
+    const draggedKinds = badgeSourceType === 'contentList' ? ['actor', 'item', 'location']
+        : isContentDisplayType(badgeSourceType) ? [resolveReferenceKind(badgeSourceType)] : [];
+    const dragDropFunctionOptions = (stageInstance.getConfiguration().functions || [])
+        .filter(fn => draggedKinds.length > 0 && draggedKinds.every(kind => fn.parameters?.some(parameter => parameter.type === kind)))
+        .map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description }));
 
     return (
         <GlassPanel variant="default" style={{ overflow: 'visible', position: 'relative', padding: '20px', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
@@ -367,7 +389,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                         setDraft((current) => ({
                                             ...current,
                                             type,
-                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'settings' ? 'settings' : type === 'statBadge' || type === 'card' || type === 'marker' ? 'standalone' : current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' ? 'bottom' : current.placement,
+                                            placement: type === 'popup' ? 'popup' : type === 'statOutcome' ? 'outcome' : type === 'settings' ? 'settings' : type === 'statBadge' || type === 'dragDropDisplay' || type === 'card' || type === 'marker' ? 'standalone' : current.placement === 'outcome' || current.placement === 'settings' || current.placement === 'popup' ? 'bottom' : current.placement,
                                             statId: '',
                                             badgeSource: '',
                                             pickerSource: undefined,
@@ -379,6 +401,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <option value="statEditor">Stat Editor</option>
                                     <option value="card">Card</option>
                                     <option value="statBadge">Stat Badge</option>
+                                    <option value="dragDropDisplay">Drag and Drop Display</option>
                                     <option value="statOutcome">Outcome</option>
                                     <option value="settings">Settings</option>
                                     <option value="popup">Pop-up</option>
@@ -610,7 +633,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             <SearchableOptionPicker stage={stage} multiple title="Choose card controls"
                                                 values={draft.cardDetails} options={listDetailOptions(stageInstance, draft.contentType)}
                                                 onChange={value => setDraft(current => ({ ...current, cardDetails: Array.isArray(value) ? value : [] }))} />
-                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Standalone Stat Badges of the same content type, in selection order.</span>
+                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Standalone Stat Badges and Drag and Drop Displays of the same content type, in selection order.</span>
                                         </div>
                                     </>
                                 )}
@@ -635,7 +658,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                     </>
                 ) : isStatBadge ? (
                     <section>
-                        <h2 style={sectionHeadingStyle}>Stat Badge</h2>
+                        <h2 style={sectionHeadingStyle}>{isDragDrop ? 'Drag and Drop Display' : 'Stat Badge'}</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             <div>
                                 <div style={fieldHeadingStyle}>
@@ -647,7 +670,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.contentType}
-                                    onChange={(e) => setDraft((current) => ({ ...current, contentType: e.target.value as ContentType, badgeSource: '' }))}
+                                    onChange={(e) => setDraft((current) => ({ ...current, contentType: e.target.value as ContentType, badgeSource: '', onDragFunction: '', onDropFunction: '', dropValidationFunction: '' }))}
                                 >
                                     <option value="actor">Actor</option>
                                     <option value="item">Item</option>
@@ -658,17 +681,48 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <div style={fieldHeadingStyle}>
                                     <label>Value Source</label>
                                     <HelpTip title="Badge value source">
-                                        A stat of the chosen content type, or any function. Matching Variable parameters can bind to the entry this badge is attached to. Functions returning Void or String List cannot display a badge.
+                                        {isDragDrop ? 'An Actor, Item, Location, or content list stat or function. ' : 'A stat of the chosen content type, or any function. '}
+                                        Matching Variable parameters can bind to the entry this badge is attached to. Functions returning Void or String List cannot display a badge.
                                     </HelpTip>
                                 </div>
                                 <VariableContentContext.Provider value={draft.contentType}>
                                     <HeaderVariableContext.Provider value={true}>
                                         <SearchableOptionPicker stage={stage} allowClear emptyLabel="None" title="Choose badge source" bindVariableParameters
-                                            value={draft.badgeSource || undefined} options={contentDetailSourceOptions(stageInstance, draft.contentType)}
-                                            onChange={(value) => setDraft((current) => ({ ...current, badgeSource: typeof value === 'string' ? value : '' }))} />
+                                            value={draft.badgeSource || undefined} options={badgeSourceOptions}
+                                            onChange={(value) => setDraft((current) => ({ ...current, badgeSource: typeof value === 'string' ? value : '', ...(isDragDrop ? { onDragFunction: '', onDropFunction: '', dropValidationFunction: '' } : {}) }))} />
                                     </HeaderVariableContext.Provider>
                                 </VariableContentContext.Provider>
                             </div>
+                            {isDragDrop && <>
+                                <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                    Both callbacks run on drop, not at drag start. On Drop runs first, even if the incoming content is already displayed.
+                                    On Drag runs when content is dropped outside its source display. Dropping back into the same display or canceling does nothing.
+                                    The first parameter matching the moved content type receives its ID; other arguments keep their configured values.
+                                    Mixed content lists require a parameter for each content type.
+                                    Without On Drag, content cannot be dragged. Without On Drop, this display does not receive drops.
+                                </span>
+                                {(['onDragFunction', 'onDropFunction'] as const).map(behavior => <div key={behavior}>
+                                    <label style={labelStyle}>{behavior === 'onDragFunction' ? 'On Drag' : 'On Drop'}</label>
+                                    <SearchableOptionPicker stage={stage} allowClear emptyLabel="None"
+                                        title={behavior === 'onDragFunction' ? 'Choose On Drag function' : 'Choose On Drop function'}
+                                        value={draft[behavior] || undefined} options={dragDropFunctionOptions}
+                                        onChange={value => setDraft(current => ({ ...current, [behavior]: typeof value === 'string' ? value : '' }))} />
+                                </div>)}
+                                <div>
+                                    <label style={labelStyle}>Drop Validation (optional)</label>
+                                    <SearchableOptionPicker stage={stage} allowClear emptyLabel="Accept compatible content"
+                                        title="Choose drop validation function" disabled={!draft.onDropFunction}
+                                        value={draft.dropValidationFunction || undefined}
+                                        options={dragDropFunctionOptions.filter(option => stageInstance.getConfiguration().functions
+                                            .find(fn => fn.id === functionReferenceId(option.key))?.returnType === 'boolean')}
+                                        onChange={value => setDraft(current => ({ ...current, dropValidationFunction: typeof value === 'string' ? value : '' }))} />
+                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
+                                        Evaluated read-only with the dragged content when dragging starts. Valid receivers are highlighted.
+                                        Checked again on drop; false skips On Drop but still runs the source's On Drag.
+                                        Without a validator, compatible content is accepted.
+                                    </span>
+                                </div>
+                            </>}
                             <div>
                                 <div style={fieldHeadingStyle}>
                                     <label>Label (optional)</label>

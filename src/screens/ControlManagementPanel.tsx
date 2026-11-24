@@ -32,6 +32,7 @@ const TYPE_LABELS: Record<Control['type'], string> = {
     settings: 'Settings',
     popup: 'Pop-up',
     statBadge: 'Stat Badge',
+    dragDropDisplay: 'Drag and Drop Display',
     marker: 'Marker',
 };
 

@@ -16,6 +16,7 @@ import { CachedBackgroundUrl } from './CachedImage';
 import { ContentListPortraits } from './ContentListControl';
 import { resolveIcon } from './StatRating';
 import { StatValueDisplay } from './StatDisplay';
+import { DragDropDisplay } from './DragDropDisplay';
 
 export const CardActionContext = createContext<((skit?: Skit | null) => void) | undefined>(undefined);
 
@@ -138,7 +139,8 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
                 <Box sx={{ display: 'flex', flexDirection: vertical ? 'column' : 'row', flexWrap: 'wrap', gap: 0.75,
                         alignItems: vertical ? 'stretch' : 'center', justifyContent: 'flex-end', minWidth: 0, maxWidth: '100%' }}>
                     {details.map(detail => <ListCardDetail key={detail.key} detail={detail} stage={instance}
-                        isVerticalLayout={compact} large={large} kind={kind} id={id} header={header} />)}
+                        isVerticalLayout={compact} large={large} kind={kind} id={id} header={header}
+                        onChange={() => { refresh(value => value + 1); (onAction || globalOnAction)?.(); }} />)}
                     {trailing && <Box onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{trailing}</Box>}
                 </Box>
             )}
@@ -172,7 +174,8 @@ export const ListCardDetail: FC<{
     // ~50% larger badge text/icons for horizontal landscape cards, whose bar height dwarfs the defaults.
     large?: boolean;
     kind?: ContentType; id?: string; header?: string;
-}> = ({ detail, stage, isVerticalLayout, large = false, kind, id, header }) => {
+    onChange?: () => void;
+}> = ({ detail, stage, isVerticalLayout, large = false, kind, id, header, onChange }) => {
     const control = detail.control;
     const text = (value: string, options?: { icons: 'token' }) => kind && id
         ? stage.resolveCardText(value, kind, id, header, options)
@@ -183,9 +186,10 @@ export const ListCardDetail: FC<{
     const BadgeIcon = control?.iconName ? resolveIcon(control.iconName, stage) : null;
     const isReference = ['actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList'].includes(detail.type);
     if (isReference) {
+        const dragDrop = control?.type === 'dragDropDisplay';
         const values = (Array.isArray(detail.value) ? detail.value : [detail.value]).map(String).filter(Boolean);
         const showLabel = !!control && !!labelText;
-        return values.length ? (
+        const display = values.length || dragDrop ? (
             <Box data-popup-card-detail={detail.key} title={label} sx={{
                 display: 'flex', flexDirection: showLabel ? 'column' : 'row',
                 alignItems: showLabel ? 'stretch' : 'center', gap: showLabel || BadgeIcon ? 0.5 : undefined, minWidth: 0,
@@ -200,9 +204,12 @@ export const ListCardDetail: FC<{
                         textTransform: 'uppercase', lineHeight: 1.2, overflowWrap: 'anywhere', minWidth: 0,
                     }}>{renderLoreIcons(labelText, stage)}</Typography>}
                 </Box>}
-                <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={label} variant="overlay" size={large ? 48 : isVerticalLayout ? 30 : 36} />
+                <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={label} variant="overlay"
+                    size={large ? 48 : isVerticalLayout ? 30 : 36} draggable={dragDrop && !!control.onDragFunction} hoverCards={dragDrop} />
             </Box>
         ) : null;
+        return dragDrop && kind && id ? <DragDropDisplay stage={stage} context={{ control, kind, id, header }}
+            accepts={resolveReferenceKind(detail.type)} onChange={onChange}>{display}</DragDropDisplay> : display;
     }
     // Icon stats render their value as the named icon itself (empty value shows nothing).
     const ValueIcon = detail.type === 'icon' && typeof detail.value === 'string' && detail.value.trim()

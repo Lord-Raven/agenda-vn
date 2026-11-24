@@ -52,8 +52,8 @@ export const listDetailOptions = (stage: Stage, kind: ContentType): PickerOption
     const configuration = stage.getConfiguration();
     return [
         ...(configuration.controls || [])
-            .filter(control => control.active !== false && control.type === 'statBadge' && control.contentType === kind)
-            .map(control => ({ key: controlReference(control.id), label: control.name || '(Unnamed Control)', category: 'Stat Badges', description: control.description })),
+            .filter(control => control.active !== false && (control.type === 'statBadge' || control.type === 'dragDropDisplay') && control.contentType === kind)
+            .map(control => ({ key: controlReference(control.id), label: control.name || '(Unnamed Control)', category: control.type === 'dragDropDisplay' ? 'Drag and Drop Displays' : 'Stat Badges', description: control.description })),
     ];
 };
 

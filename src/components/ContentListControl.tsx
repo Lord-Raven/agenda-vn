@@ -9,6 +9,7 @@ import { ActorPortrait } from './ActorPortrait';
 import { ItemPortrait } from './ItemPortrait';
 import { LocationPortrait } from './LocationPortrait';
 import { ReferenceMultiSelect } from './UiComponents';
+import { ContentCardControl } from './ContentCardControl';
 
 interface ContentListControlProps {
     kind?: ReferenceKind; // Omitted for mixed contentList stats, whose ids may be of any content kind.
@@ -28,13 +29,15 @@ interface ContentListPortraitsProps {
     label: string;
     variant?: 'carousel' | 'overlay';
     size?: number;
+    draggable?: boolean;
+    hoverCards?: boolean;
 }
 
 const PORTRAIT_SIZE = 40;
 const PORTRAIT_OVERLAP = 6;
 const PORTRAIT_HOVER_SCALE = 1.1;
 
-export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label, variant = 'carousel', size = PORTRAIT_SIZE }) => {
+export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label, variant = 'carousel', size = PORTRAIT_SIZE, draggable = false, hoverCards = false }) => {
     const isOverlay = variant === 'overlay';
     const overlap = isOverlay ? Math.round(size * 0.32) : PORTRAIT_OVERLAP;
     // Scroll positions round to whole pixels, even when the viewport width is fractional.
@@ -135,12 +138,16 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                         const portrait = (
                             <Box
                                 role="listitem"
+                                draggable={hoverCards || draggable ? draggable && !!(actor || item || location) : undefined}
+                                data-drag-content-id={draggable ? id : undefined}
+                                data-drag-content-kind={draggable ? actor ? 'actor' : item ? 'item' : location ? 'location' : undefined : undefined}
                                 tabIndex={0}
                                 aria-label={name}
                                 sx={{
                                     flexShrink: 0,
                                     position: 'relative',
                                     overflow: 'visible',
+                                    cursor: draggable ? 'grab' : undefined,
                                     scrollSnapAlign: 'start',
                                     borderRadius: '50%',
                                     zIndex: isOverlay ? values.length - index : undefined,
@@ -154,11 +161,15 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                                             : <Box sx={{ ...imageStyle, display: 'grid', placeItems: 'center', borderRadius: '50%', border: '2px solid var(--agenda-line-strong)', color: 'var(--agenda-text-muted)' }}><FallbackIcon sx={{ fontSize: '1.4em' }} /></Box>}
                             </Box>
                         );
-                        if (actor) {
+                        const contentKind = actor ? 'actor' : item ? 'item' : location ? 'location' : undefined;
+                        const hoverCard = hoverCards && contentKind ? stage.getCardControl(contentKind) : undefined;
+                        if (actor || hoverCard) {
                             return (
                                 <Tooltip
                                     key={`${id}-${index}`}
-                                    title={<ActorCard actor={actor} stage={() => stage} />}
+                                    title={hoverCard && contentKind
+                                        ? <ContentCardControl control={hoverCard} kind={contentKind} id={id} stage={() => stage} orientation="vertical" />
+                                        : <ActorCard actor={actor} stage={() => stage} />}
                                     placement="bottom"
                                     enterTouchDelay={0}
                                     slotProps={{ tooltip: { sx: { backgroundColor: 'transparent', padding: 0, maxWidth: 'none' } } }}
