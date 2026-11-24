@@ -4,7 +4,7 @@ import { Bed, Bedtime, EventAvailable, HourglassBottom, HourglassTop, WbSunny, W
 import { Stage } from "../Stage";
 import { formatCurrentDate, formatDateLabel } from "../content/Skit";
 import { CALENDAR_TIME_OF_DAY_ORDER, CalendarTimeOfDay } from "../content/CalendarEvent";
-interface DayControlProps {
+interface TimeControlProps {
     stage: () => Stage;
     isVerticalLayout?: boolean;
 }
@@ -25,7 +25,7 @@ const getDateTimeIcon = (timeOfDay?: string) => {
     return EventAvailable;
 };
 
-export const DayControl: FC<DayControlProps> = ({ stage, isVerticalLayout = false }) => {
+export const TimeControl: FC<TimeControlProps> = ({ stage, isVerticalLayout = false }) => {
     const stageInstance = stage();
     const save = stageInstance.getSave();
     const currentDate = save?.currentDate || stageInstance.getConfiguration(save)?.startingDate || new Date().toISOString().slice(0, 10);

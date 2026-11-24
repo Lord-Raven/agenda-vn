@@ -314,7 +314,7 @@ test('content list displays match ordinary control heights without clipping port
     }
 });
 
-test('day and date indicators match stat control heights with the game theme', { skip: !process.env.CHROME_BIN }, () => {
+test('time controls match stat control heights with the game theme', { skip: !process.env.CHROME_BIN }, () => {
     const directory = mkdtempSync(join(tmpdir(), 'agenda-date-height-'));
     try {
         const fixtures: { html: string; isVerticalLayout: boolean }[] = [];
@@ -374,7 +374,7 @@ test('day and date indicators match stat control heights with the game theme', {
     }
 });
 
-test('vertical Day phase segments stay beneath the label and match compact control heights', { skip: !process.env.CHROME_BIN }, () => {
+test('vertical time phase segments stay beneath the label and match compact control heights', { skip: !process.env.CHROME_BIN }, () => {
     const directory = mkdtempSync(join(tmpdir(), 'agenda-day-segments-'));
     try {
         const fixtures: string[] = [];

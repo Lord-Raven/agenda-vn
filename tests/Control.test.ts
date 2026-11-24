@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { compareControlPriority, Control, controlReference, isControlAvailable } from '../src/content/Control';
+import { compareControlPriority, Control, controlReference, isBarContentControl, isControlAvailable } from '../src/content/Control';
 import { cloneStat } from '../src/content/Stat';
 
 test('new and legacy controls default to equal width weights', () => {
@@ -148,33 +148,33 @@ test('pop-up controls preserve their map selection and always use pop-up placeme
     assert.equal(new Control({}).screenId, '');
 });
 
-test('stat badges always use standalone placement and preserve content type and source through export', () => {
+test('content-bound stat displays use standalone placement and preserve scope and source through export', () => {
     for (const placement of [undefined, 'top', 'bottom', 'standalone']) {
-        const control = new Control({ type: 'statBadge', placement, contentType: 'item', badgeSource: 'itemStat:quality' });
+        const control = new Control({ type: 'statDisplay', placement, contentType: 'item', displaySource: 'itemStat:quality' });
         const restored = new Control(JSON.parse(JSON.stringify(control)));
-        assert.equal(restored.type, 'statBadge');
+        assert.equal(restored.type, 'statDisplay');
         assert.equal(restored.placement, 'standalone');
         assert.equal(restored.contentType, 'item');
-        assert.equal(restored.badgeSource, 'itemStat:quality');
+        assert.equal(restored.displaySource, 'itemStat:quality');
     }
-    assert.equal(new Control({ type: 'button', placement: 'standalone' }).placement, 'bottom');
 });
 
-test('stat badges normalize malformed content types and reject self-referential sources', () => {
+test('stat displays normalize content types and reject self-referential sources', () => {
     assert.equal(new Control({}).contentType, 'actor');
+    assert.equal(new Control({ type: 'statDisplay' }).contentType, undefined);
     assert.equal(new Control({ contentType: 'bogus' }).contentType, 'actor');
-    assert.equal(new Control({}).badgeSource, '');
-    assert.equal(new Control({ badgeSource: 7 }).badgeSource, '');
-    assert.equal(new Control({ type: 'statBadge', badgeSource: controlReference('other') }).badgeSource, '');
+    assert.equal(new Control({}).displaySource, '');
+    assert.equal(new Control({ displaySource: 7 }).displaySource, '');
+    assert.equal(new Control({ type: 'statDisplay', displaySource: controlReference('other') }).displaySource, '');
 });
 
-test('stat badge availability binds variable rules to the attached entity for any content type', () => {
+test('content-bound stat display availability binds variable rules to the attached entity', () => {
     const itemStats = [cloneStat({
         id: 'quality', name: 'Quality', type: 'number', default: 0, guidance: '',
         llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
     })];
     const control = new Control({
-        type: 'statBadge',
+        type: 'statDisplay',
         contentType: 'item',
         availabilityConditions: [[
             { type: 'contentStat', contentType: 'item', targetId: 'variable', statId: 'quality', comparison: 'greaterThan', value: 2 },
@@ -182,4 +182,11 @@ test('stat badge availability binds variable rules to the attached entity for an
     });
     assert.equal(isControlAvailable(control, { itemStats, currentItem: { id: 'sword', statMap: { quality: 3 } } }), true);
     assert.equal(isControlAvailable(control, { itemStats, currentItem: { id: 'stick', statMap: { quality: 1 } } }), false);
+});
+
+test('time controls are bar controls, while content-scoped stat displays are not', () => {
+    assert.equal(new Control({ type: 'time' }).type, 'time');
+    assert.equal(isBarContentControl(new Control({ type: 'time' })), true);
+    assert.equal(isBarContentControl(new Control({ type: 'statDisplay' })), true);
+    assert.equal(isBarContentControl(new Control({ type: 'statDisplay', contentType: 'actor' })), false);
 });

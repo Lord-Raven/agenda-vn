@@ -11,13 +11,13 @@ export type BarOrientation = 'top' | 'bottom';
 
 // 'button' runs outcomes; 'statDisplay'/'statEditor' show/edit a global stat.
 // 'settings' exposes a global stat as a player-editable setting.
-// 'statBadge' is a standalone display for one content type (actor/item/location): it shows a content
-// stat or a function value for the entity it is attached to.
+// A statDisplay with a contentType shows a content stat or function value on matching cards;
+// without a contentType it displays its selected global stat.
 // 'dragDropDisplay' uses the same sources, restricted to content values. On Drag enables dragging;
 // On Drop runs before the source's On Drag. An optional read-only boolean validator highlights
 // receivers and suppresses On Drop when false; the source's On Drag still runs.
-// 'card' composes labels, standalone badges, conditions, and actions for a content type.
-export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'statOutcome' | 'settings' | 'popup' | 'statBadge' | 'dragDropDisplay' | 'card' | 'marker' | 'bar' | 'day';
+// 'card' composes labels, stat displays, conditions, and actions for a content type.
+export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'statOutcome' | 'settings' | 'popup' | 'dragDropDisplay' | 'card' | 'marker' | 'bar' | 'time';
 export type MarkerInputType = 'actor' | 'item' | 'location' | 'screen' | 'string';
 export const markerVariableBindings = (type: MarkerInputType, content: string): FunctionVariableBindings =>
     type === 'actor' || type === 'item' || type === 'location' ? { [type]: content } : { marker: content };
@@ -26,12 +26,12 @@ export const STAT_DISPLAY_TYPES = ['straight', 'percentage', 'bar', 'rating', 'l
 export type StatDisplayType = typeof STAT_DISPLAY_TYPES[number];
 export type StatDisplaySettings = Pick<Control, 'displayType' | 'displayColor' | 'ratingIconName'>;
 
-export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'statOutcome', 'settings', 'popup', 'statBadge', 'dragDropDisplay', 'card', 'marker', 'bar', 'day'];
+export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEditor', 'statOutcome', 'settings', 'popup', 'dragDropDisplay', 'card', 'marker', 'bar', 'time'];
 
 export const isPopupTitleControl = (control: Control): boolean =>
-    control.placement === 'standalone' && (control.type === 'button' || control.type === 'statDisplay' || control.type === 'statEditor');
+    control.placement === 'standalone' && (control.type === 'button' || (control.type === 'statDisplay' && control.contentType === undefined) || control.type === 'statEditor');
 export const isBarContentControl = (control: Control): boolean =>
-    isPopupTitleControl(control) || (control.placement === 'standalone' && control.type === 'day');
+    isPopupTitleControl(control) || (control.placement === 'standalone' && control.type === 'time');
 
 export type ContentDisplayType = Extract<StatType, 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'contentList'>;
 export const isContentDisplayType = (type: string | undefined): type is ContentDisplayType =>
@@ -39,7 +39,7 @@ export const isContentDisplayType = (type: string | undefined): type is ContentD
 
 export type ContentDisplayContext = { control: Control; kind: ContentType; id: string; header?: string };
 
-// References embed standalone stat badges in Card Controls.
+// References embed content-bound stat displays in Card Controls.
 const CONTROL_REFERENCE_PREFIX = 'control:';
 export const controlReference = (id: string): string => `${CONTROL_REFERENCE_PREFIX}${id}`;
 export const isControlReference = (value: unknown): value is string =>
@@ -86,11 +86,11 @@ export class Control {
 
     // The global stat shown/edited.
     statId: string = '';
-    // The content type this badge or card attaches to.
-    contentType: ContentType = 'actor';
-    // Badge/display source: a content stat reference ("<kind>Stat:<id>") or a function reference whose
+    // The content type a display or card attaches to.
+    contentType: ContentType | undefined = 'actor';
+    // Content display source: a content stat reference ("<kind>Stat:<id>") or a function reference whose
     // variable content parameter binds to the attached entity.
-    badgeSource: string = '';
+    displaySource: string = '';
     // Drag/drop callbacks receive the moved entity in their first matching content parameter.
     onDragFunction: string = '';
     onDropFunction: string = '';
@@ -138,8 +138,10 @@ export class Control {
         this.showSourceLink = this.showSourceLink === true;
         this.actions = Array.isArray(this.actions) ? this.actions.map(cloneStatUpdateAction) : [];
         this.statId = `${this.statId || ''}`;
-        this.contentType = CONTENT_TYPES.includes(this.contentType) ? this.contentType : 'actor';
-        this.badgeSource = typeof this.badgeSource === 'string' && !isControlReference(this.badgeSource) ? this.badgeSource : '';
+        this.contentType = this.type === 'statDisplay' && currentProps.contentType === undefined
+            ? undefined
+            : CONTENT_TYPES.includes(this.contentType as ContentType) ? this.contentType : 'actor';
+        this.displaySource = typeof this.displaySource === 'string' && !isControlReference(this.displaySource) ? this.displaySource : '';
         this.onDragFunction = typeof this.onDragFunction === 'string' ? this.onDragFunction : '';
         this.onDropFunction = typeof this.onDropFunction === 'string' ? this.onDropFunction : '';
         this.dropValidationFunction = typeof this.dropValidationFunction === 'string' ? this.dropValidationFunction : '';

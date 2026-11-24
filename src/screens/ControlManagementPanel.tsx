@@ -14,12 +14,11 @@ interface ControlManagementPanelProps {
     stage: () => Stage;
 }
 
-const PLACEMENT_LABELS: Record<Control['placement'], string> = {
+const PLACEMENT_LABELS: Pick<Record<Control['placement'], string>, 'bar' | 'outcome' | 'settings' | 'popup'> = {
     bar: 'Bars',
     outcome: 'Outcomes',
     settings: 'Settings',
     popup: 'Pop-ups',
-    standalone: 'Standalone Controls',
 };
 
 const TYPE_LABELS: Record<Control['type'], string> = {
@@ -30,11 +29,10 @@ const TYPE_LABELS: Record<Control['type'], string> = {
     statOutcome: 'Stat Outcome',
     settings: 'Settings',
     popup: 'Pop-up',
-    statBadge: 'Stat Badge',
     dragDropDisplay: 'Drag and Drop Display',
     marker: 'Marker',
     bar: 'Bar',
-    day: 'Day',
+    time: 'Time Control',
 };
 
 export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage }) => {
@@ -71,7 +69,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [stage, controlRevision]);
 
-    const controlsByPlacement = useMemo<CategorizedEntrySection<Control>[]>(() => {
+    const controlSections = useMemo<CategorizedEntrySection<Control>[]>(() => {
         const sections: CategorizedEntrySection<Control>[] = [
             { id: 'bar', title: PLACEMENT_LABELS.bar, entries: controls.filter((control) => control.type === 'bar') },
             { id: 'cards', title: 'Cards', entries: controls.filter(control => control.type === 'card') },
@@ -79,7 +77,11 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
             { id: 'settings', title: PLACEMENT_LABELS.settings, entries: controls.filter((control) => control.type === 'settings') },
             { id: 'popup', title: PLACEMENT_LABELS.popup, entries: controls.filter((control) => control.type === 'popup') },
             { id: 'marker', title: 'Markers', entries: controls.filter((control) => control.type === 'marker') },
-            { id: 'standalone', title: PLACEMENT_LABELS.standalone, entries: controls.filter((control) => control.placement === 'standalone' && control.type !== 'card' && control.type !== 'marker') },
+            { id: 'buttons', title: 'Buttons', entries: controls.filter(control => control.type === 'button') },
+            { id: 'dragDrops', title: 'Drag and Drops', entries: controls.filter(control => control.type === 'dragDropDisplay') },
+            { id: 'statDisplays', title: 'Stat Displays', entries: controls.filter(control => control.type === 'statDisplay') },
+            { id: 'statEditors', title: 'Stat Editors', entries: controls.filter(control => control.type === 'statEditor') },
+            { id: 'time', title: 'Time Controls', entries: controls.filter(control => control.type === 'time') },
         ];
         return sections;
     }, [controls]);
@@ -105,8 +107,8 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
         const control = new Control({
             active: true,
             name: candidateName,
-            type: sectionId === 'bar' ? 'bar' : sectionId === 'popup' ? 'popup' : sectionId === 'marker' ? 'marker' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'cards' ? 'card' : sectionId === 'settings' ? 'settings' : sectionId === 'standalone' ? 'statBadge' : 'button',
-            label: sectionId === 'cards' ? '{{content:name}}' : sectionId === 'outcome' || sectionId === 'settings' || sectionId === 'standalone' || sectionId === 'marker' ? '' : candidateName,
+            type: sectionId === 'bar' ? 'bar' : sectionId === 'popup' ? 'popup' : sectionId === 'marker' ? 'marker' : sectionId === 'outcome' ? 'statOutcome' : sectionId === 'cards' ? 'card' : sectionId === 'settings' ? 'settings' : sectionId === 'dragDrops' ? 'dragDropDisplay' : sectionId === 'statDisplays' ? 'statDisplay' : sectionId === 'statEditors' ? 'statEditor' : sectionId === 'time' ? 'time' : 'button',
+            label: sectionId === 'cards' ? '{{content:name}}' : sectionId === 'outcome' || sectionId === 'settings' || sectionId === 'dragDrops' || sectionId === 'statDisplays' || sectionId === 'statEditors' || sectionId === 'time' || sectionId === 'marker' ? '' : candidateName,
         });
 
         stage().updateConfiguration({ controls: [...configuredControls, control] });
@@ -150,7 +152,7 @@ export const ControlManagementPanel: FC<ControlManagementPanelProps> = ({ stage 
     return (
         <div style={shellStyle}>
             <CategorizedEntrySidebar
-                sections={controlsByPlacement}
+                sections={controlSections}
                 collapsedSections={collapsedSections}
                 onToggleSection={(sectionId) => {
                     setCollapsedSections((current) => toggleSidebarCollapseState(current, sectionId, true));

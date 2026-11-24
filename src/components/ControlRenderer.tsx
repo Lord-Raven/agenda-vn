@@ -13,7 +13,7 @@ import { Skit } from '../content/Skit';
 import { processLoreText, stripLoreIcons } from '../content/Lore';
 import { renderLoreIcons, renderLoreTextWithIcons } from './LoreIconText';
 import { PickerAllowedOptionsContext } from './SearchableOptionPicker';
-import { DayControl } from './DayControl';
+import { TimeControl } from './TimeControl';
 
 interface ControlRendererProps {
     control: Control;
@@ -57,11 +57,14 @@ export const ControlRenderer: FC<ControlRendererProps> = ({ control, stage, onAc
     const stageInstance = stage();
     const fontSize = isVerticalLayout ? 'clamp(0.8rem, 10cqi, 1rem)' : valueFontSize;
 
-    if (control.type === 'day') {
-        return <DayControl stage={stage} isVerticalLayout={isVerticalLayout} />;
+    if (control.type === 'time') {
+        return <TimeControl stage={stage} isVerticalLayout={isVerticalLayout} />;
     }
 
     if (control.type !== 'button' && control.type !== 'statDisplay' && control.type !== 'statEditor') {
+        return null;
+    }
+    if (control.type === 'statDisplay' && control.contentType !== undefined) {
         return null;
     }
 

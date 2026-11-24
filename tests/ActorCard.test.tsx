@@ -90,7 +90,7 @@ test('actor-card controls substitute tags with the displayed actor as char', () 
     const { configuration, render } = fixture();
     configuration.globalStats = [makeStat('Gold', { default: 3 })];
     setCardBadges(configuration, [new Control({
-        type: 'statBadge', badgeSource: 'actorStat:Health',
+        type: 'statDisplay', contentType: 'actor', displaySource: 'actorStat:Health',
         label: '{{char}}: {{char:Health}} / {{Gold}}',
         description: '{{user}} sees {{char}}',
     })]);
@@ -145,7 +145,7 @@ test('actor cards show source attribution with a link icon after all other card 
     const { actor, configuration, render } = fixture();
     actor.sourcePath = 'SomeAuthor/a-character-with-id-aca19a976af2';
     actor.summary = 'Character summary';
-    setCardBadges(configuration, [new Control({ type: 'statBadge', badgeSource: 'actorStat:Health', label: 'Health' })]);
+    setCardBadges(configuration, [new Control({ type: 'statDisplay', contentType: 'actor', displaySource: 'actorStat:Health', label: 'Health' })]);
 
     const html = render();
     assert.match(html, /href="https:\/\/chub.ai\/characters\/SomeAuthor\/a-character-with-id-aca19a976af2"/);
@@ -197,13 +197,13 @@ for (const isNewGame of [false, true]) {
     }
 }
 
-test('actor cards show only attached standalone badges in selection order with actor values and defaults', () => {
+test('actor cards show only attached stat displays in selection order with actor values and defaults', () => {
     const { configuration, render } = fixture();
     assert.doesNotMatch(render(), /Health|Energy/);
     setCardBadges(configuration, [
-        new Control({ type: 'statBadge', badgeSource: 'actorStat:Health', label: 'Health' }),
-        new Control({ type: 'statBadge', badgeSource: 'actorStat:Energy', label: 'Energy' }),
-        new Control({ type: 'statBadge', badgeSource: 'actorStat:Missing', label: 'Missing' }),
+        new Control({ type: 'statDisplay', contentType: 'actor', displaySource: 'actorStat:Health', label: 'Health' }),
+        new Control({ type: 'statDisplay', contentType: 'actor', displaySource: 'actorStat:Energy', label: 'Energy' }),
+        new Control({ type: 'statDisplay', contentType: 'actor', displaySource: 'actorStat:Missing', label: 'Missing' }),
     ]);
     configuration.controls.push(new Control({ type: 'statDisplay', statId: 'Health', placement: 'top' }));
     const html = render();
@@ -215,7 +215,7 @@ test('actor cards show only attached standalone badges in selection order with a
 test('actor-card rules react to stat changes, global state, actor identity, and deactivation', () => {
     const { actor, configuration, save, stage, render } = fixture();
     const control = new Control({
-        type: 'statBadge', badgeSource: 'actorStat:Health', label: 'Health',
+        type: 'statDisplay', contentType: 'actor', displaySource: 'actorStat:Health', label: 'Health',
         availabilityConditions: [[
             { type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' },
             { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Health', comparison: 'greaterThan', value: 5 },
@@ -248,7 +248,7 @@ test('actor card badges support option labels, booleans, references, and numbers
         makeStat('Friends', { type: 'actorList', default: [actor.id] }),
         makeStat('Relationship', { default: 7 }),
     ];
-    setCardBadges(configuration, configuration.actorStats.map(stat => new Control({ type: 'statBadge', badgeSource: `actorStat:${stat.id}`, label: stat.name })));
+    setCardBadges(configuration, configuration.actorStats.map(stat => new Control({ type: 'statDisplay', contentType: 'actor', displaySource: `actorStat:${stat.id}`, label: stat.name })));
     const html = render();
     assert.match(html, /Happy/);
     assert.match(html, /Yes/);

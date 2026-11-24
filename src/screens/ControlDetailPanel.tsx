@@ -38,8 +38,8 @@ type ControlDraft = {
     showSourceLink: boolean;
     visibilityConditions: ConditionCollection[];
     statId: string;
-    contentType: ContentType;
-    badgeSource: string;
+    contentType: ContentType | undefined;
+    displaySource: string;
     onDragFunction: string;
     onDropFunction: string;
     dropValidationFunction: string;
@@ -77,7 +77,7 @@ const createDraft = (control: Control): ControlDraft => ({
     visibilityConditions: control.visibilityConditions.map(collection => collection.map(condition => ({ ...condition }))),
     statId: control.statId,
     contentType: control.contentType,
-    badgeSource: control.badgeSource,
+    displaySource: control.displaySource,
     onDragFunction: control.onDragFunction,
     onDropFunction: control.onDropFunction,
     dropValidationFunction: control.dropValidationFunction,
@@ -150,7 +150,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         .map(candidate => ({
             key: controlReference(candidate.id),
             label: candidate.name || '(Unnamed Control)',
-            category: candidate.type === 'button' ? 'Buttons' : candidate.type === 'statDisplay' ? 'Stat Displays' : candidate.type === 'day' ? 'Day' : 'Stat Editors',
+            category: candidate.type === 'button' ? 'Buttons' : candidate.type === 'statDisplay' ? 'Stat Displays' : candidate.type === 'time' ? 'Time Controls' : 'Stat Editors',
             description: candidate.description,
         })), [stageInstance]);
     const titleBarControlOptions = barControlOptions.filter(option =>
@@ -183,7 +183,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             visibilityConditions: nextDraft.visibilityConditions,
             statId: nextDraft.statId,
             contentType: nextDraft.contentType,
-            badgeSource: nextDraft.badgeSource,
+            displaySource: nextDraft.displaySource,
             onDragFunction: nextDraft.onDragFunction,
             onDropFunction: nextDraft.onDropFunction,
             dropValidationFunction: nextDraft.dropValidationFunction,
@@ -256,7 +256,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const selectedStat = selectableStats.find((stat) => stat.id === draft.statId);
     const supportsDisplaySettings = draft.type === 'statDisplay' || draft.type === 'statOutcome';
     const isDragDrop = draft.type === 'dragDropDisplay';
-    const isStatBadge = draft.type === 'statBadge' || isDragDrop;
+    const isContentBoundDisplay = (draft.type === 'statDisplay' && draft.contentType !== undefined) || isDragDrop;
     const isCard = draft.type === 'card';
     const isMarker = draft.type === 'marker';
     const conditionProps = {
@@ -264,25 +264,25 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         actors: actors.filter(actor => actor.active !== false),
         items: items.filter(item => item.active !== false),
         locations: locations.filter(location => location.active !== false),
-        stage, variableContentType: isCard || isStatBadge ? draft.contentType : isMarker && (draft.markerInputType === 'actor' || draft.markerInputType === 'item' || draft.markerInputType === 'location') ? draft.markerInputType : usesActorStat ? 'actor' as const : undefined,
+        stage, variableContentType: isCard || isContentBoundDisplay ? draft.contentType : isMarker && (draft.markerInputType === 'actor' || draft.markerInputType === 'item' || draft.markerInputType === 'location') ? draft.markerInputType : usesActorStat ? 'actor' as const : undefined,
     };
-    const contentTypeStats = draft.contentType === 'actor' ? actorStats : draft.contentType === 'location' ? updatableLocationStats : updatableItemStats;
-    // The badge source's value type, for gating the numeric display settings.
-    const badgeStatReference = parseContentStatReference(draft.badgeSource);
-    const badgeSourceType = badgeStatReference
-        ? contentTypeStats.find((stat) => stat.id === badgeStatReference.statId)?.type
-        : isFunctionReference(draft.badgeSource)
-            ? (stageInstance.getConfiguration().functions || []).find((fn) => fn.id === functionReferenceId(draft.badgeSource))?.returnType
+    const contentTypeStats = draft.contentType === 'actor' ? actorStats : draft.contentType === 'location' ? updatableLocationStats : draft.contentType === 'item' ? updatableItemStats : [];
+    // The content source's value type, for gating the numeric display settings.
+    const displayStatReference = parseContentStatReference(draft.displaySource);
+    const displaySourceType = displayStatReference
+        ? contentTypeStats.find((stat) => stat.id === displayStatReference.statId)?.type
+        : isFunctionReference(draft.displaySource)
+            ? (stageInstance.getConfiguration().functions || []).find((fn) => fn.id === functionReferenceId(draft.displaySource))?.returnType
             : undefined;
-    const badgeSourceOptions = contentDetailSourceOptions(stageInstance, draft.contentType).filter(option => {
+    const displaySourceOptions = (draft.contentType ? contentDetailSourceOptions(stageInstance, draft.contentType) : []).filter(option => {
         if (!isDragDrop) return true;
         const reference = parseContentStatReference(option.key);
         const type = reference ? contentTypeStats.find(stat => stat.id === reference.statId)?.type
             : stageInstance.getConfiguration().functions.find(fn => fn.id === functionReferenceId(option.key))?.returnType;
         return isContentDisplayType(type);
     });
-    const draggedKinds = badgeSourceType === 'contentList' ? ['actor', 'item', 'location']
-        : isContentDisplayType(badgeSourceType) ? [resolveReferenceKind(badgeSourceType)] : [];
+    const draggedKinds = displaySourceType === 'contentList' ? ['actor', 'item', 'location']
+        : isContentDisplayType(displaySourceType) ? [resolveReferenceKind(displaySourceType)] : [];
     const dragDropFunctionOptions = (stageInstance.getConfiguration().functions || [])
         .filter(fn => draggedKinds.length > 0 && draggedKinds.every(kind => fn.parameters?.some(parameter => parameter.type === kind)))
         .map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description }));
@@ -297,7 +297,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             </div>
 
             <VariableContentContext.Provider value={conditionProps.variableContentType}>
-            <HeaderVariableContext.Provider value={isCard || isStatBadge}>
+            <HeaderVariableContext.Provider value={isCard || isContentBoundDisplay}>
             <MarkerTextVariableContext.Provider value={isMarker && (draft.markerInputType === 'string' || draft.markerInputType === 'screen')}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 <section>
@@ -379,8 +379,9 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             ...current,
                                             type,
                                             statId: '',
-                                            badgeSource: '',
+                                            displaySource: '',
                                             pickerSource: undefined,
+                                            contentType: type === 'statDisplay' ? undefined : current.contentType || 'actor',
                                         }));
                                     }}
                                 >
@@ -388,17 +389,36 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <option value="statDisplay">Stat Display</option>
                                     <option value="statEditor">Stat Editor</option>
                                     <option value="card">Card</option>
-                                    <option value="statBadge">Stat Badge</option>
                                     <option value="dragDropDisplay">Drag and Drop Display</option>
                                     <option value="statOutcome">Outcome</option>
                                     <option value="settings">Settings</option>
                                     <option value="popup">Pop-up</option>
                                     <option value="marker">Marker</option>
                                     <option value="bar">Bar</option>
-                                    <option value="day">Day</option>
+                                    <option value="time">Time Control</option>
                                 </select>
                             </div>
                         </div>
+                        {draft.type === 'statDisplay' && (
+                            <div>
+                                <div style={fieldHeadingStyle}>
+                                    <label>Content Type (optional)</label>
+                                    <HelpTip title="Display content type">
+                                        Leave unset to display a global stat. Select a content type to attach this display to matching Cards.
+                                    </HelpTip>
+                                </div>
+                                <select
+                                    style={selectStyle}
+                                    value={draft.contentType || ''}
+                                    onChange={(e) => setDraft(current => ({ ...current, contentType: e.target.value ? e.target.value as ContentType : undefined, displaySource: '' }))}
+                                >
+                                    <option value="">Global</option>
+                                    <option value="actor">Actor</option>
+                                    <option value="item">Item</option>
+                                    <option value="location">Location</option>
+                                </select>
+                            </div>
+                        )}
                     </div>
                 </section>
 
@@ -427,7 +447,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <h2 style={{ fontSize: 'inherit', margin: 0 }}>Availability</h2>
                             <HelpTip title="Control availability">
                                 {isCard ? 'Visible cards are disabled unless these conditions and the content availability rules pass.' : 'Leave conditions empty to always render this control.'}
-                                {isStatBadge && ' Evaluated per entry. Variable targets refer to the entry this badge is attached to.'}
+                                {isContentBoundDisplay && ' Evaluated per entry. Variable targets refer to the entry this display is attached to.'}
                                 {isMarker && ' Variable refers to the content passed to this marker.'}
                             </HelpTip>
                         </div>
@@ -522,18 +542,18 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <option value="bottom">Bottom</option>
                         </select>
                         <div style={{ marginTop: 15 }}>
-                            <label style={labelStyle}>Standalone Controls</label>
+                            <label style={labelStyle}>Controls</label>
                             <SearchableOptionPicker stage={stage} multiple title="Choose bar controls"
                                 values={draft.barControls} options={barControlOptions}
                                 onChange={value => setDraft(current => ({ ...current, barControls: Array.isArray(value) ? value : [] }))} />
                             <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                Day, Buttons, Stat Displays, and Stat Editors appear in selection order when available. The bar's own availability also applies.
+                                Time Controls, Buttons, Stat Displays, and Stat Editors appear in selection order when available. The bar's own availability also applies.
                             </span>
                         </div>
                     </section>
-                ) : draft.type === 'day' ? (
+                ) : draft.type === 'time' ? (
                     <section>
-                        <h2 style={sectionHeadingStyle}>Day</h2>
+                        <h2 style={sectionHeadingStyle}>Time Control</h2>
                         <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                             Displays the current day or date and time or phase according to the game settings.
                         </span>
@@ -572,7 +592,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <HelpTip title="Pop-up title bar controls">
                                     Buttons, Stat Displays, and Stat Editors shown beside the title, in selection order.
                                     Each control's availability conditions apply.
-                                    Use a Standalone-placed button whose actions break this pop-up's availability conditions as a close button.
+                                    Use a button whose actions break this pop-up's availability conditions as a close button.
                                 </HelpTip>
                             </div>
                             <SearchableOptionPicker stage={stage} multiple title="Choose title bar controls"
@@ -645,11 +665,11 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             </div>
                                         )}
                                         <div>
-                                            <label style={labelStyle}>Standalone Controls</label>
+                                            <label style={labelStyle}>Stat Displays and Drag and Drops</label>
                                             <SearchableOptionPicker stage={stage} multiple title="Choose card controls"
-                                                values={draft.cardDetails} options={listDetailOptions(stageInstance, draft.contentType)}
+                                                values={draft.cardDetails} options={listDetailOptions(stageInstance, draft.contentType || 'actor')}
                                                 onChange={value => setDraft(current => ({ ...current, cardDetails: Array.isArray(value) ? value : [] }))} />
-                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Standalone Stat Badges and Drag and Drop Displays of the same content type, in selection order.</span>
+                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Stat Displays and Drag and Drops of the same content type, in selection order.</span>
                                         </div>
                                     </>
                                 )}
@@ -672,40 +692,40 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             />
                         </section>
                     </>
-                ) : isStatBadge ? (
+                ) : isContentBoundDisplay ? (
                     <section>
-                        <h2 style={sectionHeadingStyle}>{isDragDrop ? 'Drag and Drop Display' : 'Stat Badge'}</h2>
+                        <h2 style={sectionHeadingStyle}>{isDragDrop ? 'Drag and Drop Display' : 'Stat Display'}</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                            <div>
+                            {isDragDrop ? <div>
                                 <div style={fieldHeadingStyle}>
                                     <label>Content Type</label>
-                                    <HelpTip title="Badge content type">
-                                        This badge can be attached to Card Controls of this content type.
+                                    <HelpTip title="Display content type">
+                                        This display can be attached to Card Controls of this content type.
                                     </HelpTip>
                                 </div>
                                 <select
                                     style={selectStyle}
-                                    value={draft.contentType}
-                                    onChange={(e) => setDraft((current) => ({ ...current, contentType: e.target.value as ContentType, badgeSource: '', onDragFunction: '', onDropFunction: '', dropValidationFunction: '' }))}
+                                    value={draft.contentType || 'actor'}
+                                    onChange={(e) => setDraft((current) => ({ ...current, contentType: e.target.value as ContentType, displaySource: '', onDragFunction: '', onDropFunction: '', dropValidationFunction: '' }))}
                                 >
                                     <option value="actor">Actor</option>
                                     <option value="item">Item</option>
                                     <option value="location">Location</option>
                                 </select>
-                            </div>
+                            </div> : null}
                             <div>
                                 <div style={fieldHeadingStyle}>
                                     <label>Value Source</label>
-                                    <HelpTip title="Badge value source">
+                                    <HelpTip title="Display value source">
                                         {isDragDrop ? 'An Actor, Item, Location, or content list stat or function. ' : 'A stat of the chosen content type, or any function. '}
-                                        Matching Variable parameters can bind to the entry this badge is attached to. Functions returning Void or String List cannot display a badge.
+                                        Matching Variable parameters can bind to the entry this display is attached to. Functions returning Void or String List cannot be displayed.
                                     </HelpTip>
                                 </div>
                                 <VariableContentContext.Provider value={draft.contentType}>
                                     <HeaderVariableContext.Provider value={true}>
-                                        <SearchableOptionPicker stage={stage} allowClear emptyLabel="None" title="Choose badge source" bindVariableParameters
-                                            value={draft.badgeSource || undefined} options={badgeSourceOptions}
-                                            onChange={(value) => setDraft((current) => ({ ...current, badgeSource: typeof value === 'string' ? value : '', ...(isDragDrop ? { onDragFunction: '', onDropFunction: '', dropValidationFunction: '' } : {}) }))} />
+                                        <SearchableOptionPicker stage={stage} allowClear emptyLabel="None" title="Choose display source" bindVariableParameters
+                                            value={draft.displaySource || undefined} options={displaySourceOptions}
+                                            onChange={(value) => setDraft((current) => ({ ...current, displaySource: typeof value === 'string' ? value : '', ...(isDragDrop ? { onDragFunction: '', onDropFunction: '', dropValidationFunction: '' } : {}) }))} />
                                     </HeaderVariableContext.Provider>
                                 </VariableContentContext.Provider>
                             </div>
@@ -742,7 +762,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <div>
                                 <div style={fieldHeadingStyle}>
                                     <label>Label (optional)</label>
-                                    <HelpTip title="Badge label">
+                                    <HelpTip title="Display label">
                                         Leave empty to show no label. {labelHelpText}
                                     </HelpTip>
                                 </div>
@@ -755,7 +775,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     value={draft.description}
                                     onChange={(e) => setDraft((current) => ({ ...current, description: e.target.value }))}
                                     rows={2}
-                                    placeholder="Tooltip shown with this badge"
+                                    placeholder="Description shown with this display"
                                     style={{ width: '100%', resize: 'vertical' }}
                                 />
                             </div>
@@ -763,11 +783,11 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <label style={labelStyle}>Label Icon (optional)</label>
                                 <IconPicker stage={stage} value={draft.iconName || undefined} allowClear onChange={(iconName) => setDraft((current) => ({ ...current, iconName: iconName || '' }))} />
                             </div>
-                            {badgeSourceType === 'number' && (
+                            {displaySourceType === 'number' && (
                                 <div>
                                     <div style={fieldHeadingStyle}>
                                         <label>Display</label>
-                                        <HelpTip title="Badge display">
+                                        <HelpTip title="Number display">
                                             Function sources use a 0–100 range for Percentage, Bar, and Letter Grade displays, and 5 pips for Rating.
                                         </HelpTip>
                                     </div>

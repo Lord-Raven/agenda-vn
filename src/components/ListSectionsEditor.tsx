@@ -36,7 +36,7 @@ export const listContentSourceOptions = (stage: Stage): PickerOption[] => {
     return [...valuePickerOptions(configuration, 'actorList'), ...valuePickerOptions(configuration, 'itemList'), ...valuePickerOptions(configuration, 'locationList')];
 };
 
-// Stat badge sources: all functions and the chosen content kind's stats.
+// Stat display sources: all functions and the chosen content kind's stats.
 export const contentDetailSourceOptions = (stage: Stage, kind: ContentType): PickerOption[] => {
     const configuration = stage.getConfiguration();
     const stats = kind === 'actor' ? configuration.actorStats : kind === 'location' ? configuration.locationStats : configuration.itemStats;
@@ -47,13 +47,13 @@ export const contentDetailSourceOptions = (stage: Stage, kind: ContentType): Pic
     ];
 };
 
-// Cards attach standalone badges of the same content type.
+// Cards attach stat displays of the same content type.
 export const listDetailOptions = (stage: Stage, kind: ContentType): PickerOption[] => {
     const configuration = stage.getConfiguration();
     return [
         ...(configuration.controls || [])
-            .filter(control => control.active !== false && (control.type === 'statBadge' || control.type === 'dragDropDisplay') && control.contentType === kind)
-            .map(control => ({ key: controlReference(control.id), label: control.name || '(Unnamed Control)', category: control.type === 'dragDropDisplay' ? 'Drag and Drop Displays' : 'Stat Badges', description: control.description })),
+            .filter(control => control.active !== false && (control.type === 'statDisplay' || control.type === 'dragDropDisplay') && control.contentType === kind)
+            .map(control => ({ key: controlReference(control.id), label: control.name || '(Unnamed Control)', category: control.type === 'dragDropDisplay' ? 'Drag and Drops' : 'Stat Displays', description: control.description })),
     ];
 };
 
@@ -127,7 +127,7 @@ export const ListSectionsEditor: FC<ListSectionsEditorProps> = ({ sections, onCh
                                 <SearchableOptionPicker stage={stage} allowClear emptyLabel={`Default ${CONTENT_LABELS[kind]} Card`} title="Choose Card Control"
                                     value={section.cardControlId || undefined} options={cardControlOptions(stageInstance, kind)}
                                     onChange={value => update(section.id, { cardControlId: typeof value === 'string' ? value : '' })} />
-                                <span style={helpStyle}>Configure labels, standalone badges, visibility, availability, and click actions on the selected Card Control. Variable refers to each entry; Header is this page's header.</span>
+                                <span style={helpStyle}>Configure labels, Stat Displays, visibility, availability, and click actions on the selected Card Control. Variable refers to each entry; Header is this page's header.</span>
                             </div>
                         ) : (
                             <span style={helpStyle}>Choose contents to select a matching Card Control.</span>

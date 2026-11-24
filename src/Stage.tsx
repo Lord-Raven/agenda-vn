@@ -814,20 +814,20 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Resolves one card detail: a content stat of the card's entity, a function evaluated with
     // "variable:<kind>" bound to the card and the header variable bound to its page's header, or a
-    // stat badge control wrapping either source with its display settings and per-card availability.
+    // stat display control wrapping either source with its display settings and per-card availability.
     resolveListCardDetail(detail: string, kind: ContentType, id: string, header: string, save: SaveType = this.getSave()): ResolvedListCardDetail | undefined {
         try {
             const configuration = this.getConfiguration(save);
             if (isControlReference(detail)) {
                 const control = (configuration.controls || []).find(candidate => candidate.id === controlReferenceId(detail));
-                if (!control || (control.type !== 'statBadge' && control.type !== 'dragDropDisplay') || control.contentType !== kind || isControlReference(control.badgeSource)) {
+                if (!control || (control.type !== 'statDisplay' && control.type !== 'dragDropDisplay') || control.contentType !== kind || isControlReference(control.displaySource)) {
                     return undefined;
                 }
                 const entity = this.getActiveContent(kind, id, save);
                 if (!entity) {
                     return undefined;
                 }
-                // Availability binds the card's entity as the badge's variable content target.
+                // Availability binds the card's entity as the display's variable content target.
                 const context: ConditionContext = {
                     ...this.getScheduleContext(save),
                     skitState: this.getSkitConditionState(),
@@ -837,7 +837,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 if (!isControlAvailable(control, context)) {
                     return undefined;
                 }
-                const resolved = this.resolveListCardDetail(control.badgeSource, kind, id, header, save);
+                const resolved = this.resolveListCardDetail(control.displaySource, kind, id, header, save);
                 if (!resolved) {
                     return undefined;
                 }
