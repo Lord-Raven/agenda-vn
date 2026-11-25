@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
+import { Box } from '@mui/material';
 import { buildPortableGameConfiguration, GameConfiguration, SaveType, Stage } from '../src/Stage';
 import { Actor, ACTOR_SCHEDULE_UNAVAILABLE } from '../src/content/Actor';
 import { Item } from '../src/content/Item';
@@ -33,6 +34,7 @@ import { ActorCard } from '../src/components/ActorCard';
 import { NamePlate } from '../src/components/UiComponents';
 import { DragDropDisplay } from '../src/components/DragDropDisplay';
 import { ControlDock } from '../src/components/ControlDock';
+import { GlobalStatBar } from '../src/components/GlobalStatBar';
 
 const stat = (id: string, type: StatType, defaultValue: StatValue, extra: Partial<Stat> = {}): Stat => cloneStat({
     id, name: id, type, guidance: '', default: defaultValue,
@@ -110,6 +112,41 @@ const dragDropFixture = () => {
     return { ...result, source: { control: source, kind: 'actor' as const, id: 'alice', header: 'Source' },
         target: { control: target, kind: 'actor' as const, id: 'alice', header: 'Receiver' } };
 };
+
+for (const isVerticalLayout of [false, true]) {
+    test(`header actions share the first non-empty top bar row (vertical: ${isVerticalLayout})`, () => {
+        const { stage, configuration } = fixture();
+        const first = new Control({ type: 'button', label: 'First action' });
+        const second = new Control({ type: 'button', label: 'Second action' });
+        const emptyBar = new Control({ id: 'empty', type: 'bar', barOrientation: 'top', barControls: [] });
+        const firstBar = new Control({ id: 'first', type: 'bar', barOrientation: 'top', barControls: [controlReference(first.id)] });
+        const secondBar = new Control({ id: 'second', type: 'bar', barOrientation: 'top', barControls: [controlReference(second.id)] });
+        configuration.controls.push(first, second, emptyBar, firstBar, secondBar);
+        const render = () => create(<GlobalStatBar stage={() => stage} isVerticalLayout={isVerticalLayout}
+            buttons={<button data-header-action>Menu</button>} />);
+        const renderer = render();
+        const boxes = renderer.root.findAllByType(Box);
+        const firstRow = boxes.find(box => Array.isArray(box.props.children)
+            && box.props.children.some((child: React.ReactElement) => child?.props?.['data-bar-control'] === 'first'));
+        assert.ok(firstRow);
+        assert.equal(firstRow.props.sx.display, 'flex');
+        assert.equal(firstRow.props.sx.alignItems, 'flex-start');
+        assert.equal(firstRow.findAllByProps({ 'data-header-action': true }).length, 1);
+        assert.equal(firstRow.findAllByProps({ 'data-bar-control': 'second' }).length, 0);
+        const bar = boxes.find(box => box.props['data-bar-control'] === 'first');
+        assert.equal(bar?.props.sx.minWidth, 0);
+        assert.equal(bar?.props.sx.flexWrap, 'wrap');
+        assert.equal(boxes.some(box => box.props['data-bar-control'] === 'empty'), false);
+        assert.ok(boxes.some(box => box.props['data-bar-control'] === 'second'));
+        renderer.unmount();
+
+        configuration.controls = [emptyBar];
+        const withoutBars = render();
+        assert.equal(withoutBars.root.findAllByProps({ 'data-header-action': true }).length, 1);
+        assert.equal(withoutBars.root.findAllByProps({ 'data-bar-control': 'empty' }).length, 0);
+        withoutBars.unmount();
+    });
+}
 
 test('bars render global controls and matching content displays with their selected context', () => {
     const { stage, configuration, save, source, target } = dragDropFixture();
