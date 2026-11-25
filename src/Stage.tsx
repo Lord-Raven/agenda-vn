@@ -820,6 +820,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             const configuration = this.getConfiguration(save);
             if (isControlReference(detail)) {
                 const control = (configuration.controls || []).find(candidate => candidate.id === controlReferenceId(detail));
+                if (control?.type === 'dragDropDisplay' && control.contentType === undefined) {
+                    return this.resolveGlobalDragDropDisplay(control, save);
+                }
                 if (!control || (control.type !== 'statDisplay' && control.type !== 'dragDropDisplay') || control.contentType !== kind || isControlReference(control.displaySource)) {
                     return undefined;
                 }
@@ -873,6 +876,26 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return undefined;
     }
 
+    resolveGlobalDragDropDisplay(control: Control, save: SaveType = this.getSave()): ResolvedListCardDetail | undefined {
+        try {
+            if (control.type !== 'dragDropDisplay' || control.contentType !== undefined
+                || !isControlAvailable(control, { ...this.getScheduleContext(save), skitState: this.getSkitConditionState() })) return undefined;
+            const configuration = this.getConfiguration(save);
+            const source = control.displaySource;
+            const stat = isGlobalStatReference(source)
+                ? (configuration.globalStats || []).find(candidate => candidate.id === globalStatReferenceId(source)) : undefined;
+            const fn = isFunctionReference(source)
+                ? (configuration.functions || []).find(candidate => candidate.id === functionReferenceId(source)) : undefined;
+            const type = stat?.type || fn?.returnType;
+            if (!isContentDisplayType(type)) return undefined;
+            return { key: controlReference(control.id), label: stat?.name || fn?.name || '', type,
+                value: this.resolveValue(source, type, save), stat, control };
+        } catch (error) {
+            console.error(`Global Drag and Drop Display "${control.name}" could not be resolved: ${error instanceof Error ? error.message : String(error)}`);
+            return undefined;
+        }
+    }
+
     // Re-check conditions at activation time, not just when the card was rendered.
     runCardActions(card: Control, kind: ContentType, id: string, header = '', ignoreAvailability = false): Skit | null {
         const state = this.resolveCardState(card, kind, id, header, this.getSave(), ignoreAvailability);
@@ -883,14 +906,27 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private runContentDisplayFunction(display: ContentDisplayContext, reference: string, kind: ContentType, id: string, readOnly = false): unknown {
         const save = this.getSave();
         const fn = this.getConfiguration(save).functions.find(candidate => candidate.id === functionReferenceId(reference));
-        const parameter = fn?.parameters?.find(candidate => candidate.type === kind);
-        if (!fn || !parameter || (readOnly && fn.returnType !== 'boolean')) {
-            throw new Error(`"${display.control.name}" requires a ${readOnly ? 'boolean ' : ''}function with a ${kind} parameter.`);
+        const ownerType = display.control.contentType;
+        const parameters = fn?.parameters || [];
+        const owner = ownerType ? parameters[0] : undefined;
+        const source = display.control.displaySource;
+        const sourceStat = parseContentStatReference(source);
+        const configuration = this.getConfiguration(save);
+        const sourceType = sourceStat
+            ? (sourceStat.kind === 'actor' ? configuration.actorStats : sourceStat.kind === 'item' ? configuration.itemStats : configuration.locationStats).find(stat => stat.id === sourceStat.statId)?.type
+            : isFunctionReference(source) ? configuration.functions.find(candidate => candidate.id === functionReferenceId(source))?.returnType
+            : isGlobalStatReference(source) ? configuration.globalStats.find(stat => stat.id === globalStatReferenceId(source))?.type : undefined;
+        const parameter = ownerType && sourceType !== 'contentList'
+            ? (parameters[1]?.type === kind ? parameters[1] : undefined)
+            : (ownerType ? parameters.slice(1) : parameters).find(candidate => candidate.type === kind);
+        if (!fn || !parameter || (ownerType && (owner?.type !== ownerType || display.kind !== ownerType || !display.id))
+            || (readOnly && fn.returnType !== 'boolean')) {
+            throw new Error(`"${display.control.name}" requires a ${readOnly ? 'boolean ' : ''}function with ${ownerType ? `a first ${ownerType} owner parameter and ` : ''}a ${kind} moved-content parameter.`);
         }
         const errors: string[] = [];
         const result = this.runGameFunction(save, fn, 0, message => errors.push(message), {
-            readOnly, stack: [], variables: { [display.kind]: display.id, header: display.header || '' },
-        }, { ...functionReferenceArguments(reference), [parameter.id]: id });
+            readOnly, stack: [], variables: display.kind && display.id ? { [display.kind]: display.id, header: display.header || '' } : undefined,
+        }, { ...functionReferenceArguments(reference), ...(owner && display.id ? { [owner.id]: display.id } : {}), [parameter.id]: id });
         if (errors.length) throw new Error(errors.join('\n'));
         return result;
     }
@@ -898,7 +934,8 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     canReceiveContentDrop(display: ContentDisplayContext, kind: ContentType, id: string): boolean {
         const { control } = display;
         if (control.type !== 'dragDropDisplay' || !control.onDropFunction) return false;
-        const detail = this.resolveListCardDetail(controlReference(control.id), display.kind, display.id, display.header || '');
+        const detail = control.contentType === undefined ? this.resolveGlobalDragDropDisplay(control)
+            : display.kind && display.id ? this.resolveListCardDetail(controlReference(control.id), display.kind, display.id, display.header || '') : undefined;
         if (!detail || (resolveReferenceKind(detail.type) && resolveReferenceKind(detail.type) !== kind)) return false;
         return !control.dropValidationFunction
             || this.runContentDisplayFunction(display, control.dropValidationFunction, kind, id, true) === true;
@@ -981,7 +1018,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return bar.barControls
             .map(reference => controls.find(control => control.id === controlReferenceId(reference)))
             .filter((control): control is Control => !!control && isBarContentControl(control)
-                && (!(control.type === 'dragDropDisplay' || (control.type === 'statDisplay' && control.contentType !== undefined))
+                && (!((control.type === 'dragDropDisplay' || control.type === 'statDisplay') && control.contentType !== undefined)
                     || (!!content && control.contentType === content.kind))
                 && isControlAvailable(control, context));
     }

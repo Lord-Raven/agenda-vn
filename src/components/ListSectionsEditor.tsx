@@ -52,7 +52,8 @@ export const listDetailOptions = (stage: Stage, kind: ContentType): PickerOption
     const configuration = stage.getConfiguration();
     return [
         ...(configuration.controls || [])
-            .filter(control => control.active !== false && (control.type === 'statDisplay' || control.type === 'dragDropDisplay') && control.contentType === kind)
+            .filter(control => control.active !== false && (control.type === 'statDisplay' || control.type === 'dragDropDisplay')
+                && (control.contentType === kind || (control.type === 'dragDropDisplay' && control.contentType === undefined)))
             .map(control => ({ key: controlReference(control.id), label: control.name || '(Unnamed Control)', category: control.type === 'dragDropDisplay' ? 'Drag and Drops' : 'Stat Displays', description: control.description })),
     ];
 };

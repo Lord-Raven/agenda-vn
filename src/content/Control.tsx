@@ -38,7 +38,7 @@ export type ContentDisplayType = Extract<StatType, 'actor' | 'actorList' | 'item
 export const isContentDisplayType = (type: string | undefined): type is ContentDisplayType =>
     !!type && ['actor', 'actorList', 'item', 'itemList', 'location', 'locationList', 'contentList'].includes(type);
 
-export type ContentDisplayContext = { control: Control; kind: ContentType; id: string; header?: string };
+export type ContentDisplayContext = { control: Control; kind?: ContentType; id?: string; header?: string };
 
 // References embed content-bound stat displays in Card Controls.
 const CONTROL_REFERENCE_PREFIX = 'control:';
@@ -93,7 +93,8 @@ export class Control {
     // Content display source: a content stat reference ("<kind>Stat:<id>") or a function reference whose
     // variable content parameter binds to the attached entity.
     displaySource: string = '';
-    // Drag/drop callbacks receive the moved entity in their first matching content parameter.
+    // Global callbacks receive the moved entity; content-bound callbacks receive the owner first,
+    // then the moved entity. Mixed lists use the first matching parameter after the owner.
     onDragFunction: string = '';
     onDropFunction: string = '';
     dropValidationFunction: string = '';
@@ -142,7 +143,7 @@ export class Control {
         this.showSourceLink = this.showSourceLink === true;
         this.actions = Array.isArray(this.actions) ? this.actions.map(cloneStatUpdateAction) : [];
         this.statId = `${this.statId || ''}`;
-        this.contentType = this.type === 'statDisplay' && currentProps.contentType === undefined
+        this.contentType = (this.type === 'statDisplay' || this.type === 'dragDropDisplay') && currentProps.contentType === undefined
             ? undefined
             : CONTENT_TYPES.includes(this.contentType as ContentType) ? this.contentType : 'actor';
         this.displaySource = typeof this.displaySource === 'string' && !isControlReference(this.displaySource) ? this.displaySource : '';

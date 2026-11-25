@@ -177,7 +177,7 @@ export const ListCardDetail: FC<{
     onChange?: () => void;
 }> = ({ detail, stage, isVerticalLayout, large = false, kind, id, header, onChange }) => {
     const control = detail.control;
-    const text = (value: string, options?: { icons: 'token' }) => kind && id
+    const text = (value: string, options?: { icons: 'token' }) => kind && id && (control?.type !== 'dragDropDisplay' || control.contentType !== undefined)
         ? stage.resolveCardText(value, kind, id, header, options)
         : processLoreText(value, stage, undefined, undefined, undefined, options);
     const labelText = control ? text(control.label.trim(), { icons: 'token' }) : detail.label;
@@ -208,7 +208,8 @@ export const ListCardDetail: FC<{
                     size={large ? 48 : isVerticalLayout ? 30 : 36} draggable={dragDrop && !!control.onDragFunction} hoverCards={dragDrop} />
             </Box>
         ) : null;
-        return dragDrop && kind && id ? <DragDropDisplay stage={stage} context={{ control, kind, id, header }}
+        return dragDrop && (control.contentType === undefined || (kind && id)) ? <DragDropDisplay stage={stage}
+            context={control.contentType === undefined ? { control } : { control, kind, id, header }}
             accepts={resolveReferenceKind(detail.type)} onChange={onChange}>{display}</DragDropDisplay> : display;
     }
     // Icon stats render their value as the named icon itself (empty value shows nothing).

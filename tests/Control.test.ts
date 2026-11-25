@@ -162,6 +162,9 @@ test('content-bound stat displays use standalone placement and preserve scope an
 test('stat displays normalize content types and reject self-referential sources', () => {
     assert.equal(new Control({}).contentType, 'actor');
     assert.equal(new Control({ type: 'statDisplay' }).contentType, undefined);
+    assert.equal(new Control({ type: 'dragDropDisplay' }).contentType, undefined);
+    assert.equal(new Control({ type: 'dragDropDisplay', contentType: 'item' }).contentType, 'item');
+    assert.equal(new Control(JSON.parse(JSON.stringify(new Control({ type: 'dragDropDisplay' })))).contentType, undefined);
     assert.equal(new Control({ contentType: 'bogus' }).contentType, 'actor');
     assert.equal(new Control({}).displaySource, '');
     assert.equal(new Control({ displaySource: 7 }).displaySource, '');

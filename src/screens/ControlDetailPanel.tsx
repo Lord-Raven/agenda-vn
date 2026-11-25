@@ -4,7 +4,7 @@ import { BarOrientation, ContentListDisplay, Control, controlReference, ControlT
 import { ConditionCollection, ContentType } from '../content/Condition';
 import { isReferenceListDisplayType, isReferenceStatType, resolveReferenceKind, resolveStatOptionPool, sharesOptionPool, StatUpdateAction, cloneStatUpdateAction, ReferenceKind } from '../content/Stat';
 import { parseContentStatReference, SCREEN_TYPE_LABELS } from '../content/Screen';
-import { functionReference, functionReferenceId, functionSignature, isFunctionReference } from '../content/Function';
+import { functionReference, functionReferenceId, functionSignature, globalStatReference, globalStatReferenceId, isFunctionReference, isGlobalStatReference } from '../content/Function';
 import { Button, ColorPickerInput, GlassPanel, HelpTip, ReferenceMultiSelect, TextArea, TextInput, Title } from '../components/UiComponents';
 import { ConditionEditor } from '../components/ConditionEditor';
 import { OutcomeEditor } from '../components/OutcomeEditor';
@@ -259,7 +259,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const selectedStat = selectableStats.find((stat) => stat.id === draft.statId);
     const supportsDisplaySettings = draft.type === 'statDisplay' || draft.type === 'statOutcome';
     const isDragDrop = draft.type === 'dragDropDisplay';
-    const isContentBoundDisplay = (draft.type === 'statDisplay' && draft.contentType !== undefined) || isDragDrop;
+    const isContentBoundDisplay = draft.type === 'statDisplay' && draft.contentType !== undefined;
     const isCard = draft.type === 'card';
     const isMarker = draft.type === 'marker';
     const conditionProps = {
@@ -267,27 +267,39 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
         actors: actors.filter(actor => actor.active !== false),
         items: items.filter(item => item.active !== false),
         locations: locations.filter(location => location.active !== false),
-        stage, variableContentType: isCard || isContentBoundDisplay ? draft.contentType : isMarker && (draft.markerInputType === 'actor' || draft.markerInputType === 'item' || draft.markerInputType === 'location') ? draft.markerInputType : usesActorStat ? 'actor' as const : undefined,
+        stage, variableContentType: isCard || isContentBoundDisplay || isDragDrop ? draft.contentType : isMarker && (draft.markerInputType === 'actor' || draft.markerInputType === 'item' || draft.markerInputType === 'location') ? draft.markerInputType : usesActorStat ? 'actor' as const : undefined,
     };
-    const contentTypeStats = draft.contentType === 'actor' ? actorStats : draft.contentType === 'location' ? updatableLocationStats : draft.contentType === 'item' ? updatableItemStats : [];
+    const contentTypeStats = draft.contentType === 'actor' ? actorStats : draft.contentType === 'location' ? updatableLocationStats : draft.contentType === 'item' ? updatableItemStats : globalStats;
     // The content source's value type, for gating the numeric display settings.
     const displayStatReference = parseContentStatReference(draft.displaySource);
     const displaySourceType = displayStatReference
         ? contentTypeStats.find((stat) => stat.id === displayStatReference.statId)?.type
+        : isGlobalStatReference(draft.displaySource)
+            ? globalStats.find(stat => stat.id === globalStatReferenceId(draft.displaySource))?.type
         : isFunctionReference(draft.displaySource)
             ? (stageInstance.getConfiguration().functions || []).find((fn) => fn.id === functionReferenceId(draft.displaySource))?.returnType
             : undefined;
-    const displaySourceOptions = (draft.contentType ? contentDetailSourceOptions(stageInstance, draft.contentType) : []).filter(option => {
+    const displaySourceOptions = (draft.contentType ? contentDetailSourceOptions(stageInstance, draft.contentType) : [
+        ...(stageInstance.getConfiguration().functions || []).map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description })),
+        ...globalStats.map(stat => ({ key: globalStatReference(stat.id), label: stat.name, category: 'Global Stats', description: stat.guidance })),
+    ]).filter(option => {
         if (!isDragDrop) return true;
         const reference = parseContentStatReference(option.key);
         const type = reference ? contentTypeStats.find(stat => stat.id === reference.statId)?.type
+            : isGlobalStatReference(option.key) ? globalStats.find(stat => stat.id === globalStatReferenceId(option.key))?.type
             : stageInstance.getConfiguration().functions.find(fn => fn.id === functionReferenceId(option.key))?.returnType;
         return isContentDisplayType(type);
     });
     const draggedKinds = displaySourceType === 'contentList' ? ['actor', 'item', 'location']
         : isContentDisplayType(displaySourceType) ? [resolveReferenceKind(displaySourceType)] : [];
     const dragDropFunctionOptions = (stageInstance.getConfiguration().functions || [])
-        .filter(fn => draggedKinds.length > 0 && draggedKinds.every(kind => fn.parameters?.some(parameter => parameter.type === kind)))
+        .filter(fn => {
+            const parameters = fn.parameters || [];
+            if (draft.contentType && parameters[0]?.type !== draft.contentType) return false;
+            const movedParameters = draft.contentType ? parameters.slice(1) : parameters;
+            if (draft.contentType && displaySourceType !== 'contentList') return draggedKinds.length === 1 && movedParameters[0]?.type === draggedKinds[0];
+            return draggedKinds.length > 0 && draggedKinds.every(kind => movedParameters.some(parameter => parameter.type === kind));
+        })
         .map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description }));
 
     return (
@@ -300,7 +312,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             </div>
 
             <VariableContentContext.Provider value={conditionProps.variableContentType}>
-            <HeaderVariableContext.Provider value={isCard || isContentBoundDisplay}>
+            <HeaderVariableContext.Provider value={isCard || isContentBoundDisplay || (isDragDrop && !!draft.contentType)}>
             <MarkerTextVariableContext.Provider value={isMarker && (draft.markerInputType === 'string' || draft.markerInputType === 'screen')}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 <section>
@@ -384,7 +396,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             statId: '',
                                             displaySource: '',
                                             pickerSource: undefined,
-                                            contentType: type === 'statDisplay' ? undefined : current.contentType || 'actor',
+                                            contentType: type === 'statDisplay' || type === 'dragDropDisplay' ? undefined : current.contentType || 'actor',
                                         }));
                                     }}
                                 >
@@ -450,7 +462,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <h2 style={{ fontSize: 'inherit', margin: 0 }}>Availability</h2>
                             <HelpTip title="Control availability">
                                 {isCard ? 'Visible cards are disabled unless these conditions and the content availability rules pass.' : 'Leave conditions empty to always render this control.'}
-                                {isContentBoundDisplay && ' Evaluated per entry. Variable targets refer to the entry this display is attached to.'}
+                                {(isContentBoundDisplay || (isDragDrop && draft.contentType)) && ' Evaluated per entry. Variable targets refer to the entry this display is attached to.'}
                                 {isMarker && ' Variable refers to the content passed to this marker.'}
                             </HelpTip>
                         </div>
@@ -694,7 +706,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             <SearchableOptionPicker stage={stage} multiple title="Choose card controls"
                                                 values={draft.cardDetails} options={listDetailOptions(stageInstance, draft.contentType || 'actor')}
                                                 onChange={value => setDraft(current => ({ ...current, cardDetails: Array.isArray(value) ? value : [] }))} />
-                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Stat Displays and Drag and Drops of the same content type, in selection order.</span>
+                                            <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Stat Displays and Drag and Drops of the same content type, or global Drag and Drops, in selection order.</span>
                                         </div>
                                     </>
                                 )}
@@ -717,7 +729,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             />
                         </section>
                     </>
-                ) : isContentBoundDisplay ? (
+                ) : isContentBoundDisplay || isDragDrop ? (
                     <section>
                         <h2 style={sectionHeadingStyle}>{isDragDrop ? 'Drag and Drop Display' : 'Stat Display'}</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -725,14 +737,15 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <div style={fieldHeadingStyle}>
                                     <label>Content Type</label>
                                     <HelpTip title="Display content type">
-                                        This display can be attached to Card Controls or Bars with this content type as their context.
+                                        Global displays use global sources and can be attached to any Card or Bar. Other displays use the matching content as their context.
                                     </HelpTip>
                                 </div>
                                 <select
                                     style={selectStyle}
-                                    value={draft.contentType || 'actor'}
-                                    onChange={(e) => setDraft((current) => ({ ...current, contentType: e.target.value as ContentType, displaySource: '', onDragFunction: '', onDropFunction: '', dropValidationFunction: '' }))}
+                                    value={draft.contentType || ''}
+                                    onChange={(e) => setDraft((current) => ({ ...current, contentType: e.target.value ? e.target.value as ContentType : undefined, displaySource: '', onDragFunction: '', onDropFunction: '', dropValidationFunction: '' }))}
                                 >
+                                    <option value="">Global</option>
                                     <option value="actor">Actor</option>
                                     <option value="item">Item</option>
                                     <option value="location">Location</option>
@@ -743,11 +756,12 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <label>Value Source</label>
                                     <HelpTip title="Display value source">
                                         {isDragDrop ? 'An Actor, Item, Location, or content list stat or function. ' : 'A stat of the chosen content type, or any function. '}
-                                        Matching Variable parameters can bind to the entry this display is attached to. Functions returning Void or String List cannot be displayed.
+                                        {draft.contentType ? 'Matching Variable parameters can bind to the entry this display is attached to. ' : ''}
+                                        Functions returning Void or String List cannot be displayed.
                                     </HelpTip>
                                 </div>
                                 <VariableContentContext.Provider value={draft.contentType}>
-                                    <HeaderVariableContext.Provider value={true}>
+                                    <HeaderVariableContext.Provider value={!!draft.contentType}>
                                         <SearchableOptionPicker stage={stage} allowClear emptyLabel="None" title="Choose display source" bindVariableParameters
                                             value={draft.displaySource || undefined} options={displaySourceOptions}
                                             onChange={(value) => setDraft((current) => ({ ...current, displaySource: typeof value === 'string' ? value : '', ...(isDragDrop ? { onDragFunction: '', onDropFunction: '', dropValidationFunction: '' } : {}) }))} />
@@ -758,8 +772,8 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                     Both callbacks run on drop, not at drag start. On Drop runs first, even if the incoming content is already displayed.
                                     On Drag runs when content is dropped outside its source display. Dropping back into the same display or canceling does nothing.
-                                    The first parameter matching the moved content type receives its ID; other arguments keep their configured values.
-                                    Mixed content lists require a parameter for each content type.
+                                    {draft.contentType ? 'The first parameter receives the owning content; the second receives the moved content. ' : 'The first parameter matching the moved content type receives its ID. '}
+                                    Other arguments keep their configured values. Mixed content lists require a separate moved-content parameter for each content type after the owner.
                                     Without On Drag, content cannot be dragged. Without On Drop, this display does not receive drops.
                                 </span>
                                 {(['onDragFunction', 'onDropFunction'] as const).map(behavior => <div key={behavior}>

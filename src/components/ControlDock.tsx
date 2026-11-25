@@ -33,6 +33,12 @@ export const ControlDock: FC<ControlDockProps> = ({ stage, onActivate, isVertica
                         sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: isVerticalLayout ? 0.5 : 1,
                             ...(barIndex === 0 && firstRowEnd ? { flex: '1 1 0', minWidth: 0 } : {}) }}>
                         {controls.map((control, index) => {
+                            if (control.type === 'dragDropDisplay' && control.contentType === undefined) {
+                                const detail = stageInstance.resolveGlobalDragDropDisplay(control);
+                                return detail ? <ListCardDetail key={`${control.id}-${index}`} detail={detail} stage={stageInstance}
+                                    isVerticalLayout={isVerticalLayout}
+                                    onChange={() => { setRevision(current => current + 1); onActivate?.(); }} /> : null;
+                            }
                             if (content && (control.type === 'dragDropDisplay' || (control.type === 'statDisplay' && control.contentType !== undefined))) {
                                 const detail = stageInstance.resolveListCardDetail(controlReference(control.id), content.kind, content.id, '');
                                 return detail ? <ListCardDetail key={`${control.id}-${index}`} detail={detail} stage={stageInstance}
