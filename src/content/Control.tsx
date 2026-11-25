@@ -11,7 +11,7 @@ export type BarOrientation = 'top' | 'bottom';
 
 // 'button' runs outcomes; 'statDisplay'/'statEditor' show/edit a global stat.
 // 'settings' exposes a global stat as a player-editable setting.
-// A statDisplay with a contentType shows a content stat or function value on matching cards;
+// A statDisplay with a contentType shows a content stat or function value on matching cards or bars;
 // without a contentType it displays its selected global stat.
 // 'dragDropDisplay' uses the same sources, restricted to content values. On Drag enables dragging;
 // On Drop runs before the source's On Drag. An optional read-only boolean validator highlights
@@ -31,7 +31,8 @@ export const CONTROL_TYPES: ControlType[] = ['button', 'statDisplay', 'statEdito
 export const isPopupTitleControl = (control: Control): boolean =>
     control.placement === 'standalone' && (control.type === 'button' || (control.type === 'statDisplay' && control.contentType === undefined) || control.type === 'statEditor');
 export const isBarContentControl = (control: Control): boolean =>
-    isPopupTitleControl(control) || (control.placement === 'standalone' && control.type === 'time');
+    control.placement === 'standalone' && (control.type === 'button' || control.type === 'time'
+        || control.type === 'statDisplay' || control.type === 'statEditor' || control.type === 'dragDropDisplay');
 
 export type ContentDisplayType = Extract<StatType, 'actor' | 'actorList' | 'item' | 'itemList' | 'location' | 'locationList' | 'contentList'>;
 export const isContentDisplayType = (type: string | undefined): type is ContentDisplayType =>
@@ -63,6 +64,7 @@ export class Control {
     type: ControlType = 'button';
     barOrientation: BarOrientation = 'top';
     barControls: string[] = [];
+    barContent?: { kind: ContentType; id: string };
     availabilityConditions: ConditionCollection[] = []; // Any collection may pass; all conditions within a collection must pass.
     visibilityConditions: ConditionCollection[] = []; // Cards only; unavailable visible cards remain disabled.
 
@@ -125,6 +127,8 @@ export class Control {
         this.placement = this.type === 'bar' ? 'bar' : this.type === 'popup' ? 'popup' : this.type === 'statOutcome' ? 'outcome' : this.type === 'settings' ? 'settings' : 'standalone';
         this.barOrientation = this.barOrientation === 'bottom' ? 'bottom' : 'top';
         this.barControls = Array.isArray(this.barControls) ? this.barControls.filter(isControlReference) : [];
+        this.barContent = this.barContent && CONTENT_TYPES.includes(this.barContent.kind) && typeof this.barContent.id === 'string'
+            ? { kind: this.barContent.kind, id: this.barContent.id } : undefined;
         this.availabilityConditions = Array.isArray(this.availabilityConditions) ? this.availabilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.visibilityConditions = Array.isArray(this.visibilityConditions) ? this.visibilityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.label = `${this.label || ''}`;

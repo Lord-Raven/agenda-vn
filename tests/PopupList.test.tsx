@@ -32,6 +32,7 @@ import { GameManagementPanel } from '../src/screens/GameManagementPanel';
 import { ActorCard } from '../src/components/ActorCard';
 import { NamePlate } from '../src/components/UiComponents';
 import { DragDropDisplay } from '../src/components/DragDropDisplay';
+import { ControlDock } from '../src/components/ControlDock';
 
 const stat = (id: string, type: StatType, defaultValue: StatValue, extra: Partial<Stat> = {}): Stat => cloneStat({
     id, name: id, type, guidance: '', default: defaultValue,
@@ -109,6 +110,92 @@ const dragDropFixture = () => {
     return { ...result, source: { control: source, kind: 'actor' as const, id: 'alice', header: 'Source' },
         target: { control: target, kind: 'actor' as const, id: 'alice', header: 'Receiver' } };
 };
+
+test('bars render global controls and matching content displays with their selected context', () => {
+    const { stage, configuration, save, source, target } = dragDropFixture();
+    const display = new Control({ type: 'statDisplay', contentType: 'actor', label: 'Mood display',
+        displaySource: contentStatReference('actor', 'Mood'),
+        availabilityConditions: [[{ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Mood', comparison: 'greaterThan', value: 2 }]] });
+    const editor = new Control({ type: 'statEditor', statId: 'Title', label: 'Global editor' });
+    const global = new Control({ type: 'statDisplay', statId: 'Title', label: 'Global display' });
+    const bar = new Control({ type: 'bar', barOrientation: 'bottom', barContent: { kind: 'actor', id: 'alice' },
+        barControls: [display, global, source.control, editor, target.control].map(control => controlReference(control.id)) });
+    configuration.controls.push(display, editor, global, bar);
+    const render = () => renderToStaticMarkup(<ControlDock stage={() => stage} />);
+    const html = render();
+    assert.match(html, /Mood display/);
+    assert.match(html, />3</);
+    assert.match(html, /Global display/);
+    assert.match(html, /Global editor/);
+    assert.match(html, new RegExp(`data-drag-drop-display="${source.control.id}"`));
+    assert.match(html, new RegExp(`data-drag-drop-display="${target.control.id}"`));
+    assert.ok(html.indexOf('Mood display') < html.indexOf('Global display'));
+    assert.equal(stage.canReceiveContentDrop({ ...target, id: bar.barContent!.id }, 'actor', 'bob'), true);
+
+    save.actors.alice.statMap.Mood = 1;
+    assert.doesNotMatch(render(), /Mood display/);
+    bar.barContent = { kind: 'item', id: 'sword' };
+    const mismatched = render();
+    assert.doesNotMatch(mismatched, /Mood display|data-drag-drop-display/);
+    assert.match(mismatched, /Global display/);
+    assert.match(mismatched, /Global editor/);
+    bar.barContent = { kind: 'actor', id: 'missing' };
+    assert.doesNotMatch(render(), /data-drag-drop-display/);
+    assert.match(render(), /Global display/);
+    bar.barContent = undefined;
+    assert.doesNotMatch(render(), /Mood display|data-drag-drop-display/);
+    assert.match(render(), /Global editor/);
+});
+
+for (const kind of ['actor', 'item', 'location'] as const) {
+    test(`top bars bind ${kind} content to stat displays`, () => {
+        const { stage, configuration, save } = fixture();
+        const id = kind === 'actor' ? 'alice' : kind === 'item' ? 'sword' : 'park';
+        const entity = kind === 'actor' ? save.actors[id] : kind === 'item' ? save.inventory[0] : save.atlas[id];
+        const stats = kind === 'actor' ? configuration.actorStats : kind === 'item' ? configuration.itemStats : configuration.locationStats;
+        stats.push(stat('BarValue', 'text', 'default'));
+        entity.statMap.BarValue = `value from ${kind}`;
+        const display = new Control({ type: 'statDisplay', contentType: kind, label: 'Context value',
+            displaySource: contentStatReference(kind, 'BarValue') });
+        const bar = new Control({ type: 'bar', barOrientation: 'top', barContent: { kind, id },
+            barControls: [controlReference(display.id)] });
+        configuration.controls.push(display, bar);
+        assert.match(renderToStaticMarkup(<ControlDock stage={() => stage} orientation="top" />), new RegExp(`value from ${kind}`));
+    });
+}
+
+test('bar editor offers all supported controls and saves optional content context', () => {
+    const { stage, configuration, source } = dragDropFixture();
+    const bar = new Control({ type: 'bar' });
+    const display = new Control({ type: 'statDisplay', contentType: 'actor', name: 'Actor display' });
+    const global = new Control({ type: 'statDisplay', name: 'Global display' });
+    const editor = new Control({ type: 'statEditor', name: 'Editor' });
+    configuration.controls.push(bar, display, global, editor);
+    stage.updateConfiguration = updates => { Object.assign(configuration, updates); };
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout, clearTimeout, addEventListener() {}, removeEventListener() {} } });
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+        act(() => { renderer = create(<ControlDetailPanel control={bar} stage={() => stage} />); });
+        const options = renderer!.root.findByProps({ title: 'Choose bar controls' }).props.options;
+        for (const control of [display, global, editor, source.control]) {
+            assert.ok(options.some((option: { key: string }) => option.key === controlReference(control.id)));
+        }
+        assert.equal(options.find((option: { key: string }) => option.key === controlReference(source.control.id)).category, 'Drag and Drops');
+        act(() => renderer!.root.findByProps({ title: 'Choose bar controls' }).props.onChange([controlReference(source.control.id), controlReference(global.id)]));
+        act(() => renderer!.root.findByProps({ id: `bar-content-kind-${bar.id}` }).props.onChange({ target: { value: 'actor' } }));
+        act(() => renderer!.root.findByProps({ title: 'Choose bar content' }).props.onChange('alice'));
+        act(() => renderer!.unmount());
+        renderer = undefined;
+        assert.deepEqual(configuration.controls.find(control => control.id === bar.id)!.barContent, { kind: 'actor', id: 'alice' });
+        assert.deepEqual(configuration.controls.find(control => control.id === bar.id)!.barControls, [controlReference(source.control.id), controlReference(global.id)]);
+        assert.deepEqual(new Control(JSON.parse(JSON.stringify(configuration.controls.find(control => control.id === bar.id)))).barContent, { kind: 'actor', id: 'alice' });
+    } finally {
+        if (renderer) act(() => renderer?.unmount());
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else Reflect.deleteProperty(globalThis, 'window');
+    }
+});
 
 test('drag/drop runs the receiver before the source and passes moved content, owner, and header arguments', () => {
     const { stage, save, source, target } = dragDropFixture();

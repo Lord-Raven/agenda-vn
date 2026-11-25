@@ -961,13 +961,29 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return this.getVisibleControls('bar').filter(control => control.type === 'bar' && control.barOrientation === orientation);
     }
 
+    getBarContent(bar: Control): { kind: ContentType; id: string } | undefined {
+        const content = bar.barContent;
+        return content && this.getActiveContent(content.kind, content.id, this.getSave()) ? content : undefined;
+    }
+
     getBarControls(bar: Control): Control[] {
         const save = this.getSave();
-        const context: ConditionContext = { ...this.getScheduleContext(save), skitState: this.getSkitConditionState() };
+        const content = this.getBarContent(bar);
+        const entity = content && this.getActiveContent(content.kind, content.id, save);
+        const context: ConditionContext = {
+            ...this.getScheduleContext(save), skitState: this.getSkitConditionState(),
+            ...(content && entity ? {
+                ...(content.kind === 'actor' ? { currentActor: entity as Actor } : content.kind === 'location' ? { currentLocation: entity as Location } : { currentItem: entity as Item }),
+                resolveValue: (value, type) => this.resolveValue(value, type, save, [], { [content.kind]: content.id }),
+            } : {}),
+        };
         const controls = this.getConfiguration(save).controls || [];
         return bar.barControls
             .map(reference => controls.find(control => control.id === controlReferenceId(reference)))
-            .filter((control): control is Control => !!control && isBarContentControl(control) && isControlAvailable(control, context));
+            .filter((control): control is Control => !!control && isBarContentControl(control)
+                && (!(control.type === 'dragDropDisplay' || (control.type === 'statDisplay' && control.contentType !== undefined))
+                    || (!!content && control.contentType === content.kind))
+                && isControlAvailable(control, context));
     }
 
     runControlActions(control: Control, variables?: FunctionVariableBindings): Skit | null {

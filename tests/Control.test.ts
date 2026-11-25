@@ -184,9 +184,12 @@ test('content-bound stat display availability binds variable rules to the attach
     assert.equal(isControlAvailable(control, { itemStats, currentItem: { id: 'stick', statMap: { quality: 1 } } }), false);
 });
 
-test('time controls are bar controls, while content-scoped stat displays are not', () => {
+test('bars accept standalone displays and editors but not containers', () => {
     assert.equal(new Control({ type: 'time' }).type, 'time');
     assert.equal(isBarContentControl(new Control({ type: 'time' })), true);
     assert.equal(isBarContentControl(new Control({ type: 'statDisplay' })), true);
-    assert.equal(isBarContentControl(new Control({ type: 'statDisplay', contentType: 'actor' })), false);
+    assert.equal(isBarContentControl(new Control({ type: 'statDisplay', contentType: 'actor' })), true);
+    assert.equal(isBarContentControl(new Control({ type: 'statEditor' })), true);
+    assert.equal(isBarContentControl(new Control({ type: 'dragDropDisplay' })), true);
+    assert.equal(isBarContentControl(new Control({ type: 'bar' })), false);
 });

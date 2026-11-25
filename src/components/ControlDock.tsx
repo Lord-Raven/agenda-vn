@@ -3,7 +3,8 @@ import { Box } from '@mui/material';
 import { Stage } from '../Stage';
 import { ControlRenderer } from './ControlRenderer';
 import { Skit } from '../content/Skit';
-import { BarOrientation } from '../content/Control';
+import { BarOrientation, controlReference } from '../content/Control';
+import { ListCardDetail } from './ContentCardControl';
 
 interface ControlDockProps {
     stage: () => Stage;
@@ -25,21 +26,30 @@ export const ControlDock: FC<ControlDockProps> = ({ stage, onActivate, isVertica
             {bars.map(bar => {
                 const controls = stageInstance.getBarControls(bar);
                 if (!controls.length) return null;
+                const content = stageInstance.getBarContent(bar);
                 return (
                     <Box key={bar.id} data-bar-control={bar.id}
                         sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: isVerticalLayout ? 0.5 : 1 }}>
-                        {controls.map((control, index) => (
-                            <ControlRenderer
-                                key={`${control.id}-${index}`}
-                                control={control}
-                                stage={stage}
-                                isVerticalLayout={isVerticalLayout}
-                                onActivate={skit => {
-                                    setRevision(current => current + 1);
-                                    onActivate?.(skit);
-                                }}
-                            />
-                        ))}
+                        {controls.map((control, index) => {
+                            if (content && (control.type === 'dragDropDisplay' || (control.type === 'statDisplay' && control.contentType !== undefined))) {
+                                const detail = stageInstance.resolveListCardDetail(controlReference(control.id), content.kind, content.id, '');
+                                return detail ? <ListCardDetail key={`${control.id}-${index}`} detail={detail} stage={stageInstance}
+                                    isVerticalLayout={isVerticalLayout} kind={content.kind} id={content.id}
+                                    onChange={() => { setRevision(current => current + 1); onActivate?.(); }} /> : null;
+                            }
+                            return (
+                                <ControlRenderer
+                                    key={`${control.id}-${index}`}
+                                    control={control}
+                                    stage={stage}
+                                    isVerticalLayout={isVerticalLayout}
+                                    onActivate={skit => {
+                                        setRevision(current => current + 1);
+                                        onActivate?.(skit);
+                                    }}
+                                />
+                            );
+                        })}
                     </Box>
                 );
             })}

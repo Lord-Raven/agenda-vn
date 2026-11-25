@@ -27,6 +27,7 @@ type ControlDraft = {
     type: ControlType;
     barOrientation: BarOrientation;
     barControls: string[];
+    barContent: Control['barContent'];
     label: string;
     iconName: string;
     description: string;
@@ -65,6 +66,7 @@ const createDraft = (control: Control): ControlDraft => ({
     type: control.type,
     barOrientation: control.barOrientation,
     barControls: [...control.barControls],
+    barContent: control.barContent ? { ...control.barContent } : undefined,
     label: control.label,
     iconName: control.iconName,
     description: control.description,
@@ -144,13 +146,13 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const actors = useMemo(() => stageInstance.getConfiguration().actors || [], [stageInstance]);
     const items = useMemo(() => stageInstance.getConfiguration().items || [], [stageInstance]);
     const locations = useMemo(() => stageInstance.getConfiguration().locations || [], [stageInstance]);
-    // Controls eligible for a pop-up's title bar; the pop-up itself and other non-renderable types are excluded.
     const barControlOptions = useMemo(() => (stageInstance.getConfiguration().controls || [])
         .filter(candidate => candidate.active !== false && isBarContentControl(candidate))
         .map(candidate => ({
             key: controlReference(candidate.id),
             label: candidate.name || '(Unnamed Control)',
-            category: candidate.type === 'button' ? 'Buttons' : candidate.type === 'statDisplay' ? 'Stat Displays' : candidate.type === 'time' ? 'Time Controls' : 'Stat Editors',
+            category: candidate.type === 'button' ? 'Buttons' : candidate.type === 'statDisplay' ? 'Stat Displays'
+                : candidate.type === 'time' ? 'Time Controls' : candidate.type === 'dragDropDisplay' ? 'Drag and Drops' : 'Stat Editors',
             description: candidate.description,
         })), [stageInstance]);
     const titleBarControlOptions = barControlOptions.filter(option =>
@@ -171,6 +173,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             type: nextDraft.type,
             barOrientation: nextDraft.barOrientation,
             barControls: [...nextDraft.barControls],
+            barContent: nextDraft.barContent,
             label: nextDraft.label,
             iconName: nextDraft.iconName,
             description: nextDraft.description,
@@ -404,7 +407,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <div style={fieldHeadingStyle}>
                                     <label>Content Type (optional)</label>
                                     <HelpTip title="Display content type">
-                                        Leave unset to display a global stat. Select a content type to attach this display to matching Cards.
+                                        Leave unset to display a global stat. Select a content type to attach this display to matching Cards or Bars with that content context.
                                     </HelpTip>
                                 </div>
                                 <select
@@ -542,12 +545,34 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                             <option value="bottom">Bottom</option>
                         </select>
                         <div style={{ marginTop: 15 }}>
+                            <label htmlFor={`bar-content-kind-${control.id}`} style={labelStyle}>Content context (optional)</label>
+                            <select id={`bar-content-kind-${control.id}`} style={selectStyle} value={draft.barContent?.kind || ''}
+                                onChange={event => {
+                                    const kind = event.target.value as ContentType | '';
+                                    setDraft(current => ({ ...current, barContent: kind ? { kind, id: '' } : undefined }));
+                                }}>
+                                <option value="">None</option>
+                                <option value="actor">Actor</option>
+                                <option value="item">Item</option>
+                                <option value="location">Location</option>
+                            </select>
+                            {draft.barContent && <SearchableOptionPicker stage={stage} allowClear title="Choose bar content"
+                                value={draft.barContent.id || undefined}
+                                options={(draft.barContent.kind === 'actor' ? actors : draft.barContent.kind === 'item' ? items : locations)
+                                    .filter(entity => entity.active !== false)
+                                    .map(entity => ({ key: entity.id, label: entity.name }))}
+                                onChange={value => setDraft(current => ({
+                                    ...current,
+                                    barContent: current.barContent ? { ...current.barContent, id: typeof value === 'string' ? value : '' } : undefined,
+                                }))} />}
+                        </div>
+                        <div style={{ marginTop: 15 }}>
                             <label style={labelStyle}>Controls</label>
                             <SearchableOptionPicker stage={stage} multiple title="Choose bar controls"
                                 values={draft.barControls} options={barControlOptions}
                                 onChange={value => setDraft(current => ({ ...current, barControls: Array.isArray(value) ? value : [] }))} />
                             <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                Time Controls, Buttons, Stat Displays, and Stat Editors appear in selection order when available. The bar's own availability also applies.
+                                Controls appear in selection order when available. Content-bound displays require a matching content context; global controls do not. The bar's own availability also applies.
                             </span>
                         </div>
                     </section>
@@ -700,7 +725,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <div style={fieldHeadingStyle}>
                                     <label>Content Type</label>
                                     <HelpTip title="Display content type">
-                                        This display can be attached to Card Controls of this content type.
+                                        This display can be attached to Card Controls or Bars with this content type as their context.
                                     </HelpTip>
                                 </div>
                                 <select
