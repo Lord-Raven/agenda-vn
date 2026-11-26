@@ -227,7 +227,7 @@ for (const { name, from, to, comparison = 'notEquals', value, expectedValue, exp
             const condition: Condition = category === 'globalStat'
                 ? { type: 'globalStat', statId: from.id, comparison, value }
                 : { type: 'contentStat', contentType: 'actor', targetId: 'actor-x', statId: from.id, comparison, value };
-            assert.deepEqual(changeConditionSelect(condition, from.id, nextStat.id, {
+            assert.deepEqual(changeConditionSelect(condition, category === 'contentStat' ? `stat:${from.id}` : from.id, category === 'contentStat' ? `stat:${nextStat.id}` : nextStat.id, {
                 globalStats: [from, nextStat], actorStats: [from, nextStat],
                 actors: [{ id: 'actor-x', name: 'Actor X' }], locations, variableContentType: 'location',
             }), { ...condition, statId: nextStat.id, comparison: expectedComparison, value: expectedValue });
@@ -434,7 +434,7 @@ const hasOption = (tree: ReactNode, value: string): boolean => {
     return found;
 };
 
-test('condition stat kinds fall back to stage configuration unless explicitly overridden', () => {
+test('content condition kinds remain available without custom stats', () => {
     const stage = {
         getSave: () => ({ playerId: 'player' }),
         getConfiguration: () => ({
@@ -452,8 +452,36 @@ test('condition stat kinds fall back to stage configuration unless explicitly ov
     assert.equal(hasOption(configured, 'contentStat:item'), true);
 
     const overridden = ConditionEditor({ ...props, locationStats: [], itemStats: [] });
-    assert.equal(hasOption(overridden, 'contentStat:location'), false);
-    assert.equal(hasOption(overridden, 'contentStat:item'), false);
+    assert.equal(hasOption(overridden, 'contentStat:location'), true);
+    assert.equal(hasOption(overridden, 'contentStat:item'), true);
+});
+
+test('content conditions select properties separately from custom stats and keep compatible text values', () => {
+    const stat = cloneStat({ ...numberStat, id: 'property:name', type: 'text', default: '' });
+    const condition: Condition = { type: 'contentStat', contentType: 'actor', targetId: 'any', statId: stat.id, comparison: 'contains', value: 'ranger' };
+    const props = { actorStats: [stat], locationStats: [], variableContentType: 'actor' as const };
+    const property: Condition = { ...condition, statId: '', property: 'role' };
+    assert.deepEqual(changeConditionSelect(condition, 'stat:property:name', 'property:role', props), property);
+    assert.deepEqual(changeConditionSelect(property, 'property:role', 'stat:property:name', props), condition);
+    assert.deepEqual(changeConditionSelect(property, 'contentStat:actor', 'contentStat:location', props), {
+        type: 'contentStat', contentType: 'location', targetId: 'any', statId: '', property: 'name', comparison: 'contains', value: 'ranger',
+    });
+    assert.deepEqual(changeConditionSelect({ ...property, property: 'name' }, 'contentStat:actor', 'contentStat:location', props), {
+        ...property, contentType: 'location', property: 'name',
+    });
+});
+
+test('property conditions expose text comparisons and choose a property when there are no custom stats', () => {
+    const calendar: Condition = { type: 'calendar', field: 'day', comparison: 'greaterThan', value: 3 };
+    const property = changeConditionSelect(calendar, 'calendar', 'contentStat:item');
+    assert.deepEqual(property, { type: 'contentStat', contentType: 'item', targetId: 'any', statId: '', property: 'name', comparison: 'equals', value: '' });
+    const tree = ConditionEditor({ globalStats: [], conditionCollections: [[property]], onChange: () => undefined });
+    assert.equal(hasOption(tree, 'property:name'), true);
+    assert.equal(hasOption(tree, 'property:description'), true);
+    assert.equal(hasOption(tree, 'property:category'), true);
+    assert.equal(hasOption(tree, 'property:role'), false);
+    assert.equal(hasOption(tree, 'contains'), true);
+    assert.equal(hasOption(tree, 'greaterThan'), false);
 });
 
 test('Skit State is only offered when allowed or already selected', () => {

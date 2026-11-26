@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Condition, ConditionContext, evaluateCondition } from '../src/content/Condition';
+import { Condition, ConditionContext, ContentProperty, ContentType, evaluateCondition, hasVariableContentTarget } from '../src/content/Condition';
 import { cloneStat, StatType } from '../src/content/Stat';
 
 const listTypes: StatType[] = ['actorList', 'locationList', 'itemList', 'contentList', 'optionList'];
@@ -119,4 +119,45 @@ test('skit state condition values resolve references as the field type', () => {
     assert.equal(evaluateCondition({ type: 'skitState', field: 'participants', comparison: 'contains', value: 'stat:friend' }, context), true);
     assert.equal(evaluateCondition({ type: 'skitState', field: 'location', comparison: 'equals', value: 'stat:place' }, context), true);
     assert.deepEqual(types, ['actor', 'location']);
+});
+
+test('content properties compare raw strings for each entity kind and resolve values as text', () => {
+    const common = { id: 'one', name: 'Moonstone', description: 'A pale stone', category: 'Treasures' };
+    const actor = { ...common, displayName: 'Moon', role: 'Ranger', birthDate: '2000-01-02', summary: 'A scout', background: 'Raised outside', profile: 'Curious' };
+    const fields: Array<[ContentType, ContentProperty, string]> = [
+        ...(['actor', 'item', 'location'] as const).flatMap(type => [
+            [type, 'name', 'moonstone'], [type, 'description', 'pale'], [type, 'category', 'treasures'],
+        ] as Array<[ContentType, ContentProperty, string]>),
+        ['actor', 'displayName', 'moon'], ['actor', 'role', 'ranger'], ['actor', 'birthDate', '2000-01-02'],
+        ['actor', 'summary', 'scout'], ['actor', 'background', 'outside'], ['actor', 'profile', 'curious'],
+    ];
+    const context: ConditionContext = {
+        actors: [actor], inventory: [common], atlas: [common],
+        resolveValue: (value, type) => { assert.ok(type === 'text' || type === 'actor' || type === 'item' || type === 'location'); return literalValue(value); },
+    };
+    for (const [contentType, property, value] of fields) {
+        const condition: Condition = { type: 'contentStat', contentType, targetId: 'one', statId: '', property, comparison: 'contains', value };
+        assert.equal(evaluateCondition(condition, context), true, `${contentType} ${property}`);
+        assert.equal(evaluateCondition({ ...condition, comparison: 'notContains' }, context), false);
+    }
+});
+
+test('property targets support variable, any, none, missing fields and custom stat IDs independently', () => {
+    const stat = cloneStat({ id: 'property:name', name: 'Custom', type: 'text', default: '', guidance: '', llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] } });
+    const actor = { id: 'a', name: '1d6', role: 'Guard', statMap: { 'property:name': 'custom' } };
+    const context: ConditionContext = { actors: [actor, { id: 'b', role: 'Mage', active: false }], currentActor: actor, actorStats: [stat] };
+    const condition: Condition = { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'role', comparison: 'equals', value: 'guard' };
+    assert.equal(evaluateCondition(condition, context), true);
+    assert.equal(evaluateCondition({ ...condition, targetId: 'any' }, context), true);
+    assert.equal(evaluateCondition({ ...condition, targetId: 'none' }, context), false);
+    assert.equal(evaluateCondition({ ...condition, targetId: 'none', value: 'mage' }, context), true);
+    assert.equal(evaluateCondition({ ...condition, targetId: 'missing' }, context), false);
+    assert.equal(evaluateCondition({ ...condition, property: 'summary', value: '' }, context), true);
+    assert.equal(evaluateCondition({ ...condition, property: 'name', value: '1d6' }, context), true);
+    assert.equal(evaluateCondition({ ...condition, property: 'name', value: 'variable:actor' }, { ...context, currentActor: { ...actor, name: 'variable:actor' } }), true);
+    assert.equal(hasVariableContentTarget([[{ ...condition, targetId: 'a', value: 'variable:actor' }]]), false);
+    assert.equal(hasVariableContentTarget([[{ ...condition, value: 'variable:actor' }]]), true);
+    assert.equal(evaluateCondition({ ...condition, contentType: 'item', property: 'role', targetId: 'none' }, context), false);
+    assert.equal(evaluateCondition({ type: 'contentStat', contentType: 'actor', targetId: 'a', statId: 'property:name', comparison: 'equals', value: 'custom' }, context), true);
+    assert.equal(evaluateCondition(JSON.parse(JSON.stringify(condition)), context), true);
 });

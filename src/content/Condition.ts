@@ -34,8 +34,30 @@ export type ContentStatCondition = {
     contentType: ContentType;
     targetId: ContentTarget;
     statId: string;
+    property?: ContentProperty;
     comparison: ConditionComparison;
     value: string | number | boolean;
+};
+
+export type ContentProperty = 'name' | 'description' | 'category' | 'displayName' | 'role' | 'birthDate' | 'summary' | 'background' | 'profile';
+
+const COMMON_CONTENT_PROPERTIES: Array<{ key: ContentProperty; label: string }> = [
+    { key: 'name', label: 'Name' },
+    { key: 'description', label: 'Description' },
+    { key: 'category', label: 'Category' },
+];
+
+export const CONTENT_PROPERTIES: Record<ContentType, Array<{ key: ContentProperty; label: string }>> = {
+    actor: [...COMMON_CONTENT_PROPERTIES,
+        { key: 'displayName', label: 'Display Name' },
+        { key: 'role', label: 'Role' },
+        { key: 'birthDate', label: 'Birth Date' },
+        { key: 'summary', label: 'Summary' },
+        { key: 'background', label: 'Background' },
+        { key: 'profile', label: 'Profile' },
+    ],
+    location: COMMON_CONTENT_PROPERTIES,
+    item: COMMON_CONTENT_PROPERTIES,
 };
 
 // Checks the identity of the context-specific ('variable') entity of `contentType` against a specific entity
@@ -103,7 +125,7 @@ export const parseVariableContentValue = (value: unknown): ContentType | undefin
 // A ConditionCollection is an array of Condition objects, where all conditions must be satisfied for the collection to be considered true.
 export type ConditionCollection = Condition[];
 
-export type ConditionEntity = { id?: string; name?: string; statMap?: Record<string, StatValue>; active?: boolean; generic?: boolean; status?: string };
+export type ConditionEntity = { id?: string; statMap?: Record<string, StatValue>; active?: boolean; generic?: boolean; status?: string } & Partial<Record<ContentProperty, string>>;
 export type ConditionEntityCollection = ConditionEntity[] | Record<string, ConditionEntity>;
 
 // Field names mirror SaveType (actors/atlas/inventory) so a spread save works as a context directly.
@@ -226,23 +248,24 @@ const buildDiceSeed = (condition: Condition, context: ConditionContext): string 
 // Resolves a condition's target value, rolling dice notation deterministically if present.
 const resolveConditionValue = (condition: Condition, context: ConditionContext): string | number | boolean => {
     const value = (condition as GlobalStatCondition | ContentStatCondition | CalendarCondition).value;
-    const variableContentType = isListLengthComparison(condition.comparison) ? undefined : parseVariableContentValue(value);
+    const isContentProperty = condition.type === 'contentStat' && !!condition.property;
+    const variableContentType = isListLengthComparison(condition.comparison) || isContentProperty ? undefined : parseVariableContentValue(value);
     if (variableContentType) {
         return getContextCurrentContent(context, variableContentType)?.id || '';
     }
     const stat = condition.type === 'globalStat' ? context.globalStats?.find(stat => stat.id === condition.statId)
-        : condition.type === 'contentStat' ? getContextContentStats(context, condition.contentType).find(stat => stat.id === condition.statId) : undefined;
+        : condition.type === 'contentStat' && !condition.property ? getContextContentStats(context, condition.contentType).find(stat => stat.id === condition.statId) : undefined;
     const type = isListLengthComparison(condition.comparison) ? 'number'
         : condition.type === 'contentIdentity' ? condition.contentType
         : condition.type === 'function' ? functionConditionValueType(getConditionFunction(condition, context)) || 'text'
         : condition.type === 'skitState' ? listElementType(SKIT_STATE_FIELD_TYPES[condition.field]) || SKIT_STATE_FIELD_TYPES[condition.field]
             : stat ? listElementType(stat.type) || stat.type
                 : condition.type === 'calendar' && condition.field !== 'dayOfWeek' && condition.field !== 'timeOfDay' ? 'number' : 'text';
-    const resolved = isDiceNotation(value) ? value : context.resolveValue?.(value, type === 'contentList' ? parseMovedContentValue(value) || type : type) ?? value;
+    const resolved = !isContentProperty && isDiceNotation(value) ? value : context.resolveValue?.(value, type === 'contentList' ? parseMovedContentValue(value) || type : type) ?? value;
     if (Array.isArray(resolved)) {
         throw new Error('A condition comparison requires a scalar function result.');
     }
-    return isDiceNotation(resolved) ? rollDiceNotation(resolved, buildDiceSeed(condition, context)) : resolved;
+    return !isContentProperty && isDiceNotation(resolved) ? rollDiceNotation(resolved, buildDiceSeed(condition, context)) : resolved;
 };
 
 const normalizeStatConditionValue = (value: string | number | boolean, stat: Stat | undefined): string | number | boolean => {
@@ -338,10 +361,12 @@ const resolveConditionContentSubjects = (contentType: ContentType, targetId: Con
 
 export const evaluateContentStatCondition = (condition: ContentStatCondition, context: ConditionContext): boolean => {
     const { mode, entities } = resolveConditionContentSubjects(condition.contentType, condition.targetId, context);
-    const stat = getContextContentStats(context, condition.contentType).find(candidate => candidate.id === condition.statId);
+    const property = condition.property;
+    if (property && !CONTENT_PROPERTIES[condition.contentType].some(candidate => candidate.key === property)) return false;
+    const stat = property ? undefined : getContextContentStats(context, condition.contentType).find(candidate => candidate.id === condition.statId);
     const value = resolveConditionValue(condition, context);
     const resolvedValue = isListLengthComparison(condition.comparison) ? value : normalizeStatConditionValue(value, stat);
-    const matches = (entity: ConditionEntity) => compareValues(stat ? resolveStatValue(entity.statMap?.[stat.id], stat, context) : undefined, resolvedValue, condition.comparison);
+    const matches = (entity: ConditionEntity) => compareValues(property ? entity[property] ?? '' : stat ? resolveStatValue(entity.statMap?.[stat.id], stat, context) : undefined, resolvedValue, condition.comparison);
 
     if (mode === 'any') return entities.some(matches);
     if (mode === 'none') return !entities.some(matches);
@@ -413,7 +438,8 @@ export const evaluateConditionCollections = (conditionCollections: ConditionColl
 // Whether any condition depends on a bound 'variable' entity (of `contentType`, or of any type if omitted).
 export const hasVariableContentTarget = (conditionCollections: ConditionCollection[] | undefined, contentType?: ContentType): boolean => {
     return !!conditionCollections?.some((collection) => collection.some((condition) => {
-        const valueContentType = condition.type !== 'contentIdentity' ? parseVariableContentValue(condition.value) : undefined;
+        const valueContentType = condition.type !== 'contentIdentity' && !(condition.type === 'contentStat' && condition.property)
+            ? parseVariableContentValue(condition.value) : undefined;
         if (valueContentType && (!contentType || valueContentType === contentType)) {
             return true;
         }

@@ -2,7 +2,7 @@ import { FC } from 'react';
 import { Add, AllInclusive, ArrowDownward, ArrowUpward, Delete, DoNotDisturb, LinkOffRounded, LinkRounded, SwapHoriz } from '@mui/icons-material';
 import { findStatOptionByValue, isContentListDisplayType, isOptionListStatType, isReferenceDisplayType, isReferenceListDisplayType, isTextDisplayType, resolveReferenceKind, resolveStatOptionPool, Stat, StatType } from '../content/Stat';
 import { Actor, getEmotionImage } from '../content/Actor';
-import { CONTENT_TYPES, ContentType, Condition, ConditionCollection, ConditionComparison, FunctionCondition, GlobalStatCondition, SKIT_STATE_FIELD_TYPES, SkitStateCondition, SkitStateField, functionConditionValueType, isListLengthComparison, variableContentValue } from '../content/Condition';
+import { CONTENT_PROPERTIES, CONTENT_TYPES, ContentProperty, ContentType, Condition, ConditionCollection, ConditionComparison, FunctionCondition, GlobalStatCondition, SKIT_STATE_FIELD_TYPES, SkitStateCondition, SkitStateField, functionConditionValueType, isListLengthComparison, variableContentValue } from '../content/Condition';
 import { CALENDAR_TIME_OF_DAY_ORDER, formatTimeSlot, timeSlotTerm } from '../content/CalendarEvent';
 import { ActorLike, Button, ReferenceSelect, TextInput } from './UiComponents';
 import { SearchableOptionPicker } from './SearchableOptionPicker';
@@ -128,6 +128,14 @@ const skitStateStat = (field: SkitStateField): Stat => ({
     llmSees: { value: false, conditions: [] },
     llmMaintained: { value: false, conditions: [] },
 });
+
+const contentPropertyStat = (contentType: ContentType, property: ContentProperty): Stat | undefined => {
+    const definition = CONTENT_PROPERTIES[contentType].find(candidate => candidate.key === property);
+    return definition && {
+        id: definition.key, name: definition.label, type: 'text', default: '', guidance: '',
+        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+    };
+};
 
 const selectStyle = {
     minHeight: 38,
@@ -326,6 +334,9 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         if (condition.type === 'skitState') {
             return skitStateStat(condition.field);
         }
+        if (condition.type === 'contentStat' && condition.property) {
+            return contentPropertyStat(condition.contentType, condition.property);
+        }
         if (condition.type === 'globalStat' || condition.type === 'contentStat') {
             return statsForCondition(condition).find(candidate => candidate.id === condition.statId);
         }
@@ -348,7 +359,9 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
         }
         if (type === 'contentStat') {
             const stat = statsByContentType[contentType][0];
-            return { type: 'contentStat', contentType, targetId: targetOptionsFor(contentType)[0]?.key || 'any', statId: stat?.id || '', comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) };
+            const property = stat ? undefined : CONTENT_PROPERTIES[contentType][0].key;
+            const selectedStat = stat || (property && contentPropertyStat(contentType, property));
+            return { type: 'contentStat', contentType, targetId: targetOptionsFor(contentType)[0]?.key || 'any', statId: stat?.id || '', ...(property ? { property } : {}), comparison: getDefaultComparison(selectedStat), value: getDefaultConditionValue(selectedStat) };
         }
         if (type === 'function') {
             const fn = conditionFunctions[0];
@@ -447,17 +460,25 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
             };
         }
         if (next.type === 'globalStat' || next.type === 'contentStat') {
-            if (preserveStatId && (previous.type === 'globalStat' || previous.type === 'contentStat')
+            if (preserveStatId && next.type === 'contentStat' && previous.type === 'contentStat'
+                && previous.property && contentPropertyStat(next.contentType, previous.property)) {
+                next = { ...next, statId: '', property: previous.property };
+            } else if (preserveStatId && (previous.type === 'globalStat' || previous.type === 'contentStat')
+                && !(previous.type === 'contentStat' && previous.property)
                 && statsForCondition(next).some(stat => stat.id === previous.statId)) {
-                next = { ...next, statId: previous.statId };
+                if (next.type === 'contentStat') {
+                    const { property: _property, ...base } = next;
+                    next = { ...base, statId: previous.statId };
+                } else {
+                    next = { ...next, statId: previous.statId };
+                }
             }
             if (next.type === 'contentStat' && previous.type === 'contentStat'
                 && (targetOptionsFor(next.contentType).some(option => option.key === previous.targetId)
                     || (isValueReference(previous.targetId) && isValidSourceFor(previous.targetId, next.contentType, previous.contentType)))) {
                 next = { ...next, targetId: previous.targetId };
             }
-            const { statId } = next;
-            const stat = statsForCondition(next).find(candidate => candidate.id === statId);
+            const stat = statForCondition(next);
             next = { ...next, comparison: getDefaultComparison(stat, previous.comparison) };
             return {
                 ...next,
@@ -638,9 +659,7 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                         >
                             <option value="calendar">Calendar</option>
                             <option value="globalStat">Global Stat</option>
-                            {CONTENT_TYPES
-                                .filter((contentType) => statsByContentType[contentType].length > 0 || conditionKindValue(condition) === `contentStat:${contentType}`)
-                                .map((contentType) => <option key={contentType} value={`contentStat:${contentType}`}>{CONTENT_TYPE_LABELS[contentType]} Stat</option>)}
+                            {CONTENT_TYPES.map((contentType) => <option key={contentType} value={`contentStat:${contentType}`}>{CONTENT_TYPE_LABELS[contentType]} Stat</option>)}
                             {variableContentType && <option value={`contentIdentity:${variableContentType}`}>{CONTENT_TYPE_LABELS[variableContentType]} Identity</option>}
                             {(conditionFunctions.length > 0 || condition.type === 'function') && <option value="function">Function</option>}
                             {(allowSkitState || condition.type === 'skitState') && <option value="skitState">Skit State</option>}
@@ -684,11 +703,22 @@ export const ConditionEditor: FC<ConditionEditorProps> = ({ conditionCollections
                             />
                         ) : null}
                         {(condition.type === 'globalStat' || condition.type === 'contentStat') && (
-                            <select style={selectStyle} value={condition.statId} onChange={(event) => {
-                                const stat = statsForCondition(condition).find(candidate => candidate.id === event.target.value);
-                                updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, { ...condition, statId: event.target.value, comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) }));
+                            <select style={selectStyle} value={condition.type === 'contentStat' ? condition.property ? `property:${condition.property}` : `stat:${condition.statId}` : condition.statId} onChange={(event) => {
+                                const value = event.target.value;
+                                if (condition.type === 'contentStat') {
+                                    const property = CONTENT_PROPERTIES[condition.contentType].find(candidate => value === `property:${candidate.key}`)?.key;
+                                    const { property: _property, ...base } = condition;
+                                    const next = property ? { ...base, statId: '', property } : { ...base, statId: value.slice('stat:'.length) };
+                                    updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, next));
+                                    return;
+                                }
+                                const stat = statsForCondition(condition).find(candidate => candidate.id === value);
+                                updateCondition(collectionIndex, conditionIndex, retainValidSelections(condition, { ...condition, statId: value, comparison: getDefaultComparison(stat), value: getDefaultConditionValue(stat) }));
                             }}>
-                                {statsForCondition(condition).map(stat => <option key={stat.id} value={stat.id}>{stat.name}</option>)}
+                                {condition.type === 'contentStat' && <optgroup label="Properties" title="Compares the raw property; missing properties are empty strings.">
+                                    {CONTENT_PROPERTIES[condition.contentType].map(property => <option key={property.key} value={`property:${property.key}`}>{property.label}</option>)}
+                                </optgroup>}
+                                {statsForCondition(condition).map(stat => <option key={stat.id} value={condition.type === 'contentStat' ? `stat:${stat.id}` : stat.id}>{stat.name}</option>)}
                             </select>
                         )}
                         {condition.type === 'calendar' && (

@@ -115,6 +115,25 @@ test('cue revision replaces metadata by index, resets movement state, and preser
     assert.deepEqual(entries[1].outcomes, []);
 });
 
+test('variable actor properties gate stat visibility and stat changes during skits', async () => {
+    for (const [role, allowed] of [['Ranger', true], ['Scholar', false]] as const) {
+        const { stage, skit, save } = fixture();
+        save.actors.ally.role = role;
+        const condition = { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'role', comparison: 'equals', value: 'Ranger' } as const;
+        const stat = stage.getConfiguration().actorStats[0];
+        stat.llmSees = { value: true, conditions: [[condition]] };
+        stat.llmMaintained = { value: true, conditions: [[condition]] };
+        const prompts: string[] = [];
+        stage.generateText = async prompt => {
+            prompts.push(prompt);
+            return prompts.length === 1 ? originalScript : revisedCues;
+        };
+        const entries = await generateSkitScript(skit, stage);
+        assert.equal(prompts[0].includes('These are the established actor-level stats'), allowed);
+        assert.equal(entries[0].outcomes.some(outcome => outcome.type === OutcomeType.ACTOR_STAT), allowed);
+    }
+});
+
 for (const finishFirst of ['speech', 'cues']) {
     test(`speech and cue revision run concurrently and are both awaited (${finishFirst} completes first)`, async () => {
         const { stage, skit, speak } = fixture();

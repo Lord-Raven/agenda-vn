@@ -960,7 +960,7 @@ export function buildActorContext(actor: Actor, outfitId: string, stage: Stage, 
     if (options.includes('stats')) {
         const actorStatContext: ConditionContext = {
             ...stage.getScheduleContext(save),
-            currentActor: { id: actor.id, name: actor.name, statMap: actor.statMap },
+            currentActor: actor,
         };
         const actorStats = (stage.getConfiguration(save).actorStats || []).filter(stat => stat?.name?.trim() && isStatLlmSeen(stat, actorStatContext));
         const statLines = actorStats

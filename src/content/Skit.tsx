@@ -54,7 +54,7 @@ const buildActorStatPromptContext = (stage: Stage, save: ReturnType<Stage['getSa
         .filter(stat => stat?.id && stat.name?.trim())
         .filter(stat => actors.some(actor => isStatLlmSeen(stat, {
                 ...baseContext,
-                currentActor: { id: actor.id, name: actor.name, statMap: actor.statMap },
+                currentActor: actor,
             })));
 
     if (stats.length === 0) {
@@ -789,7 +789,7 @@ export async function generateSkitScript(skit: Skit, stage: Stage): Promise<Scri
 
                 const matchedStatContext: ConditionContext = {
                     ...stage.getScheduleContext(save),
-                    currentActor: { id: matchedActor.id, name: matchedActor.name, statMap: matchedActor.statMap },
+                    currentActor: matchedActor,
                 };
                 if (!isStatLlmMaintained(matchedStat, matchedStatContext)) {
                     return undefined;

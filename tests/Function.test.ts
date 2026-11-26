@@ -2265,6 +2265,20 @@ test('actor context retains ordinary stats and conditional LLM visibility', () =
     assert.doesNotMatch(buildActorContext(save.actors.a, '', stage, ['summary']).format(), /Score|Party/);
 });
 
+test('actor stat visibility can depend on the variable actor role', () => {
+    const { stage, save, configuration } = fixture();
+    save.actors.a.role = 'Ranger';
+    configuration.actorStats = [stat('Score', 'number', {
+        llmSees: { value: true, conditions: [[{
+            type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'role',
+            comparison: 'equals', value: 'Ranger',
+        }]] },
+    })];
+    assert.match(buildActorContext(save.actors.a, '', stage, ['stats']).format(), /Score: 2/);
+    save.actors.a.role = 'Scholar';
+    assert.doesNotMatch(buildActorContext(save.actors.a, '', stage, ['stats']).format(), /Score: 2/);
+});
+
 test('synchronizing legacy saves materializes references once for global and entity stats', () => {
     const { stage, configuration, save } = fixture();
     configuration.functions = [typedFunction('cast', 'actorList', 'return get("Score") > 1 ? ["a"] : ["b"];')];
