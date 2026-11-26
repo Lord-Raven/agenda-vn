@@ -44,6 +44,11 @@ type ControlDraft = {
     onDragActions: StatUpdateAction[];
     onDropActions: StatUpdateAction[];
     dropValidityConditions: ConditionCollection[];
+    emptyText: string;
+    showBorder: boolean;
+    borderColor: string;
+    showBackground: boolean;
+    backgroundColor: string;
     pickerSource?: string[];
     screenId: string;
     titleBarControls: string[];
@@ -83,6 +88,11 @@ const createDraft = (control: Control): ControlDraft => ({
     onDragActions: control.onDragActions.map(cloneStatUpdateAction),
     onDropActions: control.onDropActions.map(cloneStatUpdateAction),
     dropValidityConditions: control.dropValidityConditions.map(collection => collection.map(condition => ({ ...condition }))),
+    emptyText: control.emptyText,
+    showBorder: control.showBorder,
+    borderColor: control.borderColor,
+    showBackground: control.showBackground,
+    backgroundColor: control.backgroundColor,
     pickerSource: control.pickerSource ? [...control.pickerSource] : undefined,
     screenId: control.screenId,
     titleBarControls: [...control.titleBarControls],
@@ -190,6 +200,11 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             onDragActions: nextDraft.onDragActions,
             onDropActions: nextDraft.onDropActions,
             dropValidityConditions: nextDraft.dropValidityConditions,
+            emptyText: nextDraft.emptyText,
+            showBorder: nextDraft.showBorder,
+            borderColor: nextDraft.borderColor,
+            showBackground: nextDraft.showBackground,
+            backgroundColor: nextDraft.backgroundColor,
             pickerSource: nextDraft.pickerSource ? [...nextDraft.pickerSource] : undefined,
             screenId: nextDraft.screenId,
             titleBarControls: [...nextDraft.titleBarControls],
@@ -760,6 +775,25 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 </VariableContentContext.Provider>
                             </div>
                             {isDragDrop && <>
+                                <div>
+                                    <label style={labelStyle} htmlFor={`control-empty-text-${control.id}`}>Empty Text</label>
+                                    <TextInput id={`control-empty-text-${control.id}`} fullWidth value={draft.emptyText}
+                                        onChange={e => setDraft(current => ({ ...current, emptyText: e.target.value }))} />
+                                    <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>Leave empty to show no text while retaining the drop target.</span>
+                                </div>
+                                {([
+                                    ['showBorder', 'borderColor', 'Border'],
+                                    ['showBackground', 'backgroundColor', 'Background'],
+                                ] as const).map(([enabled, color, label]) => <div key={enabled}>
+                                    <label style={labelStyle}>
+                                        <input id={`control-${enabled}-${control.id}`} type="checkbox" checked={draft[enabled]}
+                                            onChange={e => setDraft(current => ({ ...current, [enabled]: e.target.checked }))} />
+                                        {' '}{label}
+                                    </label>
+                                    {draft[enabled] && <ColorPickerInput value={draft[color]} placeholder="Theme default"
+                                        popoverTitle={`Choose ${label} Color`}
+                                        onChange={value => setDraft(current => ({ ...current, [color]: value }))} />}
+                                </div>)}
                                 <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                     Both action lists run on drop, not at drag start. On Drop runs first, even if the incoming content is already displayed.
                                     On Drag runs when content is dropped outside its source display. Dropping back into the same display or canceling does nothing.

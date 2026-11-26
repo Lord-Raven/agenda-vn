@@ -40,6 +40,22 @@ test('drop validity conditions survive cloning and export without the legacy val
     assert.deepEqual(new Control().dropValidityConditions, []);
 });
 
+test('drag/drop appearance defaults and explicit empty text survive import and export', () => {
+    const legacy = new Control(JSON.parse('{}'));
+    assert.equal(legacy.emptyText, 'None');
+    assert.equal(legacy.showBorder, false);
+    assert.equal(legacy.showBackground, false);
+    const original = new Control({ type: 'dragDropDisplay', emptyText: '', showBorder: true,
+        borderColor: '#123456', showBackground: true, backgroundColor: '#abcdef' });
+    const restored = new Control(JSON.parse(JSON.stringify(original)));
+    assert.equal(restored.emptyText, '');
+    assert.equal(restored.showBorder, true);
+    assert.equal(restored.borderColor, '#123456');
+    assert.equal(restored.showBackground, true);
+    assert.equal(restored.backgroundColor, '#abcdef');
+    assert.equal(new Control({ emptyText: undefined }).emptyText, 'None');
+});
+
 test('new and legacy controls default to equal width weights', () => {
     assert.equal(new Control({}).widthWeight, 1);
     assert.equal(new Control({ widthWeight: undefined }).widthWeight, 1);

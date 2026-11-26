@@ -31,13 +31,14 @@ interface ContentListPortraitsProps {
     size?: number;
     draggable?: boolean;
     hoverCards?: boolean;
+    emptyText?: string;
 }
 
 const PORTRAIT_SIZE = 40;
 const PORTRAIT_OVERLAP = 6;
 const PORTRAIT_HOVER_SCALE = 1.1;
 
-export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label, variant = 'carousel', size = PORTRAIT_SIZE, draggable = false, hoverCards = false }) => {
+export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, values, stage, label, variant = 'carousel', size = PORTRAIT_SIZE, draggable = false, hoverCards = false, emptyText = 'None' }) => {
     const isOverlay = variant === 'overlay';
     const overlap = isOverlay ? Math.round(size * 0.32) : PORTRAIT_OVERLAP;
     // Scroll positions round to whole pixels, even when the viewport width is fractional.
@@ -128,7 +129,7 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                         marginLeft: `-${overlap}px`,
                     },
                 }}>
-                    {values.length === 0 && <span style={{ display: 'flex', alignItems: 'center', height: dimension, color: 'var(--agenda-text-muted)', fontSize: imageStyle.fontSize }}>None</span>}
+                    {values.length === 0 && <span style={{ display: 'flex', alignItems: 'center', height: dimension, color: 'var(--agenda-text-muted)', fontSize: imageStyle.fontSize }}>{emptyText}</span>}
                     {values.map((id, index) => {
                         const actor = !kind || kind === 'actor' ? save.actors?.[id] : undefined;
                         const item = !actor && (!kind || kind === 'item') ? save.inventory?.find((candidate) => candidate.id === id) : undefined;

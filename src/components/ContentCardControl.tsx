@@ -205,7 +205,8 @@ export const ListCardDetail: FC<{
                     }}>{renderLoreIcons(labelText, stage)}</Typography>}
                 </Box>}
                 <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={label} variant="overlay"
-                    size={large ? 48 : isVerticalLayout ? 30 : 36} draggable={dragDrop && control.onDragActions.length > 0} hoverCards={dragDrop} />
+                    size={large ? 48 : isVerticalLayout ? 30 : 36} draggable={dragDrop && control.onDragActions.length > 0} hoverCards={dragDrop}
+                    emptyText={dragDrop ? control.emptyText : undefined} />
             </Box>
         ) : null;
         return dragDrop && (control.contentType === undefined || (kind && id)) ? <DragDropDisplay stage={stage}

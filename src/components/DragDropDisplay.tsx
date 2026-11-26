@@ -45,8 +45,11 @@ export const DragDropDisplay: FC<{
 
     return <div data-drag-drop-display={context.control.id} data-drop-highlighted={highlighted || undefined}
         style={{ minWidth: 32, minHeight: 32, borderRadius: 8,
+            boxSizing: 'border-box',
+            border: context.control.showBorder ? `1px solid ${context.control.borderColor || 'var(--agenda-panel-border)'}` : undefined,
             outline: highlighted ? '2px solid var(--agenda-highlight)' : undefined,
-            background: highlighted ? 'color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' : undefined }}
+            backgroundColor: context.control.showBackground ? context.control.backgroundColor || 'var(--agenda-panel-surface)' : undefined,
+            backgroundImage: highlighted ? 'linear-gradient(color-mix(in srgb, var(--agenda-highlight) 15%, transparent), color-mix(in srgb, var(--agenda-highlight) 15%, transparent))' : undefined }}
         onClick={event => event.stopPropagation()}
         onDragStart={event => {
             if (!context.control.onDragActions.length) {

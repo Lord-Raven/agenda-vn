@@ -31,7 +31,7 @@ import { CardActionContext, ContentCardControl } from '../src/components/Content
 import { OutcomeEditor } from '../src/components/OutcomeEditor';
 import { GameManagementPanel } from '../src/screens/GameManagementPanel';
 import { ActorCard } from '../src/components/ActorCard';
-import { NamePlate } from '../src/components/UiComponents';
+import { ColorPickerInput, NamePlate } from '../src/components/UiComponents';
 import { DragDropDisplay } from '../src/components/DragDropDisplay';
 import { ControlDock } from '../src/components/ControlDock';
 import { GlobalStatBar } from '../src/components/GlobalStatBar';
@@ -593,6 +593,12 @@ test('drag/drop editor offers content sources, action lists, and validity condit
         const onDragActions = [{ id: 'drag-action', kind: 'function' as const, functionId: 'drag', args: { Owner: variableContentValue('actor'), Moved: movedContentValue('actor') } }];
         act(() => onDrag.props.onChange(onDragActions));
         assert.match(JSON.stringify(renderer!.toJSON()), /Dragged Element/);
+        act(() => renderer!.root.findByProps({ id: `control-empty-text-${source.control.id}` }).props.onChange({ target: { value: '' } }));
+        act(() => renderer!.root.findByProps({ id: `control-showBorder-${source.control.id}` }).props.onChange({ target: { checked: true } }));
+        act(() => renderer!.root.findByProps({ id: `control-showBackground-${source.control.id}` }).props.onChange({ target: { checked: true } }));
+        const colors = renderer!.root.findAllByType(ColorPickerInput);
+        act(() => colors.find(picker => picker.props.popoverTitle === 'Choose Border Color')!.props.onChange('#123456'));
+        act(() => colors.find(picker => picker.props.popoverTitle === 'Choose Background Color')!.props.onChange('#abcdef'));
         act(() => renderer!.unmount());
         renderer = undefined;
         const saved = configuration.controls.find(control => control.id === source.control.id)!;
@@ -601,6 +607,11 @@ test('drag/drop editor offers content sources, action lists, and validity condit
         assert.deepEqual(saved.onDragActions, onDragActions);
         assert.deepEqual(saved.onDropActions, onDropActions);
         assert.deepEqual(saved.dropValidityConditions, dropValidityConditions);
+        assert.equal(saved.emptyText, '');
+        assert.equal(saved.showBorder, true);
+        assert.equal(saved.borderColor, '#123456');
+        assert.equal(saved.showBackground, true);
+        assert.equal(saved.backgroundColor, '#abcdef');
     } finally {
         if (renderer) act(() => renderer!.unmount());
         if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
@@ -620,10 +631,36 @@ test('drag/drop displays retain empty drop targets and make dragging opt-in', ()
     save.actors.alice.statMap.Contents = [];
     assert.match(render(), /data-drag-drop-display=/);
     assert.match(render(), />None<\/span>/);
+    source.control.emptyText = 'Empty slot';
+    assert.match(render(), />Empty slot<\/span>/);
+    source.control.emptyText = '';
+    const blank = render();
+    assert.match(blank, /data-drag-drop-display=/);
+    assert.doesNotMatch(blank, />None<\/span>|>Empty slot<\/span>/);
+});
+
+test('drag/drop appearance uses optional theme or custom colors without changing defaults', () => {
+    const { stage, source } = dragDropFixture();
+    const render = () => renderToStaticMarkup(<DragDropDisplay stage={stage} context={source}><span>Contents</span></DragDropDisplay>);
+    assert.doesNotMatch(render(), /border:1px solid|background-color:/);
+    source.control.showBorder = true;
+    source.control.showBackground = true;
+    assert.match(render(), /border:1px solid var\(--agenda-panel-border\)/);
+    assert.match(render(), /background-color:var\(--agenda-panel-surface\)/);
+    source.control.borderColor = '#123456';
+    source.control.backgroundColor = '#abcdef';
+    assert.match(render(), /border:1px solid #123456/);
+    assert.match(render(), /background-color:#abcdef/);
+    source.control.showBorder = false;
+    source.control.showBackground = false;
+    assert.doesNotMatch(render(), /#123456|#abcdef/);
 });
 
 test('drag gestures highlight valid receivers, skip invalid receivers, and clean up on drop or cancel', () => {
     const { stage, source, target, save } = dragDropFixture();
+    target.control.showBorder = true;
+    target.control.showBackground = true;
+    target.control.backgroundColor = '#abcdef';
     const originalNode = Object.getOwnPropertyDescriptor(globalThis, 'Node');
     Object.defineProperty(globalThis, 'Node', { configurable: true, value: class {} });
     const listeners = new Map<string, EventListener>();
@@ -649,9 +686,14 @@ test('drag gestures highlight valid receivers, skip invalid receivers, and clean
         const displays = () => renderer!.root.findAllByType('div').filter(node => node.props['data-drag-drop-display']);
         act(() => displays()[0].props.onDragStart(event()));
         assert.equal(displays()[1].props['data-drop-highlighted'], true);
+        assert.equal(displays()[1].props.style.backgroundColor, '#abcdef');
+        assert.match(displays()[1].props.style.backgroundImage, /--agenda-highlight/);
+        assert.match(displays()[1].props.style.outline, /--agenda-highlight/);
         assert.equal(save.globalStatValues.Title, 'Squad', 'drag start and validation do not run actions');
         act(() => displays()[0].props.onDragEnd());
         assert.equal(displays()[1].props['data-drop-highlighted'], undefined);
+        assert.equal(displays()[1].props.style.backgroundColor, '#abcdef');
+        assert.equal(displays()[1].props.style.backgroundImage, undefined);
         assert.equal(listeners.size, 0);
         act(() => displays()[0].props.onDragStart(event()));
         act(() => displays()[0].props.onDrop({ ...event(), currentTarget: sourceElement }));

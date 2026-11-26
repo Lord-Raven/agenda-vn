@@ -98,6 +98,12 @@ export class Control {
     onDragActions: StatUpdateAction[] = [];
     onDropActions: StatUpdateAction[] = [];
     dropValidityConditions: ConditionCollection[] = [];
+    // Drag/drop appearance; blank colors use the current theme and blank empty text remains blank.
+    emptyText: string = 'None';
+    showBorder: boolean = false;
+    borderColor: string = '';
+    showBackground: boolean = false;
+    backgroundColor: string = '';
     // Undefined uses the normal picker options; an array is resolved as a list of allowed option IDs.
     pickerSource?: string[];
     // Pop-ups display this Screen regardless of its availability; marker control conditions still apply.
@@ -156,6 +162,11 @@ export class Control {
         this.onDragActions = Array.isArray(this.onDragActions) ? this.onDragActions.map(cloneStatUpdateAction) : [];
         this.onDropActions = Array.isArray(this.onDropActions) ? this.onDropActions.map(cloneStatUpdateAction) : [];
         this.dropValidityConditions = Array.isArray(this.dropValidityConditions) ? this.dropValidityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
+        this.emptyText = typeof this.emptyText === 'string' ? this.emptyText : 'None';
+        this.showBorder = this.showBorder === true;
+        this.borderColor = typeof this.borderColor === 'string' ? this.borderColor : '';
+        this.showBackground = this.showBackground === true;
+        this.backgroundColor = typeof this.backgroundColor === 'string' ? this.backgroundColor : '';
         this.pickerSource = Array.isArray(this.pickerSource) ? this.pickerSource.filter((entry): entry is string => typeof entry === 'string') : undefined;
         this.screenId = `${this.screenId || ''}`;
         this.titleBarControls = Array.isArray(this.titleBarControls) ? this.titleBarControls.filter(isControlReference) : [];
