@@ -140,7 +140,7 @@ export const ContentCardControl: FC<ContentCardControlProps> = ({
                         alignItems: vertical ? 'stretch' : 'center', justifyContent: 'flex-end', minWidth: 0, maxWidth: '100%' }}>
                     {details.map(detail => <ListCardDetail key={detail.key} detail={detail} stage={instance}
                         isVerticalLayout={compact} large={large} kind={kind} id={id} header={header}
-                        onChange={() => { refresh(value => value + 1); (onAction || globalOnAction)?.(); }} />)}
+                        onChange={skit => { refresh(value => value + 1); (onAction || globalOnAction)?.(skit); }} />)}
                     {trailing && <Box onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{trailing}</Box>}
                 </Box>
             )}
@@ -174,7 +174,7 @@ export const ListCardDetail: FC<{
     // ~50% larger badge text/icons for horizontal landscape cards, whose bar height dwarfs the defaults.
     large?: boolean;
     kind?: ContentType; id?: string; header?: string;
-    onChange?: () => void;
+    onChange?: (skit?: Skit | null) => void;
 }> = ({ detail, stage, isVerticalLayout, large = false, kind, id, header, onChange }) => {
     const control = detail.control;
     const text = (value: string, options?: { icons: 'token' }) => kind && id && (control?.type !== 'dragDropDisplay' || control.contentType !== undefined)
@@ -205,7 +205,7 @@ export const ListCardDetail: FC<{
                     }}>{renderLoreIcons(labelText, stage)}</Typography>}
                 </Box>}
                 <ContentListPortraits kind={resolveReferenceKind(detail.type)} values={values} stage={stage} label={label} variant="overlay"
-                    size={large ? 48 : isVerticalLayout ? 30 : 36} draggable={dragDrop && !!control.onDragFunction} hoverCards={dragDrop} />
+                    size={large ? 48 : isVerticalLayout ? 30 : 36} draggable={dragDrop && control.onDragActions.length > 0} hoverCards={dragDrop} />
             </Box>
         ) : null;
         return dragDrop && (control.contentType === undefined || (kind && id)) ? <DragDropDisplay stage={stage}

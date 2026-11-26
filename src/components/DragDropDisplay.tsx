@@ -2,6 +2,7 @@ import { FC, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { Stage } from '../Stage';
 import { ContentDisplayContext } from '../content/Control';
 import { ContentType } from '../content/Condition';
+import { Skit } from '../content/Skit';
 import { CardActionContext } from './ContentCardControl';
 
 type DragSession = {
@@ -24,7 +25,7 @@ export const DragDropDisplay: FC<{
     stage: Stage;
     context: ContentDisplayContext;
     accepts?: ContentType;
-    onChange?: () => void;
+    onChange?: (skit?: Skit | null) => void;
     children: ReactNode;
 }> = ({ stage, context, accepts, onChange, children }) => {
     const onAction = useContext(CardActionContext);
@@ -48,7 +49,7 @@ export const DragDropDisplay: FC<{
             background: highlighted ? 'color-mix(in srgb, var(--agenda-highlight) 15%, transparent)' : undefined }}
         onClick={event => event.stopPropagation()}
         onDragStart={event => {
-            if (!context.control.onDragFunction) {
+            if (!context.control.onDragActions.length) {
                 event.preventDefault();
                 return;
             }
@@ -70,14 +71,15 @@ export const DragDropDisplay: FC<{
             const finish: DragSession['finish'] = (target, targetElement) => {
                 cancel();
                 if (targetElement === element) return;
+                let skit: Skit | null = null;
                 try {
-                    stage.runContentDrop(context, kind, id, target);
+                    skit = stage.runContentDrop(context, kind, id, target);
                 } catch (error) {
                     console.error('Failed to run drag and drop actions:', error);
                     stage.showPriorityMessage(`Failed to run drag and drop actions: ${error instanceof Error ? error.message : String(error)}`);
                 } finally {
-                    if (onChange) onChange();
-                    else onAction?.();
+                    if (onChange) onChange(skit);
+                    else onAction?.(skit);
                 }
             };
             const over = (dropEvent: DragEvent) => dropEvent.preventDefault();

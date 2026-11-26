@@ -1,7 +1,44 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { compareControlPriority, Control, controlReference, isBarContentControl, isControlAvailable } from '../src/content/Control';
-import { cloneStat } from '../src/content/Stat';
+import { cloneStat, StatUpdateAction } from '../src/content/Stat';
+import { ConditionCollection, variableContentValue } from '../src/content/Condition';
+import { movedContentValue } from '../src/content/Function';
+
+test('drag/drop action lists clone and serialize all action types and discard legacy functions', () => {
+    const onDragActions: StatUpdateAction[] = [{
+        id: 'clear', kind: 'stat', targetType: 'actor', targetId: variableContentValue('actor'),
+        statId: 'Contents', operation: 'set', value: [],
+    }];
+    const onDropActions: StatUpdateAction[] = [
+        { id: 'invoke', kind: 'function', functionId: 'drop', args: { Party: [movedContentValue('actor')] } },
+        { id: 'scene', kind: 'skit', locationId: 'park', actorIds: [variableContentValue('actor'), movedContentValue('actor')] },
+    ];
+    const original = new Control({ type: 'dragDropDisplay', onDragActions, onDropActions });
+    const restored = new Control(JSON.parse(JSON.stringify(original)));
+    assert.deepEqual(restored.onDragActions, onDragActions);
+    assert.deepEqual(restored.onDropActions, onDropActions);
+    assert.notEqual(original.onDragActions[0], onDragActions[0]);
+    assert.notEqual(original.onDropActions[0], onDropActions[0]);
+    assert.notEqual(original.onDropActions[1], onDropActions[1]);
+    const legacy = new Control(JSON.parse(JSON.stringify({ onDragFunction: 'function:drag', onDropFunction: 'function:drop' })));
+    assert.deepEqual(legacy.onDragActions, []);
+    assert.deepEqual(legacy.onDropActions, []);
+    assert.equal('onDragFunction' in legacy, false);
+    assert.equal('onDropFunction' in legacy, false);
+});
+
+test('drop validity conditions survive cloning and export without the legacy validator', () => {
+    const dropValidityConditions: ConditionCollection[] = [[{
+        type: 'globalStat', statId: 'enabled', comparison: 'equals', value: true,
+    }]];
+    const original = new Control({ type: 'dragDropDisplay', dropValidityConditions });
+    const restored = new Control(JSON.parse(JSON.stringify({ ...original, dropValidationFunction: 'function:old' })));
+    assert.deepEqual(restored.dropValidityConditions, dropValidityConditions);
+    assert.notEqual(restored.dropValidityConditions[0][0], dropValidityConditions[0][0]);
+    assert.equal('dropValidationFunction' in restored, false);
+    assert.deepEqual(new Control().dropValidityConditions, []);
+});
 
 test('new and legacy controls default to equal width weights', () => {
     assert.equal(new Control({}).widthWeight, 1);

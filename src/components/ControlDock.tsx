@@ -37,13 +37,13 @@ export const ControlDock: FC<ControlDockProps> = ({ stage, onActivate, isVertica
                                 const detail = stageInstance.resolveGlobalDragDropDisplay(control);
                                 return detail ? <ListCardDetail key={`${control.id}-${index}`} detail={detail} stage={stageInstance}
                                     isVerticalLayout={isVerticalLayout}
-                                    onChange={() => { setRevision(current => current + 1); onActivate?.(); }} /> : null;
+                                    onChange={skit => { setRevision(current => current + 1); onActivate?.(skit); }} /> : null;
                             }
                             if (content && (control.type === 'dragDropDisplay' || (control.type === 'statDisplay' && control.contentType !== undefined))) {
                                 const detail = stageInstance.resolveListCardDetail(controlReference(control.id), content.kind, content.id, '');
                                 return detail ? <ListCardDetail key={`${control.id}-${index}`} detail={detail} stage={stageInstance}
                                     isVerticalLayout={isVerticalLayout} kind={content.kind} id={content.id}
-                                    onChange={() => { setRevision(current => current + 1); onActivate?.(); }} /> : null;
+                                    onChange={skit => { setRevision(current => current + 1); onActivate?.(skit); }} /> : null;
                             }
                             return (
                                 <ControlRenderer

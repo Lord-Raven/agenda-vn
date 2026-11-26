@@ -918,45 +918,47 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return this.runButtonActions(card.actions, { [kind]: id, header });
     }
 
-    private runContentDisplayFunction(display: ContentDisplayContext, reference: string, kind: ContentType, id: string, readOnly = false): unknown {
-        const save = this.getSave();
-        const fn = this.getConfiguration(save).functions.find(candidate => candidate.id === functionReferenceId(reference));
-        if (!fn || fn.returnType !== (readOnly ? 'boolean' : 'void')) {
-            throw new Error(`"${display.control.name}" requires a ${readOnly ? 'boolean' : 'void'} function.`);
-        }
-        let args = functionReferenceArguments(reference);
-        // References saved before explicit argument wiring used positional owner/moved bindings.
-        if (!args) {
-            const parameters = fn.parameters || [];
-            const ownerType = display.control.contentType;
-            const owner = ownerType && parameters[0]?.type === ownerType ? parameters[0] : undefined;
-            const moved = (owner ? parameters.slice(1) : parameters).find(parameter => parameter.type === kind);
-            args = { ...(owner && display.id ? { [owner.id]: display.id } : {}), ...(moved ? { [moved.id]: id } : {}) };
-        }
-        const errors: string[] = [];
-        const result = this.runGameFunction(save, fn, 0, message => errors.push(message), {
-            readOnly, stack: [], variables: { ...(display.control.contentType && display.kind && display.id ? { [display.kind]: display.id, header: display.header || '' } : {}), moved: { kind, id } },
-        }, args);
-        if (errors.length) throw new Error(errors.join('\n'));
-        return result;
+    private contentDisplayVariables(display: ContentDisplayContext, kind: ContentType, id: string): FunctionVariableBindings {
+        return {
+            ...(display.control.contentType && display.kind && display.id ? { [display.kind]: display.id, header: display.header || '' } : {}),
+            moved: { kind, id },
+        };
     }
 
     canReceiveContentDrop(display: ContentDisplayContext, kind: ContentType, id: string): boolean {
         const { control } = display;
-        if (control.type !== 'dragDropDisplay' || !control.onDropFunction) return false;
+        if (control.type !== 'dragDropDisplay' || !control.onDropActions.length) return false;
         const detail = control.contentType === undefined ? this.resolveGlobalDragDropDisplay(control)
             : display.kind && display.id ? this.resolveListCardDetail(controlReference(control.id), display.kind, display.id, display.header || '') : undefined;
         if (!detail || (resolveReferenceKind(detail.type) && resolveReferenceKind(detail.type) !== kind)) return false;
-        return !control.dropValidationFunction
-            || this.runContentDisplayFunction(display, control.dropValidationFunction, kind, id, true) === true;
+        const save = this.getSave();
+        const owner = control.contentType && display.kind && display.id ? this.getActiveContent(display.kind, display.id, save) : undefined;
+        const variables = this.contentDisplayVariables(display, kind, id);
+        return evaluateConditionCollections(control.dropValidityConditions, {
+            ...this.getScheduleContext(save),
+            skitState: this.getSkitConditionState(),
+            ...(owner ? display.kind === 'actor' ? { currentActor: owner } : display.kind === 'item' ? { currentItem: owner } : { currentLocation: owner } : {}),
+            resolveValue: (value, type) => this.resolveValue(value, type, save, [], variables),
+        });
     }
 
-    runContentDrop(source: ContentDisplayContext, kind: ContentType, id: string, target?: ContentDisplayContext): void {
-        if (!source.control.onDragFunction) return;
+    runContentDrop(source: ContentDisplayContext, kind: ContentType, id: string, target?: ContentDisplayContext): Skit | null {
+        if (!source.control.onDragActions.length) return null;
         const receive = target && this.canReceiveContentDrop(target, kind, id);
+        const save = this.getSave();
+        const groups = [
+            ...(target && receive ? [{ actions: target.control.onDropActions, variables: this.contentDisplayVariables(target, kind, id) }] : []),
+            { actions: source.control.onDragActions, variables: this.contentDisplayVariables(source, kind, id) },
+        ];
         try {
-            if (target && receive) this.runContentDisplayFunction(target, target.control.onDropFunction, kind, id);
-            this.runContentDisplayFunction(source, source.control.onDragFunction, kind, id);
+            for (const group of groups) {
+                this.applyActions(save, group.actions.filter(action => action.kind !== 'skit'), group.variables);
+            }
+            for (const group of groups) {
+                const skitAction = group.actions.find(action => action.kind === 'skit');
+                if (skitAction) return this.applyActions(save, [skitAction], group.variables);
+            }
+            return null;
         } finally {
             this.saveGame();
         }

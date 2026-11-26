@@ -1,6 +1,6 @@
 import { CalendarTimeOfDay } from './CalendarEvent';
 import { findStatOptionByValue, normalizeStatValue, resolveStatValue, type Stat, type StatType, type StatValue } from './Stat';
-import { functionReferenceId, isStatReturnType, listElementType, type FunctionValueResolver, type GameFunction } from './Function';
+import { functionReferenceId, isStatReturnType, listElementType, parseMovedContentValue, type FunctionValueResolver, type GameFunction } from './Function';
 
 // 'contains'/'notContains' test list membership for list stats, or substring match for text.
 // 'minimumLength'/'maximumLength' compare list length inclusively against a non-negative integer.
@@ -238,7 +238,7 @@ const resolveConditionValue = (condition: Condition, context: ConditionContext):
         : condition.type === 'skitState' ? listElementType(SKIT_STATE_FIELD_TYPES[condition.field]) || SKIT_STATE_FIELD_TYPES[condition.field]
             : stat ? listElementType(stat.type) || stat.type
                 : condition.type === 'calendar' && condition.field !== 'dayOfWeek' && condition.field !== 'timeOfDay' ? 'number' : 'text';
-    const resolved = isDiceNotation(value) ? value : context.resolveValue?.(value, type) ?? value;
+    const resolved = isDiceNotation(value) ? value : context.resolveValue?.(value, type === 'contentList' ? parseMovedContentValue(value) || type : type) ?? value;
     if (Array.isArray(resolved)) {
         throw new Error('A condition comparison requires a scalar function result.');
     }

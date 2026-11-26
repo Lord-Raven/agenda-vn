@@ -13,9 +13,10 @@ export type BarOrientation = 'top' | 'bottom';
 // 'settings' exposes a global stat as a player-editable setting.
 // A statDisplay with a contentType shows a content stat or function value on matching cards or bars;
 // without a contentType it displays its selected global stat.
-// 'dragDropDisplay' uses the same sources, restricted to content values. On Drag enables dragging;
-// On Drop runs before the source's On Drag. An optional read-only boolean validator highlights
-// receivers and suppresses On Drop when false; the source's On Drag still runs.
+// 'dragDropDisplay' uses the same sources, restricted to content values. On Drag actions enable dragging;
+// On Drop actions run before the source's On Drag actions. Drop validity conditions highlight receivers
+// and suppress On Drop when false; empty conditions accept compatible content. On Drag still runs.
+// Only the first requested skit starts, after both lists finish their stat and function actions.
 // 'card' composes labels, stat displays, conditions, and actions for a content type.
 export type ControlType = 'button' | 'statDisplay' | 'statEditor' | 'statOutcome' | 'settings' | 'popup' | 'dragDropDisplay' | 'card' | 'marker' | 'bar' | 'time';
 export type MarkerInputType = 'actor' | 'item' | 'location' | 'screen' | 'string';
@@ -93,11 +94,10 @@ export class Control {
     // Content display source: a content stat reference ("<kind>Stat:<id>") or a function reference whose
     // variable content parameter binds to the attached entity.
     displaySource: string = '';
-    // Global callbacks receive the moved entity; content-bound callbacks receive the owner first,
-    // then the moved entity. Mixed lists use the first matching parameter after the owner.
-    onDragFunction: string = '';
-    onDropFunction: string = '';
-    dropValidationFunction: string = '';
+    // Variable binds the parent; Dragged/Dropped Element binds the moved content.
+    onDragActions: StatUpdateAction[] = [];
+    onDropActions: StatUpdateAction[] = [];
+    dropValidityConditions: ConditionCollection[] = [];
     // Undefined uses the normal picker options; an array is resolved as a list of allowed option IDs.
     pickerSource?: string[];
     // Pop-ups display this Screen regardless of its availability; marker control conditions still apply.
@@ -116,7 +116,13 @@ export class Control {
     contentList: { kind: 'actor' | 'item' | 'location' | 'mixed' | 'string'; values: string[] } = { kind: 'mixed', values: [] };
 
     constructor(props: Partial<Control> = {}) {
-        const { popupControlId: _legacyPopupControlId, ...currentProps } = props as Partial<Control> & { popupControlId?: unknown };
+        const {
+            popupControlId: _legacyPopupControlId,
+            dropValidationFunction: _legacyDropValidationFunction,
+            onDragFunction: _legacyOnDragFunction,
+            onDropFunction: _legacyOnDropFunction,
+            ...currentProps
+        } = props as Partial<Control> & { popupControlId?: unknown; dropValidationFunction?: unknown; onDragFunction?: unknown; onDropFunction?: unknown };
         Object.assign(this, currentProps);
         if (!this.id) {
             this.id = generateUuid();
@@ -147,9 +153,9 @@ export class Control {
             ? undefined
             : CONTENT_TYPES.includes(this.contentType as ContentType) ? this.contentType : 'actor';
         this.displaySource = typeof this.displaySource === 'string' && !isControlReference(this.displaySource) ? this.displaySource : '';
-        this.onDragFunction = typeof this.onDragFunction === 'string' ? this.onDragFunction : '';
-        this.onDropFunction = typeof this.onDropFunction === 'string' ? this.onDropFunction : '';
-        this.dropValidationFunction = typeof this.dropValidationFunction === 'string' ? this.dropValidationFunction : '';
+        this.onDragActions = Array.isArray(this.onDragActions) ? this.onDragActions.map(cloneStatUpdateAction) : [];
+        this.onDropActions = Array.isArray(this.onDropActions) ? this.onDropActions.map(cloneStatUpdateAction) : [];
+        this.dropValidityConditions = Array.isArray(this.dropValidityConditions) ? this.dropValidityConditions.map(collection => collection.map(condition => ({ ...condition }))) : [];
         this.pickerSource = Array.isArray(this.pickerSource) ? this.pickerSource.filter((entry): entry is string => typeof entry === 'string') : undefined;
         this.screenId = `${this.screenId || ''}`;
         this.titleBarControls = Array.isArray(this.titleBarControls) ? this.titleBarControls.filter(isControlReference) : [];

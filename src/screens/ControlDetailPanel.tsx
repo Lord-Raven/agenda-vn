@@ -41,9 +41,9 @@ type ControlDraft = {
     statId: string;
     contentType: ContentType | undefined;
     displaySource: string;
-    onDragFunction: string;
-    onDropFunction: string;
-    dropValidationFunction: string;
+    onDragActions: StatUpdateAction[];
+    onDropActions: StatUpdateAction[];
+    dropValidityConditions: ConditionCollection[];
     pickerSource?: string[];
     screenId: string;
     titleBarControls: string[];
@@ -80,9 +80,9 @@ const createDraft = (control: Control): ControlDraft => ({
     statId: control.statId,
     contentType: control.contentType,
     displaySource: control.displaySource,
-    onDragFunction: control.onDragFunction,
-    onDropFunction: control.onDropFunction,
-    dropValidationFunction: control.dropValidationFunction,
+    onDragActions: control.onDragActions.map(cloneStatUpdateAction),
+    onDropActions: control.onDropActions.map(cloneStatUpdateAction),
+    dropValidityConditions: control.dropValidityConditions.map(collection => collection.map(condition => ({ ...condition }))),
     pickerSource: control.pickerSource ? [...control.pickerSource] : undefined,
     screenId: control.screenId,
     titleBarControls: [...control.titleBarControls],
@@ -187,9 +187,9 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             statId: nextDraft.statId,
             contentType: nextDraft.contentType,
             displaySource: nextDraft.displaySource,
-            onDragFunction: nextDraft.onDragFunction,
-            onDropFunction: nextDraft.onDropFunction,
-            dropValidationFunction: nextDraft.dropValidationFunction,
+            onDragActions: nextDraft.onDragActions,
+            onDropActions: nextDraft.onDropActions,
+            dropValidityConditions: nextDraft.dropValidityConditions,
             pickerSource: nextDraft.pickerSource ? [...nextDraft.pickerSource] : undefined,
             screenId: nextDraft.screenId,
             titleBarControls: [...nextDraft.titleBarControls],
@@ -293,11 +293,6 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
     const draggedKind = isContentDisplayType(displaySourceType) ? resolveReferenceKind(displaySourceType) : undefined;
     const draggedKinds: ContentType[] = displaySourceType === 'contentList' ? ['actor', 'item', 'location']
         : draggedKind ? [draggedKind] : [];
-    const dragDropFunctionOptions = (stageInstance.getConfiguration().functions || [])
-        .map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description }));
-    const callbackFunctionOptions = dragDropFunctionOptions.filter(option => stageInstance.getConfiguration().functions
-        .find(fn => fn.id === functionReferenceId(option.key))?.returnType === 'void');
-
     return (
         <GlassPanel variant="default" style={{ overflow: 'visible', position: 'relative', padding: '20px', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '20px' }}>
@@ -739,7 +734,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <select
                                     style={selectStyle}
                                     value={draft.contentType || ''}
-                                    onChange={(e) => setDraft((current) => ({ ...current, contentType: e.target.value ? e.target.value as ContentType : undefined, displaySource: '', onDragFunction: '', onDropFunction: '', dropValidationFunction: '' }))}
+                                    onChange={(e) => setDraft((current) => ({ ...current, contentType: e.target.value ? e.target.value as ContentType : undefined, displaySource: '', onDragActions: [], onDropActions: [], dropValidityConditions: [] }))}
                                 >
                                     <option value="">Global</option>
                                     <option value="actor">Actor</option>
@@ -760,41 +755,37 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                     <HeaderVariableContext.Provider value={!!draft.contentType}>
                                         <SearchableOptionPicker stage={stage} allowClear emptyLabel="None" title="Choose display source" bindVariableParameters
                                             value={draft.displaySource || undefined} options={displaySourceOptions}
-                                            onChange={(value) => setDraft((current) => ({ ...current, displaySource: typeof value === 'string' ? value : '', ...(isDragDrop ? { onDragFunction: '', onDropFunction: '', dropValidationFunction: '' } : {}) }))} />
+                                            onChange={(value) => setDraft((current) => ({ ...current, displaySource: typeof value === 'string' ? value : '', ...(isDragDrop ? { onDragActions: [], onDropActions: [], dropValidityConditions: [] } : {}) }))} />
                                     </HeaderVariableContext.Provider>
                                 </VariableContentContext.Provider>
                             </div>
                             {isDragDrop && <>
                                 <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                    Both callbacks run on drop, not at drag start. On Drop runs first, even if the incoming content is already displayed.
+                                    Both action lists run on drop, not at drag start. On Drop runs first, even if the incoming content is already displayed.
                                     On Drag runs when content is dropped outside its source display. Dropping back into the same display or canceling does nothing.
-                                    Choose any Void function and wire its arguments using Variable for the parent and Dragged Element or Dropped Element for the moved content.
-                                    Mixed-list element arguments are empty when a different content type is moved. Other arguments keep their configured values.
-                                    Without On Drag, content cannot be dragged. Without On Drop, this display does not receive drops.
+                                    Use Variable for the parent and Dragged Element or Dropped Element for the moved content in stat targets, values, and function arguments.
+                                    Mixed-list element bindings are empty when a different content type is moved.
+                                    Without On Drag actions, content cannot be dragged. Without On Drop actions, this display does not receive drops.
+                                    Only the first requested skit starts, after both lists finish their stat and function actions.
                                 </span>
-                                {(['onDragFunction', 'onDropFunction'] as const).map(behavior => <div key={behavior}>
-                                    <label style={labelStyle}>{behavior === 'onDragFunction' ? 'On Drag' : 'On Drop'}</label>
-                                    <MovedContentContext.Provider value={{ kinds: draggedKinds, label: behavior === 'onDragFunction' ? 'Dragged Element' : 'Dropped Element' }}>
-                                        <SearchableOptionPicker stage={stage} allowClear emptyLabel="None"
-                                            title={behavior === 'onDragFunction' ? 'Choose On Drag function' : 'Choose On Drop function'}
-                                            value={draft[behavior] || undefined} options={callbackFunctionOptions}
-                                            onChange={value => setDraft(current => ({ ...current, [behavior]: typeof value === 'string' ? value : '' }))} />
+                                {(['onDragActions', 'onDropActions'] as const).map(behavior => <div key={behavior}>
+                                    <label style={labelStyle}>{behavior === 'onDragActions' ? 'On Drag' : 'On Drop'}</label>
+                                    <MovedContentContext.Provider value={{ kinds: draggedKinds, label: behavior === 'onDragActions' ? 'Dragged Element' : 'Dropped Element' }}>
+                                        <OutcomeEditor {...conditionProps} actions={draft[behavior]}
+                                            onChange={actions => setDraft(current => ({ ...current, [behavior]: actions }))} />
                                     </MovedContentContext.Provider>
                                 </div>)}
                                 <div>
-                                    <label style={labelStyle}>Drop Validation (optional)</label>
+                                    <label style={labelStyle}>Drop Validity Conditions</label>
                                     <MovedContentContext.Provider value={{ kinds: draggedKinds, label: 'Dropped Element' }}>
-                                        <SearchableOptionPicker stage={stage} allowClear emptyLabel="Accept compatible content"
-                                            title="Choose drop validation function" disabled={!draft.onDropFunction}
-                                            value={draft.dropValidationFunction || undefined}
-                                            options={dragDropFunctionOptions.filter(option => stageInstance.getConfiguration().functions
-                                                .find(fn => fn.id === functionReferenceId(option.key))?.returnType === 'boolean')}
-                                            onChange={value => setDraft(current => ({ ...current, dropValidationFunction: typeof value === 'string' ? value : '' }))} />
+                                        <ConditionEditor {...conditionProps} allowSkitState
+                                            conditionCollections={draft.dropValidityConditions}
+                                            onChange={dropValidityConditions => setDraft(current => ({ ...current, dropValidityConditions }))} />
                                     </MovedContentContext.Provider>
                                     <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
-                                        Evaluated read-only with the dragged content when dragging starts. Valid receivers are highlighted.
-                                        Checked again on drop; false skips On Drop but still runs the source's On Drag.
-                                        Without a validator, compatible content is accepted.
+                                        Any collection may pass; all conditions within it must pass. Evaluated read-only when dragging starts and checked again on drop.
+                                        Variable is the receiving display's parent; Dropped Element is the moved content. Valid receivers are highlighted.
+                                        Failed conditions skip On Drop but still run the source's On Drag. With no conditions, compatible content is accepted.
                                     </span>
                                 </div>
                             </>}
