@@ -639,6 +639,23 @@ test('drag/drop displays retain empty drop targets and make dragging opt-in', ()
     assert.doesNotMatch(blank, />None<\/span>|>Empty slot<\/span>/);
 });
 
+test('blank drag/drop targets reserve the size of one portrait in each layout', () => {
+    const { stage, source, save } = dragDropFixture();
+    source.control.emptyText = '';
+    save.actors.alice.statMap.Contents = [];
+    for (const [isVerticalLayout, large, size] of [[true, false, 30], [false, false, 36], [false, true, 48]] as const) {
+        const detail = stage.resolveListCardDetail(controlReference(source.control.id), 'actor', 'alice', '')!;
+        const html = renderToStaticMarkup(<ListCardDetail detail={detail} stage={stage}
+            kind="actor" id="alice" isVerticalLayout={isVerticalLayout} large={large} />);
+        assert.match(html, /data-drag-drop-display=/);
+        assert.match(html, new RegExp(`<span aria-hidden="true" style="[^"]*height:${size}px;width:${size}px[^"]*"></span>`));
+    }
+    save.actors.alice.statMap.Contents = ['bob'];
+    const detail = stage.resolveListCardDetail(controlReference(source.control.id), 'actor', 'alice', '')!;
+    const populated = renderToStaticMarkup(<ListCardDetail detail={detail} stage={stage} kind="actor" id="alice" isVerticalLayout={false} />);
+    assert.doesNotMatch(populated, /<span aria-hidden="true" style="[^"]*height:36px;width:36px/);
+});
+
 test('drag/drop appearance uses optional theme or custom colors without changing defaults', () => {
     const { stage, source } = dragDropFixture();
     const render = () => renderToStaticMarkup(<DragDropDisplay stage={stage} context={source}><span>Contents</span></DragDropDisplay>);
