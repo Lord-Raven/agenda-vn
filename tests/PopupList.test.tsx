@@ -14,7 +14,7 @@ import { Location } from '../src/content/Location';
 import { cloneStat, Stat, StatType, StatValue } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { cloneListSection, contentStatReference, Screen, createListSection, parseContentStatReference, listContentKind, ListSection } from '../src/content/Screen';
-import { functionReference, globalStatReference, HEADER_VARIABLE_VALUE, GameFunction } from '../src/content/Function';
+import { functionReference, globalStatReference, HEADER_VARIABLE_VALUE, movedContentValue, GameFunction } from '../src/content/Function';
 import { ConditionCollection, variableContentValue } from '../src/content/Condition';
 import { buildListContentPages, ListCardDetail } from '../src/screens/ListScreenView';
 import { ContentCardList, ContentCardView } from '../src/components/ContentCardList';
@@ -106,7 +106,7 @@ const dragDropFixture = () => {
     const source = new Control({ type: 'dragDropDisplay', contentType: 'actor', name: 'Source', displaySource: contentStatReference('actor', 'Contents'),
         onDragFunction: functionReference('drag') });
     const target = new Control({ type: 'dragDropDisplay', contentType: 'actor', name: 'Target', displaySource: contentStatReference('actor', 'Contents'),
-        onDropFunction: functionReference('drop', { Owner: 'bob', Moved: 'alice', Header: HEADER_VARIABLE_VALUE }),
+        onDropFunction: functionReference('drop', { Owner: variableContentValue('actor'), Moved: movedContentValue('actor'), Header: HEADER_VARIABLE_VALUE }),
         dropValidationFunction: functionReference('validate') });
     configuration.controls.push(source, target);
     return { ...result, source: { control: source, kind: 'actor' as const, id: 'alice', header: 'Source' },
@@ -255,7 +255,9 @@ test('drag/drop callbacks use each display owner, including when moved content h
     stage.runContentDrop(source, 'actor', 'alice', target);
     assert.equal(save.globalStatValues.Title, 'drop:bob:alice:drag:alice:alice');
     drag.parameters = [stat('Moved', 'actor', '')];
-    assert.throws(() => stage.runContentDrop(source, 'actor', 'alice'), /owner parameter/);
+    drag.script = "set('Title', arg('Moved'));";
+    stage.runContentDrop(source, 'actor', 'alice');
+    assert.equal(save.globalStatValues.Title, 'alice');
 });
 
 test('mixed drag/drop lists bind the owner and the matching moved-content parameter', () => {
@@ -268,10 +270,65 @@ test('mixed drag/drop lists bind the owner and the matching moved-content parame
     assert.equal(save.globalStatValues.Title, 'Squad:drag:alice:sword');
     const drop = configuration.functions.find(fn => fn.id === 'drop')!;
     drop.parameters = [stat('Owner', 'actor', ''), stat('Actor', 'actor', ''), stat('Item', 'item', ''), stat('Location', 'location', '')];
+    target.control.onDropFunction = functionReference('drop', { Owner: variableContentValue('actor'), Location: movedContentValue('location') });
     drop.script = "set('Title', arg('Owner') + ':' + arg('Location'));";
     target.control.dropValidationFunction = '';
     stage.runContentDrop(source, 'location', 'park', target);
     assert.equal(save.globalStatValues.Title, 'alice:park:drag:alice:');
+});
+
+test('drag/drop honors explicit arguments in any order, including nested function sources', () => {
+    const { stage, source, target, configuration, save } = dragDropFixture();
+    configuration.functions.push({
+        id: 'moved-name', name: 'Moved name', description: '', returnType: 'text',
+        parameters: [stat('Who', 'actor', '')], script: "return arg('Who');",
+    });
+    const drop = configuration.functions.find(fn => fn.id === 'drop')!;
+    drop.parameters = [stat('Label', 'text', ''), stat('Moved', 'actor', ''), stat('Fixed', 'actor', ''), stat('Owner', 'actor', '')];
+    drop.script = "set('Title', [arg('Label'), arg('Moved'), arg('Fixed'), arg('Owner')].join(':'));";
+    target.id = 'bob';
+    target.control.onDropFunction = functionReference('drop', {
+        Label: functionReference('moved-name', { Who: movedContentValue('actor') }),
+        Moved: movedContentValue('actor'), Fixed: 'alice', Owner: variableContentValue('actor'),
+    });
+    target.control.dropValidationFunction = functionReference('validate', { Owner: 'alice', Moved: movedContentValue('actor') });
+    assert.equal(stage.canReceiveContentDrop(target, 'actor', 'bob'), true);
+    stage.runContentDrop(source, 'actor', 'bob', target);
+    assert.equal(save.globalStatValues.Title, 'bob:bob:alice:bob:drag:bob');
+});
+
+test('drag/drop allows callbacks and validation without content parameters', () => {
+    const { stage, source, target, configuration, save } = dragDropFixture();
+    const drag = configuration.functions.find(fn => fn.id === 'drag')!;
+    drag.parameters = [stat('Count', 'number', 3)];
+    drag.script = "set('Title', get('Title') + ':' + arg('Count'));";
+    source.control.onDragFunction = functionReference('drag', { Count: 7 });
+    const drop = configuration.functions.find(fn => fn.id === 'drop')!;
+    drop.parameters = [];
+    drop.script = "set('Title', 'drop');";
+    target.control.onDropFunction = functionReference('drop');
+    const validator = configuration.functions.find(fn => fn.id === 'validate')!;
+    validator.parameters = [];
+    validator.script = 'return true;';
+    assert.equal(stage.canReceiveContentDrop(target, 'actor', 'bob'), true);
+    stage.runContentDrop(source, 'actor', 'bob', target);
+    assert.equal(save.globalStatValues.Title, 'drop:7');
+    drop.returnType = 'number';
+    assert.throws(() => stage.runContentDrop(source, 'actor', 'bob', target), /void function/);
+    validator.returnType = 'void';
+    assert.throws(() => stage.canReceiveContentDrop(target, 'actor', 'bob'), /boolean function/);
+});
+
+test('moved-content variables resolve scalar and list arguments by kind without replacing the parent', () => {
+    const { stage, save } = fixture();
+    const variables = { actor: 'alice', moved: { kind: 'item' as const, id: 'sword' } };
+    assert.equal(stage.resolveValue(variableContentValue('actor'), 'actor', save, [], variables), 'alice');
+    assert.equal(stage.resolveValue(movedContentValue('item'), 'item', save, [], variables), 'sword');
+    assert.equal(stage.resolveValue(movedContentValue('actor'), 'actor', save, [], variables), '');
+    assert.deepEqual(stage.resolveValue([movedContentValue('item')], 'itemList', save, [], variables), ['sword']);
+    assert.deepEqual(stage.resolveValue(['bob', movedContentValue('actor'), movedContentValue('item')], 'contentList', save, [], variables), ['bob', 'sword']);
+    assert.throws(() => stage.resolveValue(movedContentValue('actor'), 'actor'), /No moved content/);
+    assert.throws(() => stage.resolveValue(movedContentValue('item'), 'actor', save, [], variables), /not actor/);
 });
 
 test('global drag/drop sources render on bars and cards and use global callback arguments', () => {
@@ -350,6 +407,7 @@ for (const kind of ['item', 'location'] as const) {
         for (const fn of configuration.functions.filter(fn => ['drag', 'drop', 'validate'].includes(fn.id))) {
             fn.parameters![1].type = kind;
         }
+        target.control.onDropFunction = functionReference('drop', { Owner: variableContentValue('actor'), Moved: movedContentValue(kind), Header: HEADER_VARIABLE_VALUE });
         configuration.functions.find(fn => fn.id === 'validate')!.script = `return arg('Moved') === '${id}';`;
         assert.equal(stage.canReceiveContentDrop(target, kind, id), true);
         stage.runContentDrop(source, kind, id, target);
@@ -381,6 +439,9 @@ test('drag/drop editor offers only content sources and appropriately typed callb
         script: 'return true;', parameters: [stat('Item', 'item', '')] });
     configuration.functions.push({ id: 'wrong-order', name: 'Wrong order', description: '', returnType: 'boolean',
         script: 'return true;', parameters: [stat('Owner', 'actor', ''), stat('Extra', 'text', ''), stat('Moved', 'actor', '')] });
+    configuration.functions.push({ id: 'no-args', name: 'No args', description: '', returnType: 'void', script: '' },
+        { id: 'arbitrary', name: 'Arbitrary', description: '', returnType: 'void', script: '', parameters: [stat('Count', 'number', 2)] },
+        { id: 'always', name: 'Always', description: '', returnType: 'boolean', script: 'return true;' });
     let renderer: ReactTestRenderer | undefined;
     try {
         act(() => { renderer = create(<ControlDetailPanel control={source.control} stage={() => stage} />); });
@@ -392,17 +453,21 @@ test('drag/drop editor offers only content sources and appropriately typed callb
         assert.ok(onDrag.props.options.some((option: { key: string }) => option.key === functionReference('drag')));
         assert.ok(!onDrag.props.options.some((option: { key: string }) => option.key === functionReference('wrong')));
         assert.ok(!onDrag.props.options.some((option: { key: string }) => option.key === functionReference('wrong-order')));
+        assert.ok(onDrag.props.options.some((option: { key: string }) => option.key === functionReference('no-args')));
+        assert.ok(onDrag.props.options.some((option: { key: string }) => option.key === functionReference('arbitrary')));
         const validate = pickers.find(picker => picker.props.title === 'Choose drop validation function')!;
-        assert.deepEqual(validate.props.options.map((option: { key: string }) => option.key), [functionReference('validate')]);
+        assert.deepEqual(validate.props.options.map((option: { key: string }) => option.key),
+            ['validate', 'wrong', 'wrong-order', 'always'].map(id => functionReference(id)));
         const onDrop = pickers.find(picker => picker.props.title === 'Choose On Drop function')!;
         act(() => onDrop.props.onChange(functionReference('drop')));
         act(() => validate.props.onChange(functionReference('validate')));
+        act(() => onDrag.props.onChange(functionReference('drag', { Owner: variableContentValue('actor'), Moved: movedContentValue('actor') })));
         act(() => renderer!.unmount());
         renderer = undefined;
         const saved = configuration.controls.find(control => control.id === source.control.id)!;
         assert.equal(saved.type, 'dragDropDisplay');
         assert.equal(saved.placement, 'standalone');
-        assert.equal(saved.onDragFunction, functionReference('drag'));
+        assert.equal(saved.onDragFunction, functionReference('drag', { Owner: variableContentValue('actor'), Moved: movedContentValue('actor') }));
         assert.equal(saved.onDropFunction, functionReference('drop'));
         assert.equal(saved.dropValidationFunction, functionReference('validate'));
     } finally {

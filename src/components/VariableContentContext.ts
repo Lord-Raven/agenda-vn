@@ -6,3 +6,4 @@ export const VariableContentContext = createContext<ContentType | undefined>(und
 // True where the evaluation context binds the header variable (list pop-up headers), so text inputs offer it.
 export const HeaderVariableContext = createContext<boolean>(false);
 export const MarkerTextVariableContext = createContext<boolean>(false);
+export const MovedContentContext = createContext<{ kinds: ContentType[]; label: string } | undefined>(undefined);

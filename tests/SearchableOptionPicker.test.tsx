@@ -4,6 +4,8 @@ import React, { ReactNode } from 'react';
 import ReactDOM from 'react-dom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { filterPickerOptions, PickerAllowedOptionsContext, SearchableOptionPicker, SearchableOptionPickerProps } from '../src/components/SearchableOptionPicker';
+import { MovedContentContext, VariableContentContext } from '../src/components/VariableContentContext';
+import { movedContentValue } from '../src/content/Function';
 
 const renderOpenPicker = (props: SearchableOptionPickerProps, inspectPortal?: (children: ReactNode) => void) => {
     const useState = React.useState;
@@ -45,6 +47,25 @@ test('restricted pickers offer only source options and retain current selections
     );
     assert.match(render(['crew']), /Selected option: Crew/);
     assert.match(render(['other']), /Choose option/);
+});
+
+test('moved-element pickers preserve the parent Variable and only offer compatible kinds', () => {
+    for (const label of ['Dragged Element', 'Dropped Element']) {
+        const render = (functionType: 'actor' | 'item' | 'text', value: string) => renderToStaticMarkup(
+            <VariableContentContext.Provider value="actor">
+                <MovedContentContext.Provider value={{ kinds: ['actor'], label }}>
+                    <SearchableOptionPicker options={[]} functionType={functionType} value={value} onChange={() => {}} />
+                </MovedContentContext.Provider>
+            </VariableContentContext.Provider>,
+        );
+        assert.match(render('actor', movedContentValue('actor')), new RegExp(`Selected option: ${label}`));
+        assert.match(render('actor', 'variable:actor'), /Selected option: Variable/);
+        assert.doesNotMatch(render('item', movedContentValue('item')), new RegExp(`Selected option: ${label}`));
+        assert.doesNotMatch(render('text', movedContentValue('actor')), new RegExp(`Selected option: ${label}`));
+    }
+    const outside = renderToStaticMarkup(<SearchableOptionPicker options={[]} functionType="actor"
+        value={movedContentValue('actor')} onChange={() => {}} />);
+    assert.doesNotMatch(outside, /Selected option: Dragged Element|Selected option: Dropped Element/);
 });
 
 test('list picker shows every current element in selection order above search, independently of filtering', () => {

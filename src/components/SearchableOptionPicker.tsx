@@ -4,10 +4,10 @@ import { DoNotDisturb, SwapHoriz } from '@mui/icons-material';
 import { Box } from '@mui/material';
 import type { Stage } from '../Stage';
 import { resolveStatDefault, type Stat, type StatType, type StatValue } from '../content/Stat';
-import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE } from '../content/Function';
+import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE, movedContentValue } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
 import { variableContentValue } from '../content/Condition';
-import { HeaderVariableContext, MarkerTextVariableContext, VariableContentContext } from './VariableContentContext';
+import { HeaderVariableContext, MarkerTextVariableContext, MovedContentContext, VariableContentContext } from './VariableContentContext';
 
 const MAX_SELECTED_PREVIEW = 6;
 
@@ -81,6 +81,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     const variableContentType = useContext(VariableContentContext);
     const headerVariableAvailable = useContext(HeaderVariableContext);
     const markerTextAvailable = useContext(MarkerTextVariableContext);
+    const movedContent = useContext(MovedContentContext);
     const allowedOptions = useContext(PickerAllowedOptionsContext);
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const pickerFunctions: GameFunction[] = stageInstance?.getConfiguration().functions || [];
@@ -107,6 +108,16 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
     if (markerTextAvailable && functionType === 'text') {
         options = [{ key: MARKER_VARIABLE_VALUE, label: 'Variable', icon: SwapHoriz, description: 'The content passed to this marker.' }, ...options.filter(option => option.key !== MARKER_VARIABLE_VALUE)];
         defaultOptionKeys = [MARKER_VARIABLE_VALUE, ...defaultOptionKeys.filter(key => key !== MARKER_VARIABLE_VALUE)];
+    }
+    if (movedContent) {
+        const movedOptions = movedContent.kinds
+            .filter(kind => functionType === kind || functionType === 'contentList')
+            .map(kind => ({
+                key: movedContentValue(kind), label: functionType === 'contentList' ? `${movedContent.label} (${kind})` : movedContent.label, icon: SwapHoriz,
+                description: `The moved ${kind}; empty when a different content type is moved.`,
+            }));
+        options = [...movedOptions, ...options.filter(option => !movedOptions.some(moved => moved.key === option.key))];
+        defaultOptionKeys = [...defaultOptionKeys, ...movedOptions.map(option => option.key)];
     }
     const selected = multiple ? values || [] : value ? [value] : [];
     // Selected references need their own entries whether sources were merged in (functionType) or the caller

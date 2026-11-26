@@ -50,9 +50,12 @@ export const globalStatReferenceId = (value: string): string => value.slice(GLOB
 export const isValueReference = (value: unknown): value is string => isFunctionReference(value) || isGlobalStatReference(value);
 
 // Content variables bind "variable:<kind>" to an id; header and marker bind their respective text values.
-export type FunctionVariableBindings = Partial<Record<ContentType, string>> & { header?: string; marker?: string };
+export type FunctionVariableBindings = Partial<Record<ContentType, string>> & { header?: string; marker?: string; moved?: { kind: ContentType; id: string } };
 export const HEADER_VARIABLE_VALUE = 'variable:header';
 export const MARKER_VARIABLE_VALUE = 'variable:marker';
+export const movedContentValue = (kind: ContentType): string => `variable:moved:${kind}`;
+export const parseMovedContentValue = (value: unknown): ContentType | undefined =>
+    (['actor', 'item', 'location'] as const).find(kind => value === movedContentValue(kind));
 export type FunctionValueResolver = (value: unknown, type: StatType, variables?: FunctionVariableBindings) => StatValue;
 
 // The scalar type of one element of a single-kind list type. The mixed 'contentList' has no single element

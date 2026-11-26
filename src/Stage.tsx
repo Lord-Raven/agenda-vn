@@ -6,7 +6,7 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, OPPOSITE_BOOLEAN_VALUE, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, matchesValueType, validateFunctionResult, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE, isStatReturnType } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, matchesValueType, validateFunctionResult, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE, parseMovedContentValue, isStatReturnType } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
@@ -574,6 +574,16 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {
+        const movedType = parseMovedContentValue(value);
+        if (movedType) {
+            if (type !== movedType) {
+                throw new Error(`Moved content reference has type ${movedType}, not ${type}.`);
+            }
+            if (!variables?.moved) {
+                throw new Error('No moved content is bound for Dragged/Dropped Element.');
+            }
+            return variables.moved.kind === movedType ? variables.moved.id : '';
+        }
         if (value === MARKER_VARIABLE_VALUE && (type === 'text' || type === 'icon')) {
             if (variables?.marker === undefined) {
                 throw new Error('No marker content is bound for Variable.');
@@ -666,6 +676,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const elementType = listElementType(type);
         if ((elementType || type === 'contentList') && Array.isArray(value)) {
             return value.flatMap(entry => {
+                const movedType = parseMovedContentValue(entry);
+                if (movedType && (elementType === movedType || type === 'contentList')) {
+                    const resolved = this.resolveValue(entry, movedType, save, stack, variables);
+                    return resolved ? [String(resolved)] : [];
+                }
                 const variableType = parseVariableContentValue(entry);
                 if (variableType && (elementType === variableType || type === 'contentList')) {
                     return [String(this.resolveValue(entry, variableType, save, stack, variables))];
@@ -906,27 +921,22 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     private runContentDisplayFunction(display: ContentDisplayContext, reference: string, kind: ContentType, id: string, readOnly = false): unknown {
         const save = this.getSave();
         const fn = this.getConfiguration(save).functions.find(candidate => candidate.id === functionReferenceId(reference));
-        const ownerType = display.control.contentType;
-        const parameters = fn?.parameters || [];
-        const owner = ownerType ? parameters[0] : undefined;
-        const source = display.control.displaySource;
-        const sourceStat = parseContentStatReference(source);
-        const configuration = this.getConfiguration(save);
-        const sourceType = sourceStat
-            ? (sourceStat.kind === 'actor' ? configuration.actorStats : sourceStat.kind === 'item' ? configuration.itemStats : configuration.locationStats).find(stat => stat.id === sourceStat.statId)?.type
-            : isFunctionReference(source) ? configuration.functions.find(candidate => candidate.id === functionReferenceId(source))?.returnType
-            : isGlobalStatReference(source) ? configuration.globalStats.find(stat => stat.id === globalStatReferenceId(source))?.type : undefined;
-        const parameter = ownerType && sourceType !== 'contentList'
-            ? (parameters[1]?.type === kind ? parameters[1] : undefined)
-            : (ownerType ? parameters.slice(1) : parameters).find(candidate => candidate.type === kind);
-        if (!fn || !parameter || (ownerType && (owner?.type !== ownerType || display.kind !== ownerType || !display.id))
-            || (readOnly && fn.returnType !== 'boolean')) {
-            throw new Error(`"${display.control.name}" requires a ${readOnly ? 'boolean ' : ''}function with ${ownerType ? `a first ${ownerType} owner parameter and ` : ''}a ${kind} moved-content parameter.`);
+        if (!fn || fn.returnType !== (readOnly ? 'boolean' : 'void')) {
+            throw new Error(`"${display.control.name}" requires a ${readOnly ? 'boolean' : 'void'} function.`);
+        }
+        let args = functionReferenceArguments(reference);
+        // References saved before explicit argument wiring used positional owner/moved bindings.
+        if (!args) {
+            const parameters = fn.parameters || [];
+            const ownerType = display.control.contentType;
+            const owner = ownerType && parameters[0]?.type === ownerType ? parameters[0] : undefined;
+            const moved = (owner ? parameters.slice(1) : parameters).find(parameter => parameter.type === kind);
+            args = { ...(owner && display.id ? { [owner.id]: display.id } : {}), ...(moved ? { [moved.id]: id } : {}) };
         }
         const errors: string[] = [];
         const result = this.runGameFunction(save, fn, 0, message => errors.push(message), {
-            readOnly, stack: [], variables: display.kind && display.id ? { [display.kind]: display.id, header: display.header || '' } : undefined,
-        }, { ...functionReferenceArguments(reference), ...(owner && display.id ? { [owner.id]: display.id } : {}), [parameter.id]: id });
+            readOnly, stack: [], variables: { ...(display.control.contentType && display.kind && display.id ? { [display.kind]: display.id, header: display.header || '' } : {}), moved: { kind, id } },
+        }, args);
         if (errors.length) throw new Error(errors.join('\n'));
         return result;
     }

@@ -11,7 +11,7 @@ import { OutcomeEditor } from '../components/OutcomeEditor';
 import { IconPicker } from '../components/StatRating';
 import { SearchableOptionPicker } from '../components/SearchableOptionPicker';
 import { cardControlOptions, contentDetailSourceOptions, listDetailOptions } from '../components/ListSectionsEditor';
-import { HeaderVariableContext, MarkerTextVariableContext, VariableContentContext } from '../components/VariableContentContext';
+import { HeaderVariableContext, MarkerTextVariableContext, MovedContentContext, VariableContentContext } from '../components/VariableContentContext';
 
 interface ControlDetailPanelProps {
     control: Control;
@@ -290,17 +290,13 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
             : stageInstance.getConfiguration().functions.find(fn => fn.id === functionReferenceId(option.key))?.returnType;
         return isContentDisplayType(type);
     });
-    const draggedKinds = displaySourceType === 'contentList' ? ['actor', 'item', 'location']
-        : isContentDisplayType(displaySourceType) ? [resolveReferenceKind(displaySourceType)] : [];
+    const draggedKind = isContentDisplayType(displaySourceType) ? resolveReferenceKind(displaySourceType) : undefined;
+    const draggedKinds: ContentType[] = displaySourceType === 'contentList' ? ['actor', 'item', 'location']
+        : draggedKind ? [draggedKind] : [];
     const dragDropFunctionOptions = (stageInstance.getConfiguration().functions || [])
-        .filter(fn => {
-            const parameters = fn.parameters || [];
-            if (draft.contentType && parameters[0]?.type !== draft.contentType) return false;
-            const movedParameters = draft.contentType ? parameters.slice(1) : parameters;
-            if (draft.contentType && displaySourceType !== 'contentList') return draggedKinds.length === 1 && movedParameters[0]?.type === draggedKinds[0];
-            return draggedKinds.length > 0 && draggedKinds.every(kind => movedParameters.some(parameter => parameter.type === kind));
-        })
         .map(fn => ({ key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description }));
+    const callbackFunctionOptions = dragDropFunctionOptions.filter(option => stageInstance.getConfiguration().functions
+        .find(fn => fn.id === functionReferenceId(option.key))?.returnType === 'void');
 
     return (
         <GlassPanel variant="default" style={{ overflow: 'visible', position: 'relative', padding: '20px', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
@@ -772,25 +768,29 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                 <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                     Both callbacks run on drop, not at drag start. On Drop runs first, even if the incoming content is already displayed.
                                     On Drag runs when content is dropped outside its source display. Dropping back into the same display or canceling does nothing.
-                                    {draft.contentType ? 'The first parameter receives the owning content; the second receives the moved content. ' : 'The first parameter matching the moved content type receives its ID. '}
-                                    Other arguments keep their configured values. Mixed content lists require a separate moved-content parameter for each content type after the owner.
+                                    Choose any Void function and wire its arguments using Variable for the parent and Dragged Element or Dropped Element for the moved content.
+                                    Mixed-list element arguments are empty when a different content type is moved. Other arguments keep their configured values.
                                     Without On Drag, content cannot be dragged. Without On Drop, this display does not receive drops.
                                 </span>
                                 {(['onDragFunction', 'onDropFunction'] as const).map(behavior => <div key={behavior}>
                                     <label style={labelStyle}>{behavior === 'onDragFunction' ? 'On Drag' : 'On Drop'}</label>
-                                    <SearchableOptionPicker stage={stage} allowClear emptyLabel="None"
-                                        title={behavior === 'onDragFunction' ? 'Choose On Drag function' : 'Choose On Drop function'}
-                                        value={draft[behavior] || undefined} options={dragDropFunctionOptions}
-                                        onChange={value => setDraft(current => ({ ...current, [behavior]: typeof value === 'string' ? value : '' }))} />
+                                    <MovedContentContext.Provider value={{ kinds: draggedKinds, label: behavior === 'onDragFunction' ? 'Dragged Element' : 'Dropped Element' }}>
+                                        <SearchableOptionPicker stage={stage} allowClear emptyLabel="None"
+                                            title={behavior === 'onDragFunction' ? 'Choose On Drag function' : 'Choose On Drop function'}
+                                            value={draft[behavior] || undefined} options={callbackFunctionOptions}
+                                            onChange={value => setDraft(current => ({ ...current, [behavior]: typeof value === 'string' ? value : '' }))} />
+                                    </MovedContentContext.Provider>
                                 </div>)}
                                 <div>
                                     <label style={labelStyle}>Drop Validation (optional)</label>
-                                    <SearchableOptionPicker stage={stage} allowClear emptyLabel="Accept compatible content"
-                                        title="Choose drop validation function" disabled={!draft.onDropFunction}
-                                        value={draft.dropValidationFunction || undefined}
-                                        options={dragDropFunctionOptions.filter(option => stageInstance.getConfiguration().functions
-                                            .find(fn => fn.id === functionReferenceId(option.key))?.returnType === 'boolean')}
-                                        onChange={value => setDraft(current => ({ ...current, dropValidationFunction: typeof value === 'string' ? value : '' }))} />
+                                    <MovedContentContext.Provider value={{ kinds: draggedKinds, label: 'Dropped Element' }}>
+                                        <SearchableOptionPicker stage={stage} allowClear emptyLabel="Accept compatible content"
+                                            title="Choose drop validation function" disabled={!draft.onDropFunction}
+                                            value={draft.dropValidationFunction || undefined}
+                                            options={dragDropFunctionOptions.filter(option => stageInstance.getConfiguration().functions
+                                                .find(fn => fn.id === functionReferenceId(option.key))?.returnType === 'boolean')}
+                                            onChange={value => setDraft(current => ({ ...current, dropValidationFunction: typeof value === 'string' ? value : '' }))} />
+                                    </MovedContentContext.Provider>
                                     <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                         Evaluated read-only with the dragged content when dragging starts. Valid receivers are highlighted.
                                         Checked again on drop; false skips On Drop but still runs the source's On Drag.
