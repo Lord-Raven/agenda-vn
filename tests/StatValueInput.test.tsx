@@ -6,7 +6,8 @@ import { act, create } from 'react-test-renderer';
 import { StatValueInput } from '../src/components/StatValueInput';
 import { SearchableOptionPicker } from '../src/components/SearchableOptionPicker';
 import { cloneStat, StatValue } from '../src/content/Stat';
-import { functionReference, globalStatReference, valuePickerOptions } from '../src/content/Function';
+import { boundStatReference, functionReference, globalStatReference, valuePickerOptions } from '../src/content/Function';
+import { MovedContentContext, VariableContentContext } from '../src/components/VariableContentContext';
 import { Stage } from '../src/Stage';
 
 const score = cloneStat({
@@ -99,5 +100,62 @@ test('numeric formula fields render as a picker button only, offering typed sour
         assert.ok(button.findAllByType('span').some(span => span.children.includes('{{Score}} * 2')));
     } finally {
         act(() => renderer.unmount());
+    }
+});
+
+test('bound boolean, option-list, and text stats are available through value pickers', () => {
+    const stage: Stage = Object.create(Stage.prototype);
+    const flag = cloneStat({ ...score, id: 'flag', name: 'Flag', type: 'boolean', default: false });
+    const choices = cloneStat({ ...score, id: 'choices', name: 'Choices', type: 'optionList', default: [], options: [
+        { id: 'one', name: 'One', description: '' },
+    ] });
+    const text = cloneStat({ ...score, id: 'text', name: 'Text', type: 'text', default: '' });
+    stage.getConfiguration = () => ({ globalStats: [], actorStats: [flag, choices, text], functions: [] } as ReturnType<Stage['getConfiguration']>);
+    stage.getSave = () => ({ globalStatValues: {} } as ReturnType<Stage['getSave']>);
+    for (const stat of [flag, choices, text]) {
+        const source = boundStatReference('actor', stat.id, 'moved');
+        let changed: StatValue | undefined;
+        let renderer: ReturnType<typeof create>;
+        act(() => { renderer = create(
+            <MovedContentContext.Provider value={{ kinds: ['actor'], label: 'Dropped Element' }}>
+                <StatValueInput stat={stat} value={stat.default} onChange={value => { changed = value; }} stage={stage} />
+            </MovedContentContext.Provider>,
+        ); });
+        try {
+            const picker = renderer!.root.findByType(SearchableOptionPicker);
+            act(() => picker.props.onChange(stat.type === 'optionList' ? [source] : source));
+            assert.deepEqual(changed, stat.type === 'optionList' ? [source] : source);
+        } finally {
+            act(() => renderer!.unmount());
+        }
+    }
+});
+
+test('numeric picker inserts Variable and Dropped Element stat references into the formula', () => {
+    const stage: Stage = Object.create(Stage.prototype);
+    stage.getConfiguration = () => ({ globalStats: [score], actorStats: [score], functions: [] } as ReturnType<Stage['getConfiguration']>);
+    stage.getSave = () => ({ globalStatValues: {} } as ReturnType<Stage['getSave']>);
+    let changed: StatValue | undefined;
+    let renderer: ReturnType<typeof create>;
+    act(() => { renderer = create(
+        <VariableContentContext.Provider value="actor">
+            <MovedContentContext.Provider value={{ kinds: ['actor'], label: 'Dropped Element' }}>
+                <StatValueInput stat={score} value="" onChange={value => { changed = value; }} stage={stage} />
+            </MovedContentContext.Provider>
+        </VariableContentContext.Provider>,
+    ); });
+    try {
+        const picker = renderer!.root.findByType(SearchableOptionPicker);
+        const input = () => renderer!.root.findByType(SearchableOptionPicker).props.valueEditor.props.children[0];
+        act(() => picker.props.onChange(boundStatReference('actor', 'score')));
+        act(() => input().props.onBlur());
+        assert.equal(changed, '{{"variableStat:actor:score"}}');
+        act(() => input().props.onChange({ target: { value: '' } }));
+        act(() => input().props.onSelect({ currentTarget: { selectionStart: 0, selectionEnd: 0 } }));
+        act(() => picker.props.onChange(boundStatReference('actor', 'score', 'moved')));
+        act(() => input().props.onBlur());
+        assert.equal(changed, '{{"movedStat:actor:score"}}');
+    } finally {
+        act(() => renderer!.unmount());
     }
 });

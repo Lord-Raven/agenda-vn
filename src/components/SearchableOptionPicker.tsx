@@ -4,7 +4,7 @@ import { DoNotDisturb, SwapHoriz } from '@mui/icons-material';
 import { Box } from '@mui/material';
 import type { Stage } from '../Stage';
 import { resolveStatDefault, type Stat, type StatType, type StatValue } from '../content/Stat';
-import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE, movedContentValue } from '../content/Function';
+import { valuePickerOptions, isFunctionReference, isValueReference, functionReference, functionReferenceId, functionReferenceArguments, functionSignature, GameFunction, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE, movedContentValue, parseBoundStatReference } from '../content/Function';
 import { StatValueInput } from './StatValueInput';
 import { variableContentValue } from '../content/Condition';
 import { HeaderVariableContext, MarkerTextVariableContext, MovedContentContext, VariableContentContext } from './VariableContentContext';
@@ -44,7 +44,7 @@ export interface SearchableOptionPickerProps {
     buttonAriaLabel?: string;
     disabled?: boolean;
     functionType?: StatType;
-    // Narrows the global stats merged in by functionType (e.g. to option stats sharing the same source
+    // Narrows the stats merged in by functionType (e.g. to option stats sharing the same source
     // list); functions are never filtered.
     sourceStatFilter?: (stat: Stat) => boolean;
     stage?: Stage | (() => Stage);
@@ -93,7 +93,7 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
         const listTypes: StatType[] = !multiple ? []
             : functionType === 'contentList' ? ['actorList', 'itemList', 'locationList', 'contentList']
                 : listType ? [listType] : [];
-        const sourceOptions = [...scalarTypes, ...listTypes].flatMap(type => valuePickerOptions(stageInstance?.getConfiguration(), type, sourceStatFilter));
+        const sourceOptions = [...scalarTypes, ...listTypes].flatMap(type => valuePickerOptions(stageInstance?.getConfiguration(), type, sourceStatFilter, { variableContentType, movedContent }));
         options = [...options.filter(option => !isFunctionReference(option.key) && !sourceOptions.some(source => source.key === option.key)), ...sourceOptions];
     }
     if (variableContentType && (functionType === variableContentType || functionType === 'contentList')
@@ -134,6 +134,11 @@ export const SearchableOptionPicker: FC<SearchableOptionPickerProps> = ({
                 continue;
             }
             const isFunction = isFunctionReference(key);
+            const boundStat = parseBoundStatReference(key);
+            if (boundStat) {
+                options.push({ key, label: 'Missing or incompatible bound stat', category: boundStat.source === 'variable' ? 'Variable Stats' : 'Moved Element Stats' });
+                continue;
+            }
             options.push({ key, label: `Missing or incompatible ${isFunction ? 'function' : 'global stat'}`, category: isFunction ? 'Functions' : 'Global Stats' });
         }
     }

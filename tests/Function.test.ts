@@ -6,7 +6,7 @@ import { Item } from '../src/content/Item';
 import { getLocationDescription, Location } from '../src/content/Location';
 import { applyStatUpdateValue, buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, OPPOSITE_BOOLEAN_VALUE, resolveAvailableStatOptions, resolveStatDefault, resolveStatOptionPool, resolveStatValueRule, sharesOptionPool, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateContext, generateSkitScript, ScriptEntry, Skit } from '../src/content/Skit';
-import { cloneGameFunction, functionPickerOptions, functionReference, functionReferenceArguments, functionReferenceId, functionSignature, globalStatReference, parseFunctionCallText, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
+import { boundStatReference, cloneGameFunction, functionPickerOptions, functionReference, functionReferenceArguments, functionReferenceId, functionSignature, globalStatReference, parseFunctionCallText, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
 import { ConditionCollection, evaluateCondition, variableContentValue } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
@@ -568,6 +568,38 @@ test('mixed content lists accept sources of every kind, format across collection
     }, configuration.functions);
     assert.deepEqual(objects.value, ['item:Sword', 'location:Town']);
     assert.deepEqual(objects.errors, []);
+});
+
+test('bound stat sources resolve live variable and moved stats, formulas, and lists', () => {
+    const { stage, save, configuration } = fixture();
+    for (const [kind, id, entity] of [
+        ['actor', 'a', save.actors.a],
+        ['item', 'item', save.inventory[0]],
+        ['location', 'place', save.atlas.place],
+    ] as const) {
+        for (const source of ['variable', 'moved'] as const) {
+            const variables = source === 'variable' ? { [kind]: id } : { moved: { kind, id } };
+            const reference = boundStatReference(kind, 'Score', source);
+            entity.statMap.Score = 4;
+            assert.equal(stage.resolveValue(reference, 'number', save, [], variables), 4);
+            assert.equal(stage.resolveValue(`{{${JSON.stringify(reference)}}} * 2`, 'number', save, [], variables), 8);
+            entity.statMap.Score = 6;
+            assert.equal(stage.resolveValue(reference, 'number', save, [], variables), 6);
+            assert.equal(normalizeStatValue(reference, configuration.globalStats.find(stat => stat.id === 'Score')!), reference);
+            assert.deepEqual(stage.resolveValue([boundStatReference(kind, 'Party', source)], 'actorList', save, [], variables), ['b', 'deleted', 'missing', 'a']);
+            assert.deepEqual(stage.resolveValue([boundStatReference(kind, 'Places', source)], 'contentList', save, [], variables), ['place']);
+            assert.throws(() => stage.resolveValue(reference, 'text', save, [], variables), /has type number, not text/);
+            assert.throws(() => stage.resolveValue(reference, 'number'), /No .* is bound/);
+            assert.throws(() => stage.resolveValue(boundStatReference(kind, 'missing', source), 'number', save, [], variables), /Unknown bound .* stat reference/);
+            entity.statMap.Score = reference;
+            assert.throws(() => stage.resolveValue(reference, 'number', save, [], variables), /cyclic bound stat reference/);
+            entity.statMap.Score = 2;
+        }
+    }
+    const reference = boundStatReference('actor', 'Score', 'moved');
+    assert.throws(() => stage.resolveValue(reference, 'number', save, [], { moved: { kind: 'item', id: 'item' } }), /No actor is bound/);
+    assert.throws(() => stage.resolveValue(boundStatReference('actor', 'Score'), 'number', save, [], { actor: 'deleted' }), /Unknown bound stat owner/);
+    assert.throws(() => stage.resolveValue(boundStatReference('item', 'Score'), 'number', save, [], { item: 'missing' }), /Unknown bound stat owner/);
 });
 
 test('numeric formulas share precedence, parentheses, decimals, dice, and named lookups', () => {

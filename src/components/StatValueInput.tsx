@@ -5,7 +5,7 @@ import { ActorLike, ReferenceMultiSelect, ReferenceSelect, TextInput } from './U
 import { LocationLike } from './LocationPortrait';
 import { ItemLike } from './ItemPortrait';
 import { HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE, valuePickerOptions, isValueReference } from '../content/Function';
-import { HeaderVariableContext, MarkerTextVariableContext } from './VariableContentContext';
+import { HeaderVariableContext, MarkerTextVariableContext, MovedContentContext, VariableContentContext } from './VariableContentContext';
 import { PickerAllowedOptionsContext, SearchableOptionPicker } from './SearchableOptionPicker';
 import { IconPicker } from './StatRating';
 import { validateValueExpression } from '../content/ValueExpression';
@@ -29,6 +29,9 @@ interface StatValueInputProps {
 export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange, actors = [], items = [], locations = [], stage, allowExpression = false, allowOpposite = false, optionContext }) => {
     const stageInstance = typeof stage === 'function' ? stage() : stage;
     const allowedOptions = useContext(PickerAllowedOptionsContext);
+    const variableContentType = useContext(VariableContentContext);
+    const movedContent = useContext(MovedContentContext);
+    const pickerContext = { variableContentType, movedContent };
     if (!stat) {
         return <FormulaValueInput value={value} onChange={onChange} />;
     }
@@ -42,7 +45,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     }
     if (stat.type === 'boolean') {
         const showOpposite = allowOpposite || value === OPPOSITE_BOOLEAN_VALUE;
-        if (showOpposite || valuePickerOptions(stageInstance?.getConfiguration(), stat.type).length || isValueReference(value)) {
+        if (showOpposite || valuePickerOptions(stageInstance?.getConfiguration(), stat.type, undefined, pickerContext).length || isValueReference(value)) {
             return <SearchableOptionPicker
                 value={String(value)}
                 onChange={next => {
@@ -83,9 +86,9 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
             : isValueReference(value) ? [value] : [];
         const pool = resolveAvailableStatOptions(stat, value, optionContext)
             .filter(option => !allowedOptions || allowedOptions.has(option.id!) || selectedIds.includes(option.id!));
-        // Only global stats sharing this stat's option pool are meaningful sources; functions are not source checked.
+        // Only stats sharing this stat's option pool are meaningful sources; functions are not source checked.
         const sharedPoolFilter = (candidate: Stat) => sharesOptionPool(stat, candidate, optionContext);
-        if (valuePickerOptions(stageInstance?.getConfiguration(), 'option', sharedPoolFilter).length || valuePickerOptions(stageInstance?.getConfiguration(), 'optionList', sharedPoolFilter).length || selectedIds.some(isValueReference)) {
+        if (valuePickerOptions(stageInstance?.getConfiguration(), 'option', sharedPoolFilter, pickerContext).length || valuePickerOptions(stageInstance?.getConfiguration(), 'optionList', sharedPoolFilter, pickerContext).length || selectedIds.some(isValueReference)) {
             return <SearchableOptionPicker multiple values={selectedIds} maxSelections={statListMaxLength(stat)} onChange={next => onChange(Array.isArray(next) ? next : [])}
                 options={pool.map(option => ({ key: option.id!, label: option.name, description: option.description }))}
                 sourceStatFilter={sharedPoolFilter}
@@ -126,7 +129,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
     }
 
     if (stat.type === 'text') {
-        return <HeaderTextInput value={value} onChange={onChange} />;
+        return <HeaderTextInput value={value} onChange={onChange} stage={stage} />;
     }
 
     const referenceKind = resolveReferenceKind(stat.type);
@@ -162,7 +165,7 @@ export const StatValueInput: FC<StatValueInputProps> = ({ stat, value, onChange,
 };
 
 // Text input that, inside a list pop-up, can instead bind to the current page's header.
-const HeaderTextInput: FC<Pick<StatValueInputProps, 'value' | 'onChange'>> = ({ value, onChange }) => {
+const HeaderTextInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'stage'>> = ({ value, onChange, stage }) => {
     const headerAvailable = useContext(HeaderVariableContext);
     const markerAvailable = useContext(MarkerTextVariableContext);
     const buttonStyle = { border: '1px solid var(--agenda-line-subtle)', borderRadius: '8px', background: 'var(--agenda-surface-raised)', color: 'var(--agenda-text-primary)', cursor: 'pointer', padding: '4px 10px', whiteSpace: 'nowrap' as const };
@@ -175,11 +178,11 @@ const HeaderTextInput: FC<Pick<StatValueInputProps, 'value' | 'onChange'>> = ({ 
         );
     }
     if (!headerAvailable && !markerAvailable) {
-        return <FormulaValueInput value={value} onChange={onChange} />;
+        return <FormulaValueInput value={value} onChange={onChange} stage={stage} />;
     }
     return (
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
-            <div style={{ flex: 1, minWidth: 0 }}><FormulaValueInput value={value} onChange={onChange} /></div>
+            <div style={{ flex: 1, minWidth: 0 }}><FormulaValueInput value={value} onChange={onChange} stage={stage} /></div>
             {headerAvailable && <button type="button" style={buttonStyle} title="Use the pop-up page's header text" onClick={() => onChange(HEADER_VARIABLE_VALUE)}>Use Header</button>}
             {markerAvailable && <button type="button" style={buttonStyle} title="Use the content passed to this marker" onClick={() => onChange(MARKER_VARIABLE_VALUE)}>Use Variable</button>}
         </div>
@@ -212,7 +215,7 @@ const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'al
             aria-label="Formula value"
             aria-invalid={error ? true : undefined}
             placeholder={numeric ? (allowExpression ? 'e.g. 5, -2, 1d6+1, or {{Money}} * 2' : 'e.g. 5 or {{Money}} * 2') : 'Text, Greeting(), or {{Greeting}}'}
-            title={numeric ? 'Arithmetic: +, -, *, /, %, parentheses, dice, Function name(args…), call("Function name", args…), get("Global Stat"), {{Name}} (function first, then global Stat). References: function:<id>, globalStat:<id>.' : 'Use Function name(args…) or {{Function name}} for text functions. References: function:<id>, globalStat:<id>.'}
+            title={numeric ? 'Arithmetic: +, -, *, /, %, parentheses, dice, Function name(args…), call("Function name", args…), get("Global Stat"), {{Name}} (function first, then global Stat). Pick a function, global stat, or bound Variable / Dragged / Dropped Element stat to insert a reference.' : 'Use Function name(args…) or {{Function name}} for text functions. Choose a source to use a function, global stat, or bound Variable / Dragged / Dropped Element stat.'}
             onChange={event => { setDraft(event.target.value); setError(''); }}
             onSelect={event => {
                 selection.current = { start: event.currentTarget.selectionStart ?? draft.length, end: event.currentTarget.selectionEnd ?? draft.length };
@@ -248,6 +251,15 @@ const FormulaValueInput: FC<Pick<StatValueInputProps, 'value' | 'onChange' | 'al
                 setError('');
             }}
         />;
+    }
+    if (stage) {
+        return <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+            {editor}
+            <SearchableOptionPicker options={[]} functionType="text" stage={stage}
+                value={isValueReference(value) ? value : undefined}
+                title="Choose text source" emptyLabel="Choose text source"
+                onChange={next => { if (typeof next === 'string') onChange(next); }} />
+        </div>;
     }
     return editor;
 };

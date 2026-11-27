@@ -14,7 +14,7 @@ import { Location } from '../src/content/Location';
 import { cloneStat, Stat, StatType, StatValue } from '../src/content/Stat';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
 import { cloneListSection, contentStatReference, Screen, createListSection, parseContentStatReference, listContentKind, ListSection } from '../src/content/Screen';
-import { functionReference, globalStatReference, HEADER_VARIABLE_VALUE, movedContentValue, GameFunction } from '../src/content/Function';
+import { boundStatReference, functionReference, globalStatReference, HEADER_VARIABLE_VALUE, movedContentValue, GameFunction } from '../src/content/Function';
 import { ConditionCollection, variableContentValue } from '../src/content/Condition';
 import { buildListContentPages, ListCardDetail } from '../src/screens/ListScreenView';
 import { ContentCardList, ContentCardView } from '../src/components/ContentCardList';
@@ -242,6 +242,33 @@ test('drag/drop runs the receiver before the source and passes moved content, ow
     stage.runContentDrop(source, 'actor', 'bob', target);
     assert.equal(save.globalStatValues.Title, 'bob:drop:bob:alice:Receiver:drag:bob');
     assert.deepEqual(save.actors.alice.statMap.Contents, []);
+});
+
+test('card and drop actions copy bound entity stats into globals', () => {
+    const { stage, save, configuration, source, target } = dragDropFixture();
+    configuration.globalStats.push(stat('Selected Mood', 'number', 0));
+    const card = new Control({ type: 'card', contentType: 'actor', actions: [
+        { id: 'copy', kind: 'stat', targetType: 'global', targetId: 'any', statId: 'Selected Mood', operation: 'set',
+            value: `{{${JSON.stringify(boundStatReference('actor', 'Mood'))}}}` },
+        { id: 'team', kind: 'stat', targetType: 'global', targetId: 'any', statId: 'Title', operation: 'set',
+            value: boundStatReference('actor', 'Team') },
+    ] });
+    stage.runCardActions(card, 'actor', 'bob');
+    assert.equal(save.globalStatValues['Selected Mood'], 5);
+    assert.equal(save.globalStatValues.Title, 'blue');
+    target.control.onDropActions = [
+        { id: 'mood', kind: 'stat', targetType: 'global', targetId: 'any', statId: 'Selected Mood', operation: 'set',
+            value: `{{${JSON.stringify(boundStatReference('actor', 'Mood', 'moved'))}}} + {{${JSON.stringify(boundStatReference('actor', 'Mood'))}}}` },
+        { id: 'team', kind: 'stat', targetType: 'global', targetId: 'any', statId: 'Title', operation: 'set',
+            value: boundStatReference('actor', 'Team', 'moved') },
+    ];
+    source.control.onDragActions = [
+        { id: 'clear', kind: 'stat', targetType: 'actor', targetId: variableContentValue('actor'), statId: 'Contents', operation: 'set', value: [] },
+    ];
+    target.control.dropValidityConditions = [];
+    stage.runContentDrop(source, 'actor', 'bob', target);
+    assert.equal(save.globalStatValues['Selected Mood'], 8);
+    assert.equal(save.globalStatValues.Title, 'blue');
 });
 
 test('drag/drop stat actions update each parent and moved entity, then global stats', () => {

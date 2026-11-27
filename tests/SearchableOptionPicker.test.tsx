@@ -5,7 +5,9 @@ import ReactDOM from 'react-dom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { filterPickerOptions, PickerAllowedOptionsContext, SearchableOptionPicker, SearchableOptionPickerProps } from '../src/components/SearchableOptionPicker';
 import { MovedContentContext, VariableContentContext } from '../src/components/VariableContentContext';
-import { movedContentValue } from '../src/content/Function';
+import { boundStatReference, movedContentValue, valuePickerOptions } from '../src/content/Function';
+import { cloneStat } from '../src/content/Stat';
+import { Stage } from '../src/Stage';
 
 const renderOpenPicker = (props: SearchableOptionPickerProps, inspectPortal?: (children: ReactNode) => void) => {
     const useState = React.useState;
@@ -66,6 +68,38 @@ test('moved-element pickers preserve the parent Variable and only offer compatib
     const outside = renderToStaticMarkup(<SearchableOptionPicker options={[]} functionType="actor"
         value={movedContentValue('actor')} onChange={() => {}} />);
     assert.doesNotMatch(outside, /Selected option: Dragged Element|Selected option: Dropped Element/);
+});
+
+test('pickers offer type-compatible stats from the Variable and every moved kind', () => {
+    const stat = cloneStat({ id: 'score', name: 'Score', type: 'number', default: 0, guidance: '',
+        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] } });
+    const configuration = {
+        actorStats: [stat, cloneStat({ ...stat, id: 'text', name: 'Text', type: 'text' })],
+        itemStats: [stat], locationStats: [stat], globalStats: [], functions: [],
+    };
+    const context = { variableContentType: 'actor' as const, movedContent: { kinds: ['actor', 'item', 'location'] as const, label: 'Dropped Element' } };
+    const pickerContext = { ...context, movedContent: { ...context.movedContent, kinds: [...context.movedContent.kinds] } };
+    assert.deepEqual(valuePickerOptions(configuration, 'number', undefined, pickerContext).map(option => option.key), [
+        boundStatReference('actor', 'score'),
+        ...context.movedContent.kinds.map(kind => boundStatReference(kind, 'score', 'moved')),
+    ]);
+    assert.deepEqual(valuePickerOptions(configuration, 'number'), []);
+    assert.deepEqual(valuePickerOptions(configuration, 'number', () => false, pickerContext), []);
+    const stage: Stage = Object.create(Stage.prototype);
+    stage.getConfiguration = () => configuration as ReturnType<Stage['getConfiguration']>;
+    for (const key of [
+        boundStatReference('actor', 'score'), boundStatReference('item', 'score', 'moved'), boundStatReference('actor', 'text'),
+    ]) {
+        const render = (type: 'number' | 'text') => renderToStaticMarkup(
+            <VariableContentContext.Provider value="actor">
+                <MovedContentContext.Provider value={pickerContext.movedContent}>
+                    <SearchableOptionPicker options={[]} functionType={type} value={key} onChange={() => {}} stage={stage} />
+                </MovedContentContext.Provider>
+            </VariableContentContext.Provider>);
+        const type = key.endsWith(':text') ? 'text' : 'number';
+        assert.match(render(type), /Selected option: (Score|Text)/);
+        assert.match(render(type === 'number' ? 'text' : 'number'), /Missing or incompatible bound stat/);
+    }
 });
 
 test('list picker shows every current element in selection order above search, independently of filtering', () => {

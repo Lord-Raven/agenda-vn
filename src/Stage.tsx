@@ -7,7 +7,7 @@ import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
 import { buildInitialGlobalStatValues, findStatOptionByValue, formatReferenceStatText, formatStatOptionValueText, isListStatType, isReferenceStatType, resolveStatOptionPool, resolveReferenceKind, Stat, StatType, StatValue, StatUpdate, StatUpdateRule, StatUpdateAction, GameAction, OPPOSITE_BOOLEAN_VALUE, applyStatUpdateValue, cloneStat, cloneStatUpdateAction, cloneStatUpdateRules, includeNewOptionListOptions, normalizeStatValue, resolveStatText, setOptionListSourceResolver } from './content/Stat';
-import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, matchesValueType, validateFunctionResult, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE, parseMovedContentValue, isStatReturnType } from './content/Function';
+import { GameFunction, cloneGameFunction, runFunctionScript, FunctionScriptBindings, FunctionScriptEntity, FunctionScriptObject, FunctionScriptTestResult, FunctionVariableBindings, isFunctionReference, functionReference, functionReferenceId, functionReferenceArguments, namedFunctionArguments, positionalFunctionArguments, parseFunctionCallText, isGlobalStatReference, globalStatReferenceId, isValueReference, listElementType, matchesValueType, validateFunctionResult, HEADER_VARIABLE_VALUE, MARKER_VARIABLE_VALUE, parseMovedContentValue, isStatReturnType, parseBoundStatReference } from './content/Function';
 import { resolveStatValue } from './content/Stat';
 import { evaluateValueExpression } from './content/ValueExpression';
 import { SkitActionValue, StartSkitAction } from './content/Stat';
@@ -575,6 +575,32 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
     }
 
     resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {
+        const boundStat = parseBoundStatReference(value);
+        if (boundStat) {
+            const { kind, statId, source } = boundStat;
+            const id = source === 'variable' ? variables?.[kind]
+                : variables?.moved?.kind === kind ? variables.moved.id : undefined;
+            if (!id) {
+                throw new Error(`No ${kind} is bound for ${source === 'variable' ? 'Variable' : 'Dragged/Dropped Element'} stat.`);
+            }
+            const stat = this.getStatsForUpdateTarget(kind, save).find(candidate => candidate.id === statId);
+            if (!stat) {
+                throw new Error(`Unknown bound ${kind} stat reference: ${statId}`);
+            }
+            if (!matchesValueType(stat.type, type) && !(type === 'contentList' && isReferenceStatType(stat.type))) {
+                throw new Error(`Bound stat "${stat.name}" has type ${stat.type}, not ${type}.`);
+            }
+            const entity = kind === 'actor' ? save.actors?.[id]
+                : kind === 'location' ? save.atlas?.[id] : save.inventory?.find(item => item.id === id);
+            if (!entity || entity.active === false) {
+                throw new Error(`Unknown bound stat owner: ${kind} ${id}`);
+            }
+            const reference = String(value);
+            if (stack.includes(reference) || stack.length >= MAX_FUNCTION_INVOCATION_DEPTH) {
+                throw new Error(`Maximum value reference depth exceeded or cyclic bound stat reference: ${stat.name}`);
+            }
+            return this.readStatValue(entity.statMap?.[statId], stat, save, [...stack, reference], variables);
+        }
         const movedType = parseMovedContentValue(value);
         if (movedType) {
             if (type !== movedType) {
@@ -690,9 +716,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                     return typeof entry === 'string' ? [entry] : [];
                 }
                 const configuration = this.getConfiguration(save);
+                const boundStat = parseBoundStatReference(entry);
                 const sourceType = isGlobalStatReference(entry)
                     ? configuration.globalStats.find(candidate => candidate.id === globalStatReferenceId(entry))?.type
-                    : configuration.functions.find(candidate => candidate.id === functionReferenceId(entry))?.returnType;
+                    : boundStat ? this.getStatsForUpdateTarget(boundStat.kind, save).find(candidate => candidate.id === boundStat.statId)?.type
+                        : configuration.functions.find(candidate => candidate.id === functionReferenceId(entry))?.returnType;
                 // Mixed lists accept entries referencing any content kind, scalar or list; single-kind lists
                 // only accept their own list type or their scalar element type.
                 const entryType = type === 'contentList'

@@ -47,7 +47,16 @@ export const globalStatReference = (id: string): string => `${GLOBAL_STAT_REFERE
 export const isGlobalStatReference = (value: unknown): value is string =>
     typeof value === 'string' && value.startsWith(GLOBAL_STAT_REFERENCE_PREFIX);
 export const globalStatReferenceId = (value: string): string => value.slice(GLOBAL_STAT_REFERENCE_PREFIX.length);
-export const isValueReference = (value: unknown): value is string => isFunctionReference(value) || isGlobalStatReference(value);
+// Bound stat sources keep the entity binding separate from the stat id, including in formula macros.
+export const boundStatReference = (kind: ContentType, statId: string, source: 'variable' | 'moved' = 'variable'): string =>
+    `${source}Stat:${kind}:${statId}`;
+export const parseBoundStatReference = (value: unknown): { kind: ContentType; statId: string; source: 'variable' | 'moved' } | undefined => {
+    if (typeof value !== 'string') return undefined;
+    const match = /^(variable|moved)Stat:(actor|item|location):(.+)$/.exec(value);
+    return match ? { source: match[1] as 'variable' | 'moved', kind: match[2] as ContentType, statId: match[3] } : undefined;
+};
+export const isValueReference = (value: unknown): value is string =>
+    isFunctionReference(value) || isGlobalStatReference(value) || !!parseBoundStatReference(value);
 
 // Content variables bind "variable:<kind>" to an id; header and marker bind their respective text values.
 export type FunctionVariableBindings = Partial<Record<ContentType, string>> & { header?: string; marker?: string; moved?: { kind: ContentType; id: string } };
@@ -81,14 +90,31 @@ export const functionPickerOptions = (functions: GameFunction[] | undefined, typ
         key: functionReference(fn.id), label: functionSignature(fn), category: 'Functions', description: fn.description,
     }));
 
-// statFilter narrows the offered global stats (e.g. to option stats sharing a source list); functions are
+// statFilter narrows the offered stats (e.g. to option stats sharing a source list); functions are
 // never filtered because their results are not type checked against a source.
-export const valuePickerOptions = (configuration: { functions?: GameFunction[]; globalStats?: Stat[] } | undefined, type: StatType, statFilter?: (stat: Stat) => boolean) => [
-    ...functionPickerOptions(configuration?.functions, type),
-    ...(configuration?.globalStats || []).filter(stat => matchesValueType(stat.type, type) && (!statFilter || statFilter(stat))).map(stat => ({
-        key: globalStatReference(stat.id), label: stat.name, category: 'Global Stats', description: stat.guidance,
-    })),
-];
+export const valuePickerOptions = (
+    configuration: { functions?: GameFunction[]; globalStats?: Stat[]; actorStats?: Stat[]; itemStats?: Stat[]; locationStats?: Stat[] } | undefined,
+    type: StatType,
+    statFilter?: (stat: Stat) => boolean,
+    context?: { variableContentType?: ContentType; movedContent?: { kinds: ContentType[]; label: string } },
+) => {
+    const movedContent = context?.movedContent;
+    return [
+        ...functionPickerOptions(configuration?.functions, type),
+        ...(configuration?.globalStats || []).filter(stat => matchesValueType(stat.type, type) && (!statFilter || statFilter(stat))).map(stat => ({
+            key: globalStatReference(stat.id), label: stat.name, category: 'Global Stats', description: stat.guidance,
+        })),
+        ...([
+            ...(context?.variableContentType ? [{ kind: context.variableContentType, source: 'variable' as const, label: 'Variable' }] : []),
+            ...(movedContent ? movedContent.kinds.map(kind => ({ kind, source: 'moved' as const, label: movedContent.label })) : []),
+        ]).flatMap(({ kind, source, label }) => (configuration?.[`${kind}Stats`] || [])
+            .filter(stat => matchesValueType(stat.type, type) && (!statFilter || statFilter(stat)))
+            .map(stat => ({
+                key: boundStatReference(kind, stat.id, source), label: stat.name,
+                category: `${label} ${kind.charAt(0).toUpperCase() + kind.slice(1)} Stats`, description: stat.guidance,
+            }))),
+    ];
+};
 
 export const validateFunctionResult = (value: unknown, type: FunctionReturnType): void => {
     if (type === 'void') {
