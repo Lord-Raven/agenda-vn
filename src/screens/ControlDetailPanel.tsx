@@ -700,7 +700,7 @@ export const ControlDetailPanel: FC<ControlDetailPanelProps> = ({ control, stage
                                             <div>
                                                 <label htmlFor={`control-portrait-scale-${control.id}`} style={labelStyle}>Portrait size: {draft.portraitScale}%</label>
                                                 <input id={`control-portrait-scale-${control.id}`} type="range" min={50} max={100} step={1}
-                                                    value={draft.portraitScale} style={{ width: '100%' }}
+                                                    value={draft.portraitScale} style={{ width: '100%', boxSizing: 'border-box', margin: 0 }}
                                                     onChange={event => setDraft(current => ({ ...current, portraitScale: Number(event.target.value) }))} />
                                                 <span style={{ color: 'var(--agenda-text-muted)', fontSize: 12 }}>
                                                     Percentage of the card's inner width in Grids and hovers, or inner height in Lists. Portraits keep their proportions. Location backgrounds always fill the card.

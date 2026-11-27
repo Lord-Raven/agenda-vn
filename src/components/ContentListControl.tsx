@@ -10,6 +10,7 @@ import { ItemPortrait } from './ItemPortrait';
 import { LocationPortrait } from './LocationPortrait';
 import { ReferenceMultiSelect } from './UiComponents';
 import { ContentCardControl } from './ContentCardControl';
+import { HoverCardTooltip } from './HoverCardTooltip';
 
 interface ContentListControlProps {
     kind?: ReferenceKind; // Omitted for mixed contentList stats, whose ids may be of any content kind.
@@ -168,17 +169,14 @@ export const ContentListPortraits: FC<ContentListPortraitsProps> = ({ kind, valu
                         const hoverCard = hoverCards && contentKind ? stage.getCardControl(contentKind) : undefined;
                         if (actor || hoverCard) {
                             return (
-                                <Tooltip
+                                <HoverCardTooltip
                                     key={`${id}-${index}`}
                                     title={hoverCard && contentKind
                                         ? <ContentCardControl control={hoverCard} kind={contentKind} id={id} stage={() => stage} orientation="vertical" />
                                         : <ActorCard actor={actor} stage={() => stage} />}
-                                    placement="bottom"
-                                    enterTouchDelay={0}
-                                    slotProps={{ tooltip: { sx: { backgroundColor: 'transparent', padding: 0, maxWidth: 'none' } } }}
                                 >
                                     {portrait}
-                                </Tooltip>
+                                </HoverCardTooltip>
                             );
                         }
                         return (

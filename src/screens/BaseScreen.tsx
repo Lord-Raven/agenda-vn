@@ -14,6 +14,7 @@ import { applyUiSettingsToRoot } from '../content/Style';
 import { collectFontFamilies, FontHandler } from "@lord-raven/novel-visualizer";
 import { ScreenErrorBoundary } from '../components/ScreenErrorBoundary';
 import { CardActionContext } from '../components/ContentCardControl';
+import { HoverCardProvider } from '../components/HoverCardTooltip';
 
 /*
  * Base screen management; the Stage class will display this, and this will track the current screen being displayed.
@@ -129,7 +130,9 @@ export const BaseScreen: FC<BaseScreenProps> = ({ stage }) => {
     return (
         <ThemeProvider theme={theme}>
             <TooltipProvider>
-                <BaseScreenContent stage={stage} />
+                <HoverCardProvider>
+                    <BaseScreenContent stage={stage} />
+                </HoverCardProvider>
             </TooltipProvider>
         </ThemeProvider>
     );

@@ -1,6 +1,6 @@
 import { CSSProperties, FC, forwardRef, Fragment, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { EditNote, EventAvailable, MenuRounded, TouchApp } from '@mui/icons-material';
-import { Box, Tooltip, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getMapImageRect, getMapImageUrl, Map as GameMap, MapFitMode, previewToImageCoordinates } from '../content/Map';
 import { Skit } from '../content/Skit';
@@ -18,6 +18,7 @@ import { normalizeReferenceListValue, StatType } from '../content/Stat';
 import { processLoreText, stripLoreIcons } from '../content/Lore';
 import { isControlAvailable, markerVariableBindings } from '../content/Control';
 import { ContentCardControl } from '../components/ContentCardControl';
+import { HoverCardTooltip } from '../components/HoverCardTooltip';
 
 interface DefinedMapViewProps {
     stage: () => Stage;
@@ -300,15 +301,12 @@ export const DefinedMapView: FC<DefinedMapViewProps> = ({ stage, maps, onAction:
                                     return (
                                         <Fragment key={markerKey}>
                                         {showMarkerCard && markerCard && cardKind ? (
-                                                    <Tooltip
+                                                    <HoverCardTooltip
                                                         title={<ContentCardControl stage={stage} control={markerCard} kind={cardKind} id={markerContent} orientation="vertical" isAvailable={isMarkerAvailable} onAction={handleAction} />}
                                                         describeChild
-                                                        placement="bottom"
-                                                        enterTouchDelay={0}
-                                                        slotProps={{ tooltip: { sx: { backgroundColor: 'transparent', padding: 0, maxWidth: 'none' } } }}
                                                     >
                                                         {button}
-                                                    </Tooltip>
+                                                    </HoverCardTooltip>
                                                 ) : button}
                                         {contentValues.length > 0 && (
                                             <div
