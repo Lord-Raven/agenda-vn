@@ -7,7 +7,7 @@ import { getLocationDescription, Location } from '../src/content/Location';
 import { applyStatUpdateValue, buildInitialGlobalStatValues, cloneGameAction, cloneStat, cloneStatUpdateRules, formatReferenceStatText, normalizeStatValue, OPPOSITE_BOOLEAN_VALUE, resolveAvailableStatOptions, resolveStatDefault, resolveStatOptionPool, resolveStatValueRule, sharesOptionPool, StartSkitAction, Stat, StatType, StatValue } from '../src/content/Stat';
 import { generateContext, generateSkitScript, ScriptEntry, Skit } from '../src/content/Skit';
 import { cloneGameFunction, functionPickerOptions, functionReference, functionReferenceArguments, functionReferenceId, functionSignature, globalStatReference, parseFunctionCallText, validateFunctionResult, valuePickerOptions, GameFunction } from '../src/content/Function';
-import { evaluateCondition, variableContentValue } from '../src/content/Condition';
+import { ConditionCollection, evaluateCondition, variableContentValue } from '../src/content/Condition';
 import { CalendarEvent } from '../src/content/CalendarEvent';
 import { Control } from '../src/content/Control';
 import { Screen as GameMap } from '../src/content/Screen';
@@ -72,6 +72,148 @@ const fixture = () => {
 
 const gameFunction = (script: string): GameFunction => ({
     id: 'test-function', name: 'Test function', description: '', script, returnType: 'void',
+});
+
+test('entity availability checks work through lookups, enumeration, parameters, and resolved lists', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.useEvents = false;
+    save.actors.a.schedule = { unavailable: [[{
+        type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'night',
+    }]] };
+    save.actors.b.schedule = { unavailable: [] };
+    save.currentTimeOfDay = 'morning';
+    const fn: GameFunction = {
+        ...gameFunction(`return [
+            getActor('Same name').isAvailable(),
+            actors().map(a => a.isAvailable()),
+            getObjects('Party').map(a => a.isAvailable()),
+            actors(arg('Who')).isAvailable(),
+            getLocation('Town').isAvailable(), locations('place').isVisible(),
+            getItem('Sword').isAvailable(), getObjects('Inventory')[0].isAvailable(),
+            typeof actors()[0].isVisible, typeof items()[0].isVisible
+        ];`),
+        parameters: [stat('Who', 'actor', { default: 'a' })],
+    };
+    assert.deepEqual(stage.testFunction(fn), {
+        value: [true, [true, false], [false, true], true, true, true, true, true, 'undefined', 'undefined'],
+        errors: [],
+    });
+    save.currentTimeOfDay = 'night';
+    assert.deepEqual(stage.testFunction(gameFunction('return actors().map(a => a.isAvailable());')), {
+        value: [false, false], errors: [],
+    });
+    save.actors.a.schedule = { place: [] };
+    save.universalSchedule = { unavailable: [] };
+    assert.equal(stage.testFunction(gameFunction('return actors()[0].isAvailable();')).value, false);
+});
+
+test('entity availability binds conditions and nested function defaults to the evaluated entity and reads live writes', () => {
+    const { stage, save, configuration } = fixture();
+    configuration.useEvents = false;
+    const ownScore = (contentType: 'actor' | 'location' | 'item'): ConditionCollection[] => [[{
+        type: 'contentStat', contentType, targetId: 'variable',
+        statId: 'Score', comparison: 'greaterThanOrEqual', value: 5,
+    }]];
+    save.actors.a.schedule = { unavailable: ownScore('actor') };
+    save.atlas.place.availabilityConditions.unavailable = ownScore('location');
+    save.inventory[0].availabilityConditions = ownScore('item');
+    const itemRule: GameFunction = {
+        id: 'item-rule', name: 'Item rule', description: '', returnType: 'boolean',
+        parameters: [stat('Who', 'item', { default: variableContentValue('item') })],
+        script: "return items(arg('Who')).get('Score') >= 5;",
+    };
+    configuration.functions = [itemRule];
+    save.inventory[0].availabilityConditions.push([{
+        type: 'function', reference: functionReference(itemRule.id), comparison: 'equals', value: true,
+    }]);
+    const fn = gameFunction(`
+        const entities = [actors()[0], locations()[0], items()[0]];
+        const before = entities.map(e => e.isAvailable());
+        entities.forEach(e => e.set('Score', 7));
+        return [before, entities.map(e => e.isAvailable()), locations()[0].isVisible()];
+    `);
+    const before = JSON.stringify(save);
+    assert.deepEqual(stage.testFunction(fn), { value: [[true, false, false], [false, true, true], true], errors: [] });
+    assert.equal(JSON.stringify(save), before);
+    // Require the function branch, rather than the direct stat condition, to grant availability.
+    save.inventory[0].availabilityConditions = save.inventory[0].availabilityConditions.slice(1);
+    save.inventory[0].statMap.Score = 7;
+    const reader: GameFunction = { ...gameFunction("return items()[0].isAvailable();"), returnType: 'boolean' };
+    configuration.functions.push(reader);
+    assert.deepEqual(stage.testFunction(reader), { value: true, errors: [] });
+    assert.equal(stage.resolveValue(functionReference(reader.id), 'boolean'), true);
+});
+
+test('location visibility and availability distinguish closed and disabled locations and honor current events', () => {
+    const { stage, save, configuration } = fixture();
+    save.currentDate = '2026-11-09';
+    save.currentTimeOfDay = 'morning';
+    save.atlas.place.availabilityConditions = {
+        disabled: [],
+        unavailable: [[{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'evening' }]],
+    };
+    const fn = gameFunction("const place = locations('place'); return [place.isVisible(), place.isAvailable()];");
+    assert.deepEqual(stage.testFunction(fn), { value: [true, false], errors: [] });
+    save.upcomingEvents = [{
+        id: 'visit', name: 'Visit', locationId: 'place', actorIds: [], date: save.currentDate,
+        duration: ['morning'], description: '', guidance: '',
+    }];
+    assert.deepEqual(stage.testFunction(fn), { value: [true, true], errors: [] });
+    configuration.useEvents = false;
+    assert.deepEqual(stage.testFunction(fn), { value: [true, false], errors: [] });
+    configuration.useEvents = true;
+    save.currentTimeOfDay = 'afternoon';
+    assert.deepEqual(stage.testFunction(fn), { value: [true, false], errors: [] });
+    save.currentTimeOfDay = 'evening';
+    assert.deepEqual(stage.testFunction(fn), { value: [true, true], errors: [] });
+    save.currentTimeOfDay = 'morning';
+    save.atlas.place.availabilityConditions.disabled = [[{
+        type: 'contentStat', contentType: 'location', targetId: 'variable',
+        statId: 'Score', comparison: 'equals', value: 2,
+    }]];
+    assert.deepEqual(stage.testFunction(fn), { value: [false, false], errors: [] });
+    save.atlas.place.availabilityConditions = {
+        disabled: [],
+        unavailable: [[{ type: 'calendar', field: 'timeOfDay', comparison: 'equals', value: 'morning' }]],
+    };
+    save.upcomingEvents = [];
+    delete save.currentTimeOfDay;
+    assert.deepEqual(stage.testFunction(fn), { value: [true, true], errors: [] });
+});
+
+test('availability and visibility checks report cycles in conditions and dynamic event locations', () => {
+    for (const kind of ['actor', 'location', 'item'] as const) {
+        const { stage, save, configuration } = fixture();
+        configuration.useEvents = false;
+        const fn: GameFunction = {
+            ...gameFunction(`return ${kind === 'actor' ? 'actors' : kind === 'location' ? 'locations' : 'items'}()[0].isAvailable();`),
+            returnType: 'boolean',
+        };
+        configuration.functions = [fn];
+        const conditions: ConditionCollection[] = [[{
+            type: 'function', reference: functionReference(fn.id), comparison: 'equals', value: true,
+        }]];
+        if (kind === 'actor') save.actors.a.schedule = { unavailable: conditions };
+        else if (kind === 'location') save.atlas.place.availabilityConditions.unavailable = conditions;
+        else save.inventory[0].availabilityConditions = conditions;
+        assert.match(stage.testFunction(fn).errors[0], /cyclic function reference/, kind);
+        assert.throws(() => stage.resolveValue(functionReference(fn.id), 'boolean'), /cyclic function reference/, kind);
+        if (kind === 'location') {
+            fn.script = 'return locations()[0].isVisible();';
+            save.atlas.place.availabilityConditions = { disabled: conditions, unavailable: [] };
+            assert.match(stage.testFunction(fn).errors[0], /cyclic function reference/);
+        }
+    }
+    const { stage, save, configuration } = fixture();
+    const fn: GameFunction = {
+        ...gameFunction("return locations()[0].isAvailable() ? 'place' : '';"), returnType: 'location',
+    };
+    configuration.functions = [fn];
+    save.upcomingEvents = [{
+        id: 'visit', name: 'Visit', locationId: functionReference(fn.id), actorIds: [],
+        date: '2026-11-09', duration: ['morning'], description: '', guidance: '',
+    }];
+    assert.match(stage.testFunction(fn).errors[0], /cyclic function reference/);
 });
 
 test('actor getLocation is available through lookups, enumeration, and resolved lists', () => {

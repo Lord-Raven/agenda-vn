@@ -25,6 +25,12 @@ Only these game helpers are injected; there is no stage, save, player, or curren
   getField(fieldName), setField(fieldName, stringValue). There is no direct stat property access.
   getField/setField access metadata such as name, role, description, category, imageUrl, themeColor;
   field writes skip stat normalization. Resolved options are copies with id, name, description.
+  All entity accessors expose isAvailable(): actors evaluate their own and universal schedules
+  (available without an assigned location still counts); items evaluate availability conditions;
+  locations use visit rules, including current calendar events overriding closed but not disabled locations.
+  Only Location accessors expose isVisible(): disabled locations are hidden; closed locations remain visible.
+  These checks evaluate current game state, bind Variable to the evaluated entity, and do not evaluate
+  Card Control visibility or availability. Use actors().filter(a => a.isAvailable()) for available actors.
   Actor accessors also expose getLocation(): evaluate their own and universal schedule rules
   using the current game date, time, and stats, including dynamic destinations.
   Returns a Location accessor, or undefined when available without an assigned location,

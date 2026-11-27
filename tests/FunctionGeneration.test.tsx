@@ -114,6 +114,19 @@ test('function generation documents evaluated actor locations and accepts script
     assert.equal(await generateFunctionScript({ ...fn, returnType: 'location' }, [fn], stage), body);
 });
 
+test('function generation documents entity availability and location visibility checks', async () => {
+    const { stage, fn } = fixture();
+    const body = 'return actors().filter(a => a.isAvailable()).map(a => a.id);';
+    stage.generateText = async prompt => {
+        for (const reference of ['isAvailable()', 'isVisible()', 'calendar events', 'closed', 'disabled',
+            'Variable to the evaluated entity', 'Card Control visibility or availability']) {
+            assert.ok(prompt.includes(reference), `Missing availability API: ${reference}`);
+        }
+        return `<Script>${body}</Script>`;
+    };
+    assert.equal(await generateFunctionScript({ ...fn, returnType: 'actorList' }, [fn], stage), body);
+});
+
 test('generation accepts fenced bodies, rejects empty/invalid code, and never executes the result', async () => {
     const { stage, fn } = fixture();
     stage.generateText = async () => '```javascript\nthrow new Error("Not executed");\n```';

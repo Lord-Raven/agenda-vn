@@ -184,6 +184,16 @@ export const FunctionEditor: FC<FunctionEditorProps> = ({
                         description, category, imageUrl, themeColor).
                     </Typography>
                     <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
+                        All entity accessors expose <strong>isAvailable()</strong>: actors evaluate their own and
+                        universal schedules (available without an assigned location still counts); items evaluate
+                        their availability conditions; locations use visit rules, including current calendar events
+                        that can make a closed location available, but never a disabled one.
+                        Location accessors also expose <strong>isVisible()</strong>, which is false for disabled
+                        locations, while closed locations remain visible.
+                        These checks use current game state and bind Variable to the evaluated entity.
+                        For example, <strong>actors().filter(a =&gt; a.isAvailable())</strong> selects available actors.
+                    </Typography>
+                    <Typography variant="body2" style={{ color: 'var(--agenda-text-muted)', lineHeight: 1.5 }}>
                         Actor accessors also expose <strong>getLocation()</strong>, which evaluates their own and
                         universal schedule rules using the current game date, time, and stats.
                         It returns a Location accessor, or <strong>undefined</strong> if the actor is available

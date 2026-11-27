@@ -2,6 +2,7 @@ import {ReactElement} from "react";
 import { v4 as uuidv4 } from 'uuid';
 import {StageBase, StageResponse, InitialData, Message, User, Character, AspectRatio} from "@chub-ai/stages-ts";
 import { ConditionContext, ContentType, createSeededRandom, evaluateConditionCollections, hashString, parseVariableContentValue } from "./content/Condition";
+import type { FunctionValueResolver } from './content/Function';
 import {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import { Actor, ACTOR_SCHEDULE_AVAILABLE, ACTOR_SCHEDULE_UNAVAILABLE, ActorSchedule, applyActorInitialStats, cloneActorSchedule, findBestNameMatch, getLinkedActorLore, resolveActorSchedule, ScheduleContext } from "./content/Actor";
 import { DEFAULT_VOICE_MODULATION } from '@lord-raven/novel-visualizer';
@@ -566,11 +567,11 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
 
     // Builds a ScheduleContext from a save, adding the stat definitions needed to resolve schedule entries
     // that point at a location-type ActorStat rather than a fixed location id.
-    getScheduleContext(save: SaveType): ScheduleContext {
+    getScheduleContext(save: SaveType, resolveValue?: FunctionValueResolver): ScheduleContext {
         const configuration = this.getConfiguration(save);
         return { ...save, globalStats: configuration.globalStats, actorStats: configuration.actorStats, locationStats: configuration.locationStats, itemStats: configuration.itemStats,
             functions: configuration.functions,
-            resolveValue: (value, type, variables) => this.resolveValue(value, type, save, [], variables) };
+            resolveValue: resolveValue || ((value, type, variables) => this.resolveValue(value, type, save, [], variables)) };
     }
 
     resolveValue(value: unknown, type: StatType, save: SaveType = this.getSave(), stack: string[] = [], variables?: FunctionVariableBindings): StatValue {
@@ -1829,7 +1830,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         return;
     }
 
-    getCurrentLocationEvent(locationId: string, save: SaveType = this.getSave()): CalendarEvent | null {
+    getCurrentLocationEvent(locationId: string, save: SaveType = this.getSave(), resolveValue?: FunctionValueResolver): CalendarEvent | null {
         if (this.getConfiguration(save).useEvents === false) {
             return null;
         }
@@ -1838,7 +1839,7 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const currentTimeOfDay = save.currentTimeOfDay || 'morning';
 
         return [...(save.upcomingEvents || [])]
-            .map(event => this.resolveCalendarEvent(event, save))
+            .map(event => this.resolveCalendarEvent(event, save, resolveValue))
             .filter((event) => event.locationId === locationId)
             .filter((event) => event.date === currentDate)
             .filter((event) => event.duration.includes(currentTimeOfDay))
@@ -1859,22 +1860,22 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
             .sort((left, right) => this.compareCalendarEvents(left, right))[0] || null;
     }
 
-    canVisitLocation(locationId: string, save: SaveType = this.getSave()): boolean {
+    canVisitLocation(locationId: string, save: SaveType = this.getSave(), resolveValue?: FunctionValueResolver): boolean {
         const location = save.atlas?.[locationId];
-        if (!location || location.active === false || isLocationDisabled(location, this.getScheduleContext(save))) {
+        if (!location || location.active === false || isLocationDisabled(location, this.getScheduleContext(save, resolveValue))) {
             return false;
         }
 
-        return Boolean(this.getCurrentLocationEvent(locationId, save)) || isLocationAvailable(location, this.getScheduleContext(save));
+        return Boolean(this.getCurrentLocationEvent(locationId, save, resolveValue)) || isLocationAvailable(location, this.getScheduleContext(save, resolveValue));
     }
 
     // Disabled locations don't exist yet/anymore and should never appear on screens.
-    isLocationVisible(locationId: string, save: SaveType = this.getSave()): boolean {
+    isLocationVisible(locationId: string, save: SaveType = this.getSave(), resolveValue?: FunctionValueResolver): boolean {
         const location = save.atlas?.[locationId];
         if (!location || location.active === false) {
             return false;
         }
-        return !isLocationDisabled(location, this.getScheduleContext(save));
+        return !isLocationDisabled(location, this.getScheduleContext(save, resolveValue));
     }
 
     startLocationVisit(locationId: string): Skit | null {
@@ -2392,10 +2393,29 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         const statMap = entity.statMap;
         const entityFields = entity as unknown as Record<string, unknown>;
         const findStat = (statName: string) => stats.find(candidate => candidate.name.trim().toLowerCase() === `${statName || ''}`.trim().toLowerCase());
+        const getEvaluationContext = (): ScheduleContext => ({
+            ...this.getScheduleContext(save),
+            ...(kind === 'actor' ? { currentActor: save.actors[entity.id] }
+                : kind === 'location' ? { currentLocation: save.atlas[entity.id] }
+                    : { currentItem: save.inventory.find(item => item.id === entity.id) }),
+            resolveValue: (value, type, variables) => this.resolveValue(value, type, save, context.stack, { ...context.variables, [kind]: entity.id, ...variables }),
+        });
         const accessor: FunctionScriptEntity = {
             id: entity.id,
             name: entity.name,
             kind,
+            isAvailable: () => {
+                const evaluationContext = getEvaluationContext();
+                if (kind === 'actor') {
+                    const actor = save.actors[entity.id];
+                    return actor.active !== false && resolveActorSchedule(actor, evaluationContext) !== ACTOR_SCHEDULE_UNAVAILABLE;
+                }
+                if (kind === 'location') {
+                    return this.canVisitLocation(entity.id, save, evaluationContext.resolveValue);
+                }
+                const item = save.inventory.find(candidate => candidate.id === entity.id);
+                return !!item && isItemAvailable(item, evaluationContext);
+            },
             get: (statName: string) => {
                 const stat = findStat(statName);
                 return stat ? this.readStatValue(statMap[stat.id], stat, save, context.stack, context.variables) : undefined;
@@ -2415,12 +2435,12 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
                 statMap[stat.id] = this.readStatValue(value, stat, save, context.stack, context.variables);
             },
         };
+        if (kind === 'location') {
+            accessor.isVisible = () => this.isLocationVisible(entity.id, save, getEvaluationContext().resolveValue);
+        }
         if (kind === 'actor') {
             accessor.getLocation = () => {
-                const destination = resolveActorSchedule(save.actors[entity.id], {
-                    ...this.getScheduleContext(save),
-                    resolveValue: (value, type, variables) => this.resolveValue(value, type, save, context.stack, { ...context.variables, ...variables }),
-                });
+                const destination = resolveActorSchedule(save.actors[entity.id], getEvaluationContext());
                 if (destination === ACTOR_SCHEDULE_AVAILABLE || destination === ACTOR_SCHEDULE_UNAVAILABLE) {
                     return undefined;
                 }
@@ -2625,9 +2645,9 @@ export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateT
         }, { ...stat, default: currentValue });
     }
 
-    resolveCalendarEvent(event: CalendarEvent, save: SaveType = this.getSave()): CalendarEvent {
-        const actorIds = this.resolveValue(event.actorIds || event.participantActorIds || [], 'actorList', save) as string[];
-        return { ...event, locationId: String(this.resolveValue(event.locationId, 'location', save)), actorIds, participantActorIds: [...actorIds] };
+    resolveCalendarEvent(event: CalendarEvent, save: SaveType = this.getSave(), resolveValue: FunctionValueResolver = (value, type) => this.resolveValue(value, type, save)): CalendarEvent {
+        const actorIds = resolveValue(event.actorIds || event.participantActorIds || [], 'actorList') as string[];
+        return { ...event, locationId: String(resolveValue(event.locationId, 'location')), actorIds, participantActorIds: [...actorIds] };
     }
 
     private normalizeCalendarEventForSave(event: CalendarEvent, save: SaveType, useConfiguration: boolean = false): CalendarEvent {
