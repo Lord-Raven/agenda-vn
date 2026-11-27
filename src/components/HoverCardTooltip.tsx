@@ -62,7 +62,7 @@ export const HoverCardTooltip: FC<HoverCardTooltipProps> = ({ children, title, d
             placement="bottom"
             enterDelay={0}
             enterTouchDelay={0}
-            leaveDelay={2000}
+            leaveDelay={1000}
             open={context ? context.state.path.includes(id) : undefined}
             onOpen={() => context?.open(path)}
             onClose={() => context?.close(id)}

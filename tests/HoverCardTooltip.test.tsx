@@ -26,25 +26,25 @@ test('hover cards delay dismissal, stay open on re-entry, and replace one anothe
         const leave = (index: number) => act(() => button(index).props.onMouseLeave({ type: 'mouseleave' }));
         const tick = (ms: number) => act(() => t.mock.timers.tick(ms));
 
-        assert.equal(tooltips()[0].props.leaveDelay, 2000);
+        assert.equal(tooltips()[0].props.leaveDelay, 1000);
         hover(0);
         assert.equal(tooltips()[0].props.open, true);
         leave(0);
-        tick(1999);
+        tick(999);
         assert.equal(tooltips()[0].props.open, true);
         act(() => tooltips()[0].findByType(Popper).props.onMouseOver({ type: 'mouseover' }));
         tick(1);
         assert.equal(tooltips()[0].props.open, true);
-        tick(2000);
+        tick(1000);
         assert.equal(tooltips()[0].props.open, true);
         act(() => tooltips()[0].findByType(Popper).props.onMouseLeave({ type: 'mouseleave' }));
         hover(1);
         assert.equal(tooltips()[0].props.open, false);
         assert.equal(tooltips()[1].props.open, true);
-        tick(2000);
+        tick(1000);
         assert.equal(tooltips()[1].props.open, true);
         leave(1);
-        tick(2000);
+        tick(1000);
         assert.equal(tooltips()[1].props.open, false);
     } finally {
         if (renderer) act(() => renderer?.unmount());
