@@ -34,7 +34,8 @@ export type ContentStatCondition = {
     contentType: ContentType;
     targetId: ContentTarget;
     statId: string;
-    property?: ContentProperty;
+    // Identity compares entity IDs; other properties compare their raw text.
+    property?: ContentProperty | 'identity';
     comparison: ConditionComparison;
     value: string | number | boolean;
 };
@@ -60,16 +61,6 @@ export const CONTENT_PROPERTIES: Record<ContentType, Array<{ key: ContentPropert
     item: COMMON_CONTENT_PROPERTIES,
 };
 
-// Checks the identity of the context-specific ('variable') entity of `contentType` against a specific entity
-// chosen in the UI. Only meaningful where such a variable entity is bound (e.g. context.currentActor during
-// actor schedule conditions), so it has no target of its own.
-export type ContentIdentityCondition = {
-    type: 'contentIdentity';
-    contentType: ContentType;
-    comparison: 'equals' | 'notEquals';
-    value: string;
-};
-
 // Evaluates a game function (stored as a 'function:<id>' reference, optionally carrying arguments) and
 // compares its result against the condition value; list results support membership and length checks.
 export type FunctionCondition = {
@@ -92,7 +83,7 @@ export type SkitStateCondition = {
     value: string | number | boolean;
 };
 
-export type Condition = CalendarCondition | GlobalStatCondition | ContentStatCondition | ContentIdentityCondition | FunctionCondition | SkitStateCondition;
+export type Condition = CalendarCondition | GlobalStatCondition | ContentStatCondition | FunctionCondition | SkitStateCondition;
 
 // The function a 'function' condition evaluates, looked up from the context's function definitions.
 export const getConditionFunction = (condition: FunctionCondition, context: { functions?: GameFunction[] }): GameFunction | undefined =>
@@ -248,7 +239,8 @@ const buildDiceSeed = (condition: Condition, context: ConditionContext): string 
 // Resolves a condition's target value, rolling dice notation deterministically if present.
 const resolveConditionValue = (condition: Condition, context: ConditionContext): string | number | boolean => {
     const value = (condition as GlobalStatCondition | ContentStatCondition | CalendarCondition).value;
-    const isContentProperty = condition.type === 'contentStat' && !!condition.property;
+    const isIdentity = condition.type === 'contentStat' && condition.property === 'identity';
+    const isContentProperty = condition.type === 'contentStat' && !!condition.property && !isIdentity;
     const variableContentType = isListLengthComparison(condition.comparison) || isContentProperty ? undefined : parseVariableContentValue(value);
     if (variableContentType) {
         return getContextCurrentContent(context, variableContentType)?.id || '';
@@ -256,16 +248,16 @@ const resolveConditionValue = (condition: Condition, context: ConditionContext):
     const stat = condition.type === 'globalStat' ? context.globalStats?.find(stat => stat.id === condition.statId)
         : condition.type === 'contentStat' && !condition.property ? getContextContentStats(context, condition.contentType).find(stat => stat.id === condition.statId) : undefined;
     const type = isListLengthComparison(condition.comparison) ? 'number'
-        : condition.type === 'contentIdentity' ? condition.contentType
+        : isIdentity ? condition.contentType
         : condition.type === 'function' ? functionConditionValueType(getConditionFunction(condition, context)) || 'text'
         : condition.type === 'skitState' ? listElementType(SKIT_STATE_FIELD_TYPES[condition.field]) || SKIT_STATE_FIELD_TYPES[condition.field]
             : stat ? listElementType(stat.type) || stat.type
                 : condition.type === 'calendar' && condition.field !== 'dayOfWeek' && condition.field !== 'timeOfDay' ? 'number' : 'text';
-    const resolved = !isContentProperty && isDiceNotation(value) ? value : context.resolveValue?.(value, type === 'contentList' ? parseMovedContentValue(value) || type : type) ?? value;
+    const resolved = !isContentProperty && !isIdentity && isDiceNotation(value) ? value : context.resolveValue?.(value, type === 'contentList' ? parseMovedContentValue(value) || type : type) ?? value;
     if (Array.isArray(resolved)) {
         throw new Error('A condition comparison requires a scalar function result.');
     }
-    return !isContentProperty && isDiceNotation(resolved) ? rollDiceNotation(resolved, buildDiceSeed(condition, context)) : resolved;
+    return !isContentProperty && !isIdentity && isDiceNotation(resolved) ? rollDiceNotation(resolved, buildDiceSeed(condition, context)) : resolved;
 };
 
 const normalizeStatConditionValue = (value: string | number | boolean, stat: Stat | undefined): string | number | boolean => {
@@ -362,20 +354,17 @@ const resolveConditionContentSubjects = (contentType: ContentType, targetId: Con
 export const evaluateContentStatCondition = (condition: ContentStatCondition, context: ConditionContext): boolean => {
     const { mode, entities } = resolveConditionContentSubjects(condition.contentType, condition.targetId, context);
     const property = condition.property;
-    if (property && !CONTENT_PROPERTIES[condition.contentType].some(candidate => candidate.key === property)) return false;
+    if (property && property !== 'identity' && !CONTENT_PROPERTIES[condition.contentType].some(candidate => candidate.key === property)) return false;
     const stat = property ? undefined : getContextContentStats(context, condition.contentType).find(candidate => candidate.id === condition.statId);
     const value = resolveConditionValue(condition, context);
     const resolvedValue = isListLengthComparison(condition.comparison) ? value : normalizeStatConditionValue(value, stat);
-    const matches = (entity: ConditionEntity) => compareValues(property ? entity[property] ?? '' : stat ? resolveStatValue(entity.statMap?.[stat.id], stat, context) : undefined, resolvedValue, condition.comparison);
+    const matches = (entity: ConditionEntity) => property === 'identity'
+        ? entity.id !== undefined && (condition.comparison === 'equals' ? entity.id === resolvedValue : condition.comparison === 'notEquals' && entity.id !== resolvedValue)
+        : compareValues(property ? entity[property] ?? '' : stat ? resolveStatValue(entity.statMap?.[stat.id], stat, context) : undefined, resolvedValue, condition.comparison);
 
     if (mode === 'any') return entities.some(matches);
     if (mode === 'none') return !entities.some(matches);
     return entities.length > 0 && matches(entities[0]);
-};
-
-export const evaluateContentIdentityCondition = (condition: ContentIdentityCondition, context: ConditionContext): boolean => {
-    const current = getContextCurrentContent(context, condition.contentType);
-    return !!current && compareValues(current.id, resolveConditionValue(condition, context), condition.comparison);
 };
 
 // Evaluates the condition's function and compares the result; missing or void functions never match (except
@@ -417,10 +406,6 @@ export const evaluateCondition = (condition: Condition, context: ConditionContex
         return compareValues(actual, isListLengthComparison(condition.comparison) ? value : normalizeStatConditionValue(value, stat), condition.comparison);
     }
 
-    if (condition.type === 'contentIdentity') {
-        return evaluateContentIdentityCondition(condition, context);
-    }
-
     return evaluateContentStatCondition(condition, context);
 };
 
@@ -438,12 +423,12 @@ export const evaluateConditionCollections = (conditionCollections: ConditionColl
 // Whether any condition depends on a bound 'variable' entity (of `contentType`, or of any type if omitted).
 export const hasVariableContentTarget = (conditionCollections: ConditionCollection[] | undefined, contentType?: ContentType): boolean => {
     return !!conditionCollections?.some((collection) => collection.some((condition) => {
-        const valueContentType = condition.type !== 'contentIdentity' && !(condition.type === 'contentStat' && condition.property)
+        const valueContentType = !(condition.type === 'contentStat' && condition.property && condition.property !== 'identity')
             ? parseVariableContentValue(condition.value) : undefined;
         if (valueContentType && (!contentType || valueContentType === contentType)) {
             return true;
         }
-        const isVariable = condition.type === 'contentIdentity' || (condition.type === 'contentStat' && condition.targetId === 'variable');
+        const isVariable = condition.type === 'contentStat' && condition.targetId === 'variable';
         return isVariable && (!contentType || condition.contentType === contentType);
     }));
 };

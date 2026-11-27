@@ -173,17 +173,21 @@ test('portrait scales default to full size, clamp to 50–100%, and survive expo
 });
 
 test('card availability binds identity and stat rules to the displayed actor', () => {
+    const actorStats = [cloneStat({
+        id: 'health', name: 'Health', type: 'number', default: 0, guidance: '',
+        llmSees: { value: false, conditions: [] }, llmMaintained: { value: false, conditions: [] },
+    })];
     const control = new Control({
         type: 'card',
         availabilityConditions: [[
-            { type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' },
+            { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'identity', comparison: 'equals', value: 'alice' },
             { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'health', comparison: 'greaterThan', value: 5 },
         ]],
     });
 
-    assert.equal(isControlAvailable(control, { currentActor: { id: 'alice', statMap: { health: 6 } } }), true);
-    assert.equal(isControlAvailable(control, { currentActor: { id: 'bob', statMap: { health: 6 } } }), false);
-    assert.equal(isControlAvailable(control, { currentActor: { id: 'alice', statMap: { health: 5 } } }), false);
+    assert.equal(isControlAvailable(control, { actorStats, currentActor: { id: 'alice', statMap: { health: 6 } } }), true);
+    assert.equal(isControlAvailable(control, { actorStats, currentActor: { id: 'bob', statMap: { health: 6 } } }), false);
+    assert.equal(isControlAvailable(control, { actorStats, currentActor: { id: 'alice', statMap: { health: 5 } } }), false);
     control.active = false;
     assert.equal(isControlAvailable(control, { currentActor: { id: 'alice', statMap: { health: 6 } } }), false);
 });

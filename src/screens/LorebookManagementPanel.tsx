@@ -200,6 +200,7 @@ export const LorebookManagementPanel: FC<LorebookManagementPanelProps> = ({ stag
         const newEntry = createLoreEntry({
             type,
             insertionOrder: getNextInsertionOrder(),
+            updatable: false,
         });
 
         applyLorebookChange((entries) => [...entries, newEntry]);

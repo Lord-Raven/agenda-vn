@@ -214,10 +214,11 @@ test('actor cards show only attached stat displays in selection order with actor
 
 test('actor-card rules react to stat changes, global state, actor identity, and deactivation', () => {
     const { actor, configuration, save, stage, render } = fixture();
+    configuration.globalStats = [makeStat('Visible', { type: 'boolean', default: true })];
     const control = new Control({
         type: 'statDisplay', contentType: 'actor', displaySource: 'actorStat:Health', label: 'Health',
         availabilityConditions: [[
-            { type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' },
+            { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'identity', comparison: 'equals', value: 'alice' },
             { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Health', comparison: 'greaterThan', value: 5 },
             { type: 'globalStat', statId: 'Visible', comparison: 'equals', value: true },
         ]],

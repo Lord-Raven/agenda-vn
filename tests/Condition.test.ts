@@ -161,3 +161,33 @@ test('property targets support variable, any, none, missing fields and custom st
     assert.equal(evaluateCondition({ type: 'contentStat', contentType: 'actor', targetId: 'a', statId: 'property:name', comparison: 'equals', value: 'custom' }, context), true);
     assert.equal(evaluateCondition(JSON.parse(JSON.stringify(condition)), context), true);
 });
+
+test('content identity compares entity ids across target modes and resolves reference values', () => {
+    for (const contentType of ['actor', 'location', 'item'] as const) {
+        const entities = [{ id: '1d6' }, { id: 'other' }, { id: 'inactive', active: false }];
+        const context: ConditionContext = {
+            actors: entities, atlas: entities, inventory: entities,
+            currentActor: entities[0], currentLocation: entities[0], currentItem: entities[0],
+            resolveValue: (value, type) => {
+                if (value === 'globalStat:chosen') {
+                    assert.equal(type, contentType);
+                    return '1d6';
+                }
+                return literalValue(value);
+            },
+        };
+        const condition: Condition = { type: 'contentStat', contentType, targetId: 'variable', statId: '', property: 'identity', comparison: 'equals', value: '1d6' };
+        assert.equal(evaluateCondition(condition, context), true);
+        assert.equal(evaluateCondition({ ...condition, value: 'globalStat:chosen' }, context), true);
+        assert.equal(evaluateCondition({ ...condition, value: `variable:${contentType}` }, context), true);
+        assert.equal(evaluateCondition({ ...condition, comparison: 'notEquals', value: 'other' }, context), true);
+        assert.equal(evaluateCondition({ ...condition, targetId: 'any', value: 'other' }, context), true);
+        assert.equal(evaluateCondition({ ...condition, targetId: 'none', value: 'other' }, context), false);
+        assert.equal(evaluateCondition({ ...condition, targetId: 'none', value: 'inactive' }, context), true);
+        assert.equal(evaluateCondition({ ...condition, targetId: 'other', value: '1d6' }, context), false);
+        assert.equal(evaluateCondition({ ...condition, targetId: 'missing', comparison: 'notEquals' }, context), false);
+        assert.equal(evaluateCondition(condition, {}), false);
+        assert.equal(hasVariableContentTarget([[{ ...condition, targetId: 'any', value: `variable:${contentType}` }]], contentType), true);
+        assert.equal(evaluateCondition(JSON.parse(JSON.stringify(condition)), context), true);
+    }
+});

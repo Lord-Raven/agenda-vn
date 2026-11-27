@@ -270,14 +270,6 @@ test('global and content categories preserve compatible values even when their s
     assert.deepEqual(changeConditionSelect(localCondition, 'contentStat:actor', 'globalStat', props), condition);
 });
 
-test('identity conditions retain valid identity values and comparisons across category changes', () => {
-    const condition: Condition = { type: 'globalStat', statId: locationStat.id, comparison: 'notEquals', value: 'town' };
-    const props = { globalStats: [locationStat], locations, variableContentType: 'location' as const };
-    const identity: Condition = { type: 'contentIdentity', contentType: 'location', comparison: 'notEquals', value: 'town' };
-    assert.deepEqual(changeConditionSelect(condition, 'globalStat', 'contentIdentity:location', props), identity);
-    assert.deepEqual(changeConditionSelect(identity, 'contentIdentity:location', 'globalStat', props), condition);
-});
-
 test('calendar fields keep compatible values and reset incompatible choices', () => {
     const condition: Condition = { type: 'calendar', field: 'day', comparison: 'greaterThan', value: 5 };
     assert.deepEqual(changeConditionSelect(condition, 'day', 'month'), { ...condition, field: 'month' });
@@ -468,6 +460,38 @@ test('content conditions select properties separately from custom stats and keep
     });
     assert.deepEqual(changeConditionSelect({ ...property, property: 'name' }, 'contentStat:actor', 'contentStat:location', props), {
         ...property, contentType: 'location', property: 'name',
+    });
+});
+
+test('content stat selectors put Identity before Properties and Stats for each content type', () => {
+    for (const contentType of ['actor', 'location', 'item'] as const) {
+        const condition: Condition = { type: 'contentStat', contentType, targetId: 'any', statId: numberStat.id, comparison: 'greaterThan', value: 7 };
+        const props = { actorStats: [numberStat], locationStats: [numberStat], itemStats: [numberStat] };
+        const markup = renderToStaticMarkup(<ConditionEditor {...props} globalStats={[]} conditionCollections={[[condition]]} onChange={() => {}} />);
+        assert.match(markup, /<option value="identity">Identity<\/option><optgroup label="Properties"/);
+        assert.match(markup, /<optgroup label="Stats"><option value="stat:score"[^>]*>Score<\/option><\/optgroup>/);
+        assert.doesNotMatch(markup, /contentIdentity:/);
+        const identity = changeConditionSelect(condition, 'stat:score', 'identity', props);
+        assert.deepEqual(identity, { ...condition, statId: '', property: 'identity', comparison: 'equals', value: '' });
+        const identityTree = ConditionEditor({ ...props, globalStats: [], conditionCollections: [[identity]], onChange: () => undefined });
+        assert.equal(hasOption(identityTree, 'notEquals'), true);
+        assert.equal(hasOption(identityTree, 'greaterThan'), false);
+        assert.equal(hasOption(identityTree, 'contains'), false);
+        const identityMarkup = renderToStaticMarkup(<ConditionEditor {...props} globalStats={[]} conditionCollections={[[identity]]} onChange={() => {}} />);
+        assert.match(identityMarkup, /<option value="identity" selected="">Identity<\/option>/);
+        assert.deepEqual(changeConditionSelect(identity, 'identity', 'stat:score', props), { ...condition, comparison: 'equals' });
+    }
+});
+
+test('identity selections retain compatible entity values and variable targets', () => {
+    const stat = cloneStat({ ...locationStat, id: 'destination' });
+    const condition: Condition = { type: 'contentStat', contentType: 'location', targetId: 'variable', statId: stat.id, comparison: 'notEquals', value: 'town' };
+    const props = { locationStats: [stat], locations, variableContentType: 'location' as const };
+    const identity: Condition = { ...condition, statId: '', property: 'identity' };
+    assert.deepEqual(changeConditionSelect(condition, 'stat:destination', 'identity', props), identity);
+    assert.deepEqual(changeConditionSelect(identity, 'identity', 'stat:destination', props), condition);
+    assert.deepEqual(changeConditionSelect(identity, 'contentStat:location', 'contentStat:actor', props), {
+        ...identity, contentType: 'actor', targetId: 'any', value: '',
     });
 });
 

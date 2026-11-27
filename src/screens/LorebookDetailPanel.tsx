@@ -238,7 +238,6 @@ export const LorebookDetailPanel: FC<LorebookDetailPanelProps> = ({
                         onChange={(event) => onChange({ perContentType: event.target.value as ContentType })}
                         disabled={!lore.perContentType}
                         className="input-base"
-                        style={{ height: '34px' }}
                         aria-label="Per content type"
                     >
                         <option value="actor">Actor</option>

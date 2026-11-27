@@ -1875,7 +1875,7 @@ test('conditions resolve actual values, comparison values, identity, and content
     const context = { ...stage.getScheduleContext(save), currentActor: save.actors.a };
     assert.equal(evaluateCondition({ type: 'globalStat', statId: 'Score', comparison: 'equals', value: functionReference('expected') }, context), true);
     assert.equal(evaluateCondition({ type: 'contentStat', contentType: 'actor', targetId: functionReference('actor'), statId: 'Score', comparison: 'equals', value: 6 }, context), true);
-    assert.equal(evaluateCondition({ type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: functionReference('actor') }, context), true);
+    assert.equal(evaluateCondition({ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'identity', comparison: 'equals', value: functionReference('actor') }, context), true);
     assert.equal(evaluateCondition({ type: 'calendar', field: 'day', comparison: 'equals', value: functionReference('day') }, context), true);
     assert.equal(evaluateCondition({ type: 'calendar', field: 'dayOfWeek', comparison: 'equals', value: functionReference('weekday') }, context), true);
 });
@@ -2307,7 +2307,7 @@ test('conditions, schedules, skits, and calendar events read global references a
         stat('directions', 'text', { default: 'Meet at dusk' }),
     );
     const context = { ...stage.getScheduleContext(save), currentActor: save.actors.a };
-    assert.equal(evaluateCondition({ type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: globalStatReference('leader') }, context), true);
+    assert.equal(evaluateCondition({ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'identity', comparison: 'equals', value: globalStatReference('leader') }, context), true);
     const actor = new Actor({ id: 'scheduled', schedule: { [globalStatReference('destination')]: [] } });
     assert.equal(resolveActorSchedule(actor, context), 'place');
     const skit = stage['createStatUpdateSkit'](save, skitAction({

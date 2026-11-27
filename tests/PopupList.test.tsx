@@ -785,7 +785,7 @@ test('content kinds come from list function and global stat return types', () =>
 
 test('Card Controls own conditions and deep-clone across serialization; List sections do not', () => {
     const card = new Control({ type: 'card',
-        visibilityConditions: [[{ type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' }]],
+        visibilityConditions: [[{ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'identity', comparison: 'equals', value: 'alice' }]],
         availabilityConditions: [[{ type: 'globalStat', statId: 'Title', comparison: 'equals', value: 'Squad' }]],
     });
     const restored = new Control(JSON.parse(JSON.stringify(card)));
@@ -1043,7 +1043,7 @@ test('Card editor persists appearance, attached badges, conditions, and context-
         act(() => picker.props.onChange([controlReference(badge.id)]));
         const conditions = renderer.root.findAllByType(ConditionEditor);
         assert.ok(conditions.every(editor => editor.props.variableContentType === 'item'));
-        const visibility: ConditionCollection[] = [[{ type: 'contentIdentity', contentType: 'item', comparison: 'equals', value: 'sword' }]];
+        const visibility: ConditionCollection[] = [[{ type: 'contentStat', contentType: 'item', targetId: 'variable', statId: '', property: 'identity', comparison: 'equals', value: 'sword' }]];
         act(() => conditions[0].props.onChange(visibility));
         act(() => conditions[1].props.onChange(visibility));
         const actions = [{ id: 'mark', kind: 'stat', targetType: 'global', targetId: 'any', statId: 'Title', operation: 'set', value: 'clicked' }];
@@ -1174,10 +1174,10 @@ test('List entry conditions bind each card and retain OR groups and AND conditio
     const card = configureCard(stage, section);
     card.visibilityConditions = [
         [
-            { type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'alice' },
+            { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'identity', comparison: 'equals', value: 'alice' },
             { type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Mood', comparison: 'greaterThan', value: 3 },
         ],
-        [{ type: 'contentIdentity', contentType: 'actor', comparison: 'equals', value: 'bob' }],
+        [{ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: '', property: 'identity', comparison: 'equals', value: 'bob' }],
     ];
     card.availabilityConditions = [[{ type: 'contentStat', contentType: 'actor', targetId: 'variable', statId: 'Mood', comparison: 'greaterThan', value: 5 }]];
     const unrestricted = { ...createListSection(), header: 'Unrestricted', contentSource: section.contentSource };

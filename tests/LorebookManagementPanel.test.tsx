@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { Stage, GameConfiguration, SaveType } from '../src/Stage';
 import { createLoreEntry } from '../src/content/Lore';
 import { DEFAULT_UI_SETTINGS } from '../src/content/Style';
@@ -52,6 +53,23 @@ test('empty lorebooks retain the selection prompt', () => {
         assert.match(html, /Select a lore entry to view and edit details/);
         assert.doesNotMatch(html, /<textarea/);
     }
+});
+
+test('new lorebook entries are not generatively maintained by default', () => {
+    const { stage } = fixture();
+    let renderer: ReactTestRenderer;
+    act(() => {
+        renderer = create(<LorebookManagementPanel stage={() => stage} isCreatorMode={false} />);
+    });
+
+    const newEntryButton = renderer!.root.findAllByType('button')
+        .find((button) => button.children.some((child) => typeof child === 'string' && child.trim() === 'New'));
+    assert.ok(newEntryButton);
+    act(() => newEntryButton.props.onClick?.());
+
+    const generativelyMaintainedCheckbox = renderer!.root.findAllByType('input')
+        .find((input) => input.props.type === 'checkbox');
+    assert.equal(generativelyMaintainedCheckbox?.props.checked, false);
 });
 
 test('lore detail retains the editor fields and allows controls to reflow without shrinking content', () => {
